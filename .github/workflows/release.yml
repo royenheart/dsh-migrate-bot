@@ -1,0 +1,47 @@
+# After cz bump pushes vX.Y.Z, move the floating major tag (v0, v1, …)
+# to that commit. GitHub Action consumers pin @v0 / @v1.
+# https://github.com/actions/toolkit/blob/main/docs/action-versioning.md
+
+name: release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Semver tag that the major tag should point to (e.g. v0.1.1)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  floating-major:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - name: Move major version tag
+        run: |
+          set -euo pipefail
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "expected vMAJOR.MINOR.PATCH, got $TAG"
+            exit 1
+          fi
+          major="${TAG%%.*}"
+          git tag -f "$major" "$TAG"
+          git push origin "refs/tags/$major" --force
+          echo "pointed $major at $TAG"
+      - name: Publish GitHub Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          generate_release_notes: true

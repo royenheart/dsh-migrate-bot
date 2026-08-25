@@ -79,8 +79,8 @@ pipx install commitizen
 npm run commit
 npm run bump
 git push origin HEAD --follow-tags
-git tag -f v0
-git push origin v0 --force
 ```
 
-Create a GitHub Release from the version tag. Consumers pin `@v0`.
+Pushing a `vX.Y.Z` tag runs [.github/workflows/release.yml](.github/workflows/release.yml): it opens a GitHub Release and force-updates the floating major tag (`v0.1.1` → `v0`, `v1.0.0` → `v1`). Prerelease tags like `v1.0.0-rc.1` are ignored. To retarget a major tag (rollback), run the **release** workflow manually.
+
+Consumers pin `@v0` or `@v1`. Marketplace listing is still a checkbox on the GitHub Release.
