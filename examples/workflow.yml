@@ -1,0 +1,55 @@
+# Copy to .github/workflows/dsh-migrate.yml
+# Edit the cron. GitHub Actions only runs schedules that appear here.
+#
+# After a successful run, last processed dsh-v* is stored on branch
+# `dsh-migrate/state` (seen.json only). Do not merge that branch into main.
+
+name: dsh-migrate
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      dsh_version:
+        description: Target dsh version (empty = config / latest)
+        required: false
+        type: string
+      force:
+        description: Run even if dsh has not changed since the last successful run
+        required: false
+        type: boolean
+        default: false
+  repository_dispatch:
+    types: [dsh-release]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Run dsh-migrate
+        id: migrate
+        uses: royenheart/dsh-migrate-bot@v0
+        with:
+          dsh_version: ${{ inputs.dsh_version || github.event.client_payload.dsh_version }}
+          workdir: .
+          config: .github/dsh-migrate.yml
+          force: ${{ inputs.force || false }}
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload A/B/C reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-migrate-reports
+          path: .dsh-migrate/
+          if-no-files-found: ignore

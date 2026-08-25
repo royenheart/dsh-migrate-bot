@@ -1,0 +1,13 @@
+[tool.commitizen]
+name = "cz_conventional_commits"
+version_provider = "commitizen"
+version = "0.1.0"
+tag_format = "v$version"
+version_scheme = "semver"
+update_changelog_on_bump = true
+major_version_zero = true
+version_files = [
+    "VERSION",
+    "package.json:version",
+    "package-lock.json:version",
+]

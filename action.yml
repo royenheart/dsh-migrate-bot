@@ -1,0 +1,51 @@
+name: DSH Plugin Migrate
+description: Migrate a third-party DeepSeek Harness plugin across official dsh-v* releases.
+author: royenheart
+branding:
+  icon: refresh-cw
+  color: blue
+inputs:
+  dsh_version:
+    description: Target harness version (0.1.1-rc.2, dsh-v0.1.1-rc.2, or latest)
+    required: false
+    default: ''
+  config:
+    description: Path to dsh-migrate.yml relative to the plugin repository root
+    required: false
+    default: .github/dsh-migrate.yml
+  mechanical_only:
+    description: If true, run mechanical tests only (no agent, no Issue/PR)
+    required: false
+    default: 'false'
+  skip_github:
+    description: If true, do not open an Issue or PR
+    required: false
+    default: 'false'
+  force:
+    description: If true, run even when dsh has not changed since the last successful run
+    required: false
+    default: 'false'
+  workdir:
+    description: Plugin repository root inside the runner
+    required: false
+    default: '.'
+outputs:
+  status:
+    description: compatible, migrated, failed, or skipped (dsh unchanged)
+  run_dir:
+    description: Absolute path of this run's A/B/C reports (under .dsh-migrate/)
+  mechanical_ok:
+    description: '"true" if the last mechanical suite passed'
+  skipped_review:
+    description: '"true" if review A/B was skipped'
+  issue_url:
+    description: Opened Issue URL, if any
+  pull_request_url:
+    description: Opened pull request URL, if any
+  target_tag:
+    description: Resolved dsh-v* tag for this run
+  previous_tag:
+    description: Last recorded dsh-v* tag (set when status is skipped)
+runs:
+  using: docker
+  image: Dockerfile

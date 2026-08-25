@@ -1,0 +1,26 @@
+# Overlay on dsh-base + dsh-headless for the migrate profile.
+# Whole-row patches restated (cordis replaces config by id).
+- id: agent-default-model
+  config:
+    provider: !!js process.env.DSH_MIGRATE_PROVIDER || 'deepseek-official'
+    model: !!js process.env.DSH_MIGRATE_MODEL || 'deepseek-v4-pro'
+
+- id: llm-deepseek
+  config:
+    thinking: !!js process.env.DSH_MIGRATE_THINKING || 'enabled'
+    reasoningEffort: !!js process.env.DSH_MIGRATE_EFFORT || 'max'
+
+- id: headless-runner
+  disabled: true
+
+- insert:
+    - id: agent-presets
+      name: '@deepseek-ai/dsh-agent-presets'
+      config:
+        default: anchored-standard
+
+    - id: dsh-migrate-runner
+      name: './migrate-runner.js'
+      inject: [headlessStartup]
+      config:
+        task: !!js ctx.headlessStartup.task

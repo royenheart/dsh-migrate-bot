@@ -1,0 +1,40 @@
+# Copy to .github/dsh-migrate.yml in the plugin repository.
+# Schedule lives in the workflow file, not here — GitHub only honors on.schedule there.
+
+dshVersion: latest
+
+dsh:
+  provider: deepseek-official
+  model: deepseek-v4-pro
+  thinking: enabled
+  reasoningEffort: max
+  mode: anchored-standard
+
+review:
+  # always | skip-if-mechanical-pass
+  policy: always
+
+# Skip the pipeline when dsh-v* is unchanged since the last successful run.
+# First run (no dsh-migrate/state branch yet) always proceeds.
+watch:
+  enabled: true
+
+# Uncomment to **replace** (not append) the built-in mechanical suite.
+# tests:
+#   commands:
+#     - npm test
+#     - npm run typecheck
+
+# prompts:
+#   absorption: |
+#     custom A
+#   alignment: |
+#     custom B
+#   fix: |
+#     custom C
+
+issuePr:
+  language: en
+
+loop:
+  maxAttempts: 5

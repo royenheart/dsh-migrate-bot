@@ -1,0 +1,34 @@
+{
+  "name": "@royenheart/dsh-migrate-action",
+  "version": "0.1.0",
+  "description": "Containerized GitHub Action that migrates third-party DeepSeek Harness plugins across harness releases.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "dsh-migrate": "./dist/src/cli.js"
+  },
+  "files": [
+    "dist",
+    "action.yml",
+    "container",
+    "examples",
+    "Dockerfile"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/tests/unit/*.test.js dist/tests/e2e/mechanical.test.js",
+    "test:e2e": "npm run build && node --test dist/tests/e2e/*.test.js",
+    "commit": "cz commit",
+    "bump": "cz bump --changelog"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2"
+  }
+}
