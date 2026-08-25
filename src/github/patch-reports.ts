@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { neutralizeEmbedHtml, wrapFenced } from './issue-format.ts'
 
 export const PATCH_REPORTS_DIR = '.dsh-migrate/patch-reports'
 export const PATCH_REPORT_FILE = 'report.md'
@@ -86,7 +87,7 @@ export function formatPatchReportComment(input: {
   const chunks: string[] = []
   let current = header
   for (const report of input.reports) {
-    const block = `\n## ${report.slug}\n\n${report.body}\n`
+    const block = `\n## ${report.slug}\n\n${wrapFenced(neutralizeEmbedHtml(report.body), 'markdown')}\n`
     if (current.length + block.length > COMMENT_LIMIT && current !== header) {
       chunks.push(current.trim())
       current = block

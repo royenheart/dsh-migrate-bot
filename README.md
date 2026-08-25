@@ -12,7 +12,7 @@ Pin the Action as `royenheart/dsh-migrate-bot@v0`.
 2. Copy [examples/workflow.yml](examples/workflow.yml) to `.github/workflows/dsh-migrate.yml` and set the cron.
 3. Optionally copy [examples/dsh-migrate.yml](examples/dsh-migrate.yml) to `.github/dsh-migrate.yml`.
 
-Required permissions: `contents: write`, `issues: write`, `pull-requests: write`.
+Required permissions: `contents: write`, `issues: write`, `pull-requests: write`. Also enable **Allow GitHub Actions to create and approve pull requests** (Settings → Actions → General → Workflow permissions). Without that checkbox, `GITHUB_TOKEN` can push the branch and open the Issue, then gets 403 on `POST /pulls`.
 
 Schedule, `workflow_dispatch`, and `repository_dispatch` belong in **that** workflow file. GitHub only runs `on.schedule` from a workflow in the plugin repo; the Action itself cannot register a timer.
 

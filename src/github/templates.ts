@@ -2,6 +2,7 @@ import type { IssuePrLanguage } from '../config/schema.ts'
 import type { MechanicalResult } from '../mechanical/run.ts'
 import type { ResolvedVersion } from '../watch/dsh-version.ts'
 import type { RunStatus } from '../pipeline/types.ts'
+import { formatErrorExcerpt, formatWorkingTree, summarizeAgentReport } from './issue-format.ts'
 
 export interface DocumentInput {
   language: IssuePrLanguage
@@ -14,12 +15,6 @@ export interface DocumentInput {
   verdictA?: string | undefined
   verdictB?: string | undefined
   diff: string
-}
-
-function firstHeadingBlock(markdown: string | undefined, fallback: string): string {
-  if (markdown === undefined || markdown.trim() === '') return fallback
-  const lines = markdown.trim().split(/\r?\n/).slice(0, 12)
-  return lines.join('\n')
 }
 
 function en(input: DocumentInput): { title: string; issue: string; pr: string } {
@@ -44,23 +39,21 @@ ${input.mechanical.ok
 
 ## Official overlap (A)
 
-${firstHeadingBlock(input.verdictA, '_Not run._')}
+${summarizeAgentReport(input.verdictA, '_Not run._')}
 
 ## Design alignment (B)
 
-${firstHeadingBlock(input.verdictB, '_Not run._')}
+${summarizeAgentReport(input.verdictB, '_Not run._')}
 
 ## Mechanical test report
 
 Status: ${input.mechanical.ok ? 'pass' : 'fail'}
 
-\`\`\`
-${input.mechanical.errors || '(no error excerpt)'}
-\`\`\`
+${formatErrorExcerpt(input.mechanical.errors, '(no error excerpt)')}
 
 ## Working tree
 
-${input.diff.trim() === '' ? '_No file changes._' : `\`\`\`diff\n${input.diff.slice(0, 8000)}\n\`\`\``}
+${formatWorkingTree(input.diff, 'en')}
 
 ## Notes
 
@@ -84,9 +77,7 @@ Automated migration toward DeepSeek Harness \`${input.target.version}\` for \`${
 
 See the companion Issue. Mechanical excerpt:
 
-\`\`\`
-${input.mechanical.errors || '(clean)'}
-\`\`\`
+${formatErrorExcerpt(input.mechanical.errors, '(clean)')}
 
 ## Risk
 
@@ -117,23 +108,21 @@ ${input.mechanical.ok
 
 ## 官方重叠（A）
 
-${firstHeadingBlock(input.verdictA, '_未运行。_')}
+${summarizeAgentReport(input.verdictA, '_未运行。_')}
 
 ## 设计对齐（B）
 
-${firstHeadingBlock(input.verdictB, '_未运行。_')}
+${summarizeAgentReport(input.verdictB, '_未运行。_')}
 
 ## 机械测试报告
 
 状态：${input.mechanical.ok ? '通过' : '失败'}
 
-\`\`\`
-${input.mechanical.errors || '（无错误摘录）'}
-\`\`\`
+${formatErrorExcerpt(input.mechanical.errors, '（无错误摘录）')}
 
 ## 工作区变更
 
-${input.diff.trim() === '' ? '_无文件改动。_' : `\`\`\`diff\n${input.diff.slice(0, 8000)}\n\`\`\``}
+${formatWorkingTree(input.diff, 'zh')}
 
 ## 说明
 
@@ -157,9 +146,7 @@ ${input.diff.trim() === '' ? '_无文件改动。_' : `\`\`\`diff\n${input.diff.
 
 见配套 Issue。机械摘录：
 
-\`\`\`
-${input.mechanical.errors || '（干净）'}
-\`\`\`
+${formatErrorExcerpt(input.mechanical.errors, '（干净）')}
 
 ## 风险
 

@@ -1,0 +1,211 @@
+diff --git a/README.md b/README.md
+index 1c7266a..5fa1646 100644
+--- a/README.md
++++ b/README.md
+@@ -83,7 +83,7 @@ then restart dsh.
+ 
+ **This release depends on one dsh-side patch.** Apply it to deepseek-harness for full maxSteps fidelity; the patches are under [`patches/`](patches/README.md), split by feature:
+ 
+-- `patches/0001-agent-pre-step-assistant-prefill.patch` — adds optional `assistantPrefill` to `PreStepDecision`; the loop appends it to the request after the derived history and logs it on `request/header` (request-only, never a session message). The plugin uses it to restore opencode's `MAX_STEPS_PROMPT` assistant-role semantics. **Runtime compatibility**: the host plugin scans the installed `@deepseek-ai/dsh-agent-loop` bundle for the compiled `assistantPrefill` marker. When the patch is absent, maxSteps automatically degrades to an equivalent synthetic user message (nothing is silently dropped) and the `/roles` response carries the warning to the browser; the web client shows it once per page load via the native `@deepseek-ai/dsh-client-ui-primitives` `Toast` (4 seconds, non-blocking).
++- `patches/0001-agent-pre-step-assistant-prefill.patch` — adds optional `assistantPrefill` to `PreStepDecision`; the loop appends it to the request after the derived history and logs it on `request/header` (request-only, never a session message). The plugin uses it to restore opencode's `MAX_STEPS_PROMPT` assistant-role semantics. This gap still exists in `dsh-v0.1.1-rc.2`; the upstream feature request is tracked in [deepseek-harness discussion #2407](https://github.com/deepseek-ai/deepseek-harness/discussions/2407). **Runtime compatibility**: the host plugin scans the installed `@deepseek-ai/dsh-agent-loop` bundle for the compiled `assistantPrefill` marker. When the patch is absent, the same `MAX_STEPS_PROMPT` text is rendered as a system-prompt section for the ceiling step (text identical, position degraded; nothing is silently dropped) and the `/roles` response carries the warning to the browser; the web client shows it once per page load via the native `@deepseek-ai/dsh-client-ui-primitives` `Toast` (4 seconds, non-blocking).
+ 
+ ```sh
+ cd /path/to/deepseek-harness
+@@ -92,7 +92,7 @@ npm run build:lib:host
+ npx vitest run packages/core/agent-loop/tests/interception.spec.ts
+ ```
+ 
+-- Provider-visible `format`/`toolChoice` is still a proposal (see `DSH_CHANGE_PROPOSALS.md`); omo's regular path does not use it and the standalone structured-output plugin covers the common route.
++- Provider-visible `format`/`toolChoice` remains an unpatched proposal (no dsh-side file is shipped for it); omo's regular path does not use it and the standalone structured-output plugin covers the common route.
+ 
+ Everything else runs on unmodified dsh seams: the preset is published through `$DSH_HOME/.agent-presets` and the composer picker occupies the existing `conversation.input.left` slot (the client registers through `ctx.slots.inject()`, so it waits for the declaring parent regardless of out-of-tree bundle apply order).
+ 
+@@ -127,7 +127,7 @@ Full report: `docs/exps/2026-08-15-opencode-omo-equivalence-bench.md`; raw trans
+ 
+ ## Remaining gaps
+ 
+-1. **dsh-side (patch provided)**: `PreStepDecision.assistantPrefill`. Without the `patches/` patch the maxSteps prompt is degraded to a synthetic user message; after applying the patch this gap is closed.
++1. **dsh-side (patch provided)**: `PreStepDecision.assistantPrefill`. Without the `patches/` patch the maxSteps prompt is degraded to a system-prompt section (same text and trigger, different position); after applying the patch this gap is closed.
+ 2. **dsh-side (proposal, medium)**: `GenerateOptions.format` / `toolChoice`. omo's regular path does not use them; the standalone structured-output plugin covers the common route.
+ 3. Child subagent per-role sampling cannot reliably resolve the role id (dsh child headers/descriptors do not carry it); primary-role sampling defaults ARE applied and children inherit the session model.
+ 4. Plan files: dsh itself does not persist them; the plugin writes `.opencode/plans/*` after `exit_plan_mode` approval. A first-class plan-file seam remains an optional improvement.
+diff --git a/design.md b/design.md
+index 9c92644..2a1e328 100644
+--- a/design.md
++++ b/design.md
+@@ -1,4 +1,4 @@
+-# opencode-omo loop behavior on native dsh seams (no dsh loop changes)
++# opencode-omo loop behavior on native dsh seams (one request-tail patch, no driver seam)
+ 
+ ## Objective
+ 
+@@ -19,7 +19,7 @@ seam:
+ | Suppress harness identity + runtime snapshot | `complete: true` + `ctx.systemPrompt.suppressRuntimeContext()` |
+ | opencode per-model tool gating (apply_patch vs edit/write) | `system-prompt/assemble` waterfall mutates `assembly.tools` |
+ | Ultrawork keyword detection before assembly | `agent/inbox/claimed` (fires inside `preStep` before `systemPrompt.assemble`) |
+-| maxSteps + verbatim MAX_STEPS_PROMPT | `agent/pre-step` waterfall appends the text as the final step-boundary user message |
++| maxSteps + verbatim MAX_STEPS_PROMPT | `agent/pre-step` returns the assistant-role tail on a patched harness; on an unpatched harness the same text rides a system-prompt section for the ceiling step |
+ | Role primary model + ultrawork override | `agent/request` waterfall |
+ | Fallback chain before harness retry policy | `agent/request-error` waterfall returning `{ kind: 'retry' }` |
+ 
+@@ -30,11 +30,23 @@ probe tests against the dsh test harness: complete persona replacement, gpt
+ tool gating, role route, request-error fallback, max-steps injection, and
+ ultrawork routing all fire with a plain `ReactLoopAgent`.
+ 
+-## Known fidelity trade-offs (vs the old subclass)
++## Current fidelity posture (dsh-v0.1.1-rc.2)
++
++1. `PreStepDecision.assistantPrefill` is NOT yet in the official tag. The
++   plugin therefore still ships `patches/0001-agent-pre-step-assistant-prefill.patch`;
++   once applied, `MAX_STEPS_PROMPT` rides the request tail as an
++   assistant-role prefill and is logged only on `request/header` (upstream
++   proposal: https://github.com/deepseek-ai/deepseek-harness/discussions/2407).
++   Without the patch the same text degrades to a complete-prompt section, not
++   a synthetic user message and never a session message.
++
++   The patch is shaped around dsh's own rules, not the removed per-call
++   rewrite seams: it is header-logged so every model-visible byte remains
++   reconstructable from the session log (Agent Note
++   `2026-07-05-reconstructable-requests`), and it reuses the archived
++   session-prefix pattern (`2026-07-07-session-prefix`) without fabricating
++   `assistant/message`, `user/message`, or any other session event.
+ 
+-1. dsh `agent/pre-step` accepts `UserMessage[]` only, so `MAX_STEPS_PROMPT` is
+-   injected as a user message instead of opencode's assistant-role prefill.
+-   Text is verbatim; the loop still appends the model's own assistant message.
+ 2. The complete persona text provider has no turn/step argument. The step about
+    to run is inferred from the durable log (`turn/start` + last `step/start`),
+    and ultrawork is detected one event earlier via `agent/inbox/claimed`, so
+@@ -59,17 +71,18 @@ and keep shipped updates live.
+ 
+ ## dsh-side footprint after the re-scan
+ 
+-Zero. All three earlier dsh-side changes were avoidable:
++One, and it is now a patch file rather than a source-tree change:
+ 
+-- `apps/cli/src/profile-boot.ts` root merge → replaced by the native user
+-  preset root (`$DSH_HOME/.agent-presets`, a real directory whose entries
+-  symlink into the package).
+-- The entire `packages/core/agent-driver` + `agent-loop` seam → replaced by
+-  the native prompt/event seams above.
+-- The `conversation.input.role` composer seat → the picker now registers in
+-  the existing `conversation.input.left` list slot. Trade-off: the role chip
+-  sits after the access/plan chips instead of immediately right of
+-  PermissionSelect; the dsh checkout is back at its unmodified `dev` state.
++- The preset-root merge, the entire `dsh-agent-driver` + `agent-loop` subclass
++  seam, and the `conversation.input.role` composer seat were all dropped in
++  favor of the official `$DSH_HOME/.agent-presets` user root, the native
++  prompt/event waterfalls, and the existing `conversation.input.left` list slot.
++- The only remaining harness change is
++  `patches/0001-agent-pre-step-assistant-prefill.patch`
++  (`PreStepDecision.assistantPrefill`), needed for opencode's assistant-role
++  MAX_STEPS_PROMPT tail. It applies cleanly to `dsh-v0.1.1-rc.2` and is
++  tracked upstream in discussion #2407. The patchless fallback is a system
++  prompt section; no session message is ever fabricated.
+ 
+-No dsh source, config, or workspace files are modified for this plugin.
++Everything else runs on an unmodified `dsh-v0.1.1-rc.2` checkout.
+ 
+diff --git a/package.json b/package.json
+index e5deefa..5a5a616 100644
+--- a/package.json
++++ b/package.json
+@@ -48,23 +48,23 @@
+   },
+   "peerDependencies": {
+     "@deepseek-ai/cordis": "^4.0.1",
+-    "@deepseek-ai/dsh-agent": "^0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-settings": "^0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-settings-general": "^0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.6",
+-    "@deepseek-ai/dsh-host-webserver": "^0.1.0-rc.6",
+-    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6",
+-    "@deepseek-ai/dsh-sandbox": "^0.1.0-rc.7",
+-    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
++    "@deepseek-ai/dsh-agent": "^0.1.1-rc.2",
++    "@deepseek-ai/dsh-client-connection": "^0.1.1-rc.2",
++    "@deepseek-ai/dsh-client-runtime": "^0.1.1-rc.2",
++    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.1-rc.2",
++    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.1-rc.2",
++    "@deepseek-ai/dsh-client-ui-settings": "^0.1.1-rc.2",
++    "@deepseek-ai/dsh-client-ui-settings-general": "^0.1.1-rc.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.1-rc.2",
++    "@deepseek-ai/dsh-host-webserver": "^0.1.1-rc.2",
++    "@deepseek-ai/dsh-llm": "^0.1.1-rc.2",
++    "@deepseek-ai/dsh-sandbox": "^0.1.1-rc.2",
++    "@deepseek-ai/dsh-settings": "^0.1.1-rc.2",
+     "@deepseek-ai/schemastery": "^3.18.1",
+     "react": "^18.3.1"
+   },
+   "devDependencies": {
+-    "@deepseek-ai/dsh-sandbox": "^0.1.0-rc.7",
++    "@deepseek-ai/dsh-sandbox": "^0.1.1-rc.2",
+     "@types/node": "*",
+     "@types/react": "^18.3.1",
+     "tsdown": "^0.22.2",
+diff --git a/patches/0001-agent-pre-step-assistant-prefill.patch b/patches/0001-agent-pre-step-assistant-prefill.patch
+index 2b2bc33..673b42a 100644
+--- a/patches/0001-agent-pre-step-assistant-prefill.patch
++++ b/patches/0001-agent-pre-step-assistant-prefill.patch
+@@ -1,5 +1,5 @@
+ diff --git a/packages/core/agent-loop/src/agent.ts b/packages/core/agent-loop/src/agent.ts
+-index 668ef65..626468d 100644
++index 3ef1ec7..75944e5 100644
+ --- a/packages/core/agent-loop/src/agent.ts
+ +++ b/packages/core/agent-loop/src/agent.ts
+ @@ -16,7 +16,7 @@ import type {
+@@ -47,7 +47,7 @@ index 668ef65..626468d 100644
+        )
+        const assembler = new BlockAssembler()
+        const chunkSeqs: number[] = []
+-@@ -411,6 +411,7 @@ export class ReactLoopAgent implements Agent {
++@@ -430,6 +430,7 @@ export class ReactLoopAgent implements Agent {
+      system: string,
+      boundaryMessages: Message[],
+      signal: AbortSignal,
+@@ -55,7 +55,7 @@ index 668ef65..626468d 100644
+    ): Promise<{ request: GenerateOptions; preparedCall?: PreparedLlmCall }> {
+      const { session } = this
+  
+-@@ -460,6 +461,7 @@ export class ReactLoopAgent implements Agent {
++@@ -479,6 +480,7 @@ export class ReactLoopAgent implements Agent {
+        ...preparedCall === undefined ? {} : { adapterDefaults: preparedCall.adapterDefaults },
+        ...system ? { system } : {},
+        ...tools.length > 0 ? { tools } : {},
+@@ -63,7 +63,7 @@ index 668ef65..626468d 100644
+      })
+      const baseline = this.session.requestHeader()
+      if (!this.requestHeaderLogged) {
+-@@ -485,7 +487,9 @@ export class ReactLoopAgent implements Agent {
++@@ -504,7 +506,9 @@ export class ReactLoopAgent implements Agent {
+  
+      const request = markAgentLoopRequest(deepFreeze({
+        ...header.config,
+@@ -198,7 +198,7 @@ index ef67569..c240593 100644
+    const at = a.tools ?? []
+    const bt = b.tools ?? []
+ diff --git a/packages/core/session/src/types.ts b/packages/core/session/src/types.ts
+-index 17aacd1..553a7e8 100644
++index 31ce28a..f9676e2 100644
+ --- a/packages/core/session/src/types.ts
+ +++ b/packages/core/session/src/types.ts
+ @@ -207,6 +207,8 @@ export interface EpochHeader {
+diff --git a/patches/README.md b/patches/README.md
+index 510dbb7..5887577 100644
+--- a/patches/README.md
++++ b/patches/README.md
+@@ -18,6 +18,8 @@
+     npm run build:lib:host
+     npx vitest run packages/core/agent-loop packages/core/session packages/llm/token-meter packages/session/session-stats
+     ```
+-  - 未打此补丁时：插件其余功能仍可运行。host 插件通过扫描已安装 `@deepseek-ai/dsh-agent-loop` 的编译产物检测该能力；检测不到时 `agent/pre-step` 自动降级为**等文本的合成 user 消息**注入 `MAX_STEPS_PROMPT`（不再静默丢失，仅角色语义非 assistant），并通过浏览器 `Toast` 提示用户应用本补丁。maxSteps 的完全保真仍依赖此补丁。
++  - 未打此补丁时：插件其余功能仍可运行。host 插件通过扫描已安装 `@deepseek-ai/dsh-agent-loop` 的编译产物检测该能力；检测不到时 `agent/pre-step` 触发同一文本的 **system-prompt section** 注入 `MAX_STEPS_PROMPT`（不再静默丢失，仅位置从 assistant 尾部降级为 system 前缀），并通过浏览器 `Toast` 提示用户应用本补丁。maxSteps 的完全保真仍依赖此补丁。
+ 
+-补丁生成基线：`dev@adf7d95`（补丁内容即随后的 commit `4a3587f feat: agent-pre-step-assistant-prefill`）。当前 dev 若已包含 `4a3587f`，无需再 apply。
++补丁当前基线：`dsh-v0.1.1-rc.2`（tag，`b150a55`）。该 tag 尚未吸收此能力，`master` 的 `runtime-types.ts` 目前也没有该字段；`git apply --check` 与应用后受影响包 `tsc -b`、vitest 均通过。补丁遵循 dsh 官方设计约束：`2026-07-05-reconstructable-requests`（模型可见内容必须可从 session log 重建）与已归档的 `2026-07-07-session-prefix`（request-only 内容记入 `request/header`，不写 session message；当时仅因每步重付 token 丢弃 tail slot，而本补丁只在 listener 返回时才生效）。上游提案链接：
++- https://github.com/deepseek-ai/deepseek-harness/discussions/2407 （本补丁对应的 feature request）
++- https://github.com/deepseek-ai/deepseek-harness/discussions/3940 （相邻的消息改写扩展点提案，但不能提供 assistant-role 尾部续写语义）

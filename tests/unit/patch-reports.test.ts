@@ -43,7 +43,7 @@ test('issue comment starts with a table then each report body', () => {
         title: '[Feature request] pre-step hook',
         kind: 'existing',
         links: ['https://github.com/deepseek-ai/deepseek-harness/discussions/12'],
-        body: '# [Feature request] pre-step hook\n\nlinked',
+        body: '# [Feature request] pre-step hook\n\n```\nunclosed fence',
       },
       {
         slug: 'new-slot',
@@ -63,4 +63,7 @@ test('issue comment starts with a table then each report body', () => {
   const secondReportAt = body.indexOf('## new-slot')
   assert.ok(tableAt >= 0 && firstReportAt > tableAt && secondReportAt > firstReportAt)
   assert.match(body, /draft body/)
+  assert.match(body, /~~~~markdown/)
+  const firstFence = body.indexOf('unclosed fence')
+  assert.ok(firstFence >= 0 && firstFence < secondReportAt)
 })
