@@ -22,6 +22,30 @@ Last processed version is stored on branch `dsh-migrate/state` (`seen.json` only
 
 ## Pipeline
 
+```mermaid
+flowchart TD
+  start([Schedule or manual run]) --> resolve[Resolve target dsh-v*]
+  resolve --> gate{Same version as last success<br/>on dsh-migrate/state?}
+  gate -->|yes, not forced| skipped([skipped])
+  gate -->|first run, updated, or force| mech[Mechanical tests]
+  mech --> skipAB{skip-if-mechanical-pass<br/>and tests passed?}
+  skipAB -->|yes| dirty
+  skipAB -->|no| A[Review A: official overlap]
+  A --> B[Review B: design alignment]
+  B --> retest[Mechanical tests again]
+  retest --> loop{Failed and C attempts left?}
+  loop -->|yes| C[Repair Cn: A+B, errors, prior C]
+  C --> retest
+  loop -->|no| dirty{Plugin tree dirty?}
+  dirty -->|yes| pr[Open Issue and PR]
+  dirty -->|no| nopublish[No Issue or PR]
+  pr --> rec
+  nopublish --> rec{Mechanical passed?}
+  rec -->|yes| save[Record version on dsh-migrate/state]
+  rec -->|no| failed([failed — next schedule retries])
+  save --> done([compatible or migrated])
+```
+
 1. Resolve the target `dsh-v*` (`latest` or a pin).
 2. Skip if that version matches `dsh-migrate/state`, unless `force` is set or `watch.enabled` is `false`. Failed runs do not update the branch, so the next schedule retries.
 3. Mechanical tests (built-in, or `tests.commands` — that list **replaces** the default suite).
