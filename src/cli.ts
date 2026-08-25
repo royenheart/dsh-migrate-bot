@@ -10,10 +10,13 @@ import { resolveDshVersion } from './watch/dsh-version.ts'
 import { decideWatch, describeWatchDecision } from './watch/gate.ts'
 import { persistSeenState, readSeenState, STATE_BRANCH } from './watch/seen.ts'
 import { createReportStore } from './reports/store.ts'
-import { createDshRunner } from './agents/dsh.ts'
+import { createDshRunner, formatSessionProgress } from './agents/dsh.ts'
 import { createGithubPublisher } from './github/publish.ts'
 import { writeGithubOutput } from './github/output.ts'
 import { runPipeline } from './pipeline/orchestrator.ts'
+import { checkoutHarness } from './harness/checkout.ts'
+import { createQuotaQuery } from './quota/query.ts'
+import { isQuotaError } from './quota/errors.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -51,7 +54,7 @@ async function main(argv: readonly string[]): Promise<number> {
     return 0
   }
   if (command !== 'run') {
-    process.stderr.write('usage: dsh-migrate run|check-config [--workdir DIR] [--config FILE] [--dsh-version VER] [--api-key-env NAME] [--mechanical-only] [--skip-github] [--force]\n')
+    process.stderr.write('usage: dsh-migrate run|check-config [--workdir DIR] [--config FILE] [--dsh-version VER] [--api-key-env NAME] [--quota-limit N] [--mechanical-only] [--skip-github] [--force]\n')
     return 2
   }
 
@@ -68,6 +71,15 @@ async function main(argv: readonly string[]): Promise<number> {
   const mechanicalOnly = hasFlag(argv, '--mechanical-only')
   const skipGithub = hasFlag(argv, '--skip-github') || mechanicalOnly
   const force = hasFlag(argv, '--force')
+  const quotaLimitRaw = argValue(argv, '--quota-limit')
+  if (quotaLimitRaw !== undefined) {
+    const parsed = Number(quotaLimitRaw)
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      process.stderr.write('--quota-limit must be a number > 0\n')
+      return 2
+    }
+    config.quota.limit = parsed
+  }
 
   const previous = mechanicalOnly ? undefined : readSeenState(workdir)
   const decision = decideWatch({
@@ -128,25 +140,67 @@ async function main(argv: readonly string[]): Promise<number> {
     process.stderr.write('GITHUB_TOKEN missing; Issue/PR will be skipped. Pass --skip-github to silence this.\n')
   }
 
-  const result = await runPipeline({
-    config,
-    workdir,
-    target,
-    store: createReportStore(runDir),
-    apiKey,
-    runMechanical: () => runMechanical(workdir, config),
-    isDirty: () => isWorktreeDirty(workdir),
-    diff: () => worktreeDiff(workdir),
-    agent: createDshRunner({
-      ...(process.env.DSH_HOME === undefined ? {} : { dshHome: process.env.DSH_HOME }),
-      reportDir: runDir,
-    }),
-    ...(skipGithub || githubToken === undefined
-      ? {}
-      : { github: createGithubPublisher(githubToken) }),
-  }, {
-    info(message) { logLine(message) },
+  const migrateHome = resolve(process.env.DSH_MIGRATE_HOME ?? resolve(workdir, '.dsh-migrate'))
+  logLine(`stage: harness checkout ${target.tag}`)
+  const harnessResult = checkoutHarness({
+    tag: target.tag,
+    dest: resolve(migrateHome, 'harness'),
   })
+  if (!harnessResult.ok) {
+    logLine(`harness checkout skipped: ${harnessResult.detail}`)
+  } else {
+    logLine(`harness source at ${harnessResult.path}`)
+  }
+  const harness = harnessResult.ok
+    ? { path: harnessResult.path, tag: target.tag }
+    : undefined
+
+  const quotaQuery = createQuotaQuery({ provider: config.dsh.provider })
+  const quota = {
+    query: () => quotaQuery.query({ apiKey }),
+  }
+
+  let result
+  try {
+    result = await runPipeline({
+      config,
+      workdir,
+      target,
+      store: createReportStore(runDir),
+      apiKey,
+      runMechanical: () => runMechanical(workdir, config),
+      isDirty: () => isWorktreeDirty(workdir),
+      diff: () => worktreeDiff(workdir),
+      agent: createDshRunner({
+        ...(process.env.DSH_HOME === undefined ? {} : { dshHome: process.env.DSH_HOME }),
+        reportDir: runDir,
+        onStatus(progress) {
+          logLine(`dsh: ${formatSessionProgress(progress)}`)
+        },
+        onLog(line) { logLine(line) },
+      }),
+      quota,
+      ...(harness === undefined ? {} : { harness }),
+      ...(skipGithub || githubToken === undefined
+        ? {}
+        : { github: createGithubPublisher(githubToken) }),
+    }, {
+      info(message) { logLine(message) },
+    })
+  } catch (error) {
+    if (isQuotaError(error)) {
+      process.stderr.write(`${error.message}\n`)
+      writeGithubOutput({
+        status: 'failed',
+        run_dir: runDir,
+        mechanical_ok: 'false',
+        skipped_review: 'false',
+        target_tag: target.tag,
+      })
+      return 1
+    }
+    throw error
+  }
 
   if (result.status !== 'failed' && config.watch.enabled) {
     const persisted = persistSeenState(workdir, target)

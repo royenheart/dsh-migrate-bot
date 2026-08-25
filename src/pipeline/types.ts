@@ -3,11 +3,13 @@ import type { MechanicalResult } from '../mechanical/run.ts'
 import type { AgentRunner } from '../agents/types.ts'
 import type { ReportStore } from '../reports/store.ts'
 import type { ResolvedVersion } from '../watch/dsh-version.ts'
+import type { QuotaSnapshot } from '../quota/types.ts'
 
 export type RunStatus = 'compatible' | 'migrated' | 'failed' | 'skipped'
 
 export interface PublishResult {
   issueUrl?: string
+  issueNumber?: number
   pullRequestUrl?: string
 }
 
@@ -28,6 +30,11 @@ export interface GithubPublisher {
     branch: string
     workdir: string
   }): Promise<PublishResult>
+  commentIssue?(issueNumber: number, body: string, workdir: string): Promise<void>
+}
+
+export interface QuotaPort {
+  query(): Promise<QuotaSnapshot>
 }
 
 export interface PipelinePorts {
@@ -41,6 +48,8 @@ export interface PipelinePorts {
   diff: () => string
   agent: AgentRunner
   github?: GithubPublisher
+  quota?: QuotaPort
+  harness?: { path: string; tag: string } | undefined
 }
 
 export interface PipelineLogger {

@@ -61,3 +61,12 @@ test('secrets.apiKeyEnv can be overridden', () => {
 test('rejects an invalid secrets.apiKeyEnv name', () => {
   assert.throws(() => parseConfig({ secrets: { apiKeyEnv: 'not-a-name' } }), /secrets.apiKeyEnv/)
 })
+
+test('quota.limit is accepted', () => {
+  const config = parseConfig({ quota: { limit: 5.5 } })
+  assert.equal(config.quota.limit, 5.5)
+})
+
+test('rejects a non-positive quota.limit', () => {
+  assert.throws(() => parseConfig({ quota: { limit: 0 } }), /quota.limit/)
+})

@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import { stagePluginChanges } from '../git/worktree.ts'
 import type { GithubPublisher, PublishResult } from '../pipeline/types.ts'
 
 const GIT_SAFE = ['-c', 'safe.directory=*'] as const
@@ -90,11 +91,15 @@ async function githubRequest(
  */
 export function createGithubPublisher(token: string): GithubPublisher {
   return {
+    async commentIssue(issueNumber, body, workdir) {
+      const { owner, repo } = remoteRepo(workdir)
+      await githubRequest(token, 'POST', `/repos/${owner}/${repo}/issues/${issueNumber}/comments`, { body })
+    },
     async publish(input) {
       const { owner, repo } = remoteRepo(input.workdir)
       ensureGitIdentity(input.workdir)
       runGit(['checkout', '-B', input.branch], input.workdir)
-      runGit(['add', '-A', '--', '.', ':!.dsh-migrate', ':!.secrets.local.json'], input.workdir)
+      stagePluginChanges(input.workdir)
       const commit = spawnSync('git', [...GIT_SAFE, 'commit', '-m', input.title], {
         cwd: input.workdir,
         encoding: 'utf8',
@@ -128,6 +133,7 @@ export function createGithubPublisher(token: string): GithubPublisher {
 
       const published: PublishResult = {}
       if (issue.html_url !== undefined) published.issueUrl = issue.html_url
+      if (typeof issue.number === 'number') published.issueNumber = issue.number
       if (pr.html_url !== undefined) published.pullRequestUrl = pr.html_url
       return published
     },

@@ -29,6 +29,25 @@ test('fix prompt includes A+B, errors only, and prior C reports', () => {
   assert.doesNotMatch(prompt, /full test log/)
 })
 
+test('fix prompt can append a harness checkout note', () => {
+  const prompt = assembleFixPrompt({
+    template: 'FIX',
+    reportA: 'A',
+    reportB: 'B',
+    errors: 'error: x',
+    priorFixes: [],
+    harness: { path: '/tmp/harness', tag: 'dsh-v0.1.1-rc.2' },
+  })
+  assert.match(prompt, /\/tmp\/harness/)
+  assert.match(prompt, /dsh-v0\.1\.1-rc\.2/)
+  assert.match(prompt, /README/)
+  assert.match(prompt, /official extension points/)
+  assert.match(prompt, /\.dsh-migrate\/patch-reports\//)
+  assert.match(prompt, /deepseek-ai\/deepseek-harness/)
+  assert.match(prompt, /\[Feature request\]/)
+  assert.doesNotMatch(prompt, /patches\//)
+})
+
 test('first fix has no prior C reports', () => {
   const prompt = assembleFixPrompt({
     template: 'FIX',

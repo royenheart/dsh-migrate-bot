@@ -64,7 +64,7 @@ ${input.diff.trim() === '' ? '_No file changes._' : `\`\`\`diff\n${input.diff.sl
 
 ## Notes
 
-Full A/B/C reports stay in the Action artifact / local \`.dsh-migrate/\` run directory and are not committed.
+Full A/B/C reports stay in the Action artifact / local \`.dsh-migrate/\` run directory and are not committed. Per-patch reports under \`.dsh-migrate/patch-reports/\` are posted as an Issue comment (index table, then each body).
 `
   const pr = `## Summary
 
@@ -137,7 +137,7 @@ ${input.diff.trim() === '' ? '_无文件改动。_' : `\`\`\`diff\n${input.diff.
 
 ## 说明
 
-完整 A/B/C 报告只存在于 Action artifact / 本地 \`.dsh-migrate/\`，不入库。
+完整 A/B/C 报告只存在于 Action artifact / 本地 \`.dsh-migrate/\`，不入库。每个补丁的 report 在 \`.dsh-migrate/patch-reports/\`，会作为 Issue 评论贴出（先总表，再各正文）。
 `
   const pr = `## 摘要
 

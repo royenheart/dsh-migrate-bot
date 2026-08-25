@@ -73,6 +73,32 @@ export function isWorktreeDirty(cwd: string): boolean {
 }
 
 /**
+ * Stage plugin changes for the migration commit.
+ *
+ * Do not pass `:!.dsh-migrate` (or other ignored paths) to `git add`. Git
+ * treats an exclude pathspec as an explicit path and exits 1 when that path
+ * is ignored via `.gitignore` or `.git/info/exclude` — the failure both
+ * consumer Actions hit after A+B:
+ * `The following paths are ignored by one of your .gitignore files: .dsh-migrate`.
+ */
+export function stagePluginChanges(cwd: string): void {
+  const add = git(['add', '-A', '--', '.'], cwd)
+  if (add.status !== 0) {
+    throw new Error(`git add failed: ${add.stderr}`)
+  }
+  const staged = git(['diff', '--cached', '--name-only', '-z'], cwd)
+  if (staged.status !== 0) {
+    throw new Error(`git diff --cached failed: ${staged.stderr}`)
+  }
+  const noise = staged.stdout.split('\0').filter(path => path !== '' && isMigrateNoisePath(path))
+  if (noise.length === 0) return
+  const reset = git(['reset', '-q', '--', ...noise], cwd)
+  if (reset.status !== 0) {
+    throw new Error(`git reset failed: ${reset.stderr}`)
+  }
+}
+
+/**
  * `git diff` text for the Issue/PR body. Empty when clean.
  * @param cwd - git repository root
  */

@@ -60,6 +60,9 @@ if [[ "${INPUT_FORCE:-false}" == [Tt]rue ]]; then
     args+=(--force)
   fi
 fi
+if [[ -n "${INPUT_QUOTA_LIMIT:-}" && ! " ${args[*]} " =~ " --quota-limit " ]]; then
+  args+=(--quota-limit "$INPUT_QUOTA_LIMIT")
+fi
 
 cli="${DSH_MIGRATE_CLI:-/opt/dsh-migrate/dist/src/cli.js}"
 exec node "$cli" "${args[@]}"

@@ -18,7 +18,7 @@ Schedule, `workflow_dispatch`, and `repository_dispatch` belong in **that** work
 
 The first run always proceeds. Later scheduled runs skip when `dsh-v*` has not changed (`status: skipped`). Re-run the same version with `force: true` on `workflow_dispatch`.
 
-Last processed version is stored on branch `dsh-migrate/state` (`seen.json` only). Leave that branch unmerged. Reports under `.dsh-migrate/` are uploaded as an artifact and are not committed.
+Last processed version is stored on branch `dsh-migrate/state` (`seen.json` only). Leave that branch unmerged. Reports under `.dsh-migrate/` (A/B/C, harness checkout, per-patch reports) are uploaded as an artifact and are not committed.
 
 ## Pipeline
 
@@ -30,16 +30,18 @@ flowchart TD
   gate -->|first run, updated, or force| mech[Mechanical tests]
   mech --> skipAB{skip-if-mechanical-pass<br/>and tests passed?}
   skipAB -->|yes| dirty
-  skipAB -->|no| A[Review A: official overlap]
+  skipAB -->|no| checkout[Sparse-checkout target harness]
+  checkout --> A[Review A: official overlap]
   A --> B[Review B: design alignment]
   B --> retest[Mechanical tests again]
   retest --> loop{Failed and C attempts left?}
   loop -->|yes| C[Repair Cn: A+B, errors, prior C]
   C --> retest
-  loop -->|no| dirty{Plugin tree dirty?}
-  dirty -->|yes| pr[Open Issue and PR]
+  loop -->|no| dirty{Plugin tree dirty?<br/>ignore .dsh-migrate}
   dirty -->|no| nopublish[No Issue or PR]
-  pr --> rec
+  dirty -->|yes| pr[Open Issue + PR with Closes]
+  pr --> comment[Comment on Issue:<br/>PR link, patch table, report bodies]
+  comment --> rec
   nopublish --> rec{Mechanical passed?}
   rec -->|yes| save[Record version on dsh-migrate/state]
   rec -->|no| failed([failed — next schedule retries])
@@ -49,11 +51,14 @@ flowchart TD
 1. Resolve the target `dsh-v*` (`latest` or a pin).
 2. Skip if that version matches `dsh-migrate/state`, unless `force` is set or `watch.enabled` is `false`. Failed runs do not update the branch, so the next schedule retries.
 3. Mechanical tests (built-in, or `tests.commands` — that list **replaces** the default suite).
-4. Review: `always` (default) runs overlap (A) then alignment (B); `skip-if-mechanical-pass` skips A/B when step 3 passed.
-5. Re-run mechanical tests after A+B.
-6. On failure, a new dsh session gets A+B, error lines only, and prior `C1..Cn-1`; write `Cn`; retest; up to `loop.maxAttempts`.
-7. Clean worktree: no Issue, no PR (`.dsh-migrate/` does not count as dirty).
-8. Dirty worktree: open an Issue and a PR (`issuePr.language`: `en` or `zh`). Full A/B/C reports stay in the artifact.
+4. Sparse-checkout the target harness tag into `.dsh-migrate/harness` (not committed). Review: `always` (default) runs overlap (A) then alignment (B); `skip-if-mechanical-pass` skips A/B when step 3 passed.
+5. During A/B/C the agent may shrink or retire shadowed official surfaces. dsh-side patches are allowed when official extension points still cannot cover unique behavior. For each remaining patch it writes `.dsh-migrate/patch-reports/<slug>/report.md`: search official [issues / PRs / discussions](https://github.com/deepseek-ai/deepseek-harness) first and record links; if none exist, write a discussion draft (`# [Feature request] …`, English summary, Background, Current state, Proposal, Appendix: patch, Questions to confirm, Related).
+6. Re-run mechanical tests after A+B.
+7. On failure, a new dsh session gets A+B, error lines only, and prior `C1..Cn-1`; write `Cn`; retest; up to `loop.maxAttempts`.
+8. Clean plugin tree: no Issue, no PR (`.dsh-migrate/` and `.secrets.local.json` do not count as dirty and are never committed).
+9. Dirty plugin tree: open an Issue and a PR. The PR body includes `Closes #<issue>`. The Action then comments on the Issue: companion PR URL, a patch-report index table, then each report body (`issuePr.language`: `en` or `zh`). Full A/B/C reports stay in the artifact.
+
+A run that only wrote `.dsh-migrate/` is treated as clean. Insufficient official balance, or this-run spend over `quota.limit` / `quota_limit`, aborts without opening an Issue or PR.
 
 ## Configuration
 
@@ -67,10 +72,17 @@ flowchart TD
 | Issue/PR language | `en` |
 | repair loops | 5 |
 | API key secret | `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` |
+| quota limit | unset (this-run official USD cap; insufficient official balance still aborts) |
 
 Override prompts under `prompts.absorption`, `prompts.alignment`, and `prompts.fix` in `.github/dsh-migrate.yml`.
 
-Inputs: `dsh_version`, `config`, `mechanical_only`, `skip_github`, `force`, `api_key_env`, `workdir`. To use a different secret, set `api_key_env` (or `secrets.apiKeyEnv` in `.github/dsh-migrate.yml`) and map that name in the workflow `env:` block.
+Inputs: `dsh_version`, `config`, `mechanical_only`, `skip_github`, `force`, `api_key_env`, `workdir`, `quota_limit`. To use a different secret, set `api_key_env` (or `secrets.apiKeyEnv` in `.github/dsh-migrate.yml`) and map that name in the workflow `env:` block.
+
+Before each agent session the Action queries official remaining balance (`GET /user/balance` for DeepSeek). If the account is unavailable, the run stops. `quota.limit` / `quota_limit` caps this Action run's own official USD estimate (this run's cache-miss / cache-hit / output tokens × [published rates](https://api-docs.deepseek.com/quick_start/pricing), peak/off-peak from each request timestamp). Other model providers have no official balance query or rate table yet.
+
+While dsh runs, logs print the stage and, every 10s, turns / steps / elapsed / cache hit-miss / input-output. Model text is not streamed.
+
+The harness checkout under `.dsh-migrate/harness` is for the agent to read official source, apply or update a dsh-side patch when still required, and keep the plugin in sync. It is not committed.
 
 ## Local CLI
 

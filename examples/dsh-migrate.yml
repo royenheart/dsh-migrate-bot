@@ -42,3 +42,9 @@ issuePr:
 
 loop:
   maxAttempts: 5
+
+# Optional cap on this Action run's official USD estimate (not account-wide spend).
+# Also available as the Action input quota_limit. Insufficient official balance
+# always aborts, even when this is unset.
+# quota:
+#   limit: 2

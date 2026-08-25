@@ -38,6 +38,13 @@ function asInt(value: unknown, path: string, min: number): number {
   return value
 }
 
+function asPositiveNumber(value: unknown, path: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    throw new ConfigError(`${path} must be a number > 0`)
+  }
+  return value
+}
+
 function asEnum<T extends string>(value: unknown, path: string, allowed: readonly T[]): T {
   if (typeof value !== 'string' || !allowed.includes(value as T)) {
     throw new ConfigError(`${path} must be one of: ${allowed.join(', ')}`)
@@ -60,6 +67,7 @@ export function parseConfig(raw: unknown): MigrateConfig {
       loop: { ...DEFAULT_CONFIG.loop },
       watch: { ...DEFAULT_CONFIG.watch },
       secrets: { ...DEFAULT_CONFIG.secrets },
+      quota: { ...DEFAULT_CONFIG.quota },
     }
   }
   if (!isRecord(raw)) throw new ConfigError('config root must be a mapping')
@@ -147,6 +155,13 @@ export function parseConfig(raw: unknown): MigrateConfig {
     }
   }
 
+  const quotaRaw = raw.quota
+  const quota: MigrateConfig['quota'] = {}
+  if (quotaRaw !== undefined) {
+    if (!isRecord(quotaRaw)) throw new ConfigError('quota must be a mapping')
+    if (quotaRaw.limit !== undefined) quota.limit = asPositiveNumber(quotaRaw.limit, 'quota.limit')
+  }
+
   return {
     dshVersion: raw.dshVersion === undefined ? DEFAULT_CONFIG.dshVersion : asString(raw.dshVersion, 'dshVersion'),
     review: { policy },
@@ -157,6 +172,7 @@ export function parseConfig(raw: unknown): MigrateConfig {
     loop: { maxAttempts },
     watch: { enabled: watchEnabled },
     secrets: { apiKeyEnv },
+    quota,
   }
 }
 

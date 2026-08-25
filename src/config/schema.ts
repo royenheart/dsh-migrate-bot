@@ -61,6 +61,15 @@ export interface SecretsConfig {
   apiKeyEnv: string
 }
 
+export interface QuotaConfig {
+  /**
+   * Max USD this Action run may spend, priced from this run's own usage
+   * at official DeepSeek rates. Insufficient official balance still aborts
+   * when unset.
+   */
+  limit?: number
+}
+
 export interface MigrateConfig {
   dshVersion: string
   review: { policy: ReviewPolicy }
@@ -71,6 +80,7 @@ export interface MigrateConfig {
   loop: LoopConfig
   watch: WatchConfig
   secrets: SecretsConfig
+  quota: QuotaConfig
 }
 
 export const DEFAULT_CONFIG: MigrateConfig = {
@@ -88,4 +98,5 @@ export const DEFAULT_CONFIG: MigrateConfig = {
   loop: { maxAttempts: 5 },
   watch: { enabled: true },
   secrets: { apiKeyEnv: DEFAULT_API_KEY_ENV },
+  quota: {},
 }

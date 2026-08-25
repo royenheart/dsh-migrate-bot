@@ -33,6 +33,10 @@ inputs:
     description: Plugin repository root inside the runner
     required: false
     default: '.'
+  quota_limit:
+    description: Max USD this Action run may spend (this run's official usage estimate). Empty = no cap.
+    required: false
+    default: ''
 outputs:
   status:
     description: compatible, migrated, failed, or skipped (dsh unchanged)

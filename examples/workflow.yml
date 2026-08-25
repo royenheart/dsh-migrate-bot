@@ -48,7 +48,7 @@ jobs:
         env:
           DEEPSEEK_API_KEY_DSH_MIGRATE_BOT: ${{ secrets.DEEPSEEK_API_KEY_DSH_MIGRATE_BOT }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload A/B/C reports
+      - name: Upload A/B/C and patch reports
         if: always()
         uses: actions/upload-artifact@v4
         with:

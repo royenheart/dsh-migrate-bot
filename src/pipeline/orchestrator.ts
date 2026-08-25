@@ -3,6 +3,11 @@ import { join } from 'node:path'
 import { assembleFixPrompt } from '../prompts/defaults.ts'
 import { resolvePrompts } from '../prompts/resolve.ts'
 import { renderDocuments } from '../github/templates.ts'
+import { collectPatchReports, formatPatchReportComment } from '../github/patch-reports.ts'
+import { usageUnits, type SessionProgress } from '../agents/session-status.ts'
+import { decideQuota } from '../quota/check.ts'
+import { QuotaError } from '../quota/errors.ts'
+import type { AgentRequest } from '../agents/types.ts'
 import type { PipelineLogger, PipelinePorts, PipelineResult, RunStatus } from './types.ts'
 
 const silent: PipelineLogger = { info() {} }
@@ -28,7 +33,8 @@ function maybePublish(
   logger: PipelineLogger,
 ): Promise<PipelineResult['published']> {
   if (!ports.isDirty()) return Promise.resolve({})
-  if (ports.github === undefined) {
+  const github = ports.github
+  if (github === undefined) {
     logger.info('worktree dirty but GitHub publish skipped (no token or --skip-github)')
     return Promise.resolve({})
   }
@@ -46,13 +52,58 @@ function maybePublish(
   })
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
   const branch = `dsh-migrate/${ports.target.version}-${stamp}`.replace(/[^A-Za-z0-9._/-]+/g, '-')
-  return ports.github.publish({
+  return github.publish({
     title: docs.title,
     issueBody: docs.issue,
     prBody: docs.pr,
     branch,
     workdir: ports.workdir,
+  }).then(async (published) => {
+    if (published.issueNumber === undefined || github.commentIssue === undefined) {
+      return published
+    }
+    const comments = formatPatchReportComment({
+      reports: collectPatchReports(ports.workdir),
+      pullRequestUrl: published.pullRequestUrl,
+      language: ports.config.issuePr.language,
+    })
+    for (const body of comments) {
+      await github.commentIssue(published.issueNumber, body, ports.workdir)
+    }
+    return published
   })
+}
+
+async function ensureQuota(
+  ports: PipelinePorts,
+  logger: PipelineLogger,
+  stage: string,
+  used: number,
+): Promise<void> {
+  if (ports.quota === undefined) return
+  const snapshot = await ports.quota.query()
+  const remaining = snapshot.remaining === undefined ? '-' : String(snapshot.remaining)
+  const currency = snapshot.currency ?? ''
+  logger.info(`stage: quota (${stage}) ${snapshot.kind} remaining ${remaining} ${currency} used ${used}`.trim())
+  const decision = decideQuota({
+    snapshot,
+    used,
+    ...(ports.config.quota.limit === undefined ? {} : { limit: ports.config.quota.limit }),
+  })
+  if (decision.action === 'abort') {
+    throw new QuotaError(decision.reason, decision.message)
+  }
+}
+
+function addUsage(used: number, usage: SessionProgress | undefined): number {
+  return usage === undefined ? used : used + usageUnits(usage)
+}
+
+function agentInput(ports: PipelinePorts, used: number): Pick<AgentRequest, 'usageSoFar' | 'usageLimit'> {
+  return {
+    usageSoFar: used,
+    ...(ports.config.quota.limit === undefined ? {} : { usageLimit: ports.config.quota.limit }),
+  }
 }
 
 /**
@@ -63,9 +114,10 @@ export async function runPipeline(
   ports: PipelinePorts,
   logger: PipelineLogger = silent,
 ): Promise<PipelineResult> {
-  const prompts = resolvePrompts(ports.config)
-  logger.info(`target ${ports.target.tag}`)
+  const prompts = resolvePrompts(ports.config, ports.harness)
+  logger.info(`stage: target ${ports.target.tag}`)
 
+  logger.info('stage: mechanical')
   let mechanical = ports.runMechanical()
   ports.store.write('mechanical', mechanical.errors || mechanical.log)
   logger.info(`mechanical: ${mechanical.ok ? 'pass' : 'fail'}`)
@@ -87,26 +139,35 @@ export async function runPipeline(
     }
   }
 
-  logger.info('review A: official overlap')
+  let used = 0
+
+  logger.info('stage: review A (official overlap)')
+  await ensureQuota(ports, logger, 'before A', used)
   const a = await ports.agent.run({
     kind: 'absorption',
     prompt: prompts.absorption,
     workdir: ports.workdir,
     dsh: ports.config.dsh,
     apiKey: ports.apiKey,
+    ...agentInput(ports, used),
   })
   ports.store.write('A', a.report)
+  used = addUsage(used, a.usage)
 
-  logger.info('review B: design alignment')
+  logger.info('stage: review B (design alignment)')
+  await ensureQuota(ports, logger, 'before B', used)
   const b = await ports.agent.run({
     kind: 'alignment',
     prompt: prompts.alignment,
     workdir: ports.workdir,
     dsh: ports.config.dsh,
     apiKey: ports.apiKey,
+    ...agentInput(ports, used),
   })
   ports.store.write('B', b.report)
+  used = addUsage(used, b.usage)
 
+  logger.info('stage: mechanical (after A+B)')
   mechanical = ports.runMechanical()
   ports.store.write('mechanical', mechanical.errors || mechanical.log)
   logger.info(`mechanical after A+B: ${mechanical.ok ? 'pass' : 'fail'}`)
@@ -114,7 +175,8 @@ export async function runPipeline(
   let fixAttempts = 0
   while (!mechanical.ok && fixAttempts < ports.config.loop.maxAttempts) {
     fixAttempts += 1
-    logger.info(`repair C${fixAttempts}`)
+    logger.info(`stage: repair C${fixAttempts}`)
+    await ensureQuota(ports, logger, `before C${fixAttempts}`, used)
     const prior = ports.store.listFixReports()
     const prompt = assembleFixPrompt({
       template: prompts.fix,
@@ -122,6 +184,7 @@ export async function runPipeline(
       reportB: ports.store.read('B') ?? '',
       errors: mechanical.errors,
       priorFixes: prior,
+      ...(ports.harness === undefined ? {} : { harness: ports.harness }),
     })
     const c = await ports.agent.run({
       kind: 'fix',
@@ -129,8 +192,11 @@ export async function runPipeline(
       workdir: ports.workdir,
       dsh: ports.config.dsh,
       apiKey: ports.apiKey,
+      ...agentInput(ports, used),
     })
     ports.store.write(`C${fixAttempts}`, c.report)
+    used = addUsage(used, c.usage)
+    logger.info(`stage: mechanical (after C${fixAttempts})`)
     mechanical = ports.runMechanical()
     ports.store.write('mechanical', mechanical.errors || mechanical.log)
   }
