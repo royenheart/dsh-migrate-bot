@@ -2,7 +2,7 @@ import type { IssuePrLanguage } from '../config/schema.ts'
 import type { MechanicalResult } from '../mechanical/run.ts'
 import type { ResolvedVersion } from '../watch/dsh-version.ts'
 import type { RunStatus } from '../pipeline/types.ts'
-import { formatErrorExcerpt, formatWorkingTree, summarizeAgentReport } from './issue-format.ts'
+import { formatAgentReport, formatErrorExcerpt, formatRootCause, formatWorkingTree } from './issue-format.ts'
 
 export interface DocumentInput {
   language: IssuePrLanguage
@@ -14,6 +14,7 @@ export interface DocumentInput {
   mechanical: MechanicalResult
   verdictA?: string | undefined
   verdictB?: string | undefined
+  fixes?: readonly string[] | undefined
   diff: string
 }
 
@@ -33,18 +34,24 @@ function en(input: DocumentInput): { title: string; issue: string; pr: string } 
 
 ## Root cause
 
-${input.mechanical.ok
-    ? 'Mechanical checks passed on the resulting tree. Remaining product questions are in the overlap and alignment summaries below.'
-    : 'Mechanical checks still fail. The error excerpt is the immediate cause; alignment/overlap reports describe the intended fix.'}
+${formatRootCause({
+    language: 'en',
+    mechanicalOk: input.mechanical.ok,
+    reportA: input.verdictA,
+    reportB: input.verdictB,
+    reportC: input.fixes?.at(-1),
+  })}
 
 ## Official overlap (A)
 
-${summarizeAgentReport(input.verdictA, '_Not run._')}
+${formatAgentReport(input.verdictA, '_Not run._')}
 
 ## Design alignment (B)
 
-${summarizeAgentReport(input.verdictB, '_Not run._')}
-
+${formatAgentReport(input.verdictB, '_Not run._')}
+${input.fixes !== undefined && input.fixes.length > 0
+    ? `\n## Repair (C${input.fixes.length})\n\n${formatAgentReport(input.fixes.at(-1), '_Not run._')}\n`
+    : ''}
 ## Mechanical test report
 
 Status: ${input.mechanical.ok ? 'pass' : 'fail'}
@@ -102,18 +109,24 @@ function zh(input: DocumentInput): { title: string; issue: string; pr: string } 
 
 ## 根因
 
-${input.mechanical.ok
-    ? '工作区机械检测已通过。产品层结论见下方重叠与对齐摘要。'
-    : '机械检测仍失败。错误摘录是直接原因；重叠/对齐报告说明预期改法。'}
+${formatRootCause({
+    language: 'zh',
+    mechanicalOk: input.mechanical.ok,
+    reportA: input.verdictA,
+    reportB: input.verdictB,
+    reportC: input.fixes?.at(-1),
+  })}
 
 ## 官方重叠（A）
 
-${summarizeAgentReport(input.verdictA, '_未运行。_')}
+${formatAgentReport(input.verdictA, '_未运行。_')}
 
 ## 设计对齐（B）
 
-${summarizeAgentReport(input.verdictB, '_未运行。_')}
-
+${formatAgentReport(input.verdictB, '_未运行。_')}
+${input.fixes !== undefined && input.fixes.length > 0
+    ? `\n## 修复（C${input.fixes.length}）\n\n${formatAgentReport(input.fixes.at(-1), '_未运行。_')}\n`
+    : ''}
 ## 机械测试报告
 
 状态：${input.mechanical.ok ? '通过' : '失败'}

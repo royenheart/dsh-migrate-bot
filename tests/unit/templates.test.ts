@@ -18,6 +18,7 @@ test('English documents have root-cause and test sections', () => {
   const docs = renderDocuments({ ...base, language: 'en' })
   assert.match(docs.title, /0\.1\.1-rc\.2/)
   assert.match(docs.issue, /## Root cause/)
+  assert.match(docs.issue, /Overlap verdict: `shrink`/)
   assert.match(docs.issue, /## Mechanical test report/)
   assert.match(docs.issue, /patch-reports/)
   assert.match(docs.pr, /## Test plan/)

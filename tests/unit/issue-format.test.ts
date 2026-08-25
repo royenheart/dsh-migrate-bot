@@ -33,7 +33,7 @@ const omo = {
 }
 
 function outline(markdown: string): string[] {
-  return markdown.split(/\r?\n/).filter(line => /^#{1,6}\s/.test(line))
+  return markdown.split(/\r?\n/).filter(line => /^#{1,2}\s/.test(line))
 }
 
 test('omo issue #1 A/B summaries drop H1 and keep a verdict', () => {
@@ -42,8 +42,11 @@ test('omo issue #1 A/B summaries drop H1 and keep a verdict', () => {
   assert.doesNotMatch(a, /^# /m)
   assert.doesNotMatch(b, /^# /m)
   assert.match(a, /Verdict: `keep`/)
+  assert.match(a, /### Plugin purpose/)
+  assert.match(a, /### Concrete edits/)
   assert.match(a, /b150a55/)
   assert.match(a, /discussion #2407/)
+  assert.match(b, /### Current seams/)
   assert.match(b, /self-contained dsh bundle/)
   assert.doesNotMatch(a, /An adjacent but non-substitute proposal is\s*$/)
 })
@@ -117,6 +120,10 @@ test('rendered omo issue keeps a single H1 and the template outline', () => {
   assert.doesNotMatch(docs.issue, /^## Remaining gaps/m)
   assert.doesNotMatch(docs.issue, /^## 1\. Current seams/m)
   assert.match(docs.issue, /Verdict: `keep`/)
+  assert.match(docs.issue, /Overlap verdict: `keep`/)
+  assert.match(docs.issue, /assistantPrefill/)
+  assert.match(docs.issue, /### Plugin purpose/)
+  assert.match(docs.issue, /### Remaining gaps/)
   assert.match(docs.issue, /<\/details>/)
   const notesAt = docs.issue.indexOf('## Notes')
   const detailsAt = docs.issue.indexOf('</details>')

@@ -48,6 +48,7 @@ function maybePublish(
     mechanical: extra.mechanical,
     verdictA: ports.store.read('A'),
     verdictB: ports.store.read('B'),
+    fixes: ports.store.listFixReports(),
     diff: ports.diff(),
   })
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)

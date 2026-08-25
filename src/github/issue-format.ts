@@ -109,24 +109,129 @@ export function reportPreview(markdown: string, maxChars = 800): string {
   return out
 }
 
+export interface ReportSection {
+  title: string
+  body: string
+}
+
+const SECTION_BODY = 4000
+
+function truncateBlock(text: string, maxChars: number): string {
+  const trimmed = text.trim()
+  if (trimmed.length <= maxChars) return trimmed
+  const slice = trimmed.slice(0, maxChars)
+  const nl = slice.lastIndexOf('\n')
+  const cut = nl >= 200 ? slice.slice(0, nl) : slice
+  return `${cut.trimEnd()}\n…`
+}
+
 /**
- * Short Issue/PR excerpt: title, verdict, prose. No H1/H2 that steal the template outline.
+ * Split an agent report on ATX headings. The first heading is the document title.
  */
-export function summarizeAgentReport(markdown: string | undefined, fallback: string): string {
+export function splitReportSections(markdown: string): { title: string | undefined; lead: string; sections: ReportSection[] } {
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n')
+  const sections: ReportSection[] = []
+  const before: string[] = []
+  let current: ReportSection | undefined
+  for (const line of lines) {
+    const heading = line.match(/^#{1,6}\s+(?:\d+\.\s*)?(.+?)\s*$/)
+    if (heading?.[1] !== undefined) {
+      if (current !== undefined) sections.push({ title: current.title, body: current.body.trim() })
+      current = { title: heading[1].trim(), body: '' }
+      continue
+    }
+    if (current === undefined) before.push(line)
+    else current.body += `${current.body === '' ? '' : '\n'}${line}`
+  }
+  if (current !== undefined) sections.push({ title: current.title, body: current.body.trim() })
+  const title = sections[0]?.title
+  const leadFromTitle = sections[0]?.body ?? ''
+  const rest = title === undefined ? sections : sections.slice(1)
+  const lead = [before.join('\n').trim(), leadFromTitle].filter(part => part !== '').join('\n\n')
+  return { title, lead, sections: rest }
+}
+
+function findSection(markdown: string | undefined, title: RegExp): string | undefined {
+  if (markdown === undefined) return undefined
+  const found = splitReportSections(markdown).sections.find(section => title.test(section.title))
+  if (found === undefined || found.body.trim() === '') return undefined
+  return found.body.trim()
+}
+
+/**
+ * Structured A/B/C body: title, verdict, then each prompt section as `###`.
+ * Headings stay at ### so they cannot steal the Issue `##` outline.
+ */
+export function formatAgentReport(markdown: string | undefined, fallback: string): string {
   if (markdown === undefined || markdown.trim() === '') return fallback
   const text = markdown.trim()
-  const title = reportTitle(text)
+  const split = splitReportSections(text)
+  const title = split.title ?? reportTitle(text)
   const verdict = reportVerdict(text)
-  const preview = sanitizeFlowingMarkdown(reportPreview(text))
   const lines: string[] = []
   if (title !== undefined) lines.push(boldLine(title))
   if (verdict !== undefined) lines.push(`Verdict: ${inlineCode(verdict)}`)
-  if (preview !== '') {
-    if (lines.length > 0) lines.push('')
-    lines.push(preview)
+  if (split.sections.length === 0) {
+    const preview = sanitizeFlowingMarkdown(reportPreview(text) || split.lead)
+    if (preview !== '') {
+      if (lines.length > 0) lines.push('')
+      lines.push(preview)
+    }
+    return lines.length === 0 ? fallback : lines.join('\n')
   }
-  if (lines.length === 0) return fallback
-  return lines.join('\n')
+  if (split.lead !== '') {
+    lines.push('')
+    lines.push(sanitizeFlowingMarkdown(truncateBlock(split.lead, 800)))
+  }
+  for (const section of split.sections) {
+    if (section.title === '') continue
+    lines.push('')
+    lines.push(`### ${section.title.replaceAll('#', '').trim()}`)
+    if (section.body !== '') {
+      lines.push('')
+      lines.push(sanitizeFlowingMarkdown(truncateBlock(section.body, SECTION_BODY)))
+    }
+  }
+  return lines.length === 0 ? fallback : lines.join('\n')
+}
+
+/** @deprecated Use {@link formatAgentReport}. */
+export function summarizeAgentReport(markdown: string | undefined, fallback: string): string {
+  return formatAgentReport(markdown, fallback)
+}
+
+export function formatRootCause(input: {
+  language: 'en' | 'zh'
+  mechanicalOk: boolean
+  reportA?: string | undefined
+  reportB?: string | undefined
+  reportC?: string | undefined
+}): string {
+  const zh = input.language === 'zh'
+  const fromC = findSection(input.reportC, /root cause|根因/i)
+  if (fromC !== undefined) return sanitizeFlowingMarkdown(truncateBlock(fromC, SECTION_BODY))
+  const parts: string[] = []
+  const verdict = input.reportA === undefined ? undefined : reportVerdict(input.reportA)
+  if (verdict !== undefined) {
+    parts.push(zh ? `重叠结论：${inlineCode(verdict)}` : `Overlap verdict: ${inlineCode(verdict)}`)
+  }
+  const gaps = findSection(input.reportB, /remaining|gap|patch|缺口/i)
+    ?? findSection(input.reportA, /remaining|gap|patch|缺口|overlap|重叠/i)
+  const edits = findSection(input.reportA, /edit|concrete|改动/i)
+    ?? findSection(input.reportB, /edit|改动/i)
+  if (gaps !== undefined) parts.push(sanitizeFlowingMarkdown(truncateBlock(gaps, SECTION_BODY)))
+  else if (edits !== undefined) parts.push(sanitizeFlowingMarkdown(truncateBlock(edits, SECTION_BODY)))
+  if (!input.mechanicalOk) {
+    parts.push(zh
+      ? '机械测试仍失败，错误摘录见下方。'
+      : 'Mechanical tests still fail; see the excerpt below.')
+  }
+  if (parts.length === 0) {
+    return input.mechanicalOk
+      ? (zh ? '工作区机械检测已通过。产品层结论见下方重叠与对齐各节。' : 'Mechanical checks passed. See overlap and alignment sections below.')
+      : (zh ? '机械检测仍失败。错误摘录是直接原因；重叠/对齐各节说明预期改法。' : 'Mechanical checks still fail. The error excerpt is the immediate cause; overlap and alignment sections describe the intended fix.')
+  }
+  return parts.join('\n\n')
 }
 
 export function formatErrorExcerpt(errors: string, empty: string): string {
