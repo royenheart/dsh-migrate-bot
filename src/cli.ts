@@ -51,7 +51,7 @@ async function main(argv: readonly string[]): Promise<number> {
     return 0
   }
   if (command !== 'run') {
-    process.stderr.write('usage: dsh-migrate run|check-config [--workdir DIR] [--config FILE] [--dsh-version VER] [--mechanical-only] [--skip-github] [--force]\n')
+    process.stderr.write('usage: dsh-migrate run|check-config [--workdir DIR] [--config FILE] [--dsh-version VER] [--api-key-env NAME] [--mechanical-only] [--skip-github] [--force]\n')
     return 2
   }
 
@@ -63,7 +63,8 @@ async function main(argv: readonly string[]): Promise<number> {
     : loadConfigFile(configPath)
   const requested = argValue(argv, '--dsh-version') ?? config.dshVersion
   const target = await resolveDshVersion(requested)
-  const secrets = loadSecrets([workdir, appRoot, process.cwd()])
+  const apiKeyEnv = argValue(argv, '--api-key-env') ?? config.secrets.apiKeyEnv
+  const secrets = loadSecrets([workdir, appRoot, process.cwd()], { apiKeyEnv })
   const mechanicalOnly = hasFlag(argv, '--mechanical-only')
   const skipGithub = hasFlag(argv, '--skip-github') || mechanicalOnly
   const force = hasFlag(argv, '--force')
@@ -116,12 +117,14 @@ async function main(argv: readonly string[]): Promise<number> {
     return mechanical.ok ? 0 : 1
   }
 
-  if (secrets.DEEPSEEK_API_KEY === undefined) {
-    process.stderr.write('DEEPSEEK_API_KEY is required (env or .secrets.local.json). Use --mechanical-only to skip the agent.\n')
+  const apiKey = secrets.apiKey
+  if (apiKey === undefined) {
+    process.stderr.write(`${apiKeyEnv} is required (env or .secrets.local.json). Use --mechanical-only to skip the agent.\n`)
     return 1
   }
 
-  if (!skipGithub && secrets.GITHUB_TOKEN === undefined) {
+  const githubToken = secrets.githubToken
+  if (!skipGithub && githubToken === undefined) {
     process.stderr.write('GITHUB_TOKEN missing; Issue/PR will be skipped. Pass --skip-github to silence this.\n')
   }
 
@@ -130,7 +133,7 @@ async function main(argv: readonly string[]): Promise<number> {
     workdir,
     target,
     store: createReportStore(runDir),
-    apiKey: secrets.DEEPSEEK_API_KEY,
+    apiKey,
     runMechanical: () => runMechanical(workdir, config),
     isDirty: () => isWorktreeDirty(workdir),
     diff: () => worktreeDiff(workdir),
@@ -138,9 +141,9 @@ async function main(argv: readonly string[]): Promise<number> {
       ...(process.env.DSH_HOME === undefined ? {} : { dshHome: process.env.DSH_HOME }),
       reportDir: runDir,
     }),
-    ...(skipGithub || secrets.GITHUB_TOKEN === undefined
+    ...(skipGithub || githubToken === undefined
       ? {}
-      : { github: createGithubPublisher(secrets.GITHUB_TOKEN) }),
+      : { github: createGithubPublisher(githubToken) }),
   }, {
     info(message) { logLine(message) },
   })

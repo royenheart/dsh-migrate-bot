@@ -30,6 +30,7 @@ writeFileSync(process.env.DSH_MIGRATE_ARGV_OUT, JSON.stringify(process.argv.slic
         INPUT_MECHANICAL_ONLY: 'true',
         INPUT_SKIP_GITHUB: 'true',
         INPUT_FORCE: 'true',
+        INPUT_API_KEY_ENV: 'MY_DEEPSEEK_KEY',
         DSH_MIGRATE_CLI: fakeCli,
         DSH_MIGRATE_ARGV_OUT: out,
       },
@@ -44,6 +45,7 @@ writeFileSync(process.env.DSH_MIGRATE_ARGV_OUT, JSON.stringify(process.argv.slic
     assert.ok(argv.includes('--mechanical-only'))
     assert.ok(argv.includes('--skip-github'))
     assert.ok(argv.includes('--force'))
+    assert.equal(argv[argv.indexOf('--api-key-env') + 1], 'MY_DEEPSEEK_KEY')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

@@ -59,6 +59,7 @@ export function parseConfig(raw: unknown): MigrateConfig {
       issuePr: { ...DEFAULT_CONFIG.issuePr },
       loop: { ...DEFAULT_CONFIG.loop },
       watch: { ...DEFAULT_CONFIG.watch },
+      secrets: { ...DEFAULT_CONFIG.secrets },
     }
   }
   if (!isRecord(raw)) throw new ConfigError('config root must be a mapping')
@@ -134,6 +135,18 @@ export function parseConfig(raw: unknown): MigrateConfig {
     }
   }
 
+  const secretsRaw = raw.secrets
+  let apiKeyEnv = DEFAULT_CONFIG.secrets.apiKeyEnv
+  if (secretsRaw !== undefined) {
+    if (!isRecord(secretsRaw)) throw new ConfigError('secrets must be a mapping')
+    if (secretsRaw.apiKeyEnv !== undefined) {
+      apiKeyEnv = asString(secretsRaw.apiKeyEnv, 'secrets.apiKeyEnv')
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(apiKeyEnv)) {
+        throw new ConfigError('secrets.apiKeyEnv must be a valid environment variable name')
+      }
+    }
+  }
+
   return {
     dshVersion: raw.dshVersion === undefined ? DEFAULT_CONFIG.dshVersion : asString(raw.dshVersion, 'dshVersion'),
     review: { policy },
@@ -143,6 +156,7 @@ export function parseConfig(raw: unknown): MigrateConfig {
     issuePr: { language },
     loop: { maxAttempts },
     watch: { enabled: watchEnabled },
+    secrets: { apiKeyEnv },
   }
 }
 

@@ -16,12 +16,12 @@ const plugin = resolve(appRoot, 'fixtures/plugins/official-overlap-markdown')
 
 test('live dsh review against the overlap fixture', async (t) => {
   if (process.env.DSH_MIGRATE_LIVE !== '1') {
-    t.skip('set DSH_MIGRATE_LIVE=1 and put DEEPSEEK_API_KEY in .secrets.local.json')
+    t.skip('set DSH_MIGRATE_LIVE=1 and put the API key in .secrets.local.json')
     return
   }
   const secrets = loadSecrets([appRoot])
-  if (secrets.DEEPSEEK_API_KEY === undefined) {
-    t.skip('missing DEEPSEEK_API_KEY')
+  if (secrets.apiKey === undefined) {
+    t.skip('missing DeepSeek API key')
     return
   }
   const workdir = mkdtempSync(join(tmpdir(), 'dsh-mig-live-plugin-'))
@@ -33,7 +33,7 @@ test('live dsh review against the overlap fixture', async (t) => {
     workdir,
     target: { tag: 'dsh-v0.1.1-rc.2', version: '0.1.1-rc.2' },
     store: createReportStore(runDir),
-    apiKey: secrets.DEEPSEEK_API_KEY,
+    apiKey: secrets.apiKey,
     runMechanical: () => runMechanical(workdir, parseConfig({})),
     isDirty: () => false,
     diff: () => '',

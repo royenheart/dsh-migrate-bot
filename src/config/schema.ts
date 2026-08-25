@@ -1,3 +1,5 @@
+import { DEFAULT_API_KEY_ENV } from '../secrets.ts'
+
 /** User-facing review policy after the first mechanical pass. */
 export type ReviewPolicy = 'always' | 'skip-if-mechanical-pass'
 
@@ -54,6 +56,11 @@ export interface WatchConfig {
   enabled: boolean
 }
 
+export interface SecretsConfig {
+  /** Env var / repository-secret name that holds the DeepSeek API key. */
+  apiKeyEnv: string
+}
+
 export interface MigrateConfig {
   dshVersion: string
   review: { policy: ReviewPolicy }
@@ -63,6 +70,7 @@ export interface MigrateConfig {
   issuePr: IssuePrConfig
   loop: LoopConfig
   watch: WatchConfig
+  secrets: SecretsConfig
 }
 
 export const DEFAULT_CONFIG: MigrateConfig = {
@@ -79,4 +87,5 @@ export const DEFAULT_CONFIG: MigrateConfig = {
   issuePr: { language: 'en' },
   loop: { maxAttempts: 5 },
   watch: { enabled: true },
+  secrets: { apiKeyEnv: DEFAULT_API_KEY_ENV },
 }

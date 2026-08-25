@@ -2,13 +2,13 @@
 
 GitHub Action that watches [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh-v*`) releases and migrates a third-party plugin: mechanical tests, two dsh review sessions (DeepSeek V4 Pro, thinking `max`, [dsh-anchored-standard](https://github.com/xiaobright/dsh-anchored-standard)), a repair loop, then an Issue and PR only if the plugin tree is dirty.
 
-Install it by adding a workflow to the plugin repository. It runs on that repo’s GitHub-hosted runners. Provide `DEEPSEEK_API_KEY` as a repository secret.
+Install it by adding a workflow to the plugin repository. It runs on that repo’s GitHub-hosted runners. Provide `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` as a repository secret (or another name via `api_key_env` / `secrets.apiKeyEnv`).
 
 Pin the Action as `royenheart/dsh-migrate-bot@v0`.
 
 ## Usage
 
-1. Add repository secret `DEEPSEEK_API_KEY`.
+1. Add repository secret `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT`.
 2. Copy [examples/workflow.yml](examples/workflow.yml) to `.github/workflows/dsh-migrate.yml` and set the cron.
 3. Optionally copy [examples/dsh-migrate.yml](examples/dsh-migrate.yml) to `.github/dsh-migrate.yml`.
 
@@ -42,10 +42,11 @@ Last processed version is stored on branch `dsh-migrate/state` (`seen.json` only
 | watch | enabled |
 | Issue/PR language | `en` |
 | repair loops | 5 |
+| API key secret | `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` |
 
 Override prompts under `prompts.absorption`, `prompts.alignment`, and `prompts.fix` in `.github/dsh-migrate.yml`.
 
-Inputs: `dsh_version`, `config`, `mechanical_only`, `skip_github`, `force`, `workdir`.
+Inputs: `dsh_version`, `config`, `mechanical_only`, `skip_github`, `force`, `api_key_env`, `workdir`. To use a different secret, set `api_key_env` (or `secrets.apiKeyEnv` in `.github/dsh-migrate.yml`) and map that name in the workflow `env:` block.
 
 ## Local CLI
 
@@ -57,17 +58,17 @@ node dist/src/cli.js run --workdir /path/to/plugin --mechanical-only --dsh-versi
 
 `--skip-github` runs the agent without opening an Issue or PR. `--mechanical-only` skips the agent and GitHub. Host agent runs need a real `dsh` binary on `PATH` (`DSH_BIN` if it is not named `dsh`). A shell alias is not visible to `spawn`.
 
-Put the API key in gitignored `.secrets.local.json` (see [.secrets.local.json.example](.secrets.local.json.example)), or set `DEEPSEEK_API_KEY`. Live e2e: `DSH_MIGRATE_LIVE=1 npm run test:e2e`.
+Put the API key in gitignored `.secrets.local.json` (see [.secrets.local.json.example](.secrets.local.json.example)), or set `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` (`DEEPSEEK_API_KEY` is also accepted locally). Live e2e: `DSH_MIGRATE_LIVE=1 npm run test:e2e`.
 
 ```sh
 docker build -t dsh-migrate-bot .
 docker run --rm \
-  -e DEEPSEEK_API_KEY \
+  -e DEEPSEEK_API_KEY_DSH_MIGRATE_BOT \
   -v "$PWD/fixtures/plugins/typecheck-ok:/github/workspace" \
   dsh-migrate-bot run --workdir /github/workspace --mechanical-only --dsh-version 0.1.1-rc.2
 ```
 
-Pass the key with `-e DEEPSEEK_API_KEY` or a `KEY=value` env file, not `.secrets.local.json` as Docker `--env-file`.
+Pass the key with `-e DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` or a `KEY=value` env file, not `.secrets.local.json` as Docker `--env-file`.
 
 ## Releasing
 

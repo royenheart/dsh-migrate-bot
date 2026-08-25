@@ -43,8 +43,10 @@ jobs:
           workdir: .
           config: .github/dsh-migrate.yml
           force: ${{ inputs.force || false }}
+          # To use another secret, set api_key_env and map that name below.
+          # api_key_env: MY_DEEPSEEK_KEY
         env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_API_KEY_DSH_MIGRATE_BOT: ${{ secrets.DEEPSEEK_API_KEY_DSH_MIGRATE_BOT }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload A/B/C reports
         if: always()

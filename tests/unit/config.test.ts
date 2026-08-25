@@ -11,6 +11,7 @@ test('empty config uses defaults', () => {
   assert.equal(config.review.policy, 'always')
   assert.equal(config.issuePr.language, 'en')
   assert.equal(config.watch.enabled, true)
+  assert.equal(config.secrets.apiKeyEnv, 'DEEPSEEK_API_KEY_DSH_MIGRATE_BOT')
 })
 
 test('rejects unknown review policy', () => {
@@ -50,4 +51,13 @@ test('watch.enabled can be turned off', () => {
 
 test('rejects non-boolean watch.enabled', () => {
   assert.throws(() => parseConfig({ watch: { enabled: 'yes' } }), /watch.enabled/)
+})
+
+test('secrets.apiKeyEnv can be overridden', () => {
+  const config = parseConfig({ secrets: { apiKeyEnv: 'MY_DEEPSEEK_KEY' } })
+  assert.equal(config.secrets.apiKeyEnv, 'MY_DEEPSEEK_KEY')
+})
+
+test('rejects an invalid secrets.apiKeyEnv name', () => {
+  assert.throws(() => parseConfig({ secrets: { apiKeyEnv: 'not-a-name' } }), /secrets.apiKeyEnv/)
 })

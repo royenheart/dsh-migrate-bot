@@ -1,5 +1,6 @@
 export { parseConfig, loadConfigFile } from './config/load.ts'
 export { DEFAULT_CONFIG } from './config/schema.ts'
+export { DEFAULT_API_KEY_ENV, loadSecrets } from './secrets.ts'
 export { runMechanical } from './mechanical/run.ts'
 export { extractMechanicalErrors } from './mechanical/errors.ts'
 export { runPipeline } from './pipeline/orchestrator.ts'

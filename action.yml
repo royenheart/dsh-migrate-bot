@@ -25,6 +25,10 @@ inputs:
     description: If true, run even when dsh has not changed since the last successful run
     required: false
     default: 'false'
+  api_key_env:
+    description: Env var name for the DeepSeek API key (default DEEPSEEK_API_KEY_DSH_MIGRATE_BOT)
+    required: false
+    default: ''
   workdir:
     description: Plugin repository root inside the runner
     required: false

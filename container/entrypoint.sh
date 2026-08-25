@@ -42,6 +42,9 @@ fi
 if [[ -n "${INPUT_DSH_VERSION:-}" && ! " ${args[*]} " =~ " --dsh-version " ]]; then
   args+=(--dsh-version "$INPUT_DSH_VERSION")
 fi
+if [[ -n "${INPUT_API_KEY_ENV:-}" && ! " ${args[*]} " =~ " --api-key-env " ]]; then
+  args+=(--api-key-env "$INPUT_API_KEY_ENV")
+fi
 if [[ "${INPUT_MECHANICAL_ONLY:-false}" == [Tt]rue ]]; then
   if [[ ! " ${args[*]} " =~ " --mechanical-only " ]]; then
     args+=(--mechanical-only)
