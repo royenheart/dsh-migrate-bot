@@ -11,3 +11,15 @@ Version numbers are bumped with [Commitizen](https://commitizen-tools.github.io/
 - Containerized GitHub Action that migrates third-party dsh plugins.
 - Mechanical tests, overlap/alignment reviews, repair loop, Issue/PR on dirty trees.
 - dsh update gate with last-seen version stored on `dsh-migrate/state`.
+
+## v0.1.1 (2026-08-26)
+
+### Feat
+
+- rename the default DeepSeek API secret
+
+## v0.1.0 (2026-08-25)
+
+### Feat
+
+- ship the dsh-migrate GitHub Action
