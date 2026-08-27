@@ -111,7 +111,7 @@ async function main(argv: readonly string[]): Promise<number> {
   ensureMigrateGitExclude(workdir)
 
   if (mechanicalOnly) {
-    const mechanical = runMechanical(workdir, config)
+    const mechanical = runMechanical(workdir, config, { dshVersion: target.version })
     createReportStore(runDir).write('mechanical', mechanical.errors || mechanical.log)
     writeGithubOutput({
       status: mechanical.ok ? 'compatible' : 'failed',
@@ -168,7 +168,7 @@ async function main(argv: readonly string[]): Promise<number> {
       target,
       store: createReportStore(runDir),
       apiKey,
-      runMechanical: () => runMechanical(workdir, config),
+      runMechanical: () => runMechanical(workdir, config, { dshVersion: target.version }),
       isDirty: () => isWorktreeDirty(workdir),
       diff: () => worktreeDiff(workdir),
       agent: createDshRunner({

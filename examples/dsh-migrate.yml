@@ -12,6 +12,8 @@ dsh:
 
 review:
   # always | skip-if-mechanical-pass
+  # skip-if-mechanical-pass is for plugins whose npm test already proves host
+  # behavior, usage, and UI against the pinned target @deepseek-ai/dsh-* packages.
   policy: always
 
 # Skip the pipeline when dsh-v* is unchanged since the last successful run.

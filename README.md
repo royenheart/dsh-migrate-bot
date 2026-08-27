@@ -50,8 +50,8 @@ flowchart TD
 
 1. Resolve the target `dsh-v*` (`latest` or a pin).
 2. Skip if that version matches `dsh-migrate/state`, unless `force` is set or `watch.enabled` is `false`. Failed runs do not update the branch, so the next schedule retries.
-3. Mechanical tests (built-in, or `tests.commands` — that list **replaces** the default suite).
-4. Sparse-checkout the target harness tag into `.dsh-migrate/harness` (not committed). Review: `always` (default) runs overlap (A) then alignment (B); `skip-if-mechanical-pass` skips A/B when step 3 passed.
+3. Mechanical tests (built-in, or `tests.commands` — that list **replaces** the default suite). Before either suite, missing `node_modules` get `npm install`, then every `@deepseek-ai/dsh-*` dependency is pinned to the target version (`npm install --no-save …@<version>`) so typecheck and tests see that harness, not an older caret resolve. `DSH_MIGRATE_TARGET_VERSION` is set on those commands.
+4. Sparse-checkout the target harness tag into `.dsh-migrate/harness` (not committed). Review: `always` (default) runs overlap (A) then alignment (B); `skip-if-mechanical-pass` skips A/B when step 3 passed. Use `skip-if-mechanical-pass` only when the plugin's test suite itself proves host behavior, usage, and UI still work on the pinned packages.
 5. During A/B/C the agent may shrink or retire shadowed official surfaces. dsh-side patches are allowed when official extension points still cannot cover unique behavior. For each remaining patch it writes `.dsh-migrate/patch-reports/<slug>/report.md`: search official [issues / PRs / discussions](https://github.com/deepseek-ai/deepseek-harness) first and record links; if none exist, write a discussion draft (`# [Feature request] …`, English summary, Background, Current state, Proposal, Appendix: patch, Questions to confirm, Related).
 6. Re-run mechanical tests after A+B.
 7. On failure, a new dsh session gets A+B, error lines only, and prior `C1..Cn-1`; write `Cn`; retest; up to `loop.maxAttempts`.
