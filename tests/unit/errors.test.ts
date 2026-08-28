@@ -42,10 +42,10 @@ test('fix prompt can append a harness checkout note', () => {
   assert.match(prompt, /dsh-v0\.1\.1-rc\.2/)
   assert.match(prompt, /README/)
   assert.match(prompt, /official extension points/)
+  assert.match(prompt, /patches\/ directory/)
   assert.match(prompt, /\.dsh-migrate\/patch-reports\//)
   assert.match(prompt, /deepseek-ai\/deepseek-harness/)
   assert.match(prompt, /\[Feature request\]/)
-  assert.doesNotMatch(prompt, /patches\//)
 })
 
 test('first fix has no prior C reports', () => {

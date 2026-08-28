@@ -40,6 +40,9 @@ RUN set -eux; \
 COPY src ./src
 COPY container ./container
 
+# typescript is a runtime dependency so mechanical typecheck can use the
+# bundled tsc. Plugins without a local compiler must not fall through to
+# `npx tsc` (the unrelated placeholder package). prune keeps production deps.
 RUN set -eux; \
   npm run build; \
   npm prune --omit=dev; \

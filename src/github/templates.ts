@@ -77,8 +77,8 @@ Automated migration toward DeepSeek Harness \`${input.target.version}\` for \`${
 
 - [ ] Mechanical suite on this branch (Action log)
 - [ ] Install into a throwaway profile and boot \`dsh web\`
-- [ ] Confirm unique plugin behavior still works
-- [ ] Confirm no leftover shadow of an official surface that A marked \`retire\` / \`shrink\`
+- [ ] Confirm documented capabilities and entry points still work
+- [ ] Confirm no leftover shadow of an official surface that A marked \`retire\` / \`shrink\` only when official overlap absorbed that surface
 
 ## Root cause
 
@@ -152,8 +152,8 @@ ${formatWorkingTree(input.diff, 'zh')}
 
 - [ ] 本分支再跑一遍机械检测
 - [ ] 装进一次性 profile 并启动 \`dsh web\`
-- [ ] 确认插件独有行为仍在
-- [ ] 确认 A 判定为 \`retire\` / \`shrink\` 的官方重叠面已被去掉
+- [ ] 确认文档中的能力与入口仍在
+- [ ] 仅当官方重叠真正吸收了该面时，确认 A 判定为 \`retire\` / \`shrink\` 的面已被去掉
 
 ## 根因
 

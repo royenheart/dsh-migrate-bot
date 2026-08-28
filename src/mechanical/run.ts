@@ -1,10 +1,12 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { MigrateConfig } from '../config/schema.ts'
 import { extractMechanicalErrors } from './errors.ts'
 import { dshPeerSpecs, pinDshPeersCommand } from './peers.ts'
 import { scanKeyedSlots, scanPluginShape } from './scan.ts'
+import { typecheckCommand } from './typecheck.ts'
 
 export interface MechanicalResult {
   ok: boolean
@@ -123,7 +125,9 @@ export function runMechanical(
   const commands = [...prefix]
   if (scripts.build !== undefined) commands.push('npm run build')
   if (scripts.typecheck !== undefined) commands.push('npm run typecheck')
-  else if (existsSync(join(root, 'tsconfig.json'))) commands.push('npx tsc --noEmit')
+  else if (existsSync(join(root, 'tsconfig.json'))) {
+    commands.push(typecheckCommand(root, fileURLToPath(import.meta.url)))
+  }
   if (scripts.test !== undefined) commands.push('npm test')
 
   const ran = runList(commands, root, extraEnv)

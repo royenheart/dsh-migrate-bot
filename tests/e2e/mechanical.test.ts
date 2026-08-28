@@ -12,6 +12,14 @@ test('typecheck-ok passes default mechanical checks', () => {
   assert.equal(result.ok, true, result.errors)
 })
 
+test('typecheck without a plugin-local tsc uses the migrator compiler', () => {
+  const result = runMechanical(resolve(fixtures, 'typecheck-no-local-tsc'), parseConfig({}))
+  assert.equal(result.ok, true, result.errors)
+  assert.doesNotMatch(result.log, /\$ npx tsc --noEmit/)
+  assert.doesNotMatch(result.log, /This is not the tsc command you are looking for/)
+  assert.match(result.log, /--noEmit/)
+})
+
 test('slot-key-break fails default mechanical checks', () => {
   const result = runMechanical(resolve(fixtures, 'slot-key-break'), parseConfig({}))
   assert.equal(result.ok, false)
