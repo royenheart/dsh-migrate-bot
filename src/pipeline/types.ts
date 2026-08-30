@@ -11,6 +11,7 @@ export interface PublishResult {
   issueUrl?: string
   issueNumber?: number
   pullRequestUrl?: string
+  pullRequestNumber?: number
 }
 
 export interface PipelineResult {

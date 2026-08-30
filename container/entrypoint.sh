@@ -18,8 +18,11 @@ export DSH_MIGRATE_APP_ROOT="${DSH_MIGRATE_APP_ROOT:-/opt/dsh-migrate}"
 export DSH_MIGRATE_HOME="${DSH_MIGRATE_HOME:-$workspace/.dsh-migrate}"
 
 args=("$@")
-if [[ ${#args[@]} -eq 0 || ( "${args[0]}" != run && "${args[0]}" != check-config ) ]]; then
+if [[ ${#args[@]} -eq 0 || ( "${args[0]}" != run && "${args[0]}" != check-config && "${args[0]}" != refresh-badge ) ]]; then
   args=(run "${args[@]}")
+fi
+if [[ "${INPUT_REFRESH_ONLY:-false}" == [Tt]rue ]]; then
+  args=(refresh-badge)
 fi
 
 resolve_workdir() {

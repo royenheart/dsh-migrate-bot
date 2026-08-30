@@ -17,7 +17,7 @@ review:
   policy: always
 
 # Skip the pipeline when dsh-v* is unchanged since the last successful run.
-# First run (no dsh-migrate/state branch yet) always proceeds.
+# First run (no dsh-migrate/state seen.json yet) always proceeds.
 watch:
   enabled: true
 

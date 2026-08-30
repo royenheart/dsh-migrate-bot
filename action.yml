@@ -37,6 +37,10 @@ inputs:
     description: Max USD this Action run may spend (this run's official usage estimate). Empty = no cap.
     required: false
     default: ''
+  refresh_only:
+    description: If true, only reconcile a pending migrate PR and rewrite badge.json (no pipeline).
+    required: false
+    default: 'false'
 outputs:
   status:
     description: compatible, migrated, failed, or skipped (dsh unchanged)
@@ -54,6 +58,10 @@ outputs:
     description: Resolved dsh-v* tag for this run
   previous_tag:
     description: Last recorded dsh-v* tag (set when status is skipped)
+  verified_tag:
+    description: Last verified dsh-v* tag (compatible run or merged migrate PR)
+  badge_message:
+    description: shields.io badge message (verified tag, pending, or unverified)
 runs:
   using: docker
   image: Dockerfile

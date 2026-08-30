@@ -2,7 +2,9 @@
 # Edit the cron. GitHub Actions only runs schedules that appear here.
 #
 # After a successful run, last processed dsh-v* is stored on branch
-# `dsh-migrate/state` (seen.json only). Do not merge that branch into main.
+# `dsh-migrate/state` (`seen.json` + `badge.json`). Do not merge that branch
+# into main. `seen.json` is the watch cursor; `badge.json` is the shields.io
+# endpoint for default-branch support (verified / pending / unverified).
 
 name: dsh-migrate
 
@@ -22,6 +24,8 @@ on:
         default: false
   repository_dispatch:
     types: [dsh-release]
+  pull_request:
+    types: [closed]
 
 # Also enable: Settings → Actions → General → Workflow permissions →
 # "Allow GitHub Actions to create and approve pull requests".
@@ -33,6 +37,7 @@ permissions:
 
 jobs:
   migrate:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,3 +63,17 @@ jobs:
           name: dsh-migrate-reports
           path: .dsh-migrate/
           if-no-files-found: ignore
+
+  # When you merge or close a migrate PR, promote or drop pending verification.
+  refresh-badge:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: royenheart/dsh-migrate-bot@v0
+        with:
+          refresh_only: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

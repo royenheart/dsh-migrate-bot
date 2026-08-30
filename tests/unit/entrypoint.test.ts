@@ -52,3 +52,33 @@ writeFileSync(process.env.DSH_MIGRATE_ARGV_OUT, JSON.stringify(process.argv.slic
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('entrypoint maps refresh_only to refresh-badge', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-mig-entry-'))
+  try {
+    const out = join(dir, 'argv.json')
+    const fakeCli = join(dir, 'fake-cli.mjs')
+    writeFileSync(fakeCli, `import { writeFileSync } from 'node:fs'
+writeFileSync(process.env.DSH_MIGRATE_ARGV_OUT, JSON.stringify(process.argv.slice(2)))
+`)
+    chmodSync(entrypoint, 0o755)
+    const result = spawnSync('bash', [entrypoint], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOME: dir,
+        GITHUB_WORKSPACE: dir,
+        INPUT_REFRESH_ONLY: 'true',
+        INPUT_WORKDIR: '.',
+        DSH_MIGRATE_CLI: fakeCli,
+        DSH_MIGRATE_ARGV_OUT: out,
+      },
+    })
+    assert.equal(result.status, 0, result.stderr)
+    const argv = JSON.parse(readFileSync(out, 'utf8')) as string[]
+    assert.equal(argv[0], 'refresh-badge')
+    assert.ok(argv.includes('--workdir'))
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

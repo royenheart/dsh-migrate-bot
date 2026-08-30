@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { stagePluginChanges } from '../git/worktree.ts'
+import { githubRequest } from './api.ts'
 import type { GithubPublisher, PublishResult } from '../pipeline/types.ts'
 
 const GIT_SAFE = ['-c', 'safe.directory=*'] as const
@@ -62,29 +63,6 @@ function ensureGitIdentity(cwd: string): void {
   runGit(['config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com'], cwd)
 }
 
-async function githubRequest(
-  token: string,
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<unknown> {
-  const response = await fetch(`https://api.github.com${path}`, {
-    method,
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'User-Agent': 'dsh-migrate-action',
-      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-    },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  })
-  const text = await response.text()
-  if (!response.ok) {
-    throw new Error(`GitHub ${method} ${path} failed: ${response.status} ${text}`)
-  }
-  return text === '' ? {} : JSON.parse(text)
-}
-
 /**
  * Commit the dirty tree (excluding reports/secrets), push a branch, open an Issue and a PR.
  * If nothing remains after exclusions, this is a no-op.
@@ -129,12 +107,13 @@ export function createGithubPublisher(token: string): GithubPublisher {
         body: `${input.prBody}\n\nCloses #${issue.number ?? ''}`,
         head: input.branch,
         base,
-      }) as { html_url?: string }
+      }) as { html_url?: string; number?: number }
 
       const published: PublishResult = {}
       if (issue.html_url !== undefined) published.issueUrl = issue.html_url
       if (typeof issue.number === 'number') published.issueNumber = issue.number
       if (pr.html_url !== undefined) published.pullRequestUrl = pr.html_url
+      if (typeof pr.number === 'number') published.pullRequestNumber = pr.number
       return published
     },
   }

@@ -18,7 +18,15 @@ Schedule, `workflow_dispatch`, and `repository_dispatch` belong in **that** work
 
 The first run always proceeds. Later scheduled runs skip when `dsh-v*` has not changed (`status: skipped`). Re-run the same version with `force: true` on `workflow_dispatch`.
 
-Last processed version is stored on branch `dsh-migrate/state` (`seen.json` only). Leave that branch unmerged. Reports under `.dsh-migrate/` (A/B/C, harness checkout, per-patch reports) are uploaded as an artifact and are not committed.
+Last processed version is stored on branch `dsh-migrate/state` (`seen.json` + `badge.json`). Leave that branch unmerged. `seen.json` is the watch cursor (skip the next cron when dsh has not changed). `badge.json` is a [shields.io endpoint](https://shields.io/badges/endpoint-badge) for **default-branch** support: a clean `compatible` run verifies immediately; a migrate PR stays `pending` until you merge it (or `unverified` if you close it). Reports under `.dsh-migrate/` (A/B/C, harness checkout, per-patch reports) are uploaded as an artifact and are not committed.
+
+Public README badge (replace `OWNER` / `REPO`):
+
+```markdown
+[![dsh](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FOWNER%2FREPO%2Frefs%2Fheads%2Fdsh-migrate%2Fstate%2Fbadge.json)](https://github.com/OWNER/REPO/tree/dsh-migrate/state)
+```
+
+Copy [examples/workflow.yml](examples/workflow.yml) so `pull_request: closed` refreshes the badge when you merge or reject the migrate PR. Until the first Action run writes `badge.json`, shields.io may show `invalid`.
 
 ## Pipeline
 
@@ -43,7 +51,7 @@ flowchart TD
   pr --> comment[Comment on Issue:<br/>PR link, patch table, report bodies]
   comment --> rec
   nopublish --> rec{Mechanical passed?}
-  rec -->|yes| save[Record version on dsh-migrate/state]
+  rec -->|yes| save[Record processed version on dsh-migrate/state]
   rec -->|no| failed([failed — next schedule retries])
   save --> done([compatible or migrated])
 ```

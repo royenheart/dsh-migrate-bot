@@ -8,7 +8,9 @@ import { runMechanical } from './mechanical/run.ts'
 import { ensureMigrateGitExclude, isWorktreeDirty, worktreeDiff } from './git/worktree.ts'
 import { resolveDshVersion } from './watch/dsh-version.ts'
 import { decideWatch, describeWatchDecision } from './watch/gate.ts'
-import { persistSeenState, readSeenState, STATE_BRANCH } from './watch/seen.ts'
+import { applyRunToSeenState, readSeenState, STATE_BRANCH } from './watch/seen.ts'
+import { badgeFromSeenState } from './watch/badge.ts'
+import { publishedPullRequest, reconcilePendingState, writeStateBranch } from './watch/sync.ts'
 import { createReportStore } from './reports/store.ts'
 import { createDshRunner, formatSessionProgress } from './agents/dsh.ts'
 import { createGithubPublisher } from './github/publish.ts'
@@ -42,6 +44,45 @@ function resolveConfigPath(argv: readonly string[], workdir: string): string | u
   return existsSync(fallback) ? fallback : undefined
 }
 
+function persistFailed(result: { ok: false; reason: string; detail: string }): number {
+  const message = `failed to persist dsh state on ${STATE_BRANCH}: ${result.reason}: ${result.detail}`
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    process.stderr.write(`${message}\n`)
+    return 1
+  }
+  logLine(message)
+  return 0
+}
+
+function persistState(workdir: string, seen: ReturnType<typeof readSeenState>, message: string): number {
+  const persisted = writeStateBranch(workdir, seen, message)
+  if (!persisted.ok) return persistFailed(persisted)
+  if (persisted.commit !== 'unchanged') {
+    const badge = badgeFromSeenState(seen)
+    logLine(`recorded state on ${STATE_BRANCH} (${persisted.commit.slice(0, 7)}): badge ${badge.message}`)
+  }
+  return 0
+}
+
+async function refreshBadge(argv: readonly string[]): Promise<number> {
+  const workdir = resolve(argValue(argv, '--workdir') ?? process.cwd())
+  const appRoot = resolve(process.env.DSH_MIGRATE_APP_ROOT ?? resolve(here, '../..'))
+  const secrets = loadSecrets([workdir, appRoot, process.cwd()])
+  const previous = readSeenState(workdir)
+  const seen = await reconcilePendingState(workdir, previous, secrets.githubToken, logLine)
+  const code = persistState(workdir, seen, 'dsh-migrate: refresh badge')
+  const badge = badgeFromSeenState(seen)
+  writeGithubOutput({
+    status: 'skipped',
+    skipped_review: 'true',
+    verified_tag: seen?.verified?.tag,
+    badge_message: badge.message,
+    previous_tag: seen?.tag,
+  })
+  logLine(JSON.stringify({ status: 'refresh-badge', seen, badge }, null, 2))
+  return code
+}
+
 async function main(argv: readonly string[]): Promise<number> {
   const command = argv[2] ?? 'run'
   if (command === 'check-config') {
@@ -53,8 +94,11 @@ async function main(argv: readonly string[]): Promise<number> {
     logLine(JSON.stringify(config, null, 2))
     return 0
   }
+  if (command === 'refresh-badge') {
+    return refreshBadge(argv)
+  }
   if (command !== 'run') {
-    process.stderr.write('usage: dsh-migrate run|check-config [--workdir DIR] [--config FILE] [--dsh-version VER] [--api-key-env NAME] [--quota-limit N] [--mechanical-only] [--skip-github] [--force]\n')
+    process.stderr.write('usage: dsh-migrate run|check-config|refresh-badge [--workdir DIR] [--config FILE] [--dsh-version VER] [--api-key-env NAME] [--quota-limit N] [--mechanical-only] [--skip-github] [--force]\n')
     return 2
   }
 
@@ -81,7 +125,14 @@ async function main(argv: readonly string[]): Promise<number> {
     config.quota.limit = parsed
   }
 
-  const previous = mechanicalOnly ? undefined : readSeenState(workdir)
+  const loaded = mechanicalOnly ? undefined : readSeenState(workdir)
+  const previous = mechanicalOnly
+    ? undefined
+    : await reconcilePendingState(workdir, loaded, secrets.githubToken, logLine)
+  if (!mechanicalOnly && config.watch.enabled && previous !== loaded) {
+    const code = persistState(workdir, previous, 'dsh-migrate: refresh badge')
+    if (code !== 0) return code
+  }
   const decision = decideWatch({
     watchEnabled: config.watch.enabled,
     force,
@@ -91,16 +142,20 @@ async function main(argv: readonly string[]): Promise<number> {
   })
   logLine(describeWatchDecision(decision, target))
   if (decision.action === 'skip') {
+    const badge = badgeFromSeenState(previous)
     writeGithubOutput({
       status: 'skipped',
       skipped_review: 'true',
       target_tag: target.tag,
       previous_tag: decision.previous.tag,
+      verified_tag: previous?.verified?.tag,
+      badge_message: badge.message,
     })
     logLine(JSON.stringify({
       status: 'skipped',
       target,
-      previous: decision.previous,
+      previous,
+      badge,
     }, null, 2))
     return 0
   }
@@ -202,20 +257,28 @@ async function main(argv: readonly string[]): Promise<number> {
     throw error
   }
 
-  if (result.status !== 'failed' && config.watch.enabled) {
-    const persisted = persistSeenState(workdir, target)
-    if (!persisted.ok) {
-      const message = `failed to persist dsh state on ${STATE_BRANCH}: ${persisted.reason}: ${persisted.detail}`
-      if (process.env.GITHUB_ACTIONS === 'true') {
-        process.stderr.write(`${message}\n`)
-        return 1
-      }
-      logLine(message)
-    } else {
-      logLine(`recorded ${target.tag} on ${STATE_BRANCH} (${persisted.commit.slice(0, 7)})`)
+  let seen = previous
+  if (config.watch.enabled) {
+    const pullRequest = publishedPullRequest(result.published)
+    const next = applyRunToSeenState(previous, {
+      target,
+      status: result.status,
+      ...(pullRequest === undefined ? {} : { pullRequest }),
+    })
+    const seedUnverified = result.status === 'failed' && previous === undefined
+    const recordRun = result.status !== 'failed' && next !== undefined
+    if (seedUnverified || recordRun) {
+      const code = persistState(
+        workdir,
+        seedUnverified ? undefined : next,
+        seedUnverified ? 'dsh-migrate: refresh badge' : `dsh-migrate: record ${target.tag}`,
+      )
+      if (code !== 0) return code
+      if (recordRun) seen = next
     }
   }
 
+  const badge = badgeFromSeenState(seen)
   writeGithubOutput({
     status: result.status,
     run_dir: result.runDir,
@@ -224,6 +287,8 @@ async function main(argv: readonly string[]): Promise<number> {
     issue_url: result.published.issueUrl,
     pull_request_url: result.published.pullRequestUrl,
     target_tag: target.tag,
+    verified_tag: seen?.verified?.tag,
+    badge_message: badge.message,
   })
 
   logLine(JSON.stringify({

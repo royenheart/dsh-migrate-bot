@@ -7,7 +7,20 @@ export { extractMechanicalErrors } from './mechanical/errors.ts'
 export { runPipeline } from './pipeline/orchestrator.ts'
 export { resolveDshVersion } from './watch/dsh-version.ts'
 export { decideWatch, describeWatchDecision } from './watch/gate.ts'
-export { parseSeenState, persistSeenState, readSeenState, STATE_BRANCH, STATE_FILE } from './watch/seen.ts'
+export {
+  applyPullRequestToSeenState,
+  applyRunToSeenState,
+  parseSeenState,
+  persistSeenState,
+  persistStateBranch,
+  readSeenState,
+  BADGE_FILE,
+  STATE_BRANCH,
+  STATE_FILE,
+} from './watch/seen.ts'
+export { badgeFromSeenState, UNVERIFIED_BADGE } from './watch/badge.ts'
+export { publishedPullRequest, reconcilePendingState } from './watch/sync.ts'
+export { parsePullRequestNumber, fetchPullRequestState } from './github/pr.ts'
 export { createDshRunner, extractReport } from './agents/dsh.ts'
 export { renderDocuments } from './github/templates.ts'
 export { assembleFixPrompt } from './prompts/defaults.ts'
