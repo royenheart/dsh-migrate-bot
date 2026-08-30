@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { assembleFixPrompt } from '../prompts/defaults.ts'
 import { resolvePrompts } from '../prompts/resolve.ts'
 import { renderDocuments } from '../github/templates.ts'
+import { formatOfficialDiscussionInvite } from '../github/discussions.ts'
 import { collectPatchReports, formatPatchReportComment } from '../github/patch-reports.ts'
 import { usageUnits, type SessionProgress } from '../agents/session-status.ts'
 import { decideQuota } from '../quota/check.ts'
@@ -63,13 +64,25 @@ function maybePublish(
     if (published.issueNumber === undefined || github.commentIssue === undefined) {
       return published
     }
+    const reports = collectPatchReports(ports.workdir)
     const comments = formatPatchReportComment({
-      reports: collectPatchReports(ports.workdir),
+      reports,
       pullRequestUrl: published.pullRequestUrl,
       language: ports.config.issuePr.language,
     })
     for (const body of comments) {
       await github.commentIssue(published.issueNumber, body, ports.workdir)
+    }
+    for (const report of reports) {
+      if (report.kind !== 'draft') continue
+      await github.commentIssue(
+        published.issueNumber,
+        formatOfficialDiscussionInvite({
+          report,
+          language: ports.config.issuePr.language,
+        }),
+        ports.workdir,
+      )
     }
     return published
   })

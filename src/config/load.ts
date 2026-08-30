@@ -122,7 +122,9 @@ export function parseConfig(raw: unknown): MigrateConfig {
     ? DEFAULT_CONFIG.issuePr.language
     : !isRecord(issueRaw)
       ? (() => { throw new ConfigError('issuePr must be a mapping') })()
-      : asEnum(issueRaw.language, 'issuePr.language', ['en', 'zh'] as const)
+      : issueRaw.language === undefined
+        ? DEFAULT_CONFIG.issuePr.language
+        : asEnum(issueRaw.language, 'issuePr.language', ['en', 'zh'] as const)
 
   const loopRaw = raw.loop
   const maxAttempts = loopRaw === undefined

@@ -64,7 +64,7 @@ flowchart TD
 6. Re-run mechanical tests after A+B.
 7. On failure, a new dsh session gets A+B, error lines only, and prior `C1..Cn-1`; write `Cn`; retest; up to `loop.maxAttempts`.
 8. Clean plugin tree: no Issue, no PR (`.dsh-migrate/` and `.secrets.local.json` do not count as dirty and are never committed).
-9. Dirty plugin tree: open an Issue and a PR. The PR body includes `Closes #<issue>`. The Action then comments on the Issue: companion PR URL, a patch-report index table, then each report body (`issuePr.language`: `en` or `zh`). Full A/B/C reports stay in the artifact.
+9. Dirty plugin tree: open an Issue and a PR. The PR body includes `Closes #<issue>`. The Action then comments on the Issue: companion PR URL, a patch-report index table, then each report body (`issuePr.language`: `en` or `zh`). For each draft (no official thread yet) it posts a follow-up comment with an [Ideas](https://github.com/deepseek-ai/deepseek-harness/discussions/categories/ideas) “open official discussion” link. Full A/B/C reports stay in the artifact. Auto-creating that official topic is not implemented; see [docs/official-discussion-auto-post.md](docs/official-discussion-auto-post.md).
 
 A run that only wrote `.dsh-migrate/` is treated as clean. Insufficient official balance, or this-run spend over `quota.limit` / `quota_limit`, aborts without opening an Issue or PR.
 

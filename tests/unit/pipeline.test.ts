@@ -270,9 +270,47 @@ test('opened Issue gets a comment with the patch-report table and bodies', async
     agent: fakeAgent(),
     github,
   })
-  assert.equal(comments.length, 1)
+  assert.equal(comments.length, 2)
   assert.match(comments[0] ?? '', /Companion PR: https:\/\/example\.test\/p\/3/)
   assert.match(comments[0] ?? '', /## Patch report index/)
   assert.match(comments[0] ?? '', /## pre-step/)
   assert.match(comments[0] ?? '', /draft/)
+  assert.match(comments[1] ?? '', /Open official discussion: `pre-step`/)
+  assert.match(comments[1] ?? '', /discussions\/new\?/)
+  assert.match(comments[1] ?? '', /category=ideas/)
+})
+
+test('existing official links do not get an open-discussion follow-up', async () => {
+  const workdir = mkdtempSync(join(tmpdir(), 'dsh-mig-issue-'))
+  const existingDir = join(workdir, '.dsh-migrate/patch-reports/already')
+  mkdirSync(existingDir, { recursive: true })
+  writeFileSync(join(existingDir, 'report.md'), [
+    '# [Feature request] already tracked',
+    '',
+    'See https://github.com/deepseek-ai/deepseek-harness/discussions/12',
+  ].join('\n'))
+  const comments: string[] = []
+  const github: GithubPublisher = {
+    async publish() {
+      return { issueUrl: 'https://example.test/i/4', issueNumber: 4 }
+    },
+    async commentIssue(_issueNumber, body) {
+      comments.push(body)
+    },
+  }
+  await runPipeline({
+    config: parseConfig({ review: { policy: 'skip-if-mechanical-pass' } }),
+    workdir,
+    target: target(),
+    store: createReportStore(mkdtempSync(join(tmpdir(), 'dsh-mig-'))),
+    apiKey: 'k',
+    runMechanical: () => ({ ok: true, errors: '', log: 'ok' }),
+    isDirty: () => true,
+    diff: () => 'diff --git a/x',
+    agent: fakeAgent(),
+    github,
+  })
+  assert.equal(comments.length, 1)
+  assert.match(comments[0] ?? '', /existing/)
+  assert.doesNotMatch(comments[0] ?? '', /Open official discussion/)
 })
