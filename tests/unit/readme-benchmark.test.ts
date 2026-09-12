@@ -52,12 +52,12 @@ test('renderBenchmarkBlock renders the table, the mean, and the oracle arms', ()
   assert.ok(block !== undefined)
   assert.ok(block.startsWith(BLOCK_START))
   assert.ok(block.endsWith(BLOCK_END))
-  assert.match(block, /\| `M1-host-migration` \| \*\*1\.000\*\* \| 190s \| — \|/)
-  assert.match(block, /\| `S1-static-scan` \| \*\*0\.000\*\* \| 300s \| `AgentTimeoutError` \|/)
-  assert.match(block, /\| _mean of 2 scored_ \| \*\*0\.500\*\* \| \| 1 exception\(s\) \|/)
+  // The block is a per-mode summary, and the per-task detail lives in the record.
+  assert.match(block, /### `native` migration/)
+  assert.match(block, /\| 2\/2 \| 2 \| \*\*0\.500\*\* \| 1 \|/)
   assert.match(block, /Oracle self-check .*`upstream` 1\.000, `dsh-home` 0\.400\./)
   // The pinned upstream commit is abbreviated, and the record is linked.
-  assert.match(block, /upstream `ecab245`/)
+  assert.match(block, /Upstream `ecab245`/)
   assert.match(block, /20260911T034624\+0000\.json/)
 })
 
@@ -74,8 +74,27 @@ test('renderBenchmarkBlock tolerates a task with no score', () => {
     }),
   ])
   assert.ok(block !== undefined)
-  assert.match(block, /\| `X` \| — \| — \| `no-reward` \|/)
-  assert.match(block, /\| _mean of 0 scored_ \| — \| \| 1 exception\(s\) \|/)
+  // An unscored task still renders, as a row that scored nothing.
+  assert.match(block, /\| 0\/1 \|/)
+  assert.match(block, /\| 0\/1 \| 1 \| — \|/)
+})
+
+test('each migration mode renders as its own section', () => {
+  const native = benchmark({ file: 'a-native.json' })
+  const skills = benchmark({
+    file: 'b-upgrade-skills.json',
+    generatedAt: '2026-09-12T00:00:00+00:00',
+    mode: { id: 'upgrade-skills', skills: { commit: 'ecab245c6c1831c51b0240aca13573b94a6e525e', loaded: ['plugin-upgrade'] } },
+    summary: { tasks: 2, scored: 2, mean: 0.75, exceptions: 0, attempts: 6 },
+  })
+  const block = renderBenchmarkBlock([native, skills])
+  assert.ok(block !== undefined)
+  // Both modes appear, and neither mean is presented as the run's mean.
+  assert.match(block, /### `native` migration/)
+  assert.match(block, /### `upgrade-skills` migration/)
+  assert.match(block, /\| 2\/2 \| 6 \(1\/task\) \| \*\*0\.750\*\* \|/)
+  assert.match(block, /with 1 community skills at `ecab245`/)
+  assert.match(block, /are not comparable/)
 })
 
 test('replaceBlock swaps only the marked region', () => {

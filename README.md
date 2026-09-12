@@ -12,11 +12,11 @@ Pin the Action as `royenheart/dsh-migrate-bot@v0`.
 2. Copy [examples/workflow.yml](examples/workflow.yml) to `.github/workflows/dsh-migrate.yml` and set the cron.
 3. Optionally copy [examples/dsh-migrate.yml](examples/dsh-migrate.yml) to `.github/dsh-migrate.yml`.
 
-Required permissions: `contents: write`, `issues: write`, `pull-requests: write`. Also enable **Allow GitHub Actions to create and approve pull requests** (Settings → Actions → General → Workflow permissions). Without that checkbox, `GITHUB_TOKEN` can push the branch and open the Issue, then gets 403 on `POST /pulls`.
-
-Schedule, `workflow_dispatch`, and `repository_dispatch` belong in **that** workflow file. GitHub only runs `on.schedule` from a workflow in the plugin repo; the Action itself cannot register a timer.
+Required permissions: `contents: write`, `issues: write`, `pull-requests: write`, and **Allow GitHub Actions to create and approve pull requests** (Settings → Actions → General → Workflow permissions); without that checkbox `GITHUB_TOKEN` can push the branch and open the Issue, then gets 403 on `POST /pulls`.
 
 The first run always proceeds. Later scheduled runs skip when `dsh-v*` has not changed (`status: skipped`). Re-run the same version with `force: true` on `workflow_dispatch`.
+
+Every configuration key, its default, and the optional feedback channels are in [docs/installation.md](docs/installation.md).
 
 Last processed version is stored on branch `dsh-migrate/state` (`seen.json` + `badge.json`). Leave that branch unmerged. `seen.json` is the watch cursor (skip the next cron when dsh has not changed). `badge.json` is a [shields.io endpoint](https://shields.io/badges/endpoint-badge) for **default-branch** support: a clean `compatible` run verifies immediately; a migrate PR stays `pending` until you merge it (or `unverified` if you close it). Reports under `.dsh-migrate/` (A/B/C, harness checkout, per-patch reports) are uploaded as an artifact and are not committed.
 
@@ -64,6 +64,7 @@ flowchart TD
   rec -->|yes| save[Record processed version on dsh-migrate/state]
   rec -->|no| failed([failed — next schedule retries])
   save --> done([compatible or migrated])
+  done -.->|only when a maintainer merges the migrate PR| feedback[Feedback channels]
 ```
 
 1. Resolve the target `dsh-v*` (`latest` or a pin). `latest` reads GitHub releases with `GITHUB_TOKEN`; if that call is refused (rate limit, outage, no network route) it falls back to `git ls-remote --tags` and picks the newest `dsh-v*` by version order, so an unauthenticated 60/hour bucket cannot fail the run.
@@ -75,7 +76,7 @@ flowchart TD
 7. **V2 boot probe** (`verify.boot`): install the migrated tree into a scratch profile and actually start dsh under the target tag. The probe is keyless — it points the model route at a dead port and treats "reached the credential check" as a successful boot. It fails on `plugin(s) failed to load`, a throwing `apply`, `pending (waiting for services: …)`, or a watchdog timeout (dsh has no hang protection of its own).
 8. On a failing probe, a repair session gets A+B, the failing subset of the output only, and prior `C1..Cn-1`; then the probe re-runs. The loop keeps the full `loop.maxAttempts` budget regardless of the baseline. It stops early only on evidence: the agent declares `BLOCKER: upstream` **with** its attempted plugin-side fixes, the offending harness source location, and why no plugin-side change can work; or two consecutive rounds produce an unchanged failure signature. Either way the outcome routes into the existing patch-report exit.
 9. **V3 E2E subset / V4 full E2E** (`e2e`): the agent-authored suite runs the previously failing tests plus a smoke set during the loop, and everything once at final verification. See [docs/design/e2e-migration-pipeline.md](docs/design/e2e-migration-pipeline.md).
-10. Clean plugin tree: no Issue, no PR (`.dsh-migrate/` and `.secrets.local.json` do not count as dirty and are never committed).
+10. Clean plugin tree: no Issue, no PR (`.dsh-migrate/` and `.secrets.local.json` do not count as dirty and are never committed). A clean run still verifies the version, so the badge can say `compatible` without a pull request.
 11. Dirty plugin tree: open an Issue and a PR. The PR body includes `Closes #<issue>`. The Action then comments on the Issue: companion PR URL, a patch-report index table, then each report body (`issuePr.language`: `en` or `zh`). For each draft (no official thread yet) it posts a follow-up comment with an [Ideas](https://github.com/deepseek-ai/deepseek-harness/discussions/categories/ideas) “open official discussion” link. Full A/B/C reports stay in the artifact. Auto-creating that official topic is not implemented; see [docs/official-discussion-auto-post.md](docs/official-discussion-auto-post.md).
 
 ### E2E suite branch
@@ -98,7 +99,11 @@ The whole design — layer definitions, baseline attribution table, budget polic
 
 A run that only wrote `.dsh-migrate/` is treated as clean. Insufficient official balance, or this-run spend over `quota.limit` / `quota_limit`, aborts without opening an Issue or PR.
 
+12. If the maintainer later **merges** the migrate pull request, the [Feedback](#feedback) stage reports what happened to the channels you enabled. A pull request that is closed unmerged reports nothing.
+
 ## Configuration
+
+The full table of keys, their defaults, the Action inputs, and the quota behaviour is in [docs/installation.md](docs/installation.md#configuration). The short version:
 
 | Field | Default |
 |---|---|
@@ -109,25 +114,43 @@ A run that only wrote `.dsh-migrate/` is treated as clean. Insufficient official
 | watch | enabled |
 | boot probe | enabled, 180s watchdog |
 | watchdogs | agent session 60m, each mechanical command 20m, harness checkout 10m |
-| web smoke | enabled (only when the plugin has a `dsh.client` surface; runs once at final verification) |
-| step summary | always written to `$GITHUB_STEP_SUMMARY` |
-| E2E suite | enabled, branch `dsh-migrate/e2e`, `forceRebase: true`, gate `advisory` |
+| web smoke | enabled (only when the plugin has a `dsh.client` surface) |
+| E2E suite | enabled, branch `dsh-migrate/e2e`, gate `advisory` |
 | Issue/PR language | `en` |
 | repair loops | 5 (full budget; early stop is evidence-driven) |
+| feedback channels | all three off |
 | API key secret | `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` |
-| quota limit | unset (this-run official USD cap; insufficient official balance still aborts) |
-
-The verification layers (`verify`, `e2e`) need no API key at all: the boot probe points the model route at a dead port, and E2E runs against a local `dsh web`. Only the A/B/C agent sessions spend tokens.
+| quota limit | unset (this-run official USD cap) |
 
 Override prompts under `prompts.absorption`, `prompts.alignment`, and `prompts.fix` in `.github/dsh-migrate.yml`.
 
-Inputs: `dsh_version`, `config`, `mechanical_only`, `skip_github`, `force`, `api_key_env`, `workdir`, `quota_limit`. To use a different secret, set `api_key_env` (or `secrets.apiKeyEnv` in `.github/dsh-migrate.yml`) and map that name in the workflow `env:` block.
+## Feedback
 
-Before each agent session the Action queries official remaining balance (`GET /user/balance` for DeepSeek). If the account is unavailable, the run stops. `quota.limit` / `quota_limit` caps this Action run's own official USD estimate (this run's cache-miss / cache-hit / output tokens × [published rates](https://api-docs.deepseek.com/quick_start/pricing), peak/off-peak from each request timestamp). Other model providers have no official balance query or rate table yet.
+A migrate pull request is an opinion; merging it is the maintainer's verdict. When a migrate pull request is **merged**, the Action reports the migration — the merge, the comments around it, and the files the maintainer changed before merging — to whichever channels are enabled:
 
-While dsh runs, logs print the stage and, every 10s, turns / steps / elapsed / cache hit-miss / input-output. Model text is not streamed.
+```mermaid
+flowchart TD
+  pr[Migrate PR opened] --> open{Maintainer acts}
+  open -->|closed unmerged| nothing([Nothing is reported])
+  open -->|merged| read[Collect: merge, comments,<br/>maintainer's edits, run reports]
+  read --> loop{Each enabled channel}
+  loop -->|no token| skip[Skip and log why]
+  loop -->|one agent session| kind{Kind}
+  kind -->|analysis| deliver[Deliver an issue,<br/>a pull, or both]
+  kind -->|dedupe| check{Draft already asked?}
+  check -->|no| deliver
+  check -->|yes| hold[Log the thread that covers it]
+```
 
-The harness checkout under `.dsh-migrate/harness` is for the agent to read official source, apply or update a dsh-side patch when still required, and keep the plugin in sync. It is not committed.
+| Channel | Writes to | Method |
+|---|---|---|
+| `upgrade-skill` | `oh-my-dsh/dsh-plugin-upgrade-skill` | issue — a wrong card, or a corridor with no card |
+| `migrate-bot` | `royenheart/dsh-migrate-bot` | issue — what the maintainer fixed by hand, and which stage should have caught it |
+| `harness-discussion` | `deepseek-ai/deepseek-harness` | discussion — the feature request the migration already drafted, unless it is now a duplicate |
+
+All three are **off by default**, each needs a token that can write to its own target (`GITHUB_TOKEN` cannot), and a channel that is enabled without its token is skipped with the reason in the log rather than failing the run. You can also define your own channel with your own prompt and destination.
+
+Set them up with [docs/installation.md](docs/installation.md#feedback-channels); the mechanism is designed in [docs/design/migration-feedback.md](docs/design/migration-feedback.md).
 
 ## Upstream benchmark
 
@@ -144,25 +167,34 @@ The second form scores **this project's own agent** on their exam tasks: `tools/
 <!-- benchmark:start -->
 <!-- Generated by scripts/sync-readme-benchmark.ts from reports/upstream/. Do not edit by hand. -->
 
-Scored at upstream `ecab245` on dsh `0.1.2-alpha.2` with `deepseek-v4-flash`:
+### `native` migration
 
-| Task | Reward | Duration | Exception |
-|---|---|---|---|
-| `M1-host-migration` | **1.000** | 190s | — |
-| `H1-plane-trap` | **1.000** | 330s | — |
-| `S1-static-scan` | **0.000** | 300s | `AgentTimeoutError` |
-| _mean of 3 scored_ | **0.667** | | 1 exception(s) |
+| Scored | Attempts | Mean reward | Full score | Cache-miss in | Cache-hit in | Out | Cost |
+|---|---|---|---|---|---|---|---|
+| 54/56 | 168 (3/task) | **0.641** | 25 | 17.4M | 1752.3M | 13.7M | $16.11 |
+
+Upstream `ecab245`, dsh `0.1.1-rc.2, 0.1.2-alpha.2`, 3 attempt(s) per task. Served by `deepseek-flash`, fingerprint `aeb56401ca74e127821c4f9126dcb669`.
+
+Per-task rewards, ranges and token counts: [`20260912T201310+0000-native.json`](reports/upstream/20260912T201310+0000-native.json).
+
+### `upgrade-skills` migration
+
+| Scored | Attempts | Mean reward | Full score | Cache-miss in | Cache-hit in | Out | Cost |
+|---|---|---|---|---|---|---|---|
+| 54/56 | 168 (3/task) | **0.684** | 29 | 23.6M | 2017.2M | 14.6M | $18.37 |
+
+Upstream `ecab245`, dsh `0.1.2-alpha.2, 0.1.1-rc.2`, 3 attempt(s) per task, with 9 community skills at `ecab245`. Served by `deepseek-flash`, fingerprint `aeb56401ca74e127821c4f9126dcb669`.
+
+Per-task rewards, ranges and token counts: [`20260912T201310+0000-upgrade-skills.json`](reports/upstream/20260912T201310+0000-upgrade-skills.json).
 
 Oracle self-check (reference solution, no API key): `upstream` 1.000, `dsh-home` 0.400.
 
-These are single attempts and the runner reports no token usage, so they are an internal reference rather than a figure comparable with upstream's published results ([why](docs/upstream-benchmark.md#comparability-not-done-yet)).
-
-Record: [`20260911T034624+0000.json`](reports/upstream/20260911T034624+0000.json).
+Cite the section for the mode you mean: the two modes are different subjects and their means are not comparable.
 <!-- benchmark:end -->
 
 The oracle check also runs a second arm that differs by exactly one line — this Action's `DSH_HOME` — because their judge hardcodes `/root/.dsh/profiles`. That arm is the regression the check exists to catch: the same task environment scores `1.0` without it and `0.4` with it.
 
-Records of what each run produced live in [reports/](reports/README.md), in a versioned format that [docs/design/continuous-quality-tracking.md](docs/design/continuous-quality-tracking.md) designs a trend-and-regression framework around. The table above is generated from those records by `npm run sync:readme`; `npm run gates` fails when it is stale.
+Records of what each run produced live in [reports/](reports/README.md), in a versioned format that pins the migration mode, the model build that served the run, every attempt, the tokens, and the price table behind the cost — the rules are in [reports/README.md](reports/README.md#rules-that-make-the-record-reproducible), and [docs/design/continuous-quality-tracking.md](docs/design/continuous-quality-tracking.md) designs a trend-and-regression framework around them. The table above is generated from those records by `npm run sync:readme`; `npm run gates` fails when it is stale.
 
 See [docs/upstream-benchmark.md](docs/upstream-benchmark.md) for the preparations each run applies, what the suite does **not** require (isolation is only "a one-shot container"), and the defects the exercise exposed in our own code.
 

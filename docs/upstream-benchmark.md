@@ -34,16 +34,48 @@ Harbor's execution model for these tasks is "build the task image, run the agent
 python3 -m venv .harbor-venv && .harbor-venv/bin/pip install harbor==0.22.0
 
 DEEPSEEK_API_KEY=... ./tools/harbor/run-benchmark.sh M1-host-migration H1-plane-trap
+
+# both modes, three attempts each, two trials at a time
+DSH_HARBOR_SKILLS=upgrade-skills BENCH_RUNS=3 BENCH_CONCURRENCY=2 \
+  DEEPSEEK_API_KEY=... ./tools/harbor/run-benchmark.sh <task-id> ...
 ```
+
+Each invocation probes the provider once for the build that will serve it
+(`tools/harbor/model_probe.py`), because dsh never sees the HTTP response and
+the model name alone does not identify a served build.
 
 `tools/harbor/dsh_agent.py` is a Harbor agent adapter. `setup()` uploads the migrate profile this repository ships in `container/profile/` into the task container; `run()` executes the same headless command production uses, with the task's `instruction.md` **verbatim** and no routing prompt, working directory `/app`, and **without overriding `$DSH_HOME`** — the upstream judge hardcodes `/root/.dsh/profiles`, and overriding it silently invalidates every runtime-graded task (measured: adding that one line takes a task from `1.0` to `0.4`).
 
 Runner selection (`DSH_HARBOR_RUNNER`):
 
-| Mode | Behaviour |
+| Runner | Behaviour |
 |---|---|
-| `stock` (default) | the upstream `@deepseek-ai/dsh-headless` runner drives the same preset and task. Default because the migration runner could not yet drive the dsh version these tasks pin (see below) |
-| `migrate` | `container/profile/migrate-runner.js`, identical to production |
+| `migrate` (default) | `container/profile/migrate-runner.js`, identical to production. The default because only this runner prints the session's own token accounting, and a record without usage and cost is not the record this project publishes |
+| `stock` | the upstream `@deepseek-ai/dsh-headless` runner drives the same preset and task, and reports no usage |
+
+The migration runner needs two things the stock runner does not, both fixed in this repository rather than worked around in the adapter: `container/profile/session-events.js` reads the session log through whichever accessor the running host provides (`events` on 0.1.1, `snapshotEvents` on 0.1.2), and `container/profile/cordis.patch.yml` disables the `plugin-package-inventory-deepseek` request decoration, which throws — and fails the whole request as `REQUEST_EXTENSION` — when a profile mounts a preset whose rows it cannot resolve to a package.
+
+### The subject is a mode, and a run repeats
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `DSH_HARBOR_SKILLS` | `native` migrates from the harness source alone; `upgrade-skills` also loads the vendored community skills into the container's skill root | `native` |
+| `BENCH_RUNS` | attempts per task; the record keeps every attempt and reports their median | `3` |
+| `BENCH_CONCURRENCY` | concurrent trials | `1` |
+
+The two modes are different subjects — one has the version cards and the corridor index available, the other does not — so a record names its mode and the table in [README.md](../README.md#upstream-benchmark) renders one section per mode rather than one mean across both. What every record pins, and what a comparison between two records is allowed to conclude, is in [reports/README.md](../reports/README.md#rules-that-make-the-record-reproducible).
+
+## Running the suite on a shared machine
+
+Every trial brings up its own compose network, and one network takes a whole subnet from the Docker daemon's address pool. How many trials may run at once is therefore bounded by that pool long before it is bounded by CPU, memory, or the model provider.
+
+When the pool runs out, the failure is not a bad score: Harbor cannot start the trial's environment at all, and the trial is recorded as an exception. A record whose attempts carry `RuntimeError` in that shape is a record of a starved machine, not a result, and it must not be published as one.
+
+What to do:
+
+- **Lower the run's concurrency.** `BENCH_TASK_CONCURRENCY` and `BENCH_CONCURRENCY` together decide how many trials are live, and that product is what has to fit the pool. A slower suite is an acceptable outcome; a starved one is not.
+- **Reclaim only what this run created.** `tools/harbor/run-benchmark.sh` removes the trial networks it made, and only those, and only when nothing is attached to them.
+- **Never clean the host.** A machine that runs this benchmark generally runs other things too, and a `docker rm`, `docker network prune`, or volume operation without a filter scoped to this run's own resources will reach all of them. Losing somebody else's service to make a suite finish faster is not a trade this project makes, and the subnet pressure that suggests the cleanup is pressure the concurrency setting is there to absorb.
 
 ## Preparations
 
@@ -127,8 +159,8 @@ An exhaustive search of the upstream repository (`isolat`, `sandbox`, `escape`, 
 
 "May not modify the fixture, the judge or the reference solution" is enforced by prose, by a git baseline commit made at image build time, and by `tests/` being uploaded only during `verify()` — after the agent has finished. Their own helper script states the same thing in the opposite direction: *"this is NOT a sandbox … Run it inside a throwaway Docker container"*, which is precisely this Action's architecture.
 
-## Comparability (not done yet)
+## Comparability
 
-A comparable score also requires their protocol: a frozen snapshot (the 40-character commit and an explicit task list from `benchmark/snapshots/`), three runs per task taking the median, and reported token counts and durations. These runs are single attempts and the stock runner emits no usage lines, so the numbers above are
-**internal reference only** and must not be compared against upstream's published
-results.
+Their protocol asks for a frozen snapshot (the 40-character commit plus an explicit task list from `benchmark/snapshots/`), several runs per task reported as a median, and published token counts and durations. Three of those four are now in the record: `BENCH_RUNS` attempts per task with every attempt kept and their median in `reward`, token counts per task and per run, and the durations.
+
+What is still missing is the **task list**: a record names the upstream commit, not which of its tasks the invocation selected, so two records can only be compared after checking that they covered the same set. Until that is pinned, treat a comparison between records as valid only when both ran the full task directory, and say so when quoting a number outside this repository.

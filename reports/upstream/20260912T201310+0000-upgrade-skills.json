@@ -1,0 +1,2731 @@
+{
+  "schema": 2,
+  "kind": "upstream-benchmark",
+  "generatedAt": "2026-09-12T20:13:10+00:00",
+  "producer": {
+    "commit": "ba064944af7597136baff22884e3a13f6e017bba",
+    "dirty": true
+  },
+  "upstream": {
+    "repository": "oh-my-dsh/dsh-plugin-upgrade-skill",
+    "commit": "ecab245c6c1831c51b0240aca13573b94a6e525e"
+  },
+  "mode": {
+    "id": "upgrade-skills",
+    "runner": "migrate",
+    "profile": "migrate",
+    "skills": {
+      "commit": "ecab245c6c1831c51b0240aca13573b94a6e525e",
+      "loaded": [
+        "dsh-benchmark-case",
+        "dsh-upgrade-audit",
+        "plugin-heavy-dep",
+        "plugin-release",
+        "plugin-runtime-debug",
+        "plugin-test",
+        "plugin-upgrade",
+        "plugin-workflow",
+        "plugin-write"
+      ]
+    }
+  },
+  "agent": {
+    "name": "dsh",
+    "mode": "upgrade-skills",
+    "version": "0.1.2-alpha.2",
+    "versions": [
+      "0.1.2-alpha.2",
+      "0.1.1-rc.2"
+    ],
+    "model": "deepseek-v4-flash",
+    "modelsObserved": []
+  },
+  "modelIdentity": {
+    "requestedModel": "deepseek-v4-flash",
+    "endpoint": "https://api.deepseek.com/chat/completions",
+    "probedAt": "2026-09-12T20:13:09+00:00",
+    "servedModel": "deepseek-flash",
+    "systemFingerprint": "aeb56401ca74e127821c4f9126dcb669",
+    "responseId": "0f175f47-4f83-43cd-a46c-e16022ec04b9",
+    "created": 1789243990,
+    "error": null
+  },
+  "runsPerTask": 3,
+  "tasks": [
+    {
+      "id": "H1-plane-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 437.7,
+          "startedAt": "2026-09-12T17:57:21.201937Z",
+          "usage": {
+            "n_input_tokens": 198002,
+            "n_cache_tokens": 11375872,
+            "n_output_tokens": 113266
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 436.2,
+          "startedAt": "2026-09-12T18:04:59.218859Z",
+          "usage": {
+            "n_input_tokens": 244300,
+            "n_cache_tokens": 19758080,
+            "n_output_tokens": 106640
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 447.1,
+          "startedAt": "2026-09-12T17:57:21.245219Z",
+          "usage": {
+            "n_input_tokens": 135906,
+            "n_cache_tokens": 9430784,
+            "n_output_tokens": 106924
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 578208,
+        "cacheHitTokens": 40564736,
+        "outputTokens": 326830
+      }
+    },
+    {
+      "id": "H10-browser-activation-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 298.3,
+          "startedAt": "2026-09-12T17:25:59.402176Z",
+          "usage": {
+            "n_input_tokens": 129956,
+            "n_cache_tokens": 9161472,
+            "n_output_tokens": 53198
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 287.6,
+          "startedAt": "2026-09-12T17:25:59.384550Z",
+          "usage": {
+            "n_input_tokens": 122076,
+            "n_cache_tokens": 9100288,
+            "n_output_tokens": 67408
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 429.8,
+          "startedAt": "2026-09-12T17:31:13.851623Z",
+          "usage": {
+            "n_input_tokens": 98052,
+            "n_cache_tokens": 6408960,
+            "n_output_tokens": 64750
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 350084,
+        "cacheHitTokens": 24670720,
+        "outputTokens": 185356
+      }
+    },
+    {
+      "id": "H11-dual-cohort-rpc",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 20.2,
+          "startedAt": "2026-09-12T17:25:26.105947Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 20.6,
+          "startedAt": "2026-09-12T17:24:47.844286Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 20.6,
+          "startedAt": "2026-09-12T17:24:47.839198Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "H12-remote-result-boundary-trap",
+      "reward": 0.55,
+      "rewardMin": 0.3,
+      "rewardMax": 0.8,
+      "attempts": [
+        {
+          "reward": null,
+          "exception": "RuntimeError",
+          "durationSeconds": null,
+          "startedAt": null,
+          "usage": null
+        },
+        {
+          "reward": 0.3,
+          "exception": null,
+          "durationSeconds": 256.8,
+          "startedAt": "2026-09-12T17:24:43.813736Z",
+          "usage": {
+            "n_input_tokens": 167786,
+            "n_cache_tokens": 9483264,
+            "n_output_tokens": 101420
+          }
+        },
+        {
+          "reward": 0.8,
+          "exception": null,
+          "durationSeconds": 167.3,
+          "startedAt": "2026-09-12T17:24:45.088344Z",
+          "usage": {
+            "n_input_tokens": 90028,
+            "n_cache_tokens": 4156672,
+            "n_output_tokens": 67560
+          }
+        }
+      ],
+      "attemptsScored": 2,
+      "exception": "RuntimeError",
+      "usage": {
+        "inputTokens": 257814,
+        "cacheHitTokens": 13639936,
+        "outputTokens": 168980
+      }
+    },
+    {
+      "id": "H13-ghost-host-trap",
+      "reward": 0.2,
+      "rewardMin": 0.0,
+      "rewardMax": 0.2,
+      "attempts": [
+        {
+          "reward": 0.2,
+          "exception": null,
+          "durationSeconds": 506.4,
+          "startedAt": "2026-09-12T19:55:47.119348Z",
+          "usage": {
+            "n_input_tokens": 77168,
+            "n_cache_tokens": 3621120,
+            "n_output_tokens": 137230
+          }
+        },
+        {
+          "reward": 0.2,
+          "exception": null,
+          "durationSeconds": 716.8,
+          "startedAt": "2026-09-12T19:55:47.099721Z",
+          "usage": {
+            "n_input_tokens": 119964,
+            "n_cache_tokens": 8232448,
+            "n_output_tokens": 200860
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 568.5,
+          "startedAt": "2026-09-12T19:55:47.106140Z",
+          "usage": {
+            "n_input_tokens": 97606,
+            "n_cache_tokens": 4128768,
+            "n_output_tokens": 132410
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 294738,
+        "cacheHitTokens": 15982336,
+        "outputTokens": 470500
+      }
+    },
+    {
+      "id": "H14-mineru-api",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 664.4,
+          "startedAt": "2026-09-12T17:24:45.877052Z",
+          "usage": {
+            "n_input_tokens": 261516,
+            "n_cache_tokens": 30777600,
+            "n_output_tokens": 169676
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 481.0,
+          "startedAt": "2026-09-12T17:36:23.988629Z",
+          "usage": {
+            "n_input_tokens": 308720,
+            "n_cache_tokens": 34627584,
+            "n_output_tokens": 160936
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 808.3,
+          "startedAt": "2026-09-12T17:24:45.999245Z",
+          "usage": {
+            "n_input_tokens": 355256,
+            "n_cache_tokens": 34569472,
+            "n_output_tokens": 189742
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 925492,
+        "cacheHitTokens": 99974656,
+        "outputTokens": 520354
+      }
+    },
+    {
+      "id": "H15-locale-pack",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 659.6,
+          "startedAt": "2026-09-12T17:26:06.377393Z",
+          "usage": {
+            "n_input_tokens": 331216,
+            "n_cache_tokens": 28850944,
+            "n_output_tokens": 158660
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 578.8,
+          "startedAt": "2026-09-12T17:36:23.822337Z",
+          "usage": {
+            "n_input_tokens": 309126,
+            "n_cache_tokens": 34352896,
+            "n_output_tokens": 213870
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 583.0,
+          "startedAt": "2026-09-12T17:26:06.375312Z",
+          "usage": {
+            "n_input_tokens": 274440,
+            "n_cache_tokens": 28868864,
+            "n_output_tokens": 169444
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 914782,
+        "cacheHitTokens": 92072704,
+        "outputTokens": 541974
+      }
+    },
+    {
+      "id": "H16-history-dock",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 840.9,
+          "startedAt": "2026-09-12T17:42:53.068746Z",
+          "usage": {
+            "n_input_tokens": 411608,
+            "n_cache_tokens": 79661824,
+            "n_output_tokens": 230070
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 900.0,
+          "startedAt": "2026-09-12T17:29:20.548055Z",
+          "usage": null
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 789.2,
+          "startedAt": "2026-09-12T17:29:20.538346Z",
+          "usage": {
+            "n_input_tokens": 399896,
+            "n_cache_tokens": 54347008,
+            "n_output_tokens": 235574
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": "AgentTimeoutError",
+      "usage": {
+        "inputTokens": 811504,
+        "cacheHitTokens": 134008832,
+        "outputTokens": 465644
+      }
+    },
+    {
+      "id": "H17-merge-calls",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 712.8,
+          "startedAt": "2026-09-12T17:50:03.492396Z",
+          "usage": {
+            "n_input_tokens": 325450,
+            "n_cache_tokens": 39323392,
+            "n_output_tokens": 225104
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 643.9,
+          "startedAt": "2026-09-12T17:38:55.790062Z",
+          "usage": {
+            "n_input_tokens": 369082,
+            "n_cache_tokens": 43709440,
+            "n_output_tokens": 189376
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 726.9,
+          "startedAt": "2026-09-12T17:38:55.798929Z",
+          "usage": {
+            "n_input_tokens": 390154,
+            "n_cache_tokens": 64937216,
+            "n_output_tokens": 241146
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 1084686,
+        "cacheHitTokens": 147970048,
+        "outputTokens": 655626
+      }
+    },
+    {
+      "id": "H18-blame-bubbles",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 726.3,
+          "startedAt": "2026-09-12T17:44:52.577220Z",
+          "usage": {
+            "n_input_tokens": 307088,
+            "n_cache_tokens": 45241344,
+            "n_output_tokens": 252126
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 900.0,
+          "startedAt": "2026-09-12T17:44:52.589910Z",
+          "usage": null
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 564.1,
+          "startedAt": "2026-09-12T17:57:19.897401Z",
+          "usage": {
+            "n_input_tokens": 316262,
+            "n_cache_tokens": 39378688,
+            "n_output_tokens": 205734
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": "AgentTimeoutError",
+      "usage": {
+        "inputTokens": 623350,
+        "cacheHitTokens": 84620032,
+        "outputTokens": 457860
+      }
+    },
+    {
+      "id": "H19-workspace-ya",
+      "reward": 0.4,
+      "rewardMin": 0.2,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 643.0,
+          "startedAt": "2026-09-12T17:57:19.962946Z",
+          "usage": {
+            "n_input_tokens": 389534,
+            "n_cache_tokens": 52890112,
+            "n_output_tokens": 219486
+          }
+        },
+        {
+          "reward": 0.2,
+          "exception": null,
+          "durationSeconds": 625.7,
+          "startedAt": "2026-09-12T17:46:28.460783Z",
+          "usage": {
+            "n_input_tokens": 370324,
+            "n_cache_tokens": 48198400,
+            "n_output_tokens": 194980
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 703.0,
+          "startedAt": "2026-09-12T17:46:28.488528Z",
+          "usage": {
+            "n_input_tokens": 403628,
+            "n_cache_tokens": 60880640,
+            "n_output_tokens": 241140
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 1163486,
+        "cacheHitTokens": 161969152,
+        "outputTokens": 655606
+      }
+    },
+    {
+      "id": "H2-baseline-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 430.3,
+          "startedAt": "2026-09-12T18:15:47.843710Z",
+          "usage": {
+            "n_input_tokens": 231980,
+            "n_cache_tokens": 16737536,
+            "n_output_tokens": 117778
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 332.2,
+          "startedAt": "2026-09-12T18:09:56.144318Z",
+          "usage": {
+            "n_input_tokens": 231194,
+            "n_cache_tokens": 17369856,
+            "n_output_tokens": 107946
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 352.5,
+          "startedAt": "2026-09-12T18:09:56.158784Z",
+          "usage": {
+            "n_input_tokens": 161086,
+            "n_cache_tokens": 10586112,
+            "n_output_tokens": 105888
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 624260,
+        "cacheHitTokens": 44693504,
+        "outputTokens": 331612
+      }
+    },
+    {
+      "id": "H20-session-events-ledger",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 77.9,
+          "startedAt": "2026-09-12T18:03:55.921680Z",
+          "usage": {
+            "n_input_tokens": 67916,
+            "n_cache_tokens": 1677056,
+            "n_output_tokens": 31372
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 75.9,
+          "startedAt": "2026-09-12T18:02:32.329629Z",
+          "usage": {
+            "n_input_tokens": 36008,
+            "n_cache_tokens": 1057024,
+            "n_output_tokens": 32318
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 68.6,
+          "startedAt": "2026-09-12T18:02:32.325505Z",
+          "usage": {
+            "n_input_tokens": 50704,
+            "n_cache_tokens": 1209088,
+            "n_output_tokens": 27352
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 154628,
+        "cacheHitTokens": 3943168,
+        "outputTokens": 91042
+      }
+    },
+    {
+      "id": "H21-question-answerer-waterfall",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.2,
+          "startedAt": "2026-09-12T18:05:37.198592Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.7,
+          "startedAt": "2026-09-12T18:05:37.161699Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.0,
+          "startedAt": "2026-09-12T18:06:13.317519Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "H22-dsh-data-agent-alpha2",
+      "reward": null,
+      "rewardMin": null,
+      "rewardMax": null,
+      "attempts": [
+        {
+          "reward": null,
+          "exception": "RewardFileNotFoundError",
+          "durationSeconds": 20.6,
+          "startedAt": "2026-09-12T18:06:54.113872Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": null,
+          "exception": "RewardFileNotFoundError",
+          "durationSeconds": 18.8,
+          "startedAt": "2026-09-12T18:06:54.110940Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": null,
+          "exception": "RewardFileNotFoundError",
+          "durationSeconds": 18.8,
+          "startedAt": "2026-09-12T18:07:43.159872Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 0,
+      "exception": "RewardFileNotFoundError",
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "H23-storage-domain-version-compat-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 81.3,
+          "startedAt": "2026-09-12T18:08:15.282573Z",
+          "usage": {
+            "n_input_tokens": 135210,
+            "n_cache_tokens": 2359040,
+            "n_output_tokens": 25276
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 48.7,
+          "startedAt": "2026-09-12T18:07:10.710127Z",
+          "usage": {
+            "n_input_tokens": 58230,
+            "n_cache_tokens": 1216768,
+            "n_output_tokens": 17416
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 49.4,
+          "startedAt": "2026-09-12T18:07:10.707989Z",
+          "usage": {
+            "n_input_tokens": 58200,
+            "n_cache_tokens": 1129728,
+            "n_output_tokens": 18628
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 251640,
+        "cacheHitTokens": 4705536,
+        "outputTokens": 61320
+      }
+    },
+    {
+      "id": "H24-invalid-record-salvage-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 76.9,
+          "startedAt": "2026-09-12T18:08:43.247031Z",
+          "usage": {
+            "n_input_tokens": 59406,
+            "n_cache_tokens": 1368320,
+            "n_output_tokens": 30312
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 90.9,
+          "startedAt": "2026-09-12T18:08:43.244423Z",
+          "usage": {
+            "n_input_tokens": 70404,
+            "n_cache_tokens": 1961216,
+            "n_output_tokens": 33692
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 82.8,
+          "startedAt": "2026-09-12T18:10:15.280156Z",
+          "usage": {
+            "n_input_tokens": 66550,
+            "n_cache_tokens": 2193152,
+            "n_output_tokens": 29410
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 196360,
+        "cacheHitTokens": 5522688,
+        "outputTokens": 93414
+      }
+    },
+    {
+      "id": "H25-session-seed-boundary-trap",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 155.8,
+          "startedAt": "2026-09-12T18:08:56.279279Z",
+          "usage": {
+            "n_input_tokens": 77772,
+            "n_cache_tokens": 3194368,
+            "n_output_tokens": 68900
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 132.5,
+          "startedAt": "2026-09-12T18:08:56.270329Z",
+          "usage": {
+            "n_input_tokens": 95390,
+            "n_cache_tokens": 2592512,
+            "n_output_tokens": 55536
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 191.8,
+          "startedAt": "2026-09-12T18:11:23.775397Z",
+          "usage": {
+            "n_input_tokens": 136542,
+            "n_cache_tokens": 4228864,
+            "n_output_tokens": 79150
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 309704,
+        "cacheHitTokens": 10015744,
+        "outputTokens": 203586
+      }
+    },
+    {
+      "id": "H3-client-plane",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 457.2,
+          "startedAt": "2026-09-12T18:11:57.574485Z",
+          "usage": {
+            "n_input_tokens": 276898,
+            "n_cache_tokens": 24137472,
+            "n_output_tokens": 117936
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 318.3,
+          "startedAt": "2026-09-12T18:11:57.576189Z",
+          "usage": {
+            "n_input_tokens": 174126,
+            "n_cache_tokens": 13060608,
+            "n_output_tokens": 107612
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 481.0,
+          "startedAt": "2026-09-12T18:17:37.481151Z",
+          "usage": {
+            "n_input_tokens": 287814,
+            "n_cache_tokens": 28768768,
+            "n_output_tokens": 158348
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 738838,
+        "cacheHitTokens": 65966848,
+        "outputTokens": 383896
+      }
+    },
+    {
+      "id": "H4-tsbuildinfo-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 117.5,
+          "startedAt": "2026-09-12T18:14:17.763321Z",
+          "usage": {
+            "n_input_tokens": 64888,
+            "n_cache_tokens": 1702656,
+            "n_output_tokens": 50382
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 282.2,
+          "startedAt": "2026-09-12T18:14:17.740127Z",
+          "usage": {
+            "n_input_tokens": 65494,
+            "n_cache_tokens": 2268928,
+            "n_output_tokens": 68700
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 146.7,
+          "startedAt": "2026-09-12T18:16:30.634501Z",
+          "usage": {
+            "n_input_tokens": 81266,
+            "n_cache_tokens": 2114048,
+            "n_output_tokens": 62068
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 211648,
+        "cacheHitTokens": 6085632,
+        "outputTokens": 181150
+      }
+    },
+    {
+      "id": "H5-runtime-export-drift",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 504.0,
+          "startedAt": "2026-09-12T18:15:04.111264Z",
+          "usage": {
+            "n_input_tokens": 178070,
+            "n_cache_tokens": 14093568,
+            "n_output_tokens": 121562
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 672.0,
+          "startedAt": "2026-09-12T18:15:04.114182Z",
+          "usage": {
+            "n_input_tokens": 275524,
+            "n_cache_tokens": 27536384,
+            "n_output_tokens": 185540
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 374.0,
+          "startedAt": "2026-09-12T18:23:46.756954Z",
+          "usage": {
+            "n_input_tokens": 165136,
+            "n_cache_tokens": 12178944,
+            "n_output_tokens": 127222
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 618730,
+        "cacheHitTokens": 53808896,
+        "outputTokens": 434324
+      }
+    },
+    {
+      "id": "H6-remote-error-trap",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 20.6,
+          "startedAt": "2026-09-12T18:21:08.558701Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.7,
+          "startedAt": "2026-09-12T18:21:08.550738Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 20.3,
+          "startedAt": "2026-09-12T18:21:45.186358Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "H7-locale-trap",
+      "reward": 0.9,
+      "rewardMin": 0.9,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 0.9,
+          "exception": null,
+          "durationSeconds": 348.5,
+          "startedAt": "2026-09-12T18:22:25.068006Z",
+          "usage": {
+            "n_input_tokens": 158732,
+            "n_cache_tokens": 13073920,
+            "n_output_tokens": 120176
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 263.8,
+          "startedAt": "2026-09-12T18:22:25.054165Z",
+          "usage": {
+            "n_input_tokens": 163712,
+            "n_cache_tokens": 10510080,
+            "n_output_tokens": 88624
+          }
+        },
+        {
+          "reward": 0.9,
+          "exception": null,
+          "durationSeconds": 251.4,
+          "startedAt": "2026-09-12T18:27:09.659282Z",
+          "usage": {
+            "n_input_tokens": 141232,
+            "n_cache_tokens": 8935168,
+            "n_output_tokens": 95214
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 463676,
+        "cacheHitTokens": 32519168,
+        "outputTokens": 304014
+      }
+    },
+    {
+      "id": "H8-fire-drill",
+      "reward": 0.6,
+      "rewardMin": 0.6,
+      "rewardMax": 0.6,
+      "attempts": [
+        {
+          "reward": 0.6,
+          "exception": null,
+          "durationSeconds": 606.6,
+          "startedAt": "2026-09-12T18:30:22.992707Z",
+          "usage": {
+            "n_input_tokens": 276896,
+            "n_cache_tokens": 35034624,
+            "n_output_tokens": 187874
+          }
+        },
+        {
+          "reward": 0.6,
+          "exception": null,
+          "durationSeconds": 397.5,
+          "startedAt": "2026-09-12T18:23:22.091594Z",
+          "usage": {
+            "n_input_tokens": 226440,
+            "n_cache_tokens": 20941568,
+            "n_output_tokens": 137660
+          }
+        },
+        {
+          "reward": 0.6,
+          "exception": null,
+          "durationSeconds": 387.4,
+          "startedAt": "2026-09-12T18:23:22.104925Z",
+          "usage": {
+            "n_input_tokens": 230464,
+            "n_cache_tokens": 18452480,
+            "n_output_tokens": 137378
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 733800,
+        "cacheHitTokens": 74428672,
+        "outputTokens": 462912
+      }
+    },
+    {
+      "id": "H9-dsh-web-alpha2",
+      "reward": null,
+      "rewardMin": null,
+      "rewardMax": null,
+      "attempts": [
+        {
+          "reward": null,
+          "exception": "RewardFileNotFoundError",
+          "durationSeconds": 20.4,
+          "startedAt": "2026-09-12T18:26:11.538238Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": null,
+          "exception": "RewardFileNotFoundError",
+          "durationSeconds": 19.7,
+          "startedAt": "2026-09-12T18:26:11.536669Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": null,
+          "exception": "RewardFileNotFoundError",
+          "durationSeconds": 18.5,
+          "startedAt": "2026-09-12T18:27:02.752657Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 0,
+      "exception": "RewardFileNotFoundError",
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "M1-host-migration",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 306.9,
+          "startedAt": "2026-09-12T18:49:15.583353Z",
+          "usage": {
+            "n_input_tokens": 165180,
+            "n_cache_tokens": 7725568,
+            "n_output_tokens": 78620
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 459.8,
+          "startedAt": "2026-09-12T18:49:15.588947Z",
+          "usage": {
+            "n_input_tokens": 201872,
+            "n_cache_tokens": 15663360,
+            "n_output_tokens": 112828
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 621.1,
+          "startedAt": "2026-09-12T18:54:42.352881Z",
+          "usage": {
+            "n_input_tokens": 151612,
+            "n_cache_tokens": 12545792,
+            "n_output_tokens": 84192
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 518664,
+        "cacheHitTokens": 35934720,
+        "outputTokens": 275640
+      }
+    },
+    {
+      "id": "M10-tools-tree",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 712.2,
+          "startedAt": "2026-09-12T18:38:42.012429Z",
+          "usage": {
+            "n_input_tokens": 316048,
+            "n_cache_tokens": 41600512,
+            "n_output_tokens": 183780
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 619.2,
+          "startedAt": "2026-09-12T18:27:55.255352Z",
+          "usage": {
+            "n_input_tokens": 317358,
+            "n_cache_tokens": 41260544,
+            "n_output_tokens": 200254
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 805.2,
+          "startedAt": "2026-09-12T18:27:55.280104Z",
+          "usage": {
+            "n_input_tokens": 287722,
+            "n_cache_tokens": 39745024,
+            "n_output_tokens": 209478
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 921128,
+        "cacheHitTokens": 122606080,
+        "outputTokens": 593512
+      }
+    },
+    {
+      "id": "M11-sidebar-spur",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 419.6,
+          "startedAt": "2026-09-12T18:38:41.980058Z",
+          "usage": {
+            "n_input_tokens": 274990,
+            "n_cache_tokens": 25494528,
+            "n_output_tokens": 157634
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 468.1,
+          "startedAt": "2026-09-12T18:30:23.862176Z",
+          "usage": {
+            "n_input_tokens": 264684,
+            "n_cache_tokens": 28865280,
+            "n_output_tokens": 157436
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 466.8,
+          "startedAt": "2026-09-12T18:30:23.870612Z",
+          "usage": {
+            "n_input_tokens": 300474,
+            "n_cache_tokens": 32055296,
+            "n_output_tokens": 173720
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 840148,
+        "cacheHitTokens": 86415104,
+        "outputTokens": 488790
+      }
+    },
+    {
+      "id": "M12-interpreters-card",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 512.4,
+          "startedAt": "2026-09-12T18:31:55.284297Z",
+          "usage": {
+            "n_input_tokens": 324504,
+            "n_cache_tokens": 39872256,
+            "n_output_tokens": 168190
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 548.5,
+          "startedAt": "2026-09-12T18:31:55.270766Z",
+          "usage": {
+            "n_input_tokens": 300206,
+            "n_cache_tokens": 29953024,
+            "n_output_tokens": 166436
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 477.6,
+          "startedAt": "2026-09-12T18:40:52.109975Z",
+          "usage": {
+            "n_input_tokens": 328512,
+            "n_cache_tokens": 32857856,
+            "n_output_tokens": 173914
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 953222,
+        "cacheHitTokens": 102683136,
+        "outputTokens": 508540
+      }
+    },
+    {
+      "id": "M13-repository-plugins-removal",
+      "reward": 0.9,
+      "rewardMin": 0.9,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 225.0,
+          "startedAt": "2026-09-12T18:41:05.502221Z",
+          "usage": {
+            "n_input_tokens": 147322,
+            "n_cache_tokens": 8097536,
+            "n_output_tokens": 61136
+          }
+        },
+        {
+          "reward": 0.9,
+          "exception": null,
+          "durationSeconds": 270.4,
+          "startedAt": "2026-09-12T18:45:12.592998Z",
+          "usage": {
+            "n_input_tokens": 155412,
+            "n_cache_tokens": 14636032,
+            "n_output_tokens": 77580
+          }
+        },
+        {
+          "reward": 0.9,
+          "exception": null,
+          "durationSeconds": 349.8,
+          "startedAt": "2026-09-12T18:41:05.504260Z",
+          "usage": {
+            "n_input_tokens": 199326,
+            "n_cache_tokens": 20887040,
+            "n_output_tokens": 97128
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 502060,
+        "cacheHitTokens": 43620608,
+        "outputTokens": 235844
+      }
+    },
+    {
+      "id": "M14-service-renames-0812",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 106.4,
+          "startedAt": "2026-09-12T18:48:10.367402Z",
+          "usage": {
+            "n_input_tokens": 44952,
+            "n_cache_tokens": 2134784,
+            "n_output_tokens": 34812
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 101.6,
+          "startedAt": "2026-09-12T18:46:07.438803Z",
+          "usage": {
+            "n_input_tokens": 32726,
+            "n_cache_tokens": 1723648,
+            "n_output_tokens": 26726
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 243.4,
+          "startedAt": "2026-09-12T18:46:07.454462Z",
+          "usage": {
+            "n_input_tokens": 78798,
+            "n_cache_tokens": 4545024,
+            "n_output_tokens": 58268
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 156476,
+        "cacheHitTokens": 8403456,
+        "outputTokens": 119806
+      }
+    },
+    {
+      "id": "M2-optional-dep-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 383.5,
+          "startedAt": "2026-09-12T18:50:08.159483Z",
+          "usage": {
+            "n_input_tokens": 135170,
+            "n_cache_tokens": 7781120,
+            "n_output_tokens": 141596
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 895.8,
+          "startedAt": "2026-09-12T18:55:11.701779Z",
+          "usage": {
+            "n_input_tokens": 150222,
+            "n_cache_tokens": 12749056,
+            "n_output_tokens": 121684
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 284.5,
+          "startedAt": "2026-09-12T18:50:08.163454Z",
+          "usage": {
+            "n_input_tokens": 151308,
+            "n_cache_tokens": 6609408,
+            "n_output_tokens": 103348
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 436700,
+        "cacheHitTokens": 27139584,
+        "outputTokens": 366628
+      }
+    },
+    {
+      "id": "M3-session-projection",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 346.5,
+          "startedAt": "2026-09-12T18:50:36.473909Z",
+          "usage": {
+            "n_input_tokens": 113276,
+            "n_cache_tokens": 8927232,
+            "n_output_tokens": 119144
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 306.7,
+          "startedAt": "2026-09-12T18:50:36.477898Z",
+          "usage": {
+            "n_input_tokens": 147066,
+            "n_cache_tokens": 11472640,
+            "n_output_tokens": 105012
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 253.6,
+          "startedAt": "2026-09-12T18:56:00.313451Z",
+          "usage": {
+            "n_input_tokens": 158326,
+            "n_cache_tokens": 11035392,
+            "n_output_tokens": 77042
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 418668,
+        "cacheHitTokens": 31435264,
+        "outputTokens": 301198
+      }
+    },
+    {
+      "id": "M4-peer-prerelease-range",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 318.0,
+          "startedAt": "2026-09-12T18:55:10.272194Z",
+          "usage": {
+            "n_input_tokens": 81706,
+            "n_cache_tokens": 4219392,
+            "n_output_tokens": 58236
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 230.5,
+          "startedAt": "2026-09-12T18:50:59.949975Z",
+          "usage": {
+            "n_input_tokens": 115644,
+            "n_cache_tokens": 5669376,
+            "n_output_tokens": 85160
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 238.2,
+          "startedAt": "2026-09-12T18:50:59.954693Z",
+          "usage": {
+            "n_input_tokens": 122674,
+            "n_cache_tokens": 6193664,
+            "n_output_tokens": 79894
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 320024,
+        "cacheHitTokens": 16082432,
+        "outputTokens": 223290
+      }
+    },
+    {
+      "id": "M5-token-auth-smoke",
+      "reward": 0.6,
+      "rewardMin": 0.6,
+      "rewardMax": 0.6,
+      "attempts": [
+        {
+          "reward": 0.6,
+          "exception": null,
+          "durationSeconds": 192.8,
+          "startedAt": "2026-09-12T19:04:33.684941Z",
+          "usage": {
+            "n_input_tokens": 148930,
+            "n_cache_tokens": 7175680,
+            "n_output_tokens": 72070
+          }
+        },
+        {
+          "reward": 0.6,
+          "exception": null,
+          "durationSeconds": 212.7,
+          "startedAt": "2026-09-12T19:00:35.130522Z",
+          "usage": {
+            "n_input_tokens": 123612,
+            "n_cache_tokens": 7479808,
+            "n_output_tokens": 66682
+          }
+        },
+        {
+          "reward": 0.6,
+          "exception": null,
+          "durationSeconds": 241.1,
+          "startedAt": "2026-09-12T19:00:35.111447Z",
+          "usage": {
+            "n_input_tokens": 208658,
+            "n_cache_tokens": 11057408,
+            "n_output_tokens": 79062
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 481200,
+        "cacheHitTokens": 25712896,
+        "outputTokens": 217814
+      }
+    },
+    {
+      "id": "M6-sleep-tool",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 304.9,
+          "startedAt": "2026-09-12T19:06:39.348753Z",
+          "usage": {
+            "n_input_tokens": 240678,
+            "n_cache_tokens": 16249856,
+            "n_output_tokens": 119206
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 328.1,
+          "startedAt": "2026-09-12T19:00:52.299017Z",
+          "usage": {
+            "n_input_tokens": 246122,
+            "n_cache_tokens": 14594816,
+            "n_output_tokens": 132904
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 422.1,
+          "startedAt": "2026-09-12T19:00:52.286244Z",
+          "usage": {
+            "n_input_tokens": 301622,
+            "n_cache_tokens": 23642624,
+            "n_output_tokens": 149230
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 788422,
+        "cacheHitTokens": 54487296,
+        "outputTokens": 401340
+      }
+    },
+    {
+      "id": "M7-d399-overlay",
+      "reward": 1.0,
+      "rewardMin": 0.98,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 325.3,
+          "startedAt": "2026-09-12T19:10:51.278875Z",
+          "usage": {
+            "n_input_tokens": 265436,
+            "n_cache_tokens": 16334592,
+            "n_output_tokens": 127330
+          }
+        },
+        {
+          "reward": 0.98,
+          "exception": null,
+          "durationSeconds": 303.3,
+          "startedAt": "2026-09-12T19:05:27.174919Z",
+          "usage": {
+            "n_input_tokens": 261776,
+            "n_cache_tokens": 17024512,
+            "n_output_tokens": 118322
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 435.0,
+          "startedAt": "2026-09-12T19:05:27.192580Z",
+          "usage": {
+            "n_input_tokens": 281110,
+            "n_cache_tokens": 25582592,
+            "n_output_tokens": 172536
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 808322,
+        "cacheHitTokens": 58941696,
+        "outputTokens": 418188
+      }
+    },
+    {
+      "id": "M8-brand-text",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 529.4,
+          "startedAt": "2026-09-12T19:08:16.926424Z",
+          "usage": {
+            "n_input_tokens": 315656,
+            "n_cache_tokens": 28330496,
+            "n_output_tokens": 186638
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 537.7,
+          "startedAt": "2026-09-12T19:08:16.930360Z",
+          "usage": {
+            "n_input_tokens": 286564,
+            "n_cache_tokens": 24239360,
+            "n_output_tokens": 166822
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 385.8,
+          "startedAt": "2026-09-12T19:17:27.689252Z",
+          "usage": {
+            "n_input_tokens": 260738,
+            "n_cache_tokens": 19543808,
+            "n_output_tokens": 149922
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 862958,
+        "cacheHitTokens": 72113664,
+        "outputTokens": 503382
+      }
+    },
+    {
+      "id": "M9-mcpanel",
+      "reward": 1.0,
+      "rewardMin": 0.4,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 595.8,
+          "startedAt": "2026-09-12T19:11:29.854402Z",
+          "usage": {
+            "n_input_tokens": 310346,
+            "n_cache_tokens": 45798400,
+            "n_output_tokens": 200584
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 600.6,
+          "startedAt": "2026-09-12T19:11:29.856153Z",
+          "usage": {
+            "n_input_tokens": 312332,
+            "n_cache_tokens": 36005632,
+            "n_output_tokens": 206182
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 476.9,
+          "startedAt": "2026-09-12T19:21:46.735048Z",
+          "usage": {
+            "n_input_tokens": 312022,
+            "n_cache_tokens": 36529920,
+            "n_output_tokens": 169398
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 934700,
+        "cacheHitTokens": 118333952,
+        "outputTokens": 576164
+      }
+    },
+    {
+      "id": "S1-static-scan",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 187.3,
+          "startedAt": "2026-09-12T19:30:59.221699Z",
+          "usage": {
+            "n_input_tokens": 209910,
+            "n_cache_tokens": 5258752,
+            "n_output_tokens": 75082
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 250.8,
+          "startedAt": "2026-09-12T19:30:59.219651Z",
+          "usage": {
+            "n_input_tokens": 207760,
+            "n_cache_tokens": 6891264,
+            "n_output_tokens": 101928
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 201.2,
+          "startedAt": "2026-09-12T19:34:21.530861Z",
+          "usage": {
+            "n_input_tokens": 188072,
+            "n_cache_tokens": 3764992,
+            "n_output_tokens": 85204
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 605742,
+        "cacheHitTokens": 15915008,
+        "outputTokens": 262214
+      }
+    },
+    {
+      "id": "S10-paste-rename-and-version-chip",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 297.1,
+          "startedAt": "2026-09-12T19:13:19.827522Z",
+          "usage": {
+            "n_input_tokens": 92094,
+            "n_cache_tokens": 4659200,
+            "n_output_tokens": 118006
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 196.9,
+          "startedAt": "2026-09-12T19:16:18.255493Z",
+          "usage": {
+            "n_input_tokens": 65692,
+            "n_cache_tokens": 2313728,
+            "n_output_tokens": 75568
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 163.3,
+          "startedAt": "2026-09-12T19:13:19.839821Z",
+          "usage": {
+            "n_input_tokens": 55080,
+            "n_cache_tokens": 997888,
+            "n_output_tokens": 66844
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 212866,
+        "cacheHitTokens": 7970816,
+        "outputTokens": 260418
+      }
+    },
+    {
+      "id": "S11-mermaid-lazyload-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 174.4,
+          "startedAt": "2026-09-12T19:20:51.746419Z",
+          "usage": {
+            "n_input_tokens": 30676,
+            "n_cache_tokens": 742144,
+            "n_output_tokens": 72612
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 167.8,
+          "startedAt": "2026-09-12T19:17:52.123119Z",
+          "usage": {
+            "n_input_tokens": 34352,
+            "n_cache_tokens": 1192960,
+            "n_output_tokens": 64770
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 164.4,
+          "startedAt": "2026-09-12T19:17:52.126535Z",
+          "usage": {
+            "n_input_tokens": 46722,
+            "n_cache_tokens": 1675008,
+            "n_output_tokens": 69962
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 111750,
+        "cacheHitTokens": 3610112,
+        "outputTokens": 207344
+      }
+    },
+    {
+      "id": "S12-global-upgrade-ebusy-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 175.1,
+          "startedAt": "2026-09-12T19:21:05.454826Z",
+          "usage": {
+            "n_input_tokens": 100328,
+            "n_cache_tokens": 3454976,
+            "n_output_tokens": 70534
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 168.3,
+          "startedAt": "2026-09-12T19:21:05.428444Z",
+          "usage": {
+            "n_input_tokens": 101594,
+            "n_cache_tokens": 2745088,
+            "n_output_tokens": 69320
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 161.9,
+          "startedAt": "2026-09-12T19:24:08.843768Z",
+          "usage": {
+            "n_input_tokens": 76932,
+            "n_cache_tokens": 2054912,
+            "n_output_tokens": 64880
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 278854,
+        "cacheHitTokens": 8254976,
+        "outputTokens": 204734
+      }
+    },
+    {
+      "id": "S13-peer-range-vs-runtime",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 123.9,
+          "startedAt": "2026-09-12T19:25:30.748727Z",
+          "usage": {
+            "n_input_tokens": 100282,
+            "n_cache_tokens": 2478848,
+            "n_output_tokens": 49908
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 102.8,
+          "startedAt": "2026-09-12T19:25:30.763337Z",
+          "usage": {
+            "n_input_tokens": 102070,
+            "n_cache_tokens": 1400832,
+            "n_output_tokens": 43370
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 189.6,
+          "startedAt": "2026-09-12T19:27:28.765897Z",
+          "usage": {
+            "n_input_tokens": 114048,
+            "n_cache_tokens": 3441664,
+            "n_output_tokens": 68604
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 316400,
+        "cacheHitTokens": 7321344,
+        "outputTokens": 161882
+      }
+    },
+    {
+      "id": "S14-link-install-lock-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 240.6,
+          "startedAt": "2026-09-12T19:24:18.399509Z",
+          "usage": {
+            "n_input_tokens": 119836,
+            "n_cache_tokens": 4501504,
+            "n_output_tokens": 83060
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 136.4,
+          "startedAt": "2026-09-12T19:24:18.398014Z",
+          "usage": {
+            "n_input_tokens": 86116,
+            "n_cache_tokens": 2101248,
+            "n_output_tokens": 50690
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 172.7,
+          "startedAt": "2026-09-12T19:26:49.965223Z",
+          "usage": {
+            "n_input_tokens": 123856,
+            "n_cache_tokens": 2629888,
+            "n_output_tokens": 64034
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 329808,
+        "cacheHitTokens": 9232640,
+        "outputTokens": 197784
+      }
+    },
+    {
+      "id": "S15-slot-error-boundary-crash",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T19:28:43.314104Z",
+          "usage": null
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 231.0,
+          "startedAt": "2026-09-12T19:28:43.310364Z",
+          "usage": {
+            "n_input_tokens": 47300,
+            "n_cache_tokens": 2508544,
+            "n_output_tokens": 102722
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 188.3,
+          "startedAt": "2026-09-12T19:32:49.475329Z",
+          "usage": {
+            "n_input_tokens": 40066,
+            "n_cache_tokens": 1588480,
+            "n_output_tokens": 82924
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": "AgentTimeoutError",
+      "usage": {
+        "inputTokens": 87366,
+        "cacheHitTokens": 4097024,
+        "outputTokens": 185646
+      }
+    },
+    {
+      "id": "S16-self-host-upgrade-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 163.4,
+          "startedAt": "2026-09-12T19:34:16.885712Z",
+          "usage": {
+            "n_input_tokens": 89860,
+            "n_cache_tokens": 1714176,
+            "n_output_tokens": 66840
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 262.3,
+          "startedAt": "2026-09-12T19:31:26.514312Z",
+          "usage": {
+            "n_input_tokens": 113556,
+            "n_cache_tokens": 5142784,
+            "n_output_tokens": 100250
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 155.4,
+          "startedAt": "2026-09-12T19:31:26.516133Z",
+          "usage": {
+            "n_input_tokens": 121300,
+            "n_cache_tokens": 2033408,
+            "n_output_tokens": 60122
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 324716,
+        "cacheHitTokens": 8890368,
+        "outputTokens": 227212
+      }
+    },
+    {
+      "id": "S17-external-ui-plugin-onboarding-trap",
+      "reward": 0.2,
+      "rewardMin": 0.0,
+      "rewardMax": 0.6,
+      "attempts": [
+        {
+          "reward": 0.6,
+          "exception": null,
+          "durationSeconds": 253.1,
+          "startedAt": "2026-09-12T19:30:20.468879Z",
+          "usage": {
+            "n_input_tokens": 136772,
+            "n_cache_tokens": 9565184,
+            "n_output_tokens": 90044
+          }
+        },
+        {
+          "reward": 0.2,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T19:34:48.621892Z",
+          "usage": null
+        },
+        {
+          "reward": 0.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T19:30:20.473234Z",
+          "usage": null
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": "AgentTimeoutError",
+      "usage": {
+        "inputTokens": 136772,
+        "cacheHitTokens": 9565184,
+        "outputTokens": 90044
+      }
+    },
+    {
+      "id": "S2-negative-scan",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 151.8,
+          "startedAt": "2026-09-12T19:41:08.491417Z",
+          "usage": {
+            "n_input_tokens": 151080,
+            "n_cache_tokens": 1956096,
+            "n_output_tokens": 66172
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 203.1,
+          "startedAt": "2026-09-12T19:38:04.405194Z",
+          "usage": {
+            "n_input_tokens": 177522,
+            "n_cache_tokens": 5079296,
+            "n_output_tokens": 82494
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 169.0,
+          "startedAt": "2026-09-12T19:38:04.413737Z",
+          "usage": {
+            "n_input_tokens": 209378,
+            "n_cache_tokens": 4001280,
+            "n_output_tokens": 63762
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 537980,
+        "cacheHitTokens": 11036672,
+        "outputTokens": 212428
+      }
+    },
+    {
+      "id": "S3-snapshot-migration",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T19:42:53.144391Z",
+          "usage": null
+        },
+        {
+          "reward": 0.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T19:37:37.043372Z",
+          "usage": null
+        },
+        {
+          "reward": 0.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T19:37:37.041424Z",
+          "usage": null
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": "AgentTimeoutError",
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "S4-legacy-client-imports",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 18.9,
+          "startedAt": "2026-09-12T19:38:33.776295Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 20.2,
+          "startedAt": "2026-09-12T19:38:33.774170Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.5,
+          "startedAt": "2026-09-12T19:39:09.590330Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "S5-negative-naming",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 21.1,
+          "startedAt": "2026-09-12T19:39:50.850404Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.5,
+          "startedAt": "2026-09-12T19:40:27.327383Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.5,
+          "startedAt": "2026-09-12T19:39:50.852021Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "S6-corridor-net-state",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.1,
+          "startedAt": "2026-09-12T19:40:46.848884Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.7,
+          "startedAt": "2026-09-12T19:40:10.360042Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 20.1,
+          "startedAt": "2026-09-12T19:40:10.364610Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "S7-unpublished-cohort",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 20.0,
+          "startedAt": "2026-09-12T19:41:08.540710Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.3,
+          "startedAt": "2026-09-12T19:41:45.208823Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.8,
+          "startedAt": "2026-09-12T19:41:08.497370Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "S8-release-routing-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 127.2,
+          "startedAt": "2026-09-12T19:41:25.520125Z",
+          "usage": {
+            "n_input_tokens": 12772,
+            "n_cache_tokens": 542464,
+            "n_output_tokens": 46640
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 187.5,
+          "startedAt": "2026-09-12T19:41:25.517175Z",
+          "usage": {
+            "n_input_tokens": 108826,
+            "n_cache_tokens": 2263552,
+            "n_output_tokens": 81402
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 162.5,
+          "startedAt": "2026-09-12T19:43:47.804392Z",
+          "usage": {
+            "n_input_tokens": 95798,
+            "n_cache_tokens": 1613312,
+            "n_output_tokens": 71220
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 217396,
+        "cacheHitTokens": 4419328,
+        "outputTokens": 199262
+      }
+    },
+    {
+      "id": "S9-composer-coordinate-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 155.2,
+          "startedAt": "2026-09-12T19:44:34.379194Z",
+          "usage": {
+            "n_input_tokens": 39320,
+            "n_cache_tokens": 1422080,
+            "n_output_tokens": 64576
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 233.5,
+          "startedAt": "2026-09-12T19:42:45.143399Z",
+          "usage": {
+            "n_input_tokens": 105798,
+            "n_cache_tokens": 4032768,
+            "n_output_tokens": 96860
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 94.2,
+          "startedAt": "2026-09-12T19:42:45.115131Z",
+          "usage": {
+            "n_input_tokens": 11890,
+            "n_cache_tokens": 338432,
+            "n_output_tokens": 39388
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 157008,
+        "cacheHitTokens": 5793280,
+        "outputTokens": 200824
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 56,
+    "scored": 54,
+    "attempts": 168,
+    "mean": 0.6843,
+    "exceptions": 8,
+    "usage": {
+      "inputTokens": 23566778,
+      "cacheHitTokens": 2017179648,
+      "outputTokens": 14635928,
+      "attemptsReportingUsage": 159
+    },
+    "cost": {
+      "usd": 18.368112,
+      "status": "ok",
+      "model": "deepseek-flash",
+      "tableFetchedAt": "2026-09-12",
+      "tableAgeDays": 0,
+      "tier": "off-peak",
+      "attemptsPriced": 159,
+      "detail": "priced from the 2026-09-12 snapshot"
+    }
+  }
+}

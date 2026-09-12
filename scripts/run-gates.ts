@@ -12,6 +12,8 @@
 import { verifyChangelog } from './verify-changelog.ts'
 import { verifyDocIndex } from './verify-doc-index.ts'
 import { verifyMarkdownLinks } from './verify-md-links.ts'
+import { verifySkillsPin } from './verify-skills-pin.ts'
+import { verifyPriceTable } from './verify-price-table.ts'
 import { syncReadme } from './sync-readme-benchmark.ts'
 
 /** What one gate reported. */
@@ -42,6 +44,8 @@ export function runGates(): GateResult[] {
   const index = verifyDocIndex()
   const links = verifyMarkdownLinks()
   const changelog = verifyChangelog()
+  const skillsPin = verifySkillsPin()
+  const priceTable = verifyPriceTable()
   return [
     {
       name: 'changelog',
@@ -66,6 +70,22 @@ export function runGates(): GateResult[] {
         links.violations.length === 0
           ? `${String(links.checked)} file(s) checked`
           : links.violations.map(v => `${v.file}:${String(v.line)} ${v.url} [${v.reason}]`).join('; '),
+    },
+    {
+      name: 'skills-pin',
+      ok: skillsPin.violations.length === 0,
+      detail:
+        skillsPin.violations.length === 0
+          ? 'the image and the submodule pin the same skills commit'
+          : skillsPin.violations.map(v => v.detail).join('; '),
+    },
+    {
+      name: 'price-table',
+      ok: priceTable.violations.length === 0,
+      detail:
+        priceTable.violations.length === 0
+          ? `pricing/deepseek.json matches the runtime table (${String(priceTable.ageDays)} days old)`
+          : priceTable.violations.map(v => v.detail).join('; '),
     },
     checkReadmeBenchmark(),
   ]

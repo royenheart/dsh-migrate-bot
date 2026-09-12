@@ -8,6 +8,11 @@ The entry point for progressive disclosure: `AGENTS.md` carries the standing ord
 |---|---|---|
 | The product, its inputs and outputs, and how to consume the Action | `README.md` | [Usage](../README.md#usage) |
 | Where to start as a contributor, and what to run before pushing | `README.md` | [Contributing](../README.md#contributing) |
+| Installing the Action, and every configuration key and its default | `docs/installation.md` | [Install](installation.md#install) |
+| Enabling a feedback channel, the token each one needs, and writing your own | `docs/installation.md` | [Feedback channels](installation.md#feedback-channels) |
+| The checklist an agent follows when configuring this Action for someone | `docs/installation.md` | [Agent checklist](installation.md#agent-checklist) |
+| How a merged migrate pull request becomes a report in someone else's repository | `docs/design/migration-feedback.md` | [Why the merge is the trigger](design/migration-feedback.md#1-why-the-merge-is-the-trigger) |
+| The feedback stage's three built-in channels and what each one is for | `docs/design/migration-feedback.md` | [The three built-in channels](design/migration-feedback.md#4-the-three-built-in-channels) |
 | Standing orders for every agent session in this repository | `AGENTS.md` | [Rules](../AGENTS.md#rules) |
 | How documentation is organised, written, and kept from drifting | `docs/AGENTS.md` | [The tier taxonomy: one home per fact](AGENTS.md#the-tier-taxonomy-one-home-per-fact) |
 | Open work, and what is deliberately not done yet | `docs/plans/README.md` | [Open work](plans/README.md#open-work) |
@@ -23,6 +28,6 @@ The entry point for progressive disclosure: `AGENTS.md` carries the standing ord
 | The latest measured rewards, generated from the run records | `README.md` | [Upstream benchmark](../README.md#upstream-benchmark) |
 | What those results mean, and which of them are not defects | `docs/upstream-benchmark.md` | [Reading the results](upstream-benchmark.md#reading-the-results) |
 | What the benchmark exercise found wrong in our own code | `docs/upstream-benchmark.md` | [Three real defects this exercise exposed in our own code](upstream-benchmark.md#three-real-defects-this-exercise-exposed-in-our-own-code) |
-| The record format each benchmark run writes | `reports/README.md` | [The record format](../reports/README.md#the-record-format-schema-1) |
+| The record format each benchmark run writes, and the rules that make it reproducible | `reports/README.md` | [The record format](../reports/README.md#the-record-format-schema-2) |
 | The continuous quality-tracking framework this repository is converging on | `docs/design/continuous-quality-tracking.md` | [Proposed design](design/continuous-quality-tracking.md#5-proposed-design) |
-| Official harness discussions: what ships today and what an auto-post would need | `docs/official-discussion-auto-post.md` | [Why it is not enabled](official-discussion-auto-post.md#why-it-is-not-enabled) |
+| Official harness discussions: what ships today and what an auto-post would need | `docs/official-discussion-auto-post.md` | [Why a migrate run does not post](official-discussion-auto-post.md#why-a-migrate-run-does-not-post) |

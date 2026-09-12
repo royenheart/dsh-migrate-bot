@@ -19,8 +19,12 @@ Deliberate choices, each matching what the upstream task contract expects:
   with no extra routing prompt: each task's score bands depend on the traps
   written into its own statement.
 * The working directory is `/app`, the layout the tasks declare.
-* No `--skill` is passed, so this measures the agent without the community
-  skill installed. Add one later to measure the skill's delta.
+* Two migration modes are measured, and the difference between them is the
+  community knowledge. `native` runs from the harness source alone; with
+  `DSH_HARBOR_SKILLS=upgrade-skills` the vendored skills are uploaded into the
+  container's skill root, so the agent migrates with the version cards and the
+  corridor index available. The skills come from the same pinned commit the
+  image vendors, so a score and the knowledge that produced it are one snapshot.
 """
 
 from __future__ import annotations
@@ -47,13 +51,28 @@ PROFILE = "migrate"
 STOCK_PROFILE = "bench"
 
 #: `migrate` uses this Action's own runner; `stock` uses `@deepseek-ai/dsh-headless`.
-#: Default is `stock`: the runner shipped in `container/profile/migrate-runner.js`
-#: reads `agent.session.events` in a shape dsh 0.1.2-alpha.2 no longer produces
-#: ("events is not iterable"). Run with DSH_HARBOR_RUNNER=migrate once that is fixed.
+#: Default is `migrate`, and the reason is the record: only the migration runner
+#: prints the status lines that carry a session's own token accounting, so a
+#: `stock` run scores the same subject while reporting no usage and no cost. It
+#: reads the session log through `container/profile/session-events.js`, which
+#: handles both the 0.1.1 `events` getter and the 0.1.2 `snapshotEvents`
+#: accessor, and `container/profile/cordis.patch.yml` disables the plugin
+#: inventory request decoration that fails a profile mounting a preset.
 RUNNER_ENV = "DSH_HARBOR_RUNNER"
 
 #: Working directory the upstream tasks declare for the agent.
 WORKDIR = "/app"
+
+#: `native` (no community knowledge) or `upgrade-skills` (loads it). Default is
+#: `native`, so a run that did not ask for the knowledge cannot be influenced by
+#: it.
+SKILLS_ENV = "DSH_HARBOR_SKILLS"
+NATIVE_MODE = "native"
+UPGRADE_SKILLS_MODE = "upgrade-skills"
+
+#: The container's skill root. dsh discovers `<dshHome>/skills` through the
+#: filesystem skill provider the standard preset mounts.
+SKILLS_ROOT = "/root/.dsh/skills"
 
 
 class DshAgent(BaseAgent):
@@ -66,8 +85,11 @@ class DshAgent(BaseAgent):
         self._repo_root = Path(__file__).resolve().parents[2]
         self._version: str | None = None
         self._last_status: dict[str, object] = {}
-        requested = os.environ.get(RUNNER_ENV, "stock").strip().lower()
-        self._runner = "migrate" if requested == "migrate" else "stock"
+        requested = os.environ.get(RUNNER_ENV, "migrate").strip().lower()
+        self._runner = "stock" if requested == "stock" else "migrate"
+        self._mode = UPGRADE_SKILLS_MODE if os.environ.get(SKILLS_ENV, "").strip().lower() == UPGRADE_SKILLS_MODE else NATIVE_MODE
+        self._skills_commit: str | None = None
+        self._skills_loaded: list[str] = []
 
     @staticmethod
     @override
@@ -93,6 +115,7 @@ class DshAgent(BaseAgent):
             self._version = version.stdout.strip()
 
         await self._upload_profile(environment)
+        await self._upload_skills(environment)
 
     async def _install_dsh(self, environment: BaseEnvironment) -> None:
         install = await environment.exec(
@@ -180,6 +203,35 @@ class DshAgent(BaseAgent):
             "EOF\n"
         ))
 
+    async def _upload_skills(self, environment: BaseEnvironment) -> None:
+        """Load the community upgrade knowledge, or leave the skill root empty.
+
+        The skills directory is emptied first in both modes: a task image that
+        happens to ship a skill must not silently become part of the `native`
+        baseline, which is the whole point of measuring the two modes apart.
+        """
+        await environment.exec(command=f"rm -rf {shlex.quote(SKILLS_ROOT)} && mkdir -p {shlex.quote(SKILLS_ROOT)}")
+        if self._mode != UPGRADE_SKILLS_MODE:
+            return
+
+        source = self._repo_root / "vendor" / "dsh-plugin-upgrade-skill" / "skills"
+        if not source.is_dir():
+            raise RuntimeError(
+                "DSH_HARBOR_SKILLS=upgrade-skills needs the vendored skills: "
+                "run `git submodule update --init vendor/dsh-plugin-upgrade-skill`"
+            )
+        self._skills_commit = _git_dir(source, "rev-parse", "HEAD")
+        for skill in sorted(path for path in source.iterdir() if (path / "SKILL.md").is_file()):
+            await environment.upload_dir(
+                source_dir=skill,
+                target_dir=f"{SKILLS_ROOT}/{skill.name}",
+            )
+            self._skills_loaded.append(skill.name)
+        self.logger.info(
+            f"dsh: loaded {len(self._skills_loaded)} community skill(s) at "
+            f"{self._skills_commit or 'unknown commit'}: {', '.join(self._skills_loaded)}"
+        )
+
     # ── run ─────────────────────────────────────────────────────────────────
 
     @override
@@ -226,7 +278,10 @@ class DshAgent(BaseAgent):
 
         # The migrate runner prints one status line per interval with the usage
         # of the run so far; the last one is the run's total.
-        status = self._last_status_line(result.stderr or "")
+        # Harbor's exec merges the container's streams: the runner writes its
+        # status lines to stderr, and they arrive in stdout here. Read both, in
+        # the order they were produced, or a run that reports usage records none.
+        status = self._last_status_line(f"{result.stdout or ''}\n{result.stderr or ''}")
         if status is not None:
             self._last_status = status
             context.n_input_tokens = _as_int(status.get("cacheMissTokens"))
@@ -239,6 +294,9 @@ class DshAgent(BaseAgent):
                 "dsh_version": self._version,
                 "runner": self._runner,
                 "profile": profile,
+                "mode": self._mode,
+                "skills_commit": self._skills_commit,
+                "skills_loaded": self._skills_loaded,
                 "agent_exit_code": result.return_code,
                 "turns": status.get("turns"),
                 "steps": status.get("steps"),
@@ -249,15 +307,18 @@ class DshAgent(BaseAgent):
                 "dsh_version": self._version,
                 "runner": self._runner,
                 "profile": profile,
+                "mode": self._mode,
+                "skills_commit": self._skills_commit,
+                "skills_loaded": self._skills_loaded,
                 "agent_exit_code": result.return_code,
             }
 
     @staticmethod
-    def _last_status_line(stderr: str) -> dict[str, object] | None:
-        """Newest `dsh-migrate-status:` payload in the captured stderr."""
+    def _last_status_line(transcript: str) -> dict[str, object] | None:
+        """Newest `dsh-migrate-status:` payload in the captured session output."""
         prefix = "dsh-migrate-status:"
         found: dict[str, object] | None = None
-        for line in stderr.splitlines():
+        for line in transcript.splitlines():
             stripped = line.strip()
             if not stripped.startswith(prefix):
                 continue
@@ -268,6 +329,19 @@ class DshAgent(BaseAgent):
             if isinstance(payload, dict):
                 found = payload
         return found
+
+
+def _git_dir(cwd: Path, *args: str) -> str | None:
+    """`git` in a directory, or None when git or the directory is absent."""
+    import subprocess
+
+    try:
+        done = subprocess.run(
+            ("git", *args), cwd=cwd, capture_output=True, text=True, check=True
+        )
+        return done.stdout.strip() or None
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return None
 
 
 def _as_int(value: object) -> int | None:
