@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { assembleFixPrompt } from '../prompts/defaults.ts'
+import { assembleFixPrompt } from '../prompts/migrate/index.ts'
 import { resolvePrompts } from '../prompts/resolve.ts'
 import { renderDocuments } from '../github/templates.ts'
 import { formatOfficialDiscussionInvite } from '../github/discussions.ts'

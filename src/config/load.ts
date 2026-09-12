@@ -10,6 +10,7 @@ import {
   type ReviewPolicy,
   type ThinkingEffort,
 } from './schema.ts'
+import { BUILTIN_CHANNELS } from '../feedback/channels.ts'
 
 export class ConfigError extends Error {
   override readonly name = 'ConfigError'
@@ -74,6 +75,84 @@ function asBoolean(value: unknown, path: string): boolean {
   return value
 }
 
+const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/
+const REPO_SLUG = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
+const FEEDBACK_METHODS = ['issue', 'pull', 'issue+pull', 'discussion'] as const
+
+/**
+ * Parse one feedback channel.
+ *
+ * A built-in channel inherits every target field from its shipped default, so
+ * `enabled: true` is the whole configuration. A channel the user names must
+ * carry `repo`, `method`, and `prompt`: without a prompt there is nothing to
+ * run, and without a target there is nowhere to deliver it.
+ * @param id - channel id, which is also the key in `feedback.channels`.
+ * @param raw - the channel's YAML value.
+ */
+function parseFeedbackChannel(id: string, raw: unknown): MigrateConfig['feedback']['channels'][string] {
+  const path = `feedback.channels.${id}`
+  if (!isRecord(raw)) throw new ConfigError(`${path} must be a mapping`)
+  const channel: MigrateConfig['feedback']['channels'][string] = { enabled: false }
+  if (raw.enabled !== undefined) channel.enabled = asBoolean(raw.enabled, `${path}.enabled`)
+  if (raw.repo !== undefined) {
+    const repo = asString(raw.repo, `${path}.repo`)
+    if (!REPO_SLUG.test(repo)) throw new ConfigError(`${path}.repo must be "owner/name"`)
+    channel.repo = repo
+  }
+  if (raw.method !== undefined) channel.method = asEnum(raw.method, `${path}.method`, FEEDBACK_METHODS)
+  if (raw.tokenEnv !== undefined) {
+    const tokenEnv = asString(raw.tokenEnv, `${path}.tokenEnv`)
+    if (!ENV_NAME.test(tokenEnv)) {
+      throw new ConfigError(`${path}.tokenEnv must be a valid environment variable name`)
+    }
+    channel.tokenEnv = tokenEnv
+  }
+  if (raw.prompt !== undefined) channel.prompt = asString(raw.prompt, `${path}.prompt`)
+  if (raw.discussionCategory !== undefined) {
+    channel.discussionCategory = asString(raw.discussionCategory, `${path}.discussionCategory`)
+  }
+  if (raw.labels !== undefined) {
+    if (!Array.isArray(raw.labels)) throw new ConfigError(`${path}.labels must be a list of strings`)
+    channel.labels = raw.labels.map((label, index) => asString(label, `${path}.labels[${String(index)}]`))
+  }
+  return channel
+}
+
+/**
+ * Parse `feedback`, folding the built-ins' shipped defaults under the user's
+ * channel entries so a built-in needs only `enabled` and a user channel is
+ * checked for the three fields nothing can default for it.
+ * @param raw - the `feedback` YAML value.
+ */
+function parseFeedback(raw: unknown): MigrateConfig['feedback'] {
+  const feedback: MigrateConfig['feedback'] = {
+    enabled: DEFAULT_CONFIG.feedback.enabled,
+    channels: {},
+  }
+  for (const [id, channel] of Object.entries(DEFAULT_CONFIG.feedback.channels)) {
+    feedback.channels[id] = { ...channel }
+  }
+  if (raw === undefined) return feedback
+  if (!isRecord(raw)) throw new ConfigError('feedback must be a mapping')
+  if (raw.enabled !== undefined) feedback.enabled = asBoolean(raw.enabled, 'feedback.enabled')
+  if (raw.channels === undefined) return feedback
+  if (!isRecord(raw.channels)) throw new ConfigError('feedback.channels must be a mapping')
+  for (const [id, value] of Object.entries(raw.channels)) {
+    if (!isRecord(value)) throw new ConfigError(`feedback.channels.${id} must be a mapping`)
+    const parsed = parseFeedbackChannel(id, value)
+    const builtin = BUILTIN_CHANNELS[id]
+    if (builtin === undefined) {
+      for (const field of ['repo', 'method', 'prompt'] as const) {
+        if (parsed[field] === undefined) {
+          throw new ConfigError(`feedback.channels.${id}.${field} is required for a channel that is not built in`)
+        }
+      }
+    }
+    feedback.channels[id] = parsed
+  }
+  return feedback
+}
+
 /** Git ref name with the characters git refuses, plus the traversal cases. */
 function asBranchName(value: unknown, path: string): string {
   const name = asString(value, path)
@@ -127,6 +206,7 @@ export function parseConfig(raw: unknown): MigrateConfig {
       },
       e2e: { ...DEFAULT_CONFIG.e2e },
       timeouts: { ...DEFAULT_CONFIG.timeouts },
+      feedback: parseFeedback(undefined),
     }
   }
   if (!isRecord(raw)) throw new ConfigError('config root must be a mapping')
@@ -256,6 +336,8 @@ export function parseConfig(raw: unknown): MigrateConfig {
     }
   }
 
+  const feedback = parseFeedback(raw.feedback)
+
   return {
     dshVersion: raw.dshVersion === undefined ? DEFAULT_CONFIG.dshVersion : asString(raw.dshVersion, 'dshVersion'),
     review: { policy },
@@ -270,6 +352,7 @@ export function parseConfig(raw: unknown): MigrateConfig {
     verify,
     e2e,
     timeouts,
+    feedback,
   }
 }
 

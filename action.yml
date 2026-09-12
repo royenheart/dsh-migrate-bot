@@ -41,6 +41,14 @@ inputs:
     description: If true, only reconcile a pending migrate PR and rewrite badge.json (no pipeline).
     required: false
     default: 'false'
+  feedback_only:
+    description: If true, report a merged migrate PR to the enabled feedback channels (no pipeline).
+    required: false
+    default: 'false'
+  pull_request:
+    description: Pull request number to report on. Empty = the pending migrate PR recorded on the state branch.
+    required: false
+    default: ''
 outputs:
   status:
     description: compatible, migrated, failed, or skipped (dsh unchanged)
@@ -62,6 +70,8 @@ outputs:
     description: Last verified dsh-v* tag (compatible run or merged migrate PR)
   badge_message:
     description: shields.io badge message (verified tag, pending, or unverified)
+  feedback_status:
+    description: One line per feedback channel — delivered, held, skipped (with its reason), or failed
 runs:
   using: docker
   image: Dockerfile

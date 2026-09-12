@@ -189,8 +189,32 @@ async function run(ctx, task, io) {
   io.stdout.write(outcome.text + '\n')
   if (outcome.reason?.kind === 'error') {
     io.stderr.write(`dsh-migrate: ${outcome.reason.error.code}: ${outcome.reason.error.message}\n`)
+    // The dsh error carries the real failure as `cause`; without it a wrapped
+    // code like REQUEST_EXTENSION says nothing about what actually broke.
+    io.stderr.write(`dsh-migrate: reason ${JSON.stringify(outcome.reason)}\n`)
+    for (const line of describeCauses(outcome.reason.error)) io.stderr.write(`dsh-migrate: cause: ${line}\n`)
   }
   io.exit(outcome.reason?.kind === 'completed' ? 0 : 1)
+}
+
+/**
+ * Flatten an error's `cause` chain into one line per link.
+ * @param {unknown} error - the outermost error.
+ * @returns {string[]} one description per cause, outermost first.
+ */
+function describeCauses(error) {
+  const lines = []
+  let current = error?.cause
+  let depth = 0
+  while (current !== undefined && current !== null && depth < 6) {
+    const name = current?.constructor?.name ?? typeof current
+    const code = current?.code === undefined ? '' : `${current.code}: `
+    const message = current?.message ?? String(current)
+    lines.push(`${name} ${code}${message}`.trim())
+    current = current.cause
+    depth += 1
+  }
+  return lines
 }
 
 export function apply(ctx, config) {

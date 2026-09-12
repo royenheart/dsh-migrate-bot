@@ -1,4 +1,4 @@
-import { ABSORPTION_PROMPT, ALIGNMENT_PROMPT, FIX_PROMPT, withHarnessContext } from './defaults.ts'
+import { ABSORPTION_PROMPT, ALIGNMENT_PROMPT, FIX_PROMPT, withHarnessContext } from './migrate/index.ts'
 import type { MigrateConfig } from '../config/schema.ts'
 
 export interface ResolvedPrompts {

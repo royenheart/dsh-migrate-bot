@@ -49,6 +49,16 @@ RUN set -eux; \
   playwright install --with-deps chromium || playwright install --with-deps chromium; \
   rm -rf /var/lib/apt/lists/*
 
+# The community upgrade knowledge, pinned to the same commit this repository's
+# vendor/dsh-plugin-upgrade-skill submodule pins. It is cloned rather than
+# copied from the submodule because a Docker action's build context does not
+# carry submodules. scripts/verify-skills-pin.ts fails when the two drift.
+ARG UPGRADE_SKILL_COMMIT=ecab245c6c1831c51b0240aca13573b94a6e525e
+RUN git clone --filter=blob:none --no-checkout https://github.com/oh-my-dsh/dsh-plugin-upgrade-skill.git /opt/dsh-migrate/vendor/upgrade-skill \
+  && git -C /opt/dsh-migrate/vendor/upgrade-skill fetch --depth 1 origin "$UPGRADE_SKILL_COMMIT" \
+  && git -C /opt/dsh-migrate/vendor/upgrade-skill checkout --detach FETCH_HEAD \
+  && rm -rf /opt/dsh-migrate/vendor/upgrade-skill/.git
+
 WORKDIR /opt/dsh-migrate
 COPY package.json package-lock.json tsconfig.json ./
 RUN set -eux; \

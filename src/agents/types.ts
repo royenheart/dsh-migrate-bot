@@ -1,7 +1,7 @@
 import type { DshBackendConfig } from '../config/schema.ts'
 import type { SessionProgress } from './session-status.ts'
 
-export type AgentKind = 'absorption' | 'alignment' | 'fix' | 'e2e'
+export type AgentKind = 'absorption' | 'alignment' | 'fix' | 'e2e' | 'feedback'
 
 export interface AgentRequest {
   kind: AgentKind

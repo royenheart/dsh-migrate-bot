@@ -18,11 +18,14 @@ export DSH_MIGRATE_APP_ROOT="${DSH_MIGRATE_APP_ROOT:-/opt/dsh-migrate}"
 export DSH_MIGRATE_HOME="${DSH_MIGRATE_HOME:-$workspace/.dsh-migrate}"
 
 args=("$@")
-if [[ ${#args[@]} -eq 0 || ( "${args[0]}" != run && "${args[0]}" != check-config && "${args[0]}" != refresh-badge ) ]]; then
+if [[ ${#args[@]} -eq 0 || ( "${args[0]}" != run && "${args[0]}" != check-config && "${args[0]}" != refresh-badge && "${args[0]}" != feedback ) ]]; then
   args=(run "${args[@]}")
 fi
 if [[ "${INPUT_REFRESH_ONLY:-false}" == [Tt]rue ]]; then
   args=(refresh-badge)
+fi
+if [[ "${INPUT_FEEDBACK_ONLY:-false}" == [Tt]rue ]]; then
+  args=(feedback)
 fi
 
 resolve_workdir() {
@@ -65,6 +68,9 @@ if [[ "${INPUT_FORCE:-false}" == [Tt]rue ]]; then
 fi
 if [[ -n "${INPUT_QUOTA_LIMIT:-}" && ! " ${args[*]} " =~ " --quota-limit " ]]; then
   args+=(--quota-limit "$INPUT_QUOTA_LIMIT")
+fi
+if [[ -n "${INPUT_PULL_REQUEST:-}" && ! " ${args[*]} " =~ " --pull-request " ]]; then
+  args+=(--pull-request "$INPUT_PULL_REQUEST")
 fi
 
 cli="${DSH_MIGRATE_CLI:-/opt/dsh-migrate/dist/src/cli.js}"

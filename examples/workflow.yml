@@ -77,3 +77,27 @@ jobs:
           refresh_only: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Only a MERGED pull request is reported: the merge is the maintainer's verdict
+  # on the migration. A closed one proves nothing and sends nothing.
+  # Backends default to disabled; add the secrets for the channels you enabled.
+  feedback:
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: royenheart/dsh-migrate-bot@v0
+        with:
+          feedback_only: true
+          pull_request: ${{ github.event.pull_request.number }}
+          config: .github/dsh-migrate.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEEPSEEK_API_KEY_DSH_MIGRATE_BOT: ${{ secrets.DEEPSEEK_API_KEY_DSH_MIGRATE_BOT }}
+          # One token per enabled channel. Each needs write access to the
+          # repository it reports to, which GITHUB_TOKEN cannot provide.
+          DSH_MIGRATE_FEEDBACK_UPGRADE_SKILL_TOKEN: ${{ secrets.DSH_MIGRATE_FEEDBACK_UPGRADE_SKILL_TOKEN }}
+          DSH_MIGRATE_FEEDBACK_BOT_TOKEN: ${{ secrets.DSH_MIGRATE_FEEDBACK_BOT_TOKEN }}
+          DSH_MIGRATE_FEEDBACK_HARNESS_TOKEN: ${{ secrets.DSH_MIGRATE_FEEDBACK_HARNESS_TOKEN }}

@@ -52,3 +52,28 @@ loop:
 # always aborts, even when this is unset.
 # quota:
 #   limit: 2
+
+# Feedback: after a migrate pull request is MERGED, report it to the channels you
+# enable. Every channel is off by default and needs its own token, because none
+# of these targets is the plugin repository your GITHUB_TOKEN belongs to.
+# A channel that is on without its token is skipped and logged, never an error.
+#feedback:
+#  channels:
+#    upgrade-skill:
+#      enabled: false          # issue -> oh-my-dsh/dsh-plugin-upgrade-skill
+#      # tokenEnv: DSH_MIGRATE_FEEDBACK_UPGRADE_SKILL_TOKEN
+#    migrate-bot:
+#      enabled: false          # issue -> royenheart/dsh-migrate-bot
+#      # tokenEnv: DSH_MIGRATE_FEEDBACK_BOT_TOKEN
+#    harness-discussion:
+#      enabled: false          # discussion -> deepseek-ai/deepseek-harness (Ideas)
+#      # tokenEnv: DSH_MIGRATE_FEEDBACK_HARNESS_TOKEN
+#    my-team-log:              # a channel of your own
+#      enabled: false
+#      repo: my-org/migration-log
+#      method: issue           # issue | pull | issue+pull | discussion
+#      tokenEnv: MY_MIGRATION_LOG_TOKEN
+#      prompt: |
+#        Report this migration to our team log. Say which plugin moved which
+#        corridor, what the maintainer changed before merging, and what we should
+#        do differently next time.

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { extractMechanicalErrors } from '../../src/mechanical/errors.ts'
-import { assembleFixPrompt } from '../../src/prompts/defaults.ts'
+import { assembleFixPrompt } from '../../src/prompts/migrate/index.ts'
 
 test('keeps error lines and drops passing noise', () => {
   const excerpt = extractMechanicalErrors([

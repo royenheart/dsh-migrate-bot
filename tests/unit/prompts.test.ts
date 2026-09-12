@@ -5,7 +5,7 @@ import {
   ALIGNMENT_PROMPT,
   FIX_PROMPT,
   assembleFixPrompt,
-} from '../../src/prompts/defaults.ts'
+} from '../../src/prompts/migrate/index.ts'
 import { resolvePrompts } from '../../src/prompts/resolve.ts'
 import { parseConfig } from '../../src/config/load.ts'
 

@@ -11,6 +11,8 @@ import { decideWatch, describeWatchDecision } from './watch/gate.ts'
 import { applyRunToSeenState, readSeenState, STATE_BRANCH } from './watch/seen.ts'
 import { badgeFromSeenState } from './watch/badge.ts'
 import { publishedPullRequest, reconcilePendingState, writeStateBranch } from './watch/sync.ts'
+import { runFeedback } from './feedback/run.ts'
+import { skillsSource, syncUpgradeSkills, upgradeSkillsEnabled } from './skills/upgrade.ts'
 import { createReportStore } from './reports/store.ts'
 import { createDshRunner, formatSessionProgress } from './agents/dsh.ts'
 import { createGithubPublisher } from './github/publish.ts'
@@ -92,6 +94,67 @@ async function refreshBadge(argv: readonly string[]): Promise<number> {
   return code
 }
 
+/**
+ * Report one merged migrate pull request to the channels a user enabled.
+ *
+ * The recorded state is read *before* the merge is reconciled: the pending row
+ * is what names the pull request and the tag the migration targeted, and
+ * reconciliation is what removes it.
+ */
+async function feedback(argv: readonly string[]): Promise<number> {
+  const workdir = resolve(argValue(argv, '--workdir') ?? process.cwd())
+  const appRoot = resolve(process.env.DSH_MIGRATE_APP_ROOT ?? resolve(here, '../..'))
+  const configPath = resolveConfigPath(argv, workdir)
+  const config = configPath === undefined || !existsSync(configPath)
+    ? parseConfig({})
+    : loadConfigFile(configPath)
+  const apiKeyEnv = argValue(argv, '--api-key-env') ?? config.secrets.apiKeyEnv
+  const secrets = loadSecrets([workdir, appRoot, process.cwd()], { apiKeyEnv })
+  const recorded = readSeenState(workdir)
+  const explicit = argValue(argv, '--pull-request')
+  const requested = explicit === undefined ? undefined : Number(explicit)
+  if (explicit !== undefined && (!Number.isInteger(requested) || (requested ?? 0) <= 0)) {
+    process.stderr.write('--pull-request must be a positive integer\n')
+    return 2
+  }
+
+  const agent = createDshRunner({
+    ...(process.env.DSH_HOME === undefined ? {} : { dshHome: process.env.DSH_HOME }),
+    timeoutMs: config.timeouts.agentMs,
+    onStatus(progress) { logLine(`dsh: ${formatSessionProgress(progress)}`) },
+    onLog(line) { logLine(line) },
+  })
+
+  const result = await runFeedback({
+    workdir,
+    config,
+    env: process.env,
+    log: logLine,
+    seen: recorded,
+    ...(requested === undefined ? {} : { pullRequest: requested }),
+    ...(secrets.apiKey === undefined ? {} : { apiKey: secrets.apiKey }),
+    agent,
+  })
+
+  writeGithubOutput({
+    status: result.ran ? 'feedback' : 'skipped',
+    skipped_review: 'true',
+    verified_tag: recorded?.verified?.tag,
+    feedback_status: result.outcomes
+      .map(outcome => `${outcome.channel}: ${outcome.status}${outcome.status === 'delivered' ? '' : ` (${outcome.reason})`}`)
+      .join('\n'),
+  })
+  logLine(JSON.stringify({
+    status: 'feedback',
+    ran: result.ran,
+    ...(result.reason === undefined ? {} : { reason: result.reason }),
+    outcomes: result.outcomes,
+  }, null, 2))
+  // A skipped channel is a normal outcome, and a delivery failure is reported to
+  // the maintainers who enabled the channel rather than by failing their run.
+  return 0
+}
+
 async function main(argv: readonly string[]): Promise<number> {
   const command = argv[2] ?? 'run'
   if (command === 'check-config') {
@@ -106,8 +169,11 @@ async function main(argv: readonly string[]): Promise<number> {
   if (command === 'refresh-badge') {
     return refreshBadge(argv)
   }
+  if (command === 'feedback') {
+    return feedback(argv)
+  }
   if (command !== 'run') {
-    process.stderr.write('usage: dsh-migrate run|check-config|refresh-badge [--workdir DIR] [--config FILE] [--dsh-version VER] [--api-key-env NAME] [--quota-limit N] [--mechanical-only] [--skip-github] [--force]\n')
+    process.stderr.write('usage: dsh-migrate run|check-config|refresh-badge|feedback [--workdir DIR] [--config FILE] [--dsh-version VER] [--api-key-env NAME] [--quota-limit N] [--pull-request N] [--mechanical-only] [--skip-github] [--force]\n')
     return 2
   }
 
@@ -208,6 +274,17 @@ async function main(argv: readonly string[]): Promise<number> {
   if (!skipGithub && githubToken === undefined) {
     process.stderr.write('GITHUB_TOKEN missing; Issue/PR will be skipped. Pass --skip-github to silence this.\n')
   }
+
+  // The community upgrade knowledge is loaded only for a user who enabled the
+  // channel that reports back to it. Off, the skill root is left without it, so
+  // a run that does not want that knowledge cannot be influenced by it.
+  const skills = syncUpgradeSkills({
+    dshHome: process.env.DSH_HOME,
+    enabled: upgradeSkillsEnabled(config),
+    source: skillsSource(process.env),
+    log: logLine,
+  })
+  logLine(`stage: skills — ${skills.detail}`)
 
   const migrateHome = resolve(process.env.DSH_MIGRATE_HOME ?? resolve(workdir, '.dsh-migrate'))
   logLine(`stage: harness checkout ${target.tag}`)
@@ -463,6 +540,7 @@ async function main(argv: readonly string[]): Promise<number> {
   logLine(JSON.stringify({
     status: result.status,
     runDir: result.runDir,
+    skills: { status: skills.status, loaded: skills.skills },
     skippedReview: result.skippedReview,
     fixAttempts: result.fixAttempts,
     mechanicalOk: result.mechanical.ok,
