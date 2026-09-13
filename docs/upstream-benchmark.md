@@ -110,7 +110,13 @@ Two facts about the shape of those results belong here rather than in a table.
 
 The scored tasks reproduce their rewards across runs and across both build paths described above, which is the property worth monitoring. A single run is evidence that the pipeline works; only a sequence of them shows whether it still does, which is what [continuous quality tracking](design/continuous-quality-tracking.md#7-phasing) is designed to watch.
 
-## Three real defects this exercise exposed in our own code
+### The two modes are the point of the table
+
+`native` and `upgrade-skills` run against the same frozen snapshot, the same build of the served model, and the same task set; the only difference is whether the community skills are loaded. Both records cover all 56 tasks with three attempts each, and the figures are in [README.md](../README.md#upstream-benchmark) — this document does not restate them.
+
+What the comparison says today: the mode with the skills loaded scores **higher**, on the mean and on the count of full-score tasks, in the same direction. What it does not say: how much of that is the skills and how much is the sampling. Three attempts per task is enough for a median to mean something, but the gap is small next to the spread a stochastic subject produces, and two tasks per mode carry no score at all, so a difference of that size is a direction and not a measurement. Treat it as a reason to keep measuring, not as a number to quote.
+
+## What this exercise exposed in our own code
 
 ### 1. The migrate profile is brittle across dsh versions
 
@@ -149,6 +155,30 @@ version-adaptive runner, not one per version":** the incompatibility was a singl
 `run-benchmark.sh` decided which Harbor job directories belonged to the current invocation with `find jobs -newer "$WORK_ROOT"`. `prepare()` rewrites the work root once per task, so after the last task every earlier job directory was older than the reference point. A three-task run therefore produced a record holding one task and reported no error — a summary that understated its own coverage.
 
 Fixed by snapshotting the job directories before the loop and taking a `comm` set difference afterwards, plus a warning when fewer records appear than tasks were requested. Regenerating the record for the run above yields all three tasks (`mean 0.6667`, one exception) instead of one (`mean 0.0000`).
+
+### 4. A request decoration failed every session of a profile that mounts a preset
+
+On dsh **0.1.2-alpha.2** the migration runner could not start a single task: every trial ended in two seconds with
+
+```
+dsh-migrate: REQUEST_EXTENSION: DeepSeek request extension preparation failed
+```
+
+The task was never the problem. dsh ships a request decoration that reports the active plugin inventory to the model provider, and it resolves every active Loader row to its owning package, throwing when one has no resolvable manifest. A profile that mounts a preset adds that preset's rows to the inventory, and this Action's migrate profile does exactly that — which is why the same suite scored `1.000` with the stock runner and `0.000` with ours, on the same task, in the same image. The cause is invisible from the session log, because dsh serializes the error without its `cause`; it took a stock-versus-migrate control run to localize it, and confirming the fix took one more.
+
+`container/profile/cordis.patch.yml` disables the decoration. A migration session does not need the provider to receive this plugin's inventory, and not sending it is the smaller request. **This is a defect in the shipped profile, not only in the benchmark:** any user whose plugin repository runs a dsh version carrying that decoration would have had every agent session fail.
+
+### 5. Token usage was reported as absent while the run was reporting it
+
+The adapter read the runner's `dsh-migrate-status:` lines from the trial's stderr. Harbor's `exec` merges the container's streams, so those lines arrive on stdout and stderr is empty: every record said `usage: null`, and a whole suite would have been published claiming no token counts. Reading both streams, in order, is the fix. The recorder now also totals usage per task and per run, which is what the cost is derived from.
+
+### 6. A truncated task id produced a record naming a task that does not exist
+
+Harbor names a trial directory `<task-id>__<suffix>` and shortens the id when the container name it derives from would be too long, so the suite's `S17-external-ui-plugin-onboarding-trap` appears as `S17-external-ui-plugin-onboardin`. The record took the directory name, which is not a task in the suite: a reader comparing two records would have found a task that does not exist and silently missed the real one. `summarize.py` now maps an observed id back to the suite's directory name when exactly one task matches its prefix.
+
+### 7. A repair run replaced a record instead of completing it
+
+A suite run can lose a task to something outside the task — a build that failed, an environment that would not start. Re-running the whole suite to recover it would discard measurements that were already taken, so `--merge-into` folds the repair run's tasks into the existing record and recomputes the aggregate. It refuses a repair whose mode, upstream snapshot, or producer commit differs, because that is a different subject and has to be its own record.
 
 ## Isolation: the upstream suite does not require it
 

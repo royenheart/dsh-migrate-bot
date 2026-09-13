@@ -27,7 +27,7 @@ The entry point for progressive disclosure: `AGENTS.md` carries the standing ord
 | Scoring this Action against the community benchmark suite | `docs/upstream-benchmark.md` | [Preparations](upstream-benchmark.md#preparations) |
 | The latest measured rewards, generated from the run records | `README.md` | [Upstream benchmark](../README.md#upstream-benchmark) |
 | What those results mean, and which of them are not defects | `docs/upstream-benchmark.md` | [Reading the results](upstream-benchmark.md#reading-the-results) |
-| What the benchmark exercise found wrong in our own code | `docs/upstream-benchmark.md` | [Three real defects this exercise exposed in our own code](upstream-benchmark.md#three-real-defects-this-exercise-exposed-in-our-own-code) |
+| What the benchmark exercise found wrong in our own code | `docs/upstream-benchmark.md` | [What this exercise exposed in our own code](upstream-benchmark.md#what-this-exercise-exposed-in-our-own-code) |
 | The record format each benchmark run writes, and the rules that make it reproducible | `reports/README.md` | [The record format](../reports/README.md#the-record-format-schema-2) |
 | The continuous quality-tracking framework this repository is converging on | `docs/design/continuous-quality-tracking.md` | [Proposed design](design/continuous-quality-tracking.md#5-proposed-design) |
 | Official harness discussions: what ships today and what an auto-post would need | `docs/official-discussion-auto-post.md` | [Why a migrate run does not post](official-discussion-auto-post.md#why-a-migrate-run-does-not-post) |
