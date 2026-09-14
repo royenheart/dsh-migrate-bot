@@ -202,10 +202,49 @@ export function priceDeepseekUsageDetailed(
   options: { servedModel?: string | undefined; now?: Date } = {},
 ): PricedUsage {
   const now = options.now ?? new Date()
-  const pricedAs = modelForPricing(model, options.servedModel, now)
-  const rates = DEEPSEEK_RATES[pricedAs]
   const ageDays = priceTableAgeDays(now)
-  if (rates === undefined) {
+  // Routing is resolved per request, from that request's own time: a run that
+  // spans the moment a model starts being served as another one has to price
+  // each request under the rules that applied when it was made, and a cost
+  // computed "as of now" would silently re-price an older run.
+  let usd = 0
+  let sawPeak = false
+  let sawOffPeak = false
+  let pricedAs = modelForPricing(model, options.servedModel, samples[0] === undefined ? now : new Date(samples[0].time))
+  let priced = false
+  for (const sample of samples) {
+    const at = new Date(sample.time)
+    const perSample = modelForPricing(model, options.servedModel, at)
+    const rates = DEEPSEEK_RATES[perSample]
+    if (rates === undefined) {
+      pricedAs = perSample
+      continue
+    }
+    pricedAs = perSample
+    priced = true
+    const peak = isDeepseekPeak(at)
+    if (peak) sawPeak = true
+    else sawOffPeak = true
+    usd += sample.cacheMissTokens / PER_MILLION * (peak ? rates.cacheMiss.peak : rates.cacheMiss.offPeak)
+    usd += sample.cacheHitTokens / PER_MILLION * (peak ? rates.cacheHit.peak : rates.cacheHit.offPeak)
+    usd += sample.outputTokens / PER_MILLION * (peak ? rates.output.peak : rates.output.offPeak)
+  }
+  if (!priced) {
+    // Nothing to price is not the same as nothing known: an empty sample list
+    // still reports the table, and only a model with no vendored rate is
+    // `unknown-model`.
+    const known = DEEPSEEK_RATES[modelForPricing(model, options.servedModel, now)]
+    if (known !== undefined && samples.length === 0) {
+      const staleEmpty = ageDays > PRICE_TABLE_STALE_AFTER_DAYS
+      return {
+        usd: 0,
+        status: staleEmpty ? 'stale-table' : 'ok',
+        tableFetchedAt: PRICE_TABLE_FETCHED_AT,
+        tableAgeDays: ageDays,
+        model: pricedAs,
+        detail: `no priced request in this usage; the ${PRICE_TABLE_FETCHED_AT} snapshot would have applied`,
+      }
+    }
     return {
       status: 'unknown-model',
       tableFetchedAt: PRICE_TABLE_FETCHED_AT,
@@ -213,17 +252,6 @@ export function priceDeepseekUsageDetailed(
       model: pricedAs,
       detail: `no vendored rate for \`${pricedAs}\`; costs are unreported rather than zero`,
     }
-  }
-  let usd = 0
-  let sawPeak = false
-  let sawOffPeak = false
-  for (const sample of samples) {
-    const peak = isDeepseekPeak(new Date(sample.time))
-    if (peak) sawPeak = true
-    else sawOffPeak = true
-    usd += sample.cacheMissTokens / PER_MILLION * (peak ? rates.cacheMiss.peak : rates.cacheMiss.offPeak)
-    usd += sample.cacheHitTokens / PER_MILLION * (peak ? rates.cacheHit.peak : rates.cacheHit.offPeak)
-    usd += sample.outputTokens / PER_MILLION * (peak ? rates.output.peak : rates.output.offPeak)
   }
   const stale = ageDays > PRICE_TABLE_STALE_AFTER_DAYS
   return {

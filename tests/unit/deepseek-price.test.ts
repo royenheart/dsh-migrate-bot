@@ -94,9 +94,21 @@ test('cost reporting names the table and its age instead of a bare number', () =
   // 12:00 UTC is off-peak: one million cache-miss tokens at 0.15.
   assert.equal(priced.usd, 0.15)
 
-  const stale = priceDeepseekUsageDetailed([], 'deepseek-flash', { now: new Date('2026-10-30T00:00:00Z') })
+  // A run recorded long after the snapshot was taken reports it as stale, and
+  // still prices the requests it actually made.
+  const stale = priceDeepseekUsageDetailed(
+    [{ time: Date.parse('2026-09-20T12:00:00Z'), cacheMissTokens: 1_000_000, cacheHitTokens: 0, outputTokens: 0 }],
+    'deepseek-flash',
+    { now: new Date('2026-10-30T00:00:00Z') },
+  )
   assert.equal(stale.status, 'stale-table')
   assert.match(stale.detail, /re-check/)
+  assert.equal(stale.usd, 0.15)
+
+  // Nothing to price is not the same as a model with no rate.
+  const empty = priceDeepseekUsageDetailed([], 'deepseek-flash', { now: new Date('2026-09-20T00:00:00Z') })
+  assert.equal(empty.status, 'ok')
+  assert.equal(empty.usd, 0)
 })
 
 test('an unknown model reports unknown-model rather than a zero cost', () => {
