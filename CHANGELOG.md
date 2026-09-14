@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/).
 Entries are generated from the commit history by [Commitizen](https://commitizen-tools.github.io/commitizen/); do not edit them by hand.
 
+## v0.3.4 (2026-09-15)
+
+### Fix
+
+- price each request under the rules that applied when it was made
+
 ## v0.3.3 (2026-09-15)
 
 ### Feat
