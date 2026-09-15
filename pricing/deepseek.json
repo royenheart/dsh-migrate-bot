@@ -1,0 +1,46 @@
+{
+  "source": "https://api-docs.deepseek.com/quick_start/pricing",
+  "fetchedAt": "2026-09-12",
+  "staleAfterDays": 14,
+  "currency": "USD",
+  "unit": "per 1M tokens",
+  "peakWindowsUtc": [
+    { "startMinute": 60, "endMinute": 240, "days": ["monday", "tuesday", "wednesday", "thursday", "friday"] },
+    { "startMinute": 360, "endMinute": 600, "days": ["monday", "tuesday", "wednesday", "thursday", "friday"] }
+  ],
+  "note": "Off-peak is half of peak. Prices are read from the published table on fetchedAt; DeepSeek publishes no machine-readable source, and every third-party dataset checked on 2026-09-12 was stale, missing a current model id, or had no peak/off-peak concept.",
+  "models": {
+    "deepseek-flash": {
+      "modelVersion": "DeepSeek-V4.1-Flash",
+      "cacheHit": { "offPeak": 0.003, "peak": 0.006 },
+      "cacheMiss": { "offPeak": 0.15, "peak": 0.3 },
+      "output": { "offPeak": 0.6, "peak": 1.2 }
+    },
+    "deepseek-v4-flash": {
+      "modelVersion": "DeepSeek-V4-Flash (retired; requests are served by V4.1-Flash and billed at Flash rates)",
+      "cacheHit": { "offPeak": 0.003, "peak": 0.006 },
+      "cacheMiss": { "offPeak": 0.15, "peak": 0.3 },
+      "output": { "offPeak": 0.6, "peak": 1.2 }
+    },
+    "deepseek-v4-flash-vision-exp": {
+      "modelVersion": "DeepSeek-V4-Flash-Vision-Exp (retired; served by V4.1-Flash and billed at Flash rates)",
+      "cacheHit": { "offPeak": 0.003, "peak": 0.006 },
+      "cacheMiss": { "offPeak": 0.15, "peak": 0.3 },
+      "output": { "offPeak": 0.6, "peak": 1.2 }
+    },
+    "deepseek-v4-pro": {
+      "modelVersion": "DeepSeek-V4-Pro-0813",
+      "cacheHit": { "offPeak": 0.022, "peak": 0.044 },
+      "cacheMiss": { "offPeak": 0.66, "peak": 1.32 },
+      "output": { "offPeak": 1.98, "peak": 3.96 }
+    }
+  },
+  "routeOverrides": [
+    {
+      "model": "deepseek-v4-pro",
+      "from": "2026-09-14T04:00:00Z",
+      "pricedAs": "deepseek-flash",
+      "note": "The release news says all deepseek-v4-pro requests route to V4.1-Flash at V4.1-Flash rates from this time; the pricing page footnote still says the billing method is unchanged. The routed reading is applied, and a cost that looks wrong is the signal to re-read the page."
+    }
+  ]
+}

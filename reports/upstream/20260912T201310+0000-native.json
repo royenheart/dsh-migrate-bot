@@ -1,0 +1,2697 @@
+{
+  "schema": 2,
+  "kind": "upstream-benchmark",
+  "generatedAt": "2026-09-12T20:13:10+00:00",
+  "producer": {
+    "commit": "ba064944af7597136baff22884e3a13f6e017bba",
+    "dirty": true
+  },
+  "upstream": {
+    "repository": "oh-my-dsh/dsh-plugin-upgrade-skill",
+    "commit": "ecab245c6c1831c51b0240aca13573b94a6e525e"
+  },
+  "mode": {
+    "id": "native",
+    "runner": "migrate",
+    "profile": "migrate"
+  },
+  "agent": {
+    "name": "dsh",
+    "mode": "native",
+    "version": "0.1.1-rc.2",
+    "versions": [
+      "0.1.1-rc.2",
+      "0.1.2-alpha.2"
+    ],
+    "model": "deepseek-v4-flash",
+    "modelsObserved": []
+  },
+  "modelIdentity": {
+    "requestedModel": "deepseek-v4-flash",
+    "endpoint": "https://api.deepseek.com/chat/completions",
+    "probedAt": "2026-09-12T20:13:09+00:00",
+    "servedModel": "deepseek-flash",
+    "systemFingerprint": "aeb56401ca74e127821c4f9126dcb669",
+    "responseId": "0f175f47-4f83-43cd-a46c-e16022ec04b9",
+    "created": 1789243990,
+    "error": null
+  },
+  "runsPerTask": 3,
+  "tasks": [
+    {
+      "id": "H1-plane-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 296.6,
+          "startedAt": "2026-09-12T15:41:46.518213Z",
+          "usage": {
+            "n_input_tokens": 142692,
+            "n_cache_tokens": 11147008,
+            "n_output_tokens": 103060
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 349.9,
+          "startedAt": "2026-09-12T15:46:22.007322Z",
+          "usage": {
+            "n_input_tokens": 190618,
+            "n_cache_tokens": 13965568,
+            "n_output_tokens": 103626
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 237.9,
+          "startedAt": "2026-09-12T15:41:46.516610Z",
+          "usage": {
+            "n_input_tokens": 118174,
+            "n_cache_tokens": 8540928,
+            "n_output_tokens": 78626
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 451484,
+        "cacheHitTokens": 33653504,
+        "outputTokens": 285312
+      }
+    },
+    {
+      "id": "H10-browser-activation-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 240.6,
+          "startedAt": "2026-09-12T15:06:26.565216Z",
+          "usage": {
+            "n_input_tokens": 121188,
+            "n_cache_tokens": 6787840,
+            "n_output_tokens": 59396
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 281.5,
+          "startedAt": "2026-09-12T15:06:26.566596Z",
+          "usage": {
+            "n_input_tokens": 96182,
+            "n_cache_tokens": 5181440,
+            "n_output_tokens": 46564
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 283.3,
+          "startedAt": "2026-09-12T15:10:54.833362Z",
+          "usage": {
+            "n_input_tokens": 108376,
+            "n_cache_tokens": 6201088,
+            "n_output_tokens": 57396
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 325746,
+        "cacheHitTokens": 18170368,
+        "outputTokens": 163356
+      }
+    },
+    {
+      "id": "H11-dual-cohort-rpc",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 20.2,
+          "startedAt": "2026-09-12T15:04:53.963971Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 20.6,
+          "startedAt": "2026-09-12T15:04:17.073179Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.9,
+          "startedAt": "2026-09-12T15:04:17.071442Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "H12-remote-result-boundary-trap",
+      "reward": 0.3,
+      "rewardMin": 0.3,
+      "rewardMax": 0.3,
+      "attempts": [
+        {
+          "reward": 0.3,
+          "exception": null,
+          "durationSeconds": 190.1,
+          "startedAt": "2026-09-12T20:08:27.635912Z",
+          "usage": {
+            "n_input_tokens": 118194,
+            "n_cache_tokens": 4499200,
+            "n_output_tokens": 77386
+          }
+        },
+        {
+          "reward": 0.3,
+          "exception": null,
+          "durationSeconds": 190.2,
+          "startedAt": "2026-09-12T20:08:27.634597Z",
+          "usage": {
+            "n_input_tokens": 112654,
+            "n_cache_tokens": 4047872,
+            "n_output_tokens": 79392
+          }
+        },
+        {
+          "reward": 0.3,
+          "exception": null,
+          "durationSeconds": 175.4,
+          "startedAt": "2026-09-12T20:08:27.633208Z",
+          "usage": {
+            "n_input_tokens": 65554,
+            "n_cache_tokens": 2441728,
+            "n_output_tokens": 74362
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 296402,
+        "cacheHitTokens": 10988800,
+        "outputTokens": 231140
+      }
+    },
+    {
+      "id": "H13-ghost-host-trap",
+      "reward": 0.2,
+      "rewardMin": 0.0,
+      "rewardMax": 0.2,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 900.0,
+          "startedAt": "2026-09-12T15:04:12.620235Z",
+          "usage": null
+        },
+        {
+          "reward": 0.2,
+          "exception": null,
+          "durationSeconds": 673.5,
+          "startedAt": "2026-09-12T15:04:12.618420Z",
+          "usage": {
+            "n_input_tokens": 70718,
+            "n_cache_tokens": 6155776,
+            "n_output_tokens": 163152
+          }
+        },
+        {
+          "reward": 0.2,
+          "exception": null,
+          "durationSeconds": 732.9,
+          "startedAt": "2026-09-12T15:15:41.224484Z",
+          "usage": {
+            "n_input_tokens": 88248,
+            "n_cache_tokens": 7043584,
+            "n_output_tokens": 186582
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": "AgentTimeoutError",
+      "usage": {
+        "inputTokens": 158966,
+        "cacheHitTokens": 13199360,
+        "outputTokens": 349734
+      }
+    },
+    {
+      "id": "H14-mineru-api",
+      "reward": 0.95,
+      "rewardMin": 0.4,
+      "rewardMax": 0.95,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 498.1,
+          "startedAt": "2026-09-12T15:12:45.136355Z",
+          "usage": {
+            "n_input_tokens": 215856,
+            "n_cache_tokens": 26046720,
+            "n_output_tokens": 173262
+          }
+        },
+        {
+          "reward": 0.95,
+          "exception": null,
+          "durationSeconds": 484.8,
+          "startedAt": "2026-09-12T15:04:18.190681Z",
+          "usage": {
+            "n_input_tokens": 190922,
+            "n_cache_tokens": 20502784,
+            "n_output_tokens": 157400
+          }
+        },
+        {
+          "reward": 0.95,
+          "exception": null,
+          "durationSeconds": 607.5,
+          "startedAt": "2026-09-12T15:04:18.192148Z",
+          "usage": {
+            "n_input_tokens": 242144,
+            "n_cache_tokens": 33554688,
+            "n_output_tokens": 158124
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 648922,
+        "cacheHitTokens": 80104192,
+        "outputTokens": 488786
+      }
+    },
+    {
+      "id": "H15-locale-pack",
+      "reward": 0.4,
+      "rewardMin": 0.0,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 653.3,
+          "startedAt": "2026-09-12T15:16:03.337791Z",
+          "usage": {
+            "n_input_tokens": 252948,
+            "n_cache_tokens": 29620480,
+            "n_output_tokens": 197552
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 579.0,
+          "startedAt": "2026-09-12T15:05:57.003682Z",
+          "usage": {
+            "n_input_tokens": 184788,
+            "n_cache_tokens": 24465152,
+            "n_output_tokens": 188778
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 635.1,
+          "startedAt": "2026-09-12T15:05:57.002198Z",
+          "usage": {
+            "n_input_tokens": 236800,
+            "n_cache_tokens": 28214528,
+            "n_output_tokens": 164250
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 674536,
+        "cacheHitTokens": 82300160,
+        "outputTokens": 550580
+      }
+    },
+    {
+      "id": "H16-history-dock",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 692.3,
+          "startedAt": "2026-09-12T15:16:27.100531Z",
+          "usage": {
+            "n_input_tokens": 317558,
+            "n_cache_tokens": 43229440,
+            "n_output_tokens": 208730
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 644.0,
+          "startedAt": "2026-09-12T15:16:27.096864Z",
+          "usage": {
+            "n_input_tokens": 284652,
+            "n_cache_tokens": 40621824,
+            "n_output_tokens": 198376
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 823.8,
+          "startedAt": "2026-09-12T15:27:34.584808Z",
+          "usage": {
+            "n_input_tokens": 288360,
+            "n_cache_tokens": 47702272,
+            "n_output_tokens": 225140
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 890570,
+        "cacheHitTokens": 131553536,
+        "outputTokens": 632246
+      }
+    },
+    {
+      "id": "H17-merge-calls",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 702.5,
+          "startedAt": "2026-09-12T15:21:29.796799Z",
+          "usage": {
+            "n_input_tokens": 303846,
+            "n_cache_tokens": 50388992,
+            "n_output_tokens": 220268
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 689.6,
+          "startedAt": "2026-09-12T15:33:15.598437Z",
+          "usage": {
+            "n_input_tokens": 320564,
+            "n_cache_tokens": 54654464,
+            "n_output_tokens": 241196
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 679.0,
+          "startedAt": "2026-09-12T15:21:29.795213Z",
+          "usage": {
+            "n_input_tokens": 284102,
+            "n_cache_tokens": 51050752,
+            "n_output_tokens": 208016
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 908512,
+        "cacheHitTokens": 156094208,
+        "outputTokens": 669480
+      }
+    },
+    {
+      "id": "H18-blame-bubbles",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 663.1,
+          "startedAt": "2026-09-12T15:38:58.390573Z",
+          "usage": {
+            "n_input_tokens": 275600,
+            "n_cache_tokens": 40444160,
+            "n_output_tokens": 226200
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 662.9,
+          "startedAt": "2026-09-12T15:27:30.592916Z",
+          "usage": {
+            "n_input_tokens": 278016,
+            "n_cache_tokens": 38381312,
+            "n_output_tokens": 220416
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 770.2,
+          "startedAt": "2026-09-12T15:27:30.594314Z",
+          "usage": {
+            "n_input_tokens": 314692,
+            "n_cache_tokens": 57163520,
+            "n_output_tokens": 224996
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 868308,
+        "cacheHitTokens": 135988992,
+        "outputTokens": 671612
+      }
+    },
+    {
+      "id": "H19-workspace-ya",
+      "reward": 0.4,
+      "rewardMin": 0.2,
+      "rewardMax": 0.95,
+      "attempts": [
+        {
+          "reward": 0.95,
+          "exception": null,
+          "durationSeconds": 790.2,
+          "startedAt": "2026-09-12T15:38:08.465739Z",
+          "usage": {
+            "n_input_tokens": 401548,
+            "n_cache_tokens": 73899264,
+            "n_output_tokens": 263842
+          }
+        },
+        {
+          "reward": 0.2,
+          "exception": null,
+          "durationSeconds": 557.4,
+          "startedAt": "2026-09-12T15:28:14.257412Z",
+          "usage": {
+            "n_input_tokens": 312148,
+            "n_cache_tokens": 43209472,
+            "n_output_tokens": 192120
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 617.1,
+          "startedAt": "2026-09-12T15:28:14.258962Z",
+          "usage": {
+            "n_input_tokens": 223858,
+            "n_cache_tokens": 32968448,
+            "n_output_tokens": 180424
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 937554,
+        "cacheHitTokens": 150077184,
+        "outputTokens": 636386
+      }
+    },
+    {
+      "id": "H2-baseline-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 311.9,
+          "startedAt": "2026-09-12T15:52:37.205006Z",
+          "usage": {
+            "n_input_tokens": 169578,
+            "n_cache_tokens": 12270592,
+            "n_output_tokens": 112982
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 277.2,
+          "startedAt": "2026-09-12T15:58:08.883992Z",
+          "usage": {
+            "n_input_tokens": 120806,
+            "n_cache_tokens": 8002048,
+            "n_output_tokens": 91452
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 383.6,
+          "startedAt": "2026-09-12T15:52:37.202894Z",
+          "usage": {
+            "n_input_tokens": 156940,
+            "n_cache_tokens": 8767232,
+            "n_output_tokens": 95162
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 447324,
+        "cacheHitTokens": 29039872,
+        "outputTokens": 299596
+      }
+    },
+    {
+      "id": "H20-session-events-ledger",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 66.4,
+          "startedAt": "2026-09-12T15:45:14.952978Z",
+          "usage": {
+            "n_input_tokens": 85680,
+            "n_cache_tokens": 1340416,
+            "n_output_tokens": 20862
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 61.9,
+          "startedAt": "2026-09-12T15:45:14.954273Z",
+          "usage": {
+            "n_input_tokens": 60252,
+            "n_cache_tokens": 931072,
+            "n_output_tokens": 21410
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 83.5,
+          "startedAt": "2026-09-12T15:46:33.318306Z",
+          "usage": {
+            "n_input_tokens": 48268,
+            "n_cache_tokens": 1507584,
+            "n_output_tokens": 35716
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 194200,
+        "cacheHitTokens": 3779072,
+        "outputTokens": 77988
+      }
+    },
+    {
+      "id": "H21-question-answerer-waterfall",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.2,
+          "startedAt": "2026-09-12T15:48:19.544616Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.7,
+          "startedAt": "2026-09-12T15:48:55.067563Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 20.4,
+          "startedAt": "2026-09-12T15:48:19.546149Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "H22-dsh-data-agent-alpha2",
+      "reward": null,
+      "rewardMin": null,
+      "rewardMax": null,
+      "attempts": [
+        {
+          "reward": null,
+          "exception": "RewardFileNotFoundError",
+          "durationSeconds": 19.8,
+          "startedAt": "2026-09-12T15:50:25.962859Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": null,
+          "exception": "RewardFileNotFoundError",
+          "durationSeconds": 20.4,
+          "startedAt": "2026-09-12T15:49:36.279844Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": null,
+          "exception": "RewardFileNotFoundError",
+          "durationSeconds": 20.1,
+          "startedAt": "2026-09-12T15:49:36.284453Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 0,
+      "exception": "RewardFileNotFoundError",
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "H23-storage-domain-version-compat-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 52.5,
+          "startedAt": "2026-09-12T15:50:33.132506Z",
+          "usage": {
+            "n_input_tokens": 43266,
+            "n_cache_tokens": 1040640,
+            "n_output_tokens": 18738
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 50.8,
+          "startedAt": "2026-09-12T15:51:34.614864Z",
+          "usage": {
+            "n_input_tokens": 39426,
+            "n_cache_tokens": 824576,
+            "n_output_tokens": 18238
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 46.9,
+          "startedAt": "2026-09-12T15:50:33.130680Z",
+          "usage": {
+            "n_input_tokens": 62342,
+            "n_cache_tokens": 1083392,
+            "n_output_tokens": 17390
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 145034,
+        "cacheHitTokens": 2948608,
+        "outputTokens": 54366
+      }
+    },
+    {
+      "id": "H24-invalid-record-salvage-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 74.7,
+          "startedAt": "2026-09-12T15:51:18.044248Z",
+          "usage": {
+            "n_input_tokens": 43576,
+            "n_cache_tokens": 1299712,
+            "n_output_tokens": 26716
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 58.9,
+          "startedAt": "2026-09-12T15:51:18.042798Z",
+          "usage": {
+            "n_input_tokens": 54776,
+            "n_cache_tokens": 1140992,
+            "n_output_tokens": 20852
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 63.7,
+          "startedAt": "2026-09-12T15:52:31.540813Z",
+          "usage": {
+            "n_input_tokens": 67868,
+            "n_cache_tokens": 1116928,
+            "n_output_tokens": 20596
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 166220,
+        "cacheHitTokens": 3557632,
+        "outputTokens": 68164
+      }
+    },
+    {
+      "id": "H25-session-seed-boundary-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 155.8,
+          "startedAt": "2026-09-12T15:51:49.410840Z",
+          "usage": {
+            "n_input_tokens": 78014,
+            "n_cache_tokens": 3024384,
+            "n_output_tokens": 66910
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 165.7,
+          "startedAt": "2026-09-12T15:54:40.584714Z",
+          "usage": {
+            "n_input_tokens": 125614,
+            "n_cache_tokens": 4019968,
+            "n_output_tokens": 70524
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 240.1,
+          "startedAt": "2026-09-12T15:51:49.412398Z",
+          "usage": {
+            "n_input_tokens": 100644,
+            "n_cache_tokens": 5460992,
+            "n_output_tokens": 95622
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 304272,
+        "cacheHitTokens": 12505344,
+        "outputTokens": 233056
+      }
+    },
+    {
+      "id": "H3-client-plane",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 349.0,
+          "startedAt": "2026-09-12T15:57:59.784632Z",
+          "usage": {
+            "n_input_tokens": 147078,
+            "n_cache_tokens": 9382400,
+            "n_output_tokens": 74868
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 420.7,
+          "startedAt": "2026-09-12T15:52:57.799457Z",
+          "usage": {
+            "n_input_tokens": 225714,
+            "n_cache_tokens": 18285056,
+            "n_output_tokens": 136124
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 277.1,
+          "startedAt": "2026-09-12T15:52:58.433284Z",
+          "usage": {
+            "n_input_tokens": 189618,
+            "n_cache_tokens": 13545728,
+            "n_output_tokens": 91668
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 562410,
+        "cacheHitTokens": 41213184,
+        "outputTokens": 302660
+      }
+    },
+    {
+      "id": "H4-tsbuildinfo-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 127.2,
+          "startedAt": "2026-09-12T15:55:06.120133Z",
+          "usage": {
+            "n_input_tokens": 42450,
+            "n_cache_tokens": 1417728,
+            "n_output_tokens": 49196
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 137.1,
+          "startedAt": "2026-09-12T15:55:06.118615Z",
+          "usage": {
+            "n_input_tokens": 65096,
+            "n_cache_tokens": 2498560,
+            "n_output_tokens": 55310
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 152.6,
+          "startedAt": "2026-09-12T15:57:27.928510Z",
+          "usage": {
+            "n_input_tokens": 55646,
+            "n_cache_tokens": 1701376,
+            "n_output_tokens": 63942
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 163192,
+        "cacheHitTokens": 5617664,
+        "outputTokens": 168448
+      }
+    },
+    {
+      "id": "H5-runtime-export-drift",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 382.8,
+          "startedAt": "2026-09-12T15:57:54.102022Z",
+          "usage": {
+            "n_input_tokens": 132002,
+            "n_cache_tokens": 10076416,
+            "n_output_tokens": 95916
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 488.5,
+          "startedAt": "2026-09-12T15:57:54.098586Z",
+          "usage": {
+            "n_input_tokens": 152488,
+            "n_cache_tokens": 16803328,
+            "n_output_tokens": 119746
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 333.0,
+          "startedAt": "2026-09-12T16:04:34.981137Z",
+          "usage": {
+            "n_input_tokens": 113928,
+            "n_cache_tokens": 7093504,
+            "n_output_tokens": 89108
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 398418,
+        "cacheHitTokens": 33973248,
+        "outputTokens": 304770
+      }
+    },
+    {
+      "id": "H6-remote-error-trap",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.8,
+          "startedAt": "2026-09-12T16:01:43.853787Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.7,
+          "startedAt": "2026-09-12T16:02:38.687443Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.6,
+          "startedAt": "2026-09-12T16:01:44.016931Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "H7-locale-trap",
+      "reward": 0.9,
+      "rewardMin": 0.9,
+      "rewardMax": 0.9,
+      "attempts": [
+        {
+          "reward": 0.9,
+          "exception": null,
+          "durationSeconds": 397.4,
+          "startedAt": "2026-09-12T19:48:44.259121Z",
+          "usage": {
+            "n_input_tokens": 275826,
+            "n_cache_tokens": 25940480,
+            "n_output_tokens": 137206
+          }
+        },
+        {
+          "reward": 0.9,
+          "exception": null,
+          "durationSeconds": 333.7,
+          "startedAt": "2026-09-12T19:48:44.257466Z",
+          "usage": {
+            "n_input_tokens": 142396,
+            "n_cache_tokens": 13076224,
+            "n_output_tokens": 119630
+          }
+        },
+        {
+          "reward": 0.9,
+          "exception": null,
+          "durationSeconds": 266.5,
+          "startedAt": "2026-09-12T19:48:44.255712Z",
+          "usage": {
+            "n_input_tokens": 117486,
+            "n_cache_tokens": 8846592,
+            "n_output_tokens": 95260
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 535708,
+        "cacheHitTokens": 47863296,
+        "outputTokens": 352096
+      }
+    },
+    {
+      "id": "H8-fire-drill",
+      "reward": 0.725,
+      "rewardMin": 0.6,
+      "rewardMax": 0.85,
+      "attempts": [
+        {
+          "reward": null,
+          "exception": "RuntimeError",
+          "durationSeconds": null,
+          "startedAt": null,
+          "usage": null
+        },
+        {
+          "reward": 0.85,
+          "exception": null,
+          "durationSeconds": 678.3,
+          "startedAt": "2026-09-12T16:03:20.154327Z",
+          "usage": {
+            "n_input_tokens": 218510,
+            "n_cache_tokens": 28718336,
+            "n_output_tokens": 188284
+          }
+        },
+        {
+          "reward": 0.6,
+          "exception": null,
+          "durationSeconds": 676.4,
+          "startedAt": "2026-09-12T16:03:18.710731Z",
+          "usage": {
+            "n_input_tokens": 251936,
+            "n_cache_tokens": 30617344,
+            "n_output_tokens": 181732
+          }
+        }
+      ],
+      "attemptsScored": 2,
+      "exception": "RuntimeError",
+      "usage": {
+        "inputTokens": 470446,
+        "cacheHitTokens": 59335680,
+        "outputTokens": 370016
+      }
+    },
+    {
+      "id": "H9-dsh-web-alpha2",
+      "reward": null,
+      "rewardMin": null,
+      "rewardMax": null,
+      "attempts": [
+        {
+          "reward": null,
+          "exception": "RewardFileNotFoundError",
+          "durationSeconds": 19.4,
+          "startedAt": "2026-09-12T16:03:24.139824Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": null,
+          "exception": "RewardFileNotFoundError",
+          "durationSeconds": 19.7,
+          "startedAt": "2026-09-12T16:03:24.137874Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": null,
+          "exception": "RewardFileNotFoundError",
+          "durationSeconds": 20.0,
+          "startedAt": "2026-09-12T16:04:14.723771Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 0,
+      "exception": "RewardFileNotFoundError",
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "M1-host-migration",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 161.4,
+          "startedAt": "2026-09-12T16:21:00.501047Z",
+          "usage": {
+            "n_input_tokens": 112864,
+            "n_cache_tokens": 4654592,
+            "n_output_tokens": 54314
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 241.3,
+          "startedAt": "2026-09-12T16:21:00.498765Z",
+          "usage": {
+            "n_input_tokens": 70104,
+            "n_cache_tokens": 3640832,
+            "n_output_tokens": 54334
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 195.7,
+          "startedAt": "2026-09-12T16:24:01.755902Z",
+          "usage": {
+            "n_input_tokens": 93654,
+            "n_cache_tokens": 4792320,
+            "n_output_tokens": 68556
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 276622,
+        "cacheHitTokens": 13087744,
+        "outputTokens": 177204
+      }
+    },
+    {
+      "id": "M10-tools-tree",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 490.7,
+          "startedAt": "2026-09-12T16:04:16.563748Z",
+          "usage": {
+            "n_input_tokens": 202984,
+            "n_cache_tokens": 25623040,
+            "n_output_tokens": 170170
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 431.6,
+          "startedAt": "2026-09-12T16:04:16.561807Z",
+          "usage": {
+            "n_input_tokens": 212704,
+            "n_cache_tokens": 26961664,
+            "n_output_tokens": 144146
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 517.4,
+          "startedAt": "2026-09-12T16:11:51.922723Z",
+          "usage": {
+            "n_input_tokens": 177766,
+            "n_cache_tokens": 19451136,
+            "n_output_tokens": 147630
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 593454,
+        "cacheHitTokens": 72035840,
+        "outputTokens": 461946
+      }
+    },
+    {
+      "id": "M11-sidebar-spur",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 400.7,
+          "startedAt": "2026-09-12T16:05:08.251493Z",
+          "usage": {
+            "n_input_tokens": 211712,
+            "n_cache_tokens": 18961920,
+            "n_output_tokens": 134640
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 450.8,
+          "startedAt": "2026-09-12T16:12:12.513370Z",
+          "usage": {
+            "n_input_tokens": 208252,
+            "n_cache_tokens": 22603776,
+            "n_output_tokens": 158972
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 404.6,
+          "startedAt": "2026-09-12T16:05:08.253464Z",
+          "usage": {
+            "n_input_tokens": 242148,
+            "n_cache_tokens": 24523008,
+            "n_output_tokens": 134912
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 662112,
+        "cacheHitTokens": 66088704,
+        "outputTokens": 428524
+      }
+    },
+    {
+      "id": "M12-interpreters-card",
+      "reward": 0.95,
+      "rewardMin": 0.4,
+      "rewardMax": 0.95,
+      "attempts": [
+        {
+          "reward": 0.95,
+          "exception": null,
+          "durationSeconds": 566.8,
+          "startedAt": "2026-09-12T16:10:30.606453Z",
+          "usage": {
+            "n_input_tokens": 218826,
+            "n_cache_tokens": 33070336,
+            "n_output_tokens": 171006
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 418.3,
+          "startedAt": "2026-09-12T16:19:51.639619Z",
+          "usage": {
+            "n_input_tokens": 192284,
+            "n_cache_tokens": 21601280,
+            "n_output_tokens": 151222
+          }
+        },
+        {
+          "reward": 0.95,
+          "exception": null,
+          "durationSeconds": 536.4,
+          "startedAt": "2026-09-12T16:10:30.608048Z",
+          "usage": {
+            "n_input_tokens": 186848,
+            "n_cache_tokens": 22566656,
+            "n_output_tokens": 167600
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 597958,
+        "cacheHitTokens": 77238272,
+        "outputTokens": 489828
+      }
+    },
+    {
+      "id": "M13-repository-plugins-removal",
+      "reward": 1.0,
+      "rewardMin": 0.9,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 331.3,
+          "startedAt": "2026-09-12T16:15:25.457779Z",
+          "usage": {
+            "n_input_tokens": 157412,
+            "n_cache_tokens": 15207936,
+            "n_output_tokens": 91064
+          }
+        },
+        {
+          "reward": 0.9,
+          "exception": null,
+          "durationSeconds": 260.3,
+          "startedAt": "2026-09-12T16:15:25.458970Z",
+          "usage": {
+            "n_input_tokens": 134106,
+            "n_cache_tokens": 10973184,
+            "n_output_tokens": 84780
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 327.5,
+          "startedAt": "2026-09-12T16:20:12.324300Z",
+          "usage": {
+            "n_input_tokens": 126876,
+            "n_cache_tokens": 12280064,
+            "n_output_tokens": 89870
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 418394,
+        "cacheHitTokens": 38461184,
+        "outputTokens": 265714
+      }
+    },
+    {
+      "id": "M14-service-renames-0812",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 107.4,
+          "startedAt": "2026-09-12T16:21:57.186481Z",
+          "usage": {
+            "n_input_tokens": 34794,
+            "n_cache_tokens": 1618944,
+            "n_output_tokens": 32420
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 77.1,
+          "startedAt": "2026-09-12T16:20:12.460183Z",
+          "usage": {
+            "n_input_tokens": 21310,
+            "n_cache_tokens": 888832,
+            "n_output_tokens": 24534
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 112.7,
+          "startedAt": "2026-09-12T16:20:12.462002Z",
+          "usage": {
+            "n_input_tokens": 54420,
+            "n_cache_tokens": 2530304,
+            "n_output_tokens": 32440
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 110524,
+        "cacheHitTokens": 5038080,
+        "outputTokens": 89394
+      }
+    },
+    {
+      "id": "M2-optional-dep-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 290.8,
+          "startedAt": "2026-09-12T16:24:11.730733Z",
+          "usage": {
+            "n_input_tokens": 68902,
+            "n_cache_tokens": 4619008,
+            "n_output_tokens": 107958
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 586.6,
+          "startedAt": "2026-09-12T16:24:11.728491Z",
+          "usage": {
+            "n_input_tokens": 106002,
+            "n_cache_tokens": 7205376,
+            "n_output_tokens": 100316
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 417.9,
+          "startedAt": "2026-09-12T16:29:23.384135Z",
+          "usage": {
+            "n_input_tokens": 70294,
+            "n_cache_tokens": 3916544,
+            "n_output_tokens": 67654
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 245198,
+        "cacheHitTokens": 15740928,
+        "outputTokens": 275928
+      }
+    },
+    {
+      "id": "M3-session-projection",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 270.7,
+          "startedAt": "2026-09-12T16:26:06.977073Z",
+          "usage": {
+            "n_input_tokens": 103872,
+            "n_cache_tokens": 5987840,
+            "n_output_tokens": 97490
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 260.3,
+          "startedAt": "2026-09-12T16:26:06.975620Z",
+          "usage": {
+            "n_input_tokens": 114740,
+            "n_cache_tokens": 5955072,
+            "n_output_tokens": 91260
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 232.4,
+          "startedAt": "2026-09-12T16:30:43.668276Z",
+          "usage": {
+            "n_input_tokens": 94442,
+            "n_cache_tokens": 6116608,
+            "n_output_tokens": 78158
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 313054,
+        "cacheHitTokens": 18059520,
+        "outputTokens": 266908
+      }
+    },
+    {
+      "id": "M4-peer-prerelease-range",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 373.0,
+          "startedAt": "2026-09-12T16:27:15.725669Z",
+          "usage": {
+            "n_input_tokens": 101954,
+            "n_cache_tokens": 6338304,
+            "n_output_tokens": 84098
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 354.9,
+          "startedAt": "2026-09-12T16:32:51.161165Z",
+          "usage": {
+            "n_input_tokens": 83432,
+            "n_cache_tokens": 5559808,
+            "n_output_tokens": 88086
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 312.7,
+          "startedAt": "2026-09-12T16:27:15.751974Z",
+          "usage": {
+            "n_input_tokens": 58868,
+            "n_cache_tokens": 4982528,
+            "n_output_tokens": 85576
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 244254,
+        "cacheHitTokens": 16880640,
+        "outputTokens": 257760
+      }
+    },
+    {
+      "id": "M5-token-auth-smoke",
+      "reward": 0.6,
+      "rewardMin": 0.6,
+      "rewardMax": 0.6,
+      "attempts": [
+        {
+          "reward": 0.6,
+          "exception": null,
+          "durationSeconds": 191.7,
+          "startedAt": "2026-09-12T16:30:42.598189Z",
+          "usage": {
+            "n_input_tokens": 129412,
+            "n_cache_tokens": 6688256,
+            "n_output_tokens": 65146
+          }
+        },
+        {
+          "reward": 0.6,
+          "exception": null,
+          "durationSeconds": 270.6,
+          "startedAt": "2026-09-12T16:27:42.078179Z",
+          "usage": {
+            "n_input_tokens": 113584,
+            "n_cache_tokens": 7428096,
+            "n_output_tokens": 70104
+          }
+        },
+        {
+          "reward": 0.6,
+          "exception": null,
+          "durationSeconds": 153.9,
+          "startedAt": "2026-09-12T16:27:42.076540Z",
+          "usage": {
+            "n_input_tokens": 104624,
+            "n_cache_tokens": 4756224,
+            "n_output_tokens": 48054
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 347620,
+        "cacheHitTokens": 18872576,
+        "outputTokens": 183304
+      }
+    },
+    {
+      "id": "M6-sleep-tool",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 391.9,
+          "startedAt": "2026-09-12T16:41:41.680697Z",
+          "usage": {
+            "n_input_tokens": 176916,
+            "n_cache_tokens": 16501504,
+            "n_output_tokens": 142150
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 416.3,
+          "startedAt": "2026-09-12T16:34:25.785994Z",
+          "usage": {
+            "n_input_tokens": 179814,
+            "n_cache_tokens": 15979776,
+            "n_output_tokens": 157674
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 496.4,
+          "startedAt": "2026-09-12T16:34:25.787495Z",
+          "usage": {
+            "n_input_tokens": 197556,
+            "n_cache_tokens": 26409728,
+            "n_output_tokens": 186472
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 554286,
+        "cacheHitTokens": 58891008,
+        "outputTokens": 486296
+      }
+    },
+    {
+      "id": "M7-d399-overlay",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 413.7,
+          "startedAt": "2026-09-12T16:34:56.850427Z",
+          "usage": {
+            "n_input_tokens": 203508,
+            "n_cache_tokens": 22087680,
+            "n_output_tokens": 147864
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 511.4,
+          "startedAt": "2026-09-12T16:34:56.852448Z",
+          "usage": {
+            "n_input_tokens": 218410,
+            "n_cache_tokens": 29281024,
+            "n_output_tokens": 168150
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 374.7,
+          "startedAt": "2026-09-12T16:42:16.136952Z",
+          "usage": {
+            "n_input_tokens": 215490,
+            "n_cache_tokens": 16342272,
+            "n_output_tokens": 139414
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 637408,
+        "cacheHitTokens": 67710976,
+        "outputTokens": 455428
+      }
+    },
+    {
+      "id": "M8-brand-text",
+      "reward": 0.4,
+      "rewardMin": 0.0,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 553.3,
+          "startedAt": "2026-09-12T16:36:46.193428Z",
+          "usage": {
+            "n_input_tokens": 315744,
+            "n_cache_tokens": 39124480,
+            "n_output_tokens": 181716
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 500.2,
+          "startedAt": "2026-09-12T16:45:05.338514Z",
+          "usage": {
+            "n_input_tokens": 252488,
+            "n_cache_tokens": 30535424,
+            "n_output_tokens": 172028
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 481.6,
+          "startedAt": "2026-09-12T16:36:46.192271Z",
+          "usage": {
+            "n_input_tokens": 241798,
+            "n_cache_tokens": 29445632,
+            "n_output_tokens": 168672
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 810030,
+        "cacheHitTokens": 99105536,
+        "outputTokens": 522416
+      }
+    },
+    {
+      "id": "M9-mcpanel",
+      "reward": 0.4,
+      "rewardMin": 0.4,
+      "rewardMax": 0.4,
+      "attempts": [
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 622.6,
+          "startedAt": "2026-09-12T16:45:58.618182Z",
+          "usage": {
+            "n_input_tokens": 256684,
+            "n_cache_tokens": 33313536,
+            "n_output_tokens": 208576
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 493.5,
+          "startedAt": "2026-09-12T16:39:11.295869Z",
+          "usage": {
+            "n_input_tokens": 202468,
+            "n_cache_tokens": 24033024,
+            "n_output_tokens": 160830
+          }
+        },
+        {
+          "reward": 0.4,
+          "exception": null,
+          "durationSeconds": 385.5,
+          "startedAt": "2026-09-12T16:39:11.293697Z",
+          "usage": {
+            "n_input_tokens": 228004,
+            "n_cache_tokens": 17622016,
+            "n_output_tokens": 142038
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 687156,
+        "cacheHitTokens": 74968576,
+        "outputTokens": 511444
+      }
+    },
+    {
+      "id": "S1-static-scan",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T17:07:40.513391Z",
+          "usage": null
+        },
+        {
+          "reward": 0.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T17:12:55.859871Z",
+          "usage": null
+        },
+        {
+          "reward": 0.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T17:07:40.514701Z",
+          "usage": null
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": "AgentTimeoutError",
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "S10-paste-rename-and-version-chip",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 235.0,
+          "startedAt": "2026-09-12T16:50:14.053412Z",
+          "usage": {
+            "n_input_tokens": 36174,
+            "n_cache_tokens": 1728768,
+            "n_output_tokens": 94484
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 177.3,
+          "startedAt": "2026-09-12T16:53:08.211050Z",
+          "usage": {
+            "n_input_tokens": 31700,
+            "n_cache_tokens": 1393664,
+            "n_output_tokens": 71426
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 159.6,
+          "startedAt": "2026-09-12T16:50:14.054582Z",
+          "usage": {
+            "n_input_tokens": 21148,
+            "n_cache_tokens": 390912,
+            "n_output_tokens": 64700
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 89022,
+        "cacheHitTokens": 3513344,
+        "outputTokens": 230610
+      }
+    },
+    {
+      "id": "S11-mermaid-lazyload-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 199.5,
+          "startedAt": "2026-09-12T16:55:39.617938Z",
+          "usage": {
+            "n_input_tokens": 17020,
+            "n_cache_tokens": 1497856,
+            "n_output_tokens": 75512
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 278.8,
+          "startedAt": "2026-09-12T16:50:29.384153Z",
+          "usage": {
+            "n_input_tokens": 48730,
+            "n_cache_tokens": 3124736,
+            "n_output_tokens": 115232
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T16:50:29.382455Z",
+          "usage": null
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": "AgentTimeoutError",
+      "usage": {
+        "inputTokens": 65750,
+        "cacheHitTokens": 4622592,
+        "outputTokens": 190744
+      }
+    },
+    {
+      "id": "S12-global-upgrade-ebusy-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T16:55:06.453911Z",
+          "usage": null
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 200.7,
+          "startedAt": "2026-09-12T16:55:06.452493Z",
+          "usage": {
+            "n_input_tokens": 56344,
+            "n_cache_tokens": 2279168,
+            "n_output_tokens": 74586
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 177.6,
+          "startedAt": "2026-09-12T16:58:51.377419Z",
+          "usage": {
+            "n_input_tokens": 40282,
+            "n_cache_tokens": 1608448,
+            "n_output_tokens": 72580
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": "AgentTimeoutError",
+      "usage": {
+        "inputTokens": 96626,
+        "cacheHitTokens": 3887616,
+        "outputTokens": 147166
+      }
+    },
+    {
+      "id": "S13-peer-range-vs-runtime",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 107.6,
+          "startedAt": "2026-09-12T16:59:21.131319Z",
+          "usage": {
+            "n_input_tokens": 17304,
+            "n_cache_tokens": 631296,
+            "n_output_tokens": 41972
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 130.2,
+          "startedAt": "2026-09-12T16:58:02.022818Z",
+          "usage": {
+            "n_input_tokens": 43618,
+            "n_cache_tokens": 1467392,
+            "n_output_tokens": 45688
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 52.0,
+          "startedAt": "2026-09-12T16:58:02.021570Z",
+          "usage": {
+            "n_input_tokens": 4768,
+            "n_cache_tokens": 159744,
+            "n_output_tokens": 19270
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 65690,
+        "cacheHitTokens": 2258432,
+        "outputTokens": 106930
+      }
+    },
+    {
+      "id": "S14-link-install-lock-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 218.7,
+          "startedAt": "2026-09-12T16:58:29.965831Z",
+          "usage": {
+            "n_input_tokens": 82334,
+            "n_cache_tokens": 2234624,
+            "n_output_tokens": 81702
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 291.7,
+          "startedAt": "2026-09-12T16:58:29.964477Z",
+          "usage": {
+            "n_input_tokens": 145798,
+            "n_cache_tokens": 6022912,
+            "n_output_tokens": 94410
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 206.6,
+          "startedAt": "2026-09-12T17:02:42.108337Z",
+          "usage": {
+            "n_input_tokens": 145016,
+            "n_cache_tokens": 3472384,
+            "n_output_tokens": 71974
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 373148,
+        "cacheHitTokens": 11729920,
+        "outputTokens": 248086
+      }
+    },
+    {
+      "id": "S15-slot-error-boundary-crash",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 198.3,
+          "startedAt": "2026-09-12T17:00:49.818504Z",
+          "usage": {
+            "n_input_tokens": 11550,
+            "n_cache_tokens": 1094656,
+            "n_output_tokens": 78318
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 220.2,
+          "startedAt": "2026-09-12T17:04:46.368041Z",
+          "usage": {
+            "n_input_tokens": 30704,
+            "n_cache_tokens": 1570560,
+            "n_output_tokens": 94646
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 199.2,
+          "startedAt": "2026-09-12T17:00:49.816969Z",
+          "usage": {
+            "n_input_tokens": 10996,
+            "n_cache_tokens": 681216,
+            "n_output_tokens": 84388
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 53250,
+        "cacheHitTokens": 3346432,
+        "outputTokens": 257352
+      }
+    },
+    {
+      "id": "S16-self-host-upgrade-trap",
+      "reward": 1.0,
+      "rewardMin": 0.8,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 0.8,
+          "exception": null,
+          "durationSeconds": 206.4,
+          "startedAt": "2026-09-12T17:03:26.071521Z",
+          "usage": {
+            "n_input_tokens": 109130,
+            "n_cache_tokens": 3190528,
+            "n_output_tokens": 72490
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 150.5,
+          "startedAt": "2026-09-12T17:03:26.070062Z",
+          "usage": {
+            "n_input_tokens": 19344,
+            "n_cache_tokens": 830208,
+            "n_output_tokens": 55584
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 186.0,
+          "startedAt": "2026-09-12T17:06:10.913233Z",
+          "usage": {
+            "n_input_tokens": 77042,
+            "n_cache_tokens": 2220288,
+            "n_output_tokens": 74336
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 205516,
+        "cacheHitTokens": 6241024,
+        "outputTokens": 202410
+      }
+    },
+    {
+      "id": "S17-external-ui-plugin-onboarding-trap",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.2,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T17:04:36.633804Z",
+          "usage": null
+        },
+        {
+          "reward": 0.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T17:09:51.359387Z",
+          "usage": null
+        },
+        {
+          "reward": 0.2,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T17:04:36.631851Z",
+          "usage": null
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": "AgentTimeoutError",
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "S2-negative-scan",
+      "reward": 0.6,
+      "rewardMin": 0.0,
+      "rewardMax": 0.6,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T17:10:04.873606Z",
+          "usage": null
+        },
+        {
+          "reward": 0.6,
+          "exception": null,
+          "durationSeconds": 283.2,
+          "startedAt": "2026-09-12T17:10:04.872060Z",
+          "usage": {
+            "n_input_tokens": 129696,
+            "n_cache_tokens": 7758592,
+            "n_output_tokens": 101410
+          }
+        },
+        {
+          "reward": 0.6,
+          "exception": null,
+          "durationSeconds": 281.6,
+          "startedAt": "2026-09-12T17:15:02.640835Z",
+          "usage": {
+            "n_input_tokens": 170862,
+            "n_cache_tokens": 9878784,
+            "n_output_tokens": 101202
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": "AgentTimeoutError",
+      "usage": {
+        "inputTokens": 300558,
+        "cacheHitTokens": 17637376,
+        "outputTokens": 202612
+      }
+    },
+    {
+      "id": "S3-snapshot-migration",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T17:17:12.607336Z",
+          "usage": null
+        },
+        {
+          "reward": 0.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T17:11:58.040137Z",
+          "usage": null
+        },
+        {
+          "reward": 0.0,
+          "exception": "AgentTimeoutError",
+          "durationSeconds": 300.0,
+          "startedAt": "2026-09-12T17:11:58.038675Z",
+          "usage": null
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": "AgentTimeoutError",
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "S4-legacy-client-imports",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 20.5,
+          "startedAt": "2026-09-12T17:15:12.528058Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 21.0,
+          "startedAt": "2026-09-12T17:15:12.526198Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 20.2,
+          "startedAt": "2026-09-12T17:15:49.316967Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "S5-negative-naming",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 21.4,
+          "startedAt": "2026-09-12T17:16:30.894890Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.1,
+          "startedAt": "2026-09-12T17:16:30.891717Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 20.8,
+          "startedAt": "2026-09-12T17:17:06.300891Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "S6-corridor-net-state",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 30.0,
+          "startedAt": "2026-09-12T17:17:48.247804Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 30.0,
+          "startedAt": "2026-09-12T17:17:48.246411Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.3,
+          "startedAt": "2026-09-12T17:18:38.259840Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "S7-unpublished-cohort",
+      "reward": 0.0,
+      "rewardMin": 0.0,
+      "rewardMax": 0.0,
+      "attempts": [
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.5,
+          "startedAt": "2026-09-12T17:18:39.307836Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 19.0,
+          "startedAt": "2026-09-12T17:19:15.065207Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        },
+        {
+          "reward": 0.0,
+          "exception": null,
+          "durationSeconds": 20.4,
+          "startedAt": "2026-09-12T17:18:39.306209Z",
+          "usage": {
+            "n_input_tokens": 0,
+            "n_cache_tokens": 0,
+            "n_output_tokens": 0
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    {
+      "id": "S8-release-routing-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 202.7,
+          "startedAt": "2026-09-12T17:19:16.694537Z",
+          "usage": {
+            "n_input_tokens": 54446,
+            "n_cache_tokens": 2249472,
+            "n_output_tokens": 83502
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 113.7,
+          "startedAt": "2026-09-12T17:21:54.194270Z",
+          "usage": {
+            "n_input_tokens": 5318,
+            "n_cache_tokens": 289792,
+            "n_output_tokens": 49350
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 142.9,
+          "startedAt": "2026-09-12T17:19:16.692766Z",
+          "usage": {
+            "n_input_tokens": 24938,
+            "n_cache_tokens": 702208,
+            "n_output_tokens": 59802
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 84702,
+        "cacheHitTokens": 3241472,
+        "outputTokens": 192654
+      }
+    },
+    {
+      "id": "S9-composer-coordinate-trap",
+      "reward": 1.0,
+      "rewardMin": 1.0,
+      "rewardMax": 1.0,
+      "attempts": [
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 137.8,
+          "startedAt": "2026-09-12T17:19:53.091109Z",
+          "usage": {
+            "n_input_tokens": 9164,
+            "n_cache_tokens": 391424,
+            "n_output_tokens": 58250
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 130.3,
+          "startedAt": "2026-09-12T17:19:53.092765Z",
+          "usage": {
+            "n_input_tokens": 24906,
+            "n_cache_tokens": 888832,
+            "n_output_tokens": 54714
+          }
+        },
+        {
+          "reward": 1.0,
+          "exception": null,
+          "durationSeconds": 125.1,
+          "startedAt": "2026-09-12T17:22:17.846333Z",
+          "usage": {
+            "n_input_tokens": 11610,
+            "n_cache_tokens": 388608,
+            "n_output_tokens": 53148
+          }
+        }
+      ],
+      "attemptsScored": 3,
+      "exception": null,
+      "usage": {
+        "inputTokens": 45680,
+        "cacheHitTokens": 1668864,
+        "outputTokens": 166112
+      }
+    }
+  ],
+  "summary": {
+    "tasks": 56,
+    "scored": 54,
+    "attempts": 168,
+    "mean": 0.6412,
+    "exceptions": 10,
+    "usage": {
+      "inputTokens": 17426236,
+      "cacheHitTokens": 1752290560,
+      "outputTokens": 13726562,
+      "attemptsReportingUsage": 154
+    },
+    "cost": {
+      "usd": 16.106744,
+      "status": "ok",
+      "model": "deepseek-flash",
+      "tableFetchedAt": "2026-09-12",
+      "tableAgeDays": 0,
+      "tier": "off-peak",
+      "attemptsPriced": 154,
+      "detail": "priced from the 2026-09-12 snapshot"
+    }
+  }
+}

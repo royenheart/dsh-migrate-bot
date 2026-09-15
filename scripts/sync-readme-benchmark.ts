@@ -26,13 +26,34 @@ export const BLOCK_END = '<!-- benchmark:end -->'
 /** The README path the block is rendered into. */
 export const README_PATH = resolve(REPO_ROOT, 'README.md')
 
-/** One task's outcome inside a record. */
-export interface RecordTask {
-  id: string
+/** One attempt at a task, inside a record. */
+export interface RecordAttempt {
   reward: number | null
   exception: string | null
   durationSeconds: number | null
+  usage: { n_input_tokens?: number | null; n_cache_tokens?: number | null; n_output_tokens?: number | null } | null
+}
+
+/** One task's outcome inside a record. */
+export interface RecordTask {
+  id: string
+  /** The median over the task's attempts; null when none scored. */
+  reward: number | null
+  rewardMin?: number | null
+  rewardMax?: number | null
+  exception: string | null
+  durationSeconds?: number | null
+  attempts?: RecordAttempt[]
   usage: unknown
+}
+
+/** The model build that served a run, as the probe recorded it. */
+export interface RecordModelIdentity {
+  requestedModel?: string | null
+  servedModel?: string | null
+  systemFingerprint?: string | null
+  probedAt?: string | null
+  error?: string | null
 }
 
 /** One benchmark or oracle record, as written by `tools/harbor/summarize.py`. */
@@ -42,9 +63,23 @@ export interface BenchmarkRecord {
   generatedAt: string
   producer: { commit: string | null; dirty: boolean }
   upstream: { repository: string; commit: string }
-  agent: { name: string; version?: string; model?: string; task?: string }
+  agent: { name: string; version?: string; versions?: string[]; model?: string; task?: string; modelsObserved?: string[] }
+  /** The migration mode under test; absent in schema 1. */
+  mode?: { id?: string; runner?: string | null; profile?: string | null; skills?: { commit?: string | null; loaded?: string[] } }
+  modelIdentity?: RecordModelIdentity | null
+  runsPerTask?: number
   tasks: RecordTask[]
-  summary: { tasks: number; scored: number; mean: number | null; exceptions: number }
+  summary: {
+    tasks: number
+    scored: number
+    mean: number | null
+    exceptions: number
+    attempts?: number
+    usage?: { inputTokens?: number; cacheHitTokens?: number; outputTokens?: number; attemptsReportingUsage?: number }
+    cost?: { usd?: number | null; status?: string; model?: string | null; tableFetchedAt?: string; tableAgeDays?: number | null }
+  }
+  /** The file this record was read from, attached on load. */
+  file?: string
 }
 
 /**
@@ -57,7 +92,7 @@ export function loadRecords(): BenchmarkRecord[] {
   for (const file of files) {
     const parsed: unknown = JSON.parse(readText(file))
     if (typeof parsed === 'object' && parsed !== null && 'kind' in parsed && 'tasks' in parsed) {
-      records.push(parsed as BenchmarkRecord)
+      records.push({ ...(parsed as BenchmarkRecord), file: file.slice(file.lastIndexOf('/') + 1) })
     }
   }
   return records
@@ -74,6 +109,41 @@ export function latestOf(records: readonly BenchmarkRecord[], kind: string): Ben
     .filter(record => record.kind === kind)
     .sort((a, b) => a.generatedAt.localeCompare(b.generatedAt))
     .at(-1)
+}
+
+/** The migration mode a record describes, defaulting for schema-1 records. */
+export function modeOf(record: BenchmarkRecord): string {
+  return record.mode?.id ?? 'native'
+}
+
+/**
+ * The newest record of one kind for each migration mode.
+ *
+ * Modes are different subjects — one migrates from the harness source alone and
+ * one loads the community skills — so the table renders one section per mode
+ * rather than averaging them into a single mean.
+ * @param records - every record found on disk.
+ * @param kind - the `kind` field to match.
+ * @returns one record per mode, newest first by mode name.
+ */
+export function latestPerMode(records: readonly BenchmarkRecord[], kind: string): BenchmarkRecord[] {
+  const newest = new Map<string, BenchmarkRecord>()
+  for (const record of records.filter(entry => entry.kind === kind)) {
+    const mode = modeOf(record)
+    const current = newest.get(mode)
+    if (current === undefined || current.generatedAt.localeCompare(record.generatedAt) < 0) {
+      newest.set(mode, record)
+    }
+  }
+  return [...newest.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(entry => entry[1])
+}
+
+/** A number of tokens, abbreviated for a table cell. */
+function tokens(value: number | undefined): string {
+  if (value === undefined) return '—'
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000) return `${Math.round(value / 1_000)}k`
+  return String(value)
 }
 
 /** Format a reward, or an em dash when the task produced no score. */
@@ -104,27 +174,45 @@ function shortSha(sha: string): string {
  * @returns the block text, markers included.
  */
 export function renderBenchmarkBlock(records: readonly BenchmarkRecord[]): string | undefined {
-  const benchmark = latestOf(records, 'upstream-benchmark')
-  if (benchmark === undefined) return undefined
+  const benchmarks = latestPerMode(records, 'upstream-benchmark')
+  if (benchmarks.length === 0) return undefined
   const oracle = latestOf(records, 'oracle-selfcheck')
 
   const lines: string[] = [
     BLOCK_START,
     '<!-- Generated by scripts/sync-readme-benchmark.ts from reports/upstream/. Do not edit by hand. -->',
-    '',
-    `Scored at upstream \`${shortSha(benchmark.upstream.commit)}\` on dsh \`${benchmark.agent.version ?? 'unknown'}\`` +
-      ` with \`${benchmark.agent.model ?? 'unknown'}\`:`,
-    '',
-    '| Task | Reward | Duration | Exception |',
-    '|---|---|---|---|',
   ]
 
-  for (const task of benchmark.tasks) {
-    const exception = task.exception === null ? '—' : `\`${task.exception}\``
-    lines.push(`| \`${task.id}\` | ${rewardCell(task.reward)} | ${durationCell(task.durationSeconds)} | ${exception} |`)
+  for (const benchmark of benchmarks) {
+    const mode = modeOf(benchmark)
+    const identity = benchmark.modelIdentity ?? undefined
+    const skills = benchmark.mode?.skills
+    const summary = benchmark.summary
+    const usage = summary.usage
+    const cost = summary.cost
+    lines.push(
+      '',
+      `### \`${mode}\` migration`,
+      '',
+      '| Scored | Attempts | Mean reward | Full score | Cache-miss in | Cache-hit in | Out | Cost |',
+      '|---|---|---|---|---|---|---|---|',
+      `| ${String(summary.scored)}/${String(summary.tasks)} | `
+        + `${summary.attempts === undefined ? String(benchmark.tasks.length) : `${String(summary.attempts)} (${String(benchmark.runsPerTask ?? 1)}/task)`} | `
+        + `${summary.mean === null ? '—' : `**${summary.mean.toFixed(3)}**`} | `
+        + `${String(benchmark.tasks.filter(task => task.reward === 1).length)} | ${tokens(usage?.inputTokens)} | `
+        + `${tokens(usage?.cacheHitTokens)} | ${tokens(usage?.outputTokens)} | `
+        + `${cost?.usd === undefined || cost.usd === null ? `— (${String(cost?.status ?? 'unknown')})` : `$${cost.usd.toFixed(2)}`} |`,
+      '',
+      `Upstream \`${shortSha(benchmark.upstream.commit)}\`, dsh \`${(benchmark.agent.versions ?? [benchmark.agent.version]).filter(Boolean).join(', ') || 'unknown'}\`, `
+        + `${String(benchmark.runsPerTask ?? 1)} attempt(s) per task`
+        + `${skills === undefined || (skills.loaded ?? []).length === 0 ? '' : `, with ${String((skills.loaded ?? []).length)} community skills at \`${shortSha(skills.commit ?? '')}\``}. `
+        + `Served by ${identity?.servedModel === undefined || identity?.servedModel === null ? 'an unidentified model' : `\`${identity.servedModel}\``}`
+        + `${identity?.systemFingerprint === undefined || identity?.systemFingerprint === null ? '' : `, fingerprint \`${identity.systemFingerprint}\``}`
+        + `${identity?.error === undefined || identity?.error === null ? '' : ` (${identity.error})`}.`,
+      '',
+      `Per-task rewards, ranges and token counts: [\`${recordName(benchmark)}\`](reports/upstream/${recordName(benchmark)}).`,
+    )
   }
-  const mean = benchmark.summary.mean === null ? '—' : `**${benchmark.summary.mean.toFixed(3)}**`
-  lines.push(`| _mean of ${String(benchmark.summary.scored)} scored_ | ${mean} | | ${String(benchmark.summary.exceptions)} exception(s) |`)
 
   if (oracle !== undefined) {
     const arms = oracle.tasks
@@ -135,11 +223,7 @@ export function renderBenchmarkBlock(records: readonly BenchmarkRecord[]): strin
 
   lines.push(
     '',
-    'These are single attempts and the runner reports no token usage, so they are an internal reference rather than' +
-      ' a figure comparable with upstream\'s published results' +
-      ' ([why](docs/upstream-benchmark.md#comparability-not-done-yet)).',
-    '',
-    `Record: [\`${recordName(benchmark)}\`](reports/upstream/${recordName(benchmark)}).`,
+    'Cite the section for the mode you mean: the two modes are different subjects and their means are not comparable.',
     BLOCK_END,
   )
   return lines.join('\n')
@@ -151,6 +235,7 @@ export function renderBenchmarkBlock(records: readonly BenchmarkRecord[]): strin
  * @returns the file name under `reports/upstream/`.
  */
 function recordName(record: BenchmarkRecord): string {
+  if (record.file !== undefined) return record.file
   const stamp = record.generatedAt.replace(/[:]/g, '').replace(/[-]/g, '')
   return `${stamp}.json`
 }
