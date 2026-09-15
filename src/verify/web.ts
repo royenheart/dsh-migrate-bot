@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync }
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { classifyBoot, writeProbeProfile, type BootProbeResult } from './boot.ts'
+import { readPackageName } from '../mechanical/run.ts'
 
 /**
  * Headless web smoke: boot the real `dsh web` server with the plugin mounted
@@ -73,18 +74,6 @@ export function hasClientSurface(workdir: string): boolean {
     return typeof client === 'object' && client !== null
   } catch {
     return false
-  }
-}
-
-function readPackageName(workdir: string): string | undefined {
-  const path = join(workdir, 'package.json')
-  if (!existsSync(path)) return undefined
-  try {
-    const pkg: unknown = JSON.parse(readFileSync(path, 'utf8'))
-    const name = (pkg as { name?: unknown } | null)?.name
-    return typeof name === 'string' && name !== '' ? name : undefined
-  } catch {
-    return undefined
   }
 }
 

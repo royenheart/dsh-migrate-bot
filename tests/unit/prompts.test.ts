@@ -5,7 +5,7 @@ import {
   ALIGNMENT_PROMPT,
   FIX_PROMPT,
   assembleFixPrompt,
-} from '../../src/prompts/defaults.ts'
+} from '../../src/prompts/migrate/index.ts'
 import { resolvePrompts } from '../../src/prompts/resolve.ts'
 import { parseConfig } from '../../src/config/load.ts'
 
@@ -77,4 +77,16 @@ test('the Agent Notes boundary does not remove the report every stage must produ
   }
   assert.match(ALIGNMENT_PROMPT, /printing it is the deliverable/)
   assert.match(ALIGNMENT_PROMPT, /never written into the plugin tree/)
+})
+
+test('a tag from outside cannot add a line to the harness note', async () => {
+  // The note is interpolated into a prompt an agent reads with an API key in its
+  // environment, and the tag comes from an action input or from the recorded
+  // state: one line of it.
+  const { harnessContextNote } = await import('../../src/prompts/migrate/prompts.ts')
+  const note = harnessContextNote({ path: '/tmp/harness', tag: 'dsh-v0.1.6\n::add-mask::not-a-secret' })
+  // The note is a paragraph of its own; what the tag may not do is add a line.
+  assert.equal(note.split('\n').filter(line => line.startsWith('::')).length, 0)
+  const line = note.split('\n').find(entry => entry.includes('Harness source for'))
+  assert.match(line ?? '', /\`dsh-v0\.1\.6 ::add-mask::not-a-secret\` is at/)
 })

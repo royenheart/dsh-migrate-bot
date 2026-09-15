@@ -43,7 +43,7 @@ function ports(overrides: Partial<PipelinePorts> & { config?: ReturnType<typeof 
     target,
     store: store(),
     apiKey: 'k',
-    runMechanical: () => ({ ok: true, errors: '', log: 'ok' }),
+    runMechanical: () => ({ ok: true, errors: '', log: 'ok', checks: 1 }),
     isDirty: () => true,
     diff: () => '',
     agent: agentReturning(),
@@ -78,6 +78,22 @@ test('two rounds with the same failure signature stop the loop early', async () 
   assert.equal(result.fixAttempts, 1)
   assert.equal(result.stoppedBy, 'stalled')
   assert.equal(result.status, 'failed')
+})
+
+test('the line that reports a stalled signature is one line', async () => {
+  // A signature is the probe's own output — npm's text, the harness's text — and
+  // this line is written to stdout unprefixed.
+  const logged: string[] = []
+  const signature = 'probe unavailable: npm error code ECONNREFUSED\nnpm error syscall connect\n::add-mask::forged'
+  const result = await runPipeline(ports({
+    agent: agentReturning(),
+    probeTarget: async () => boot(false, signature),
+  }), { info: (message: string) => logged.push(message) })
+  assert.equal(result.stoppedBy, 'stalled')
+  const line = logged.find(message => message.includes('failure signature unchanged'))
+  assert.notEqual(line, undefined)
+  assert.equal(line?.split('\n').length, 1)
+  assert.deepEqual(logged.filter(message => message.split('\n').some(part => part.startsWith('::'))), [])
 })
 
 test('a changing signature keeps spending the full budget', async () => {
@@ -190,7 +206,7 @@ test('the boot probe short-circuits the browser suite while it is failing', asyn
 
 test('a failed fast gate skips verification entirels and reports it', async () => {
   const result = await runPipeline(ports({
-    runMechanical: () => ({ ok: false, errors: 'TS2304: cannot find name', log: '' }),
+    runMechanical: () => ({ ok: false, errors: 'TS2304: cannot find name', log: '', checks: 1 }),
     probeTarget: async () => boot(true),
     config: parseConfig({ loop: { maxAttempts: 1 } }),
   }))

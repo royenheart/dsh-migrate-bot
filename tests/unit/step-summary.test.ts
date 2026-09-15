@@ -16,7 +16,7 @@ test('a passing run summarizes the verdict, baseline and layers', () => {
   const markdown = renderStepSummary({
     ...base,
     result: {
-      mechanical: { ok: true, errors: '', log: '' },
+      mechanical: { ok: true, errors: '', log: '', checks: 1 },
       fixAttempts: 1,
       skippedReview: false,
       attribution: { preExisting: false, regression: true, summary: 'baseline passed: the corridor caused this' },
@@ -41,7 +41,7 @@ test('a failure shows the failing layer output and why the loop stopped', () => 
     ...base,
     status: 'failed',
     result: {
-      mechanical: { ok: true, errors: '', log: '' },
+      mechanical: { ok: true, errors: '', log: '', checks: 1 },
       fixAttempts: 2,
       skippedReview: false,
       verification: {
@@ -66,7 +66,7 @@ test('a skipped review and a skipped verification layer are both stated', () => 
     ...base,
     status: 'compatible',
     result: {
-      mechanical: { ok: true, errors: '', log: '' },
+      mechanical: { ok: true, errors: '', log: '', checks: 1 },
       fixAttempts: 0,
       skippedReview: true,
       verification: {
@@ -105,7 +105,7 @@ test('each verification layer is named correctly, including the web smoke', () =
   const markdown = renderStepSummary({
     ...base,
     result: {
-      mechanical: { ok: true, errors: '', log: '' },
+      mechanical: { ok: true, errors: '', log: '', checks: 1 },
       fixAttempts: 0,
       skippedReview: false,
       verification: {
@@ -119,4 +119,40 @@ test('each verification layer is named correctly, including the web smoke', () =
   })
   assert.match(markdown, /\*\*Verification\*\* — web smoke: pass/)
   assert.doesNotMatch(markdown, /E2E suite/)
+})
+
+test('a value from outside cannot forge a line or leave a fence in the summary', () => {
+  // The tag is a free-form input and the failing layer's detail is the plugin's
+  // own output: the summary is what a human reads on the run page, so neither may
+  // start a line of its own or end the fence it sits in.
+  const markdown = renderStepSummary({
+    ...base,
+    target: { tag: 'dsh-v0.1.6\n## Injected heading\n::add-mask::not-a-secret', version: '0.1.6' },
+    result: {
+      mechanical: { ok: false, errors: '', log: '', checks: 1 },
+      fixAttempts: 0,
+      skippedReview: false,
+      attribution: { preExisting: false, regression: false, summary: 'baseline\n- @everyone approved' },
+      verification: {
+        ok: false,
+        layer: 'boot',
+        signature: 'load: failed',
+        detail: 'the plugin did not load\n```\n</details>\n# Injected\n',
+        skipped: 'not this time\n::stop-commands::tok',
+      },
+      stoppedBy: 'budget',
+      e2eSync: { ok: false, pushed: false, reason: 'the suite branch is gone\n::add-mask::x' },
+    },
+    issueUrl: 'https://user:s3cr3t@evil.test/private',
+    liveViewUrl: 'javascript:fetch("https://evil.test")',
+  })
+  assert.equal(markdown.split('\n').filter(line => line.startsWith('## Injected')).length, 0)
+  assert.equal(markdown.split('\n').filter(line => line.startsWith('::')).length, 0)
+  assert.equal(markdown.includes('```\n</details>'), false)
+  assert.equal(markdown.split('```').length - 1, 2)
+  assert.equal(markdown.includes('s3cr3t'), false)
+  assert.equal(markdown.includes('javascript:'), false)
+  // A reader can tell a target that named nothing from one whose page was refused.
+  assert.match(markdown, /named a page this Action will not link/)
+  assert.match(markdown, /dsh-v0\.1\.6 ## Injected heading ::add-mask::not-a-secret/)
 })

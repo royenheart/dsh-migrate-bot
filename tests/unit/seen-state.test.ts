@@ -18,6 +18,9 @@ import {
   STATE_BRANCH,
   STATE_FILE,
 } from '../../src/watch/seen.ts'
+import { retryLostRace } from '../../src/watch/sync.ts'
+import { commandRecorded } from '../../src/commands/idempotency.ts'
+import type { SeenState } from '../../src/watch/seen.ts'
 
 const recordedAt = '2026-08-25T00:00:00.000Z'
 const now = new Date(recordedAt)
@@ -214,5 +217,135 @@ test('persistStateBranch can seed an unverified badge without seen.json', () => 
   } finally {
     rmSync(bare, { recursive: true, force: true })
     rmSync(work, { recursive: true, force: true })
+  }
+})
+
+test('a state write that lost a race is retried, and nothing else is', () => {
+  const attempts: number[] = []
+  const retried = retryLostRace(() => {
+    attempts.push(1)
+    return attempts.length < 3
+      ? { ok: false as const, reason: 'push-failed' as const, detail: 'non-fast-forward' }
+      : { ok: true as const, commit: 'abc' }
+  }, { attempts: 3, log: () => {} })
+  assert.equal(retried.ok, true)
+  assert.equal(attempts.length, 3)
+
+  // A reason that will not have healed comes back after one try.
+  const hopeless: string[] = []
+  const failed = retryLostRace(() => {
+    hopeless.push('try')
+    return { ok: false as const, reason: 'no-remote' as const, detail: 'no remote origin' }
+  }, { attempts: 3, log: () => {} })
+  assert.equal(failed.ok, false)
+  assert.equal(hopeless.length, 1)
+
+  // And a first-attempt success is a single attempt, not a retry loop.
+  const once: number[] = []
+  const ok = retryLostRace(() => {
+    once.push(1)
+    return { ok: true as const, commit: 'def' }
+  }, { attempts: 3, log: () => {} })
+  assert.equal(ok.ok, true)
+  assert.equal(once.length, 1)
+})
+
+/**
+ * A badge-only write replaces the whole state file, so it must not be the thing
+ * that decides the ledger is empty. The *timing* case — a run whose state was
+ * read before a command recorded itself — is covered by the merge's own unit test
+ * and by the record-write race test; this pins the observable half.
+ */
+test('a badge write keeps the ledger the branch already holds', async () => {
+  const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { spawnSync } = await import('node:child_process')
+  const { STATE_BRANCH, STATE_FILE } = await import('../../src/watch/seen.ts')
+
+  const bare = mkdtempSync(join(tmpdir(), 'dsh-mig-merge-bare-'))
+  const work = mkdtempSync(join(tmpdir(), 'dsh-mig-merge-work-'))
+  try {
+    const git = (args: string[], cwd = work): void => {
+      const result = spawnSync('git', ['-c', 'safe.directory=*', '-c', 'commit.gpgsign=false', ...args], { cwd, encoding: 'utf8' })
+      assert.equal(result.status, 0, result.stderr)
+    }
+    spawnSync('git', ['init', '--bare', bare], { encoding: 'utf8' })
+    git(['init'])
+    git(['config', 'user.name', 'test'])
+    git(['config', 'user.email', 'test@example.test'])
+    writeFileSync(join(work, 'plugin.js'), 'export {}\n')
+    git(['add', '.'])
+    git(['commit', '-m', 'init'])
+    git(['remote', 'add', 'origin', bare])
+    git(['push', '-u', 'origin', 'HEAD:master'])
+
+    const withCommand: SeenState = {
+      tag: 'dsh-v0.1.5',
+      version: '0.1.5',
+      recordedAt: '2026-09-14T00:00:00Z',
+      commands: [{ key: 'me/plugin#7:redeploy:comment=99', verb: 'redeploy', at: '2026-09-14T02:00:00.000Z' }],
+    }
+    assert.equal(persistStateBranch(work, { seen: withCommand, badge: badgeFromSeenState(withCommand) }).ok, true)
+
+    // The badge job writes the whole file back; the command's record must survive.
+    const child = spawnSync(process.execPath, ['dist/src/cli.js', 'refresh-badge', '--workdir', work], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', GITHUB_REPOSITORY: 'me/plugin' },
+    })
+    assert.equal(child.status, 0, child.stderr)
+
+    const shown = spawnSync('git', ['-C', bare, 'show', `${STATE_BRANCH}:${STATE_FILE}`], { encoding: 'utf8' })
+    const after = parseSeenState(shown.stdout)
+    assert.notEqual(commandRecorded(after?.commands ?? [], 'me/plugin#7:redeploy:comment=99'), undefined)
+    assert.equal(after?.tag, 'dsh-v0.1.5')
+  } finally {
+    rmSync(bare, { recursive: true, force: true })
+    rmSync(work, { recursive: true, force: true })
+  }
+})
+
+test('a state write names the tag it recorded without letting it add a line', async () => {
+  const { writeStateBranch } = await import('../../src/watch/sync.ts')
+  const { persistStateBranch } = await import('../../src/watch/seen.ts')
+  const { badgeFromSeenState } = await import('../../src/watch/badge.ts')
+  const { mkdtempSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { spawnSync } = await import('node:child_process')
+  const work = mkdtempSync(join(tmpdir(), 'dsh-state-message-'))
+  const bare = mkdtempSync(join(tmpdir(), 'dsh-state-message-bare-'))
+  const git = (args: string[]): void => {
+    const result = spawnSync('git', ['-c', 'safe.directory=*', '-c', 'commit.gpgsign=false', ...args], { cwd: work, encoding: 'utf8' })
+    assert.equal(result.status, 0, `${args.join(' ')}\n${result.stderr}`)
+  }
+  try {
+    spawnSync('git', ['init', '--bare', bare], { encoding: 'utf8' })
+    git(['init'])
+    git(['config', 'user.name', 'test'])
+    git(['config', 'user.email', 'test@example.test'])
+    git(['commit', '--allow-empty', '-m', 'init'])
+    git(['branch', '-M', 'main'])
+    git(['remote', 'add', 'origin', bare])
+    git(['push', '-u', 'origin', 'main'])
+
+    const state = {
+      tag: 'dsh-v0.1.5\n::add-mask::not-a-secret',
+      version: '0.1.5',
+      recordedAt: '2026-01-01T00:00:00.000Z',
+    }
+    // The default subject names the tag, so a tag that carries a newline would
+    // otherwise write a second line into the commit message.
+    const written = persistStateBranch(work, { seen: state, badge: { schemaVersion: 1, label: 'dsh', message: 'x', color: 'lightgrey' } })
+    assert.equal(written.ok, true, written.ok ? '' : written.detail)
+    const message = spawnSync('git', ['-C', bare, 'log', '-1', '--format=%B', state.recordedAt ? 'dsh-migrate/state' : 'main'], { encoding: 'utf8' }).stdout.trim()
+    assert.match(message, /^dsh-migrate: record dsh-v0\.1\.5 ::add-mask::not-a-secret$/)
+    assert.equal(message.includes('\n'), false)
+
+    // The badge-only write goes through the same path with its own subject.
+    assert.equal(writeStateBranch(work, undefined, 'dsh-migrate: refresh badge').ok, true)
+  } finally {
+    for (const dir of [work, bare]) rmSync(dir, { recursive: true, force: true })
   }
 })

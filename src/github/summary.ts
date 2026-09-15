@@ -1,4 +1,5 @@
 import { appendFileSync } from 'node:fs'
+import { externalUrl, inline } from '../render/text.ts'
 import type { PipelineResult, RunStatus, VerificationResult } from '../pipeline/types.ts'
 
 /**
@@ -19,6 +20,8 @@ export interface StepSummaryInput {
   >
   issueUrl?: string | undefined
   pullRequestUrl?: string | undefined
+  /** Read-only view of this run, when a deploy target is streaming it. */
+  liveViewUrl?: string | undefined
   runDir: string
 }
 
@@ -44,7 +47,19 @@ export function renderStepSummary(input: StepSummaryInput): string {
   const lines: string[] = []
   lines.push(`## dsh-migrate: ${VERDICT[input.status]}`)
   lines.push('')
-  lines.push(`**${input.pluginName}** × \`${input.target.tag}\``)
+  lines.push(`**${inline(input.pluginName, 120)}** × \`${inline(input.target.tag, 80)}\``)
+  // A link only when the value is a page: `externalUrl` is what decides that, and
+  // a URL that is not one is dropped rather than rendered.
+  const view = input.liveViewUrl === undefined ? undefined : externalUrl(input.liveViewUrl, 300)
+  if (view !== undefined) {
+    lines.push('')
+    lines.push(`[Watch this run](${view}) — read-only, and it keeps the log after the run ends.`)
+  } else if (input.liveViewUrl !== undefined) {
+    // The reader of a run page has to be able to tell "the target named nothing"
+    // from "the target named something this Action will not link".
+    lines.push('')
+    lines.push('_The deploy target named a page this Action will not link._')
+  }
   lines.push('')
 
   const facts: string[] = [`fast gate: ${input.result.mechanical.ok ? 'pass' : 'fail'}`]
@@ -57,7 +72,7 @@ export function renderStepSummary(input: StepSummaryInput): string {
 
   if (input.result.attribution !== undefined) {
     lines.push('')
-    lines.push(`**Baseline** — ${input.result.attribution.summary}`)
+    lines.push(`**Baseline** — ${inline(input.result.attribution.summary, 300)}`)
   }
 
   const verification = input.result.verification
@@ -65,12 +80,14 @@ export function renderStepSummary(input: StepSummaryInput): string {
     lines.push('')
     const label = VERIFY_LABEL[verification.layer]
     lines.push(`**Verification** — ${label}: ${verification.ok ? 'pass' : 'fail'}${
-      verification.skipped === undefined ? '' : ` (skipped: ${verification.skipped})`
+      verification.skipped === undefined ? '' : ` (skipped: ${inline(verification.skipped, 200)})`
     }`)
     if (!verification.ok) {
+      // One line of the failing layer's own output: this is the plugin's text,
+      // and a multi-line value inside a fence is a way out of the fence.
       lines.push('')
       lines.push('```')
-      lines.push(verification.detail.trim().slice(0, 1500) || verification.signature)
+      lines.push(inline(verification.detail.trim().slice(0, 1500) || verification.signature, 600))
       lines.push('```')
     }
   }
@@ -79,16 +96,18 @@ export function renderStepSummary(input: StepSummaryInput): string {
     lines.push('')
     lines.push(`**E2E branch** — ${input.result.e2eSync.pushed
       ? 'updated'
-      : `not updated (${input.result.e2eSync.reason ?? 'unknown'})`}`)
+      : `not updated (${inline(input.result.e2eSync.reason ?? 'unknown', 200)})`}`)
   }
 
-  const links = [input.issueUrl, input.pullRequestUrl].filter((url): url is string => url !== undefined)
+  const links = [input.issueUrl, input.pullRequestUrl]
+    .map(url => (url === undefined ? undefined : externalUrl(url, 300)))
+    .filter((url): url is string => url !== undefined)
   if (links.length > 0) {
     lines.push('')
     lines.push(links.join(' · '))
   }
   lines.push('')
-  lines.push(`<sub>reports: \`${input.runDir}\`</sub>`)
+  lines.push(`<sub>reports: \`${inline(input.runDir, 200)}\`</sub>`)
   return `${lines.join('\n')}\n`
 }
 

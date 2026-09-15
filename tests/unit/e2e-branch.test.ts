@@ -153,7 +153,7 @@ test('the suite is transplanted onto its own branch and pushed', () => {
       stagingDir: staging,
       worktreeDir: worktree,
       index: INDEX,
-      message: 'test(e2e): cover',
+      tag: 'dsh-v0.1.5-rc.1',
     })
     assert.equal(result.ok, true)
     assert.equal(result.pushed, true)
@@ -185,7 +185,7 @@ test('a vanished base ref falls back to the default branch', () => {
       stagingDir: staging,
       worktreeDir: join(dir, '.dsh-migrate', 'e2e-branch'),
       index: INDEX,
-      message: 'test(e2e): cover',
+      tag: 'dsh-v0.1.5-rc.1',
     })
     assert.equal(result.ok, true)
     assert.equal(result.pushed, true)
@@ -211,7 +211,7 @@ test('an unresolvable base still publishes from the checked-out commit', () => {
       stagingDir: staging,
       worktreeDir: join(dir, '.dsh-migrate', 'e2e-branch'),
       index: INDEX,
-      message: 'test(e2e): cover',
+      tag: 'dsh-v0.1.5-rc.1',
     })
     assert.equal(result.reason, undefined)
     assert.equal(result.pushed, true)
@@ -232,7 +232,7 @@ test('no staged suite is reported instead of pushing an empty branch', () => {
       stagingDir: join(dir, '.dsh-migrate', 'missing'),
       worktreeDir: join(dir, '.dsh-migrate', 'e2e-branch'),
       index: INDEX,
-      message: 'test(e2e): cover',
+      tag: 'dsh-v0.1.5-rc.1',
     })
     assert.equal(result.ok, false)
     assert.equal(result.reason, 'no-draft')
@@ -256,7 +256,7 @@ test('an unchanged suite is not re-committed', () => {
       stagingDir: staging,
       worktreeDir: join(dir, '.dsh-migrate', 'e2e-branch'),
       index: INDEX,
-      message: 'test(e2e): cover',
+      tag: 'dsh-v0.1.5-rc.1',
     }
     assert.equal(syncE2EBranch(input).pushed, true)
     const second = syncE2EBranch(input)
@@ -338,7 +338,7 @@ test('the suite runs against the migrated tree overlaid on its branch', () => {
       stagingDir: staging,
       worktreeDir: join(dir, '.dsh-migrate', 'e2e-branch'),
       index: INDEX,
-      message: 'test(e2e): cover',
+      tag: 'dsh-v0.1.5-rc.1',
     })
 
     let observedCwd = ''
@@ -382,5 +382,35 @@ test('a staged index is read back from disk', () => {
     assert.equal(readIndex(join(dir, 'nope.json')), undefined)
   } finally {
     rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('a tag from outside cannot add a line to the suite commit subject', () => {
+  // The subject is a commit message, and the tag is a resolved version: one line.
+  const { dir, origin, cleanup } = repoWithOrigin()
+  const staging = join(dir, '.dsh-migrate', 'e2e-draft')
+  const worktree = join(dir, '.dsh-migrate', 'e2e-branch')
+  try {
+    mkdirSync(join(staging, 'e2e', 'specs'), { recursive: true })
+    writeFileSync(join(staging, 'e2e', 'specs', 'settings.spec.ts'), 'export {}\n')
+    writeFileSync(join(staging, INDEX_FILE), JSON.stringify(INDEX))
+
+    const result = syncE2EBranch({
+      workdir: dir,
+      branch: 'dsh-migrate/e2e',
+      baseRef: 'origin/main',
+      defaultBranch: 'main',
+      forceRebase: true,
+      stagingDir: staging,
+      worktreeDir: worktree,
+      index: INDEX,
+      tag: 'dsh-v0.1.5\n::add-mask::forged-by-a-tag',
+    })
+    assert.equal(result.ok, true, result.ok ? '' : result.detail)
+    const subject = git(origin, ['log', '-1', '--format=%B', 'dsh-migrate/e2e']).out.trim()
+    assert.match(subject, /^test\(e2e\): cover dsh-v0\.1\.5 ::add-mask::forged-by-a-tag \(\d+ features\)$/)
+    assert.equal(subject.includes('\n'), false)
+  } finally {
+    cleanup()
   }
 })

@@ -1,8 +1,8 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { assembleFixPrompt } from '../prompts/defaults.ts'
+import { assembleFixPrompt } from '../prompts/migrate/index.ts'
 import { resolvePrompts } from '../prompts/resolve.ts'
 import { renderDocuments } from '../github/templates.ts'
+import { readPluginName } from '../mechanical/run.ts'
+import { inline } from '../render/text.ts'
 import { formatOfficialDiscussionInvite } from '../github/discussions.ts'
 import { collectPatchReports, formatPatchReportComment } from '../github/patch-reports.ts'
 import { usageUnits, type SessionProgress } from '../agents/session-status.ts'
@@ -22,16 +22,6 @@ import type {
 const silent: PipelineLogger = { info() {} }
 
 const PASS: VerificationResult = { ok: true, layer: 'boot', signature: 'pass', detail: '' }
-
-function pluginName(workdir: string): string {
-  const pkgPath = join(workdir, 'package.json')
-  if (!existsSync(pkgPath)) return 'plugin'
-  const pkg: unknown = JSON.parse(readFileSync(pkgPath, 'utf8'))
-  if (typeof pkg === 'object' && pkg !== null && typeof (pkg as { name?: unknown }).name === 'string') {
-    return (pkg as { name: string }).name
-  }
-  return 'plugin'
-}
 
 function maybePublish(
   ports: PipelinePorts,
@@ -55,7 +45,7 @@ function maybePublish(
     language: ports.config.issuePr.language,
     status,
     target: ports.target,
-    pluginName: pluginName(ports.workdir),
+    pluginName: readPluginName(ports.workdir),
     skippedReview: extra.skippedReview,
     fixAttempts: extra.fixAttempts,
     mechanical: extra.mechanical,
@@ -177,7 +167,7 @@ export async function runPipeline(
   logger: PipelineLogger = silent,
 ): Promise<PipelineResult> {
   const prompts = resolvePrompts(ports.config, ports.harness)
-  logger.info(`stage: target ${ports.target.tag}`)
+  logger.info(`stage: target ${inline(ports.target.tag, 80)}`)
   if (ports.attribution !== undefined) logger.info(`baseline: ${ports.attribution.summary}`)
 
   logger.info('stage: fast gate (V1)')
@@ -253,7 +243,9 @@ export async function runPipeline(
 
   while (!verification.ok && fixAttempts < ports.config.loop.maxAttempts) {
     if (signatureStalled(previousSignature, verification.signature)) {
-      logger.info(`repair loop stopped: failure signature unchanged (${verification.signature})`)
+      // A signature is the probe's own output, which comes from whatever the
+      // harness printed: one line of it, since this is a log line.
+      logger.info(`repair loop stopped: failure signature unchanged (${inline(verification.signature, 200)})`)
       stoppedBy = 'stalled'
       break
     }

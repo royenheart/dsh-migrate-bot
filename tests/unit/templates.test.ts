@@ -8,7 +8,7 @@ const base = {
   pluginName: '@me/dsh-plugin-x',
   skippedReview: false,
   fixAttempts: 2,
-  mechanical: { ok: true, errors: '', log: 'ok' },
+  mechanical: { ok: true, errors: '', log: 'ok', checks: 1 },
   verdictA: '## Verdict\nshrink',
   verdictB: '## Edits\nuse official slot',
   diff: '+ key: x',
@@ -41,7 +41,7 @@ test('the report renders the baseline attribution and the verification layer', (
     pluginName: '@acme/plugin',
     skippedReview: false,
     fixAttempts: 2,
-    mechanical: { ok: true, errors: '', log: '' },
+    mechanical: { ok: true, errors: '', log: '', checks: 1 },
     diff: '',
     attribution: { preExisting: true, regression: false, summary: 'baseline already broken (state): look further back' },
     verification: {
@@ -65,7 +65,7 @@ test('the Chinese report names every layer in Chinese', () => {
     pluginName: '@acme/plugin',
     skippedReview: false,
     fixAttempts: 0,
-    mechanical: { ok: true, errors: '', log: '' },
+    mechanical: { ok: true, errors: '', log: '', checks: 1 },
     diff: '',
     verification: { ok: true, layer: 'boot', signature: 'pass', detail: '' },
   })
@@ -81,8 +81,30 @@ test('a report with no verification section stays unchanged', () => {
     pluginName: '@acme/plugin',
     skippedReview: true,
     fixAttempts: 0,
-    mechanical: { ok: true, errors: '', log: '' },
+    mechanical: { ok: true, errors: '', log: '', checks: 1 },
     diff: '',
   })
   assert.doesNotMatch(docs.issue, /## Layered verification/)
+})
+
+test('a harness tag from an input cannot forge a line of the issue or the pull request', () => {
+  // `dsh_version` is a free-form action input, so the tag is operator text until
+  // the resolver turns it into one: it lands in an issue title and body.
+  const docs = renderDocuments({
+    ...base,
+    language: 'en',
+    target: { tag: 'dsh-v0.1.6\n## Injected heading\n- @everyone', version: '0.1.6\n::add-mask::x' },
+    verification: {
+      ok: false,
+      layer: 'boot',
+      signature: 'load: failed',
+      detail: 'the plugin did not load\n```\n</details>\n# Injected\n',
+    },
+  })
+  assert.equal(docs.title.split('\n').length, 1)
+  assert.equal(docs.issue.split('\n').filter(line => line.startsWith('## Injected')).length, 0)
+  assert.equal(docs.issue.split('\n').filter(line => line.startsWith('- @everyone')).length, 0)
+  assert.equal(docs.pr.split('\n').filter(line => line.startsWith('::')).length, 0)
+  assert.equal(docs.issue.includes('```\n</details>'), false)
+  assert.match(docs.issue, /dsh-v0\.1\.6 ## Injected heading - @everyone/)
 })

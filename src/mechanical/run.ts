@@ -7,11 +7,21 @@ import { extractMechanicalErrors } from './errors.ts'
 import { dshPeerSpecs, pinDshPeersCommand } from './peers.ts'
 import { scanKeyedSlots, scanPluginShape } from './scan.ts'
 import { typecheckCommand } from './typecheck.ts'
+import { inline } from '../render/text.ts'
 
 export interface MechanicalResult {
   ok: boolean
   errors: string
   log: string
+  /**
+   * How many commands ran that were checks rather than installs.
+   *
+   * Zero means the plugin declares no build, typecheck or test command and no
+   * suite is configured, so `ok` says nothing about whether the plugin works —
+   * a distinction a caller that publishes on the strength of this result has to
+   * be able to make.
+   */
+  checks: number
 }
 
 /** Optional run context so tests pin `@deepseek-ai/dsh-*` to the target tag. */
@@ -52,6 +62,41 @@ function readPackageJson(root: string): unknown {
   return JSON.parse(readFileSync(pkgPath, 'utf8')) as unknown
 }
 
+/**
+ * The `name` in a plugin's `package.json`, when that file holds a usable one.
+ *
+ * The package.json belongs to the tree being migrated, so a file that is not
+ * JSON, or a name that is not a non-empty string, is nothing rather than a
+ * crash: this is read once to name the plugin in the boot probe's profile and
+ * again to name it in a report, and neither is worth failing a run over.
+ * @param workdir - the plugin working tree.
+ */
+export function readPackageName(workdir: string): string | undefined {
+  try {
+    const pkg = readPackageJson(workdir)
+    if (typeof pkg !== 'object' || pkg === null) return undefined
+    const name = (pkg as { name?: unknown }).name
+    return typeof name === 'string' && name !== '' ? name : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The name a report calls the plugin by.
+ *
+ * That name lands in an issue title and an issue body, so it is collapsed to one
+ * line and bounded like every other value that came from outside this Action; a
+ * tree with no usable name is called `plugin` rather than nothing.
+ * @param workdir - the plugin working tree.
+ */
+export function readPluginName(workdir: string): string {
+  const name = readPackageName(workdir)
+  if (name === undefined) return 'plugin'
+  const collapsed = inline(name, 80)
+  return collapsed === '' ? 'plugin' : collapsed
+}
+
 function packageScripts(pkg: unknown): Record<string, string> {
   if (typeof pkg !== 'object' || pkg === null) return {}
   const scripts = (pkg as Record<string, unknown>).scripts
@@ -89,11 +134,11 @@ function runList(
     logs.push(`$ ${command}\n${result.output}`)
     if (!result.ok) {
       const log = logs.join('\n')
-      return { ok: false, errors: extractMechanicalErrors(result.output), log }
+      return { ok: false, errors: extractMechanicalErrors(result.output), log, checks: 0 }
     }
   }
   const log = logs.join('\n')
-  return { ok: true, errors: '', log }
+  return { ok: true, errors: '', log, checks: 0 }
 }
 
 /**
@@ -115,7 +160,7 @@ export function runMechanical(
   const timeoutMs = options.timeoutMs
 
   if (config.tests !== undefined) {
-    return runList([...prefix, ...config.tests.commands], root, extraEnv, timeoutMs)
+    return { ...runList([...prefix, ...config.tests.commands], root, extraEnv, timeoutMs), checks: config.tests.commands.length }
   }
 
   const logs: string[] = []
@@ -123,14 +168,14 @@ export function runMechanical(
   if (shape.length > 0) {
     const text = shape.map(item => `error: ${item.message}`).join('\n')
     logs.push(text)
-    return { ok: false, errors: text, log: text }
+    return { ok: false, errors: text, log: text, checks: 0 }
   }
 
   const slots = scanKeyedSlots(root)
   if (slots.length > 0) {
-    const text = slots.map(item => `error: ${item.file}: ${item.message}`).join('\n')
-    logs.push(text)
-    return { ok: false, errors: text, log: text }
+    const text = slots.map(item => `${item.file}: ${item.message}`).join('\n')
+    logs.push(`error: ${text}`)
+    return { ok: false, errors: text, log: `error: ${text}`, checks: 0 }
   }
 
   const scripts = packageScripts(pkg)
@@ -143,10 +188,12 @@ export function runMechanical(
   if (scripts.test !== undefined) commands.push('npm test')
 
   const ran = runList(commands, root, extraEnv, timeoutMs)
-  if (logs.length === 0) return ran
+  const checks = commands.length - prefix.length
+  if (logs.length === 0) return { ...ran, checks }
   return {
     ok: ran.ok,
     errors: ran.errors,
     log: `${logs.join('\n')}\n${ran.log}`,
+    checks,
   }
 }

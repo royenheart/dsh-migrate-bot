@@ -26,7 +26,7 @@ const omo = {
   pluginName: '@royenheart/dsh-plugin-opencode-omo',
   skippedReview: false,
   fixAttempts: 0,
-  mechanical: { ok: true, errors: '', log: 'ok' },
+  mechanical: { ok: true, errors: '', log: 'ok', checks: 1 },
   verdictA: reportA,
   verdictB: reportB,
   diff: worktree,
@@ -72,7 +72,7 @@ test('fences in errors, previews, and diffs cannot steal later sections', () => 
   const docs = renderDocuments({
     ...omo,
     verdictA: '# Review\n\nHere is a config sample that must not open a fence.\n\n```yaml\nfoo: a-long-enough-mapping-value\n```\n\n## 3. Verdict\nkeep\n',
-    mechanical: { ok: false, errors: 'failed\n```\nnot a fence closer\n```\n', log: '' },
+    mechanical: { ok: false, errors: 'failed\n```\nnot a fence closer\n```\n', log: '', checks: 1 },
     diff: [
       'diff --git a/README.md b/README.md',
       '--- a/README.md',

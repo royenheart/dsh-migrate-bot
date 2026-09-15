@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { inline } from '../render/text.ts'
 
 /**
  * The agent-authored end-to-end suite lives on its own branch, never in a
@@ -223,7 +224,8 @@ export interface SyncE2EBranchInput {
   /** Scratch worktree location. */
   worktreeDir: string
   index: E2EIndex
-  message: string
+  /** The harness tag the suite was authored for; the commit subject names it. */
+  tag: string
 }
 
 export interface SyncE2EBranchResult {
@@ -239,7 +241,7 @@ export interface SyncE2EBranchResult {
  * The suite branch is rebased onto the migration branch head when it exists so
  * the tests describe the migrated state, and onto the default branch when that
  * head is gone (a closed or deleted migration branch must not strand the suite).
- * @param input - branch names, staging directory, index, commit message
+ * @param input - branch names, staging directory, index, and the tag the suite is for
  */
 export function syncE2EBranch(input: SyncE2EBranchInput): SyncE2EBranchResult {
   if (!existsSync(input.stagingDir)) {
@@ -299,7 +301,10 @@ export function syncE2EBranch(input: SyncE2EBranchInput): SyncE2EBranchResult {
     if (staged.out === '') {
       return { ok: true, pushed: false, reason: 'no-change', detail: 'suite already up to date' }
     }
-    git(['-c', 'user.name=dsh-migrate[bot]', '-c', 'user.email=41898282+github-actions[bot]@users.noreply.github.com', 'commit', '-m', input.message], input.worktreeDir)
+    // The subject names the harness the suite covers. The tag is a resolved
+    // version, so it is collapsed: a commit subject is a line.
+    const message = `test(e2e): cover ${inline(input.tag, 80)} (${String(input.index.features.length)} features)`
+    git(['-c', 'user.name=dsh-migrate[bot]', '-c', 'user.email=41898282+github-actions[bot]@users.noreply.github.com', 'commit', '-m', message], input.worktreeDir)
 
     const push = remoteExists
       ? git(['push', '--force-with-lease', 'origin', `HEAD:refs/heads/${input.branch}`], input.worktreeDir)

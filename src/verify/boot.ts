@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { readPackageName } from '../mechanical/run.ts'
 
 /**
  * `dsh` reports a plugin that cannot load, a plugin whose `apply` throws, and a
@@ -207,19 +208,6 @@ export interface BootProbeOptions {
   profile?: string | undefined
   /** Kept on disk for inspection (implies the caller cleans up). */
   keepHome?: boolean | undefined
-}
-
-function readPackageName(workdir: string): string | undefined {
-  const path = join(workdir, 'package.json')
-  if (!existsSync(path)) return undefined
-  try {
-    const pkg: unknown = JSON.parse(readFileSync(path, 'utf8'))
-    if (typeof pkg !== 'object' || pkg === null) return undefined
-    const name = (pkg as { name?: unknown }).name
-    return typeof name === 'string' && name !== '' ? name : undefined
-  } catch {
-    return undefined
-  }
 }
 
 /**

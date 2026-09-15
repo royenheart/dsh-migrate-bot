@@ -80,10 +80,15 @@ Do not declare a blocker merely because the problem is hard, and do not declare 
 The report is the last markdown document you print. Do not wrap it in a code fence.
 `
 
-export function harnessContextNote(input: { path: string; tag: string }): string {
-  return `Harness source for \`${input.tag}\` is at \`${input.path}\`. First read the plugin README, other project docs, and the plugin's patches/ directory (the complete-surface requirement). Treat documented features and entry points as the product spec. Then, for each documented capability, decide whether official overlap absorbed that specific surface — official extension points cover a capability only when they are the same seam (same slot, menu, RPC, or behavior), not when a different official surface could substitute a coarser job. If a patch is still required for the documented complete surface, update or write it, apply it on that checkout to test, and keep the plugin updated. Do not drop a patch because the plugin degrades without it. Do not commit the checkout.
+import { discussionDraftSpec } from '../discussion-draft.ts'
+import { inline } from '../../render/text.ts'
 
-For each remaining required patch, write one report at \`.dsh-migrate/patch-reports/<slug>/report.md\`. Search https://github.com/deepseek-ai/deepseek-harness issues, pull requests, and discussions first. If a related request exists, put its links in that report. If none exists, write the report as a discussion draft with these sections: Title (\`# [Feature request] …\`), English summary (blockquote), Background, Current state, Proposal, Appendix: patch, Questions to confirm, Related.
+export function harnessContextNote(input: { path: string; tag: string }): string {
+  // The tag is a resolved version, and it is interpolated into a prompt an
+  // agent reads with an API key in its environment: one line of it.
+  return `Harness source for \`${inline(input.tag, 80)}\` is at \`${input.path}\`. First read the plugin README, other project docs, and the plugin's patches/ directory (the complete-surface requirement). Treat documented features and entry points as the product spec. Then, for each documented capability, decide whether official overlap absorbed that specific surface — official extension points cover a capability only when they are the same seam (same slot, menu, RPC, or behavior), not when a different official surface could substitute a coarser job. If a patch is still required for the documented complete surface, update or write it, apply it on that checkout to test, and keep the plugin updated. Do not drop a patch because the plugin degrades without it. Do not commit the checkout.
+
+For each remaining required patch, write one report at \`.dsh-migrate/patch-reports/<slug>/report.md\`. Search https://github.com/deepseek-ai/deepseek-harness issues, pull requests, and discussions first. If a related request exists, put its links in that report. If none exists, write the report as a discussion draft with these sections: ${discussionDraftSpec()}.
 `
 }
 

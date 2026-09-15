@@ -51,3 +51,24 @@ test('fetchPullRequestState maps merged, open, closed, and 404', async () => {
   }), 'missing')
   assert.ok(calls[0]?.includes('/repos/a/b/pulls/1'))
 })
+
+test('a GitHub answer cannot add a line to the message it becomes', async () => {
+  // An error body is JSON from somebody else's service, and these messages reach
+  // a log line and, through a thrown error, whatever renders it.
+  const { githubGet, githubRequest } = await import('../../src/github/api.ts')
+  const body = '{\n  "message": "Validation Failed",\n  "errors": [{"code": "missing"}]\n}'
+  const answer = await githubGet('t', '/repos/a/b/pulls/1', async () => new Response(body, { status: 422 }))
+  assert.equal(answer.ok, false)
+  const detail = answer.ok ? '' : answer.detail
+  assert.equal(detail.split('\n').length, 1)
+  assert.match(detail, /Validation Failed/)
+
+  await assert.rejects(
+    async () => await githubRequest('t', 'POST', '/repos/a/b/issues', {}, async () => new Response(body, { status: 422 })),
+    (error: Error) => {
+      assert.equal(error.message.split('\n').length, 1)
+      assert.match(error.message, /Validation Failed/)
+      return true
+    },
+  )
+})

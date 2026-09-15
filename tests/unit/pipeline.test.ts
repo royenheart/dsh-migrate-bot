@@ -42,7 +42,7 @@ test('skip-if-mechanical-pass on a clean tree does not review or publish', async
     target: target(),
     store,
     apiKey: 'k',
-    runMechanical: () => ({ ok: true, errors: '', log: 'ok' }),
+    runMechanical: () => ({ ok: true, errors: '', log: 'ok', checks: 1 }),
     isDirty: () => false,
     diff: () => '',
     agent,
@@ -69,7 +69,7 @@ test('A and B prompts include the harness checkout note', async () => {
     target: target(),
     store,
     apiKey: 'k',
-    runMechanical: () => ({ ok: true, errors: '', log: 'ok' }),
+    runMechanical: () => ({ ok: true, errors: '', log: 'ok', checks: 1 }),
     isDirty: () => false,
     diff: () => '',
     agent,
@@ -88,7 +88,7 @@ test('always reviews even when mechanical already passed', async () => {
     target: target(),
     store,
     apiKey: 'k',
-    runMechanical: () => ({ ok: true, errors: '', log: 'ok' }),
+    runMechanical: () => ({ ok: true, errors: '', log: 'ok', checks: 1 }),
     isDirty: () => false,
     diff: () => '',
     agent,
@@ -101,9 +101,9 @@ test('always reviews even when mechanical already passed', async () => {
 test('failed retest starts C-loop with errors only and stops when green', async () => {
   const store = createReportStore(mkdtempSync(join(tmpdir(), 'dsh-mig-')))
   const mechanical: MechanicalResult[] = [
-    { ok: false, errors: 'error: first', log: 'FULL LOG one' },
-    { ok: false, errors: 'error: after-review', log: 'FULL LOG two' },
-    { ok: true, errors: '', log: 'ok' },
+    { ok: false, errors: 'error: first', log: 'FULL LOG one', checks: 1 },
+    { ok: false, errors: 'error: after-review', log: 'FULL LOG two', checks: 1 },
+    { ok: true, errors: '', log: 'ok', checks: 1 },
   ]
   const agent = fakeAgent({
     fix: 'changed client.js',
@@ -121,7 +121,7 @@ test('failed retest starts C-loop with errors only and stops when green', async 
     target: target(),
     store,
     apiKey: 'k',
-    runMechanical: () => mechanical.shift() ?? { ok: true, errors: '', log: '' },
+    runMechanical: () => mechanical.shift() ?? { ok: true, errors: '', log: '', checks: 1 },
     isDirty: () => false,
     diff: () => '',
     agent: wrapped,
@@ -162,7 +162,7 @@ test('this-run USD limit aborts before B after A reports usage', async () => {
       target: target(),
       store,
       apiKey: 'k',
-      runMechanical: () => ({ ok: true, errors: '', log: 'ok' }),
+      runMechanical: () => ({ ok: true, errors: '', log: 'ok', checks: 1 }),
       isDirty: () => false,
       diff: () => '',
       agent,
@@ -191,7 +191,7 @@ test('insufficient official balance aborts before the agent', async () => {
       target: target(),
       store,
       apiKey: 'k',
-      runMechanical: () => ({ ok: true, errors: '', log: 'ok' }),
+      runMechanical: () => ({ ok: true, errors: '', log: 'ok', checks: 1 }),
       isDirty: () => false,
       diff: () => '',
       agent,
@@ -227,7 +227,7 @@ test('dirty tree publishes Issue and PR; clean tree never does', async () => {
     target: target(),
     store,
     apiKey: 'k',
-    runMechanical: () => ({ ok: true, errors: '', log: 'ok' }),
+    runMechanical: () => ({ ok: true, errors: '', log: 'ok', checks: 1 }),
     isDirty: () => true,
     diff: () => 'diff --git a/x',
     agent: fakeAgent(),
@@ -237,6 +237,45 @@ test('dirty tree publishes Issue and PR; clean tree never does', async () => {
   assert.equal(dirty.published.pullRequestUrl, 'https://example.test/p/2')
   assert.equal(titles.length, 1)
   assert.match(branches[0] ?? '', /^dsh-migrate\/0\.1\.1-rc\.2-/)
+})
+
+test('a package name that carries a newline cannot forge a line of the report', async () => {
+  // The name is read from the tree the migration just edited, and it lands in an
+  // issue title and body: one line of it, with nothing that starts a line of its
+  // own, is what the pipeline has to publish.
+  const workdir = mkdtempSync(join(tmpdir(), 'dsh-mig-name-'))
+  writeFileSync(join(workdir, 'package.json'), '{"name": "evil\\n## Forged"}')
+  const store = createReportStore(mkdtempSync(join(tmpdir(), 'dsh-mig-')))
+  let title = ''
+  let issueBody = ''
+  const logged: string[] = []
+  const github: GithubPublisher = {
+    async publish(input) {
+      title = input.title
+      issueBody = input.issueBody
+      return { issueUrl: 'https://example.test/i/3' }
+    },
+  }
+  const result = await runPipeline({
+    config: parseConfig({ review: { policy: 'skip-if-mechanical-pass' } }),
+    workdir,
+    target: { tag: 'dsh-v0.1.1\n::add-mask::forged-by-a-version-string', version: '0.1.1' },
+    store,
+    apiKey: 'k',
+    runMechanical: () => ({ ok: true, errors: '', log: 'ok', checks: 1 }),
+    isDirty: () => true,
+    diff: () => 'diff --git a/x',
+    agent: fakeAgent(),
+    github,
+  }, { info: (message: string) => logged.push(message) })
+  assert.equal(result.status, 'migrated')
+  assert.equal(title.includes('\n'), false)
+  assert.match(title, /evil ## Forged/)
+  assert.equal(issueBody.split('\n').some(line => line.startsWith('## Forged')), false)
+  // The same run also logs the target it resolved, and that line goes to stdout
+  // unprefixed: one line of it, too.
+  const stage = logged.find(message => message.startsWith('stage: target '))
+  assert.equal(stage?.split('\n').length, 1)
 })
 
 test('opened Issue gets a comment with the patch-report table and bodies', async () => {
@@ -264,7 +303,7 @@ test('opened Issue gets a comment with the patch-report table and bodies', async
     target: target(),
     store: createReportStore(mkdtempSync(join(tmpdir(), 'dsh-mig-'))),
     apiKey: 'k',
-    runMechanical: () => ({ ok: true, errors: '', log: 'ok' }),
+    runMechanical: () => ({ ok: true, errors: '', log: 'ok', checks: 1 }),
     isDirty: () => true,
     diff: () => 'diff --git a/x',
     agent: fakeAgent(),
@@ -304,7 +343,7 @@ test('existing official links do not get an open-discussion follow-up', async ()
     target: target(),
     store: createReportStore(mkdtempSync(join(tmpdir(), 'dsh-mig-'))),
     apiKey: 'k',
-    runMechanical: () => ({ ok: true, errors: '', log: 'ok' }),
+    runMechanical: () => ({ ok: true, errors: '', log: 'ok', checks: 1 }),
     isDirty: () => true,
     diff: () => 'diff --git a/x',
     agent: fakeAgent(),

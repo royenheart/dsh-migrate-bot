@@ -4,6 +4,7 @@ import type { ResolvedVersion } from '../watch/dsh-version.ts'
 import type { RunStatus, VerificationResult } from '../pipeline/types.ts'
 import type { Attribution } from '../verify/baseline.ts'
 import { formatAgentReport, formatErrorExcerpt, formatRootCause, formatWorkingTree } from './issue-format.ts'
+import { inline } from '../render/text.ts'
 
 export interface DocumentInput {
   language: IssuePrLanguage
@@ -49,7 +50,7 @@ function verificationSection(input: DocumentInput, language: IssuePrLanguage): s
       : ` (${zh ? '跳过' : 'skipped'}: ${input.verification.skipped})`
     lines.push(`${label}: ${state}${skipped}`)
     if (!input.verification.ok) {
-      lines.push('', '```', input.verification.detail.trim().slice(0, 4000) || input.verification.signature, '```')
+      lines.push('', '```', inline(input.verification.detail.trim().slice(0, 4000) || input.verification.signature, 600), '```')
     }
   }
   if (lines.length === 0) return ''
@@ -58,13 +59,13 @@ function verificationSection(input: DocumentInput, language: IssuePrLanguage): s
 
 function en(input: DocumentInput): { title: string; issue: string; pr: string } {
   const title = input.status === 'failed'
-    ? `dsh ${input.target.version}: migration incomplete for ${input.pluginName}`
-    : `dsh ${input.target.version}: migrate ${input.pluginName}`
-  const issue = `# Migration report: ${input.pluginName} × DeepSeek Harness ${input.target.version}
+    ? `dsh ${inline(input.target.version, 80)}: migration incomplete for ${inline(input.pluginName, 120)}`
+    : `dsh ${inline(input.target.version, 80)}: migrate ${inline(input.pluginName, 120)}`
+  const issue = `# Migration report: ${inline(input.pluginName, 120)} × DeepSeek Harness ${inline(input.target.version, 80)}
 
 ## Summary
 
-- Target harness: \`${input.target.tag}\` (${input.target.version})
+- Target harness: \`${inline(input.target.tag, 80)}\` (${inline(input.target.version, 80)})
 - Outcome: **${input.status}**
 - Review skipped: ${input.skippedReview ? 'yes' : 'no'}
 - Repair loops: ${input.fixAttempts}
@@ -106,7 +107,7 @@ Full A/B/C reports stay in the Action artifact / local \`.dsh-migrate/\` run dir
 `
   const pr = `## Summary
 
-Automated migration toward DeepSeek Harness \`${input.target.version}\` for \`${input.pluginName}\`.
+Automated migration toward DeepSeek Harness \`${inline(input.target.version, 80)}\` for \`${inline(input.pluginName, 120)}\`.
 
 - Outcome: **${input.status}**
 - Repair loops: ${input.fixAttempts}
@@ -133,13 +134,13 @@ Preview-era harness APIs still move. Re-run the Action when the next \`dsh-v*\` 
 
 function zh(input: DocumentInput): { title: string; issue: string; pr: string } {
   const title = input.status === 'failed'
-    ? `dsh ${input.target.version}：${input.pluginName} 迁移未完成`
-    : `dsh ${input.target.version}：迁移 ${input.pluginName}`
-  const issue = `# 迁移报告：${input.pluginName} × DeepSeek Harness ${input.target.version}
+    ? `dsh ${inline(input.target.version, 80)}：${inline(input.pluginName, 120)} 迁移未完成`
+    : `dsh ${inline(input.target.version, 80)}：迁移 ${inline(input.pluginName, 120)}`
+  const issue = `# 迁移报告：${inline(input.pluginName, 120)} × DeepSeek Harness ${inline(input.target.version, 80)}
 
 ## 摘要
 
-- 目标 harness：\`${input.target.tag}\`（${input.target.version}）
+- 目标 harness：\`${inline(input.target.tag, 80)}\`（${inline(input.target.version, 80)}）
 - 结果：**${input.status}**
 - 是否跳过复核：${input.skippedReview ? '是' : '否'}
 - 修复循环次数：${input.fixAttempts}
@@ -181,7 +182,7 @@ ${formatWorkingTree(input.diff, 'zh')}
 `
   const pr = `## 摘要
 
-针对 DeepSeek Harness \`${input.target.version}\` 的自动迁移（\`${input.pluginName}\`）。
+针对 DeepSeek Harness \`${inline(input.target.version, 80)}\` 的自动迁移（\`${inline(input.pluginName, 120)}\`）。
 
 - 结果：**${input.status}**
 - 修复循环：${input.fixAttempts}
