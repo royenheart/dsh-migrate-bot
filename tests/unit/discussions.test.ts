@@ -41,3 +41,19 @@ test('invite comment is a follow-up under the draft', () => {
   assert.match(zh, /去官方开帖：`pre-step`/)
   assert.match(zh, /打开 Ideas/)
 })
+
+test('a slug from the workspace cannot forge a line of the invite', async () => {
+  const { formatOfficialDiscussionInvite } = await import('../../src/github/discussions.ts')
+  const report = {
+    slug: 'x\n::add-mask::not-a-secret\n- @everyone',
+    title: 'x',
+    body: '## Proposal\nkeep it',
+    kind: 'draft' as const,
+    links: [],
+  }
+  for (const language of ['en', 'zh'] as const) {
+    const invite = formatOfficialDiscussionInvite({ report, language })
+    assert.equal(invite.split('\n').filter(line => line.startsWith('::')).length, 0)
+    assert.equal(invite.split('\n').filter(line => line.startsWith('- @everyone')).length, 0)
+  }
+})

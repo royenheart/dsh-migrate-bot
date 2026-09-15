@@ -1,5 +1,6 @@
 import type { IssuePrLanguage } from '../config/schema.ts'
 import type { PatchReport } from './patch-reports.ts'
+import { inline } from '../render/text.ts'
 
 export const OFFICIAL_HARNESS_OWNER = 'deepseek-ai'
 export const OFFICIAL_HARNESS_REPO = 'deepseek-harness'
@@ -37,7 +38,7 @@ export function formatOfficialDiscussionInvite(input: {
   const url = officialDiscussionNewUrl(title)
   if (input.language === 'zh') {
     return [
-      `### 去官方开帖：\`${input.report.slug}\``,
+      `### 去官方开帖：\`${inline(input.report.slug, 60)}\``,
       '',
       '未找到对应的官方 discussion / issue / PR。请复制上一条评论里的讨论草稿，再到官方 Ideas 开帖：',
       '',
@@ -47,7 +48,7 @@ export function formatOfficialDiscussionInvite(input: {
     ].join('\n')
   }
   return [
-    `### Open official discussion: \`${input.report.slug}\``,
+    `### Open official discussion: \`${inline(input.report.slug, 60)}\``,
     '',
     'No matching official discussion / issue / PR was found. Copy the draft in the previous comment, then start an Ideas topic:',
     '',

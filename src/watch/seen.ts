@@ -2,6 +2,8 @@ import { spawnSync, type SpawnSyncReturns } from 'node:child_process'
 import type { ResolvedVersion } from './dsh-version.ts'
 import { badgeFromSeenState, serializeBadge, type ShieldsEndpoint } from './badge.ts'
 import type { PullRequestMergeState } from '../github/pr.ts'
+import { parseCommandLedger, type CommandRecord } from '../commands/idempotency.ts'
+import { inline } from '../render/text.ts'
 
 /** Branch in the *consumer* plugin repo. Only this Action writes it. */
 export const STATE_BRANCH = 'dsh-migrate/state'
@@ -31,9 +33,26 @@ export interface SeenState {
   verified?: VersionRef
   /** Open migrate PR that has not been accepted yet. */
   pending?: PendingMigration
+  /**
+   * Commands this Action has already carried out, oldest first.
+   *
+   * It rides in this file because the state branch is the only durable memory a
+   * command invocation has: the workflow that runs one checks the repository
+   * out fresh, so anything kept in the worktree is gone by the time a repeat
+   * arrives. [Making a command safe to deliver twice] owns what a record means.
+   *
+   * [Making a command safe to deliver twice]: ../commands/idempotency.ts
+   */
+  commands?: CommandRecord[]
 }
 
-export type PersistFailureReason = 'no-git' | 'no-remote' | 'push-failed' | 'git-failed'
+export type PersistFailureReason =
+  | 'no-git'
+  | 'no-remote'
+  | 'push-failed'
+  | 'git-failed'
+  /** A writer that needs state to append to found none, because the branch has none yet. */
+  | 'no-state'
 
 export type PersistResult =
   | { ok: true; commit: string }
@@ -95,6 +114,8 @@ export function parseSeenState(text: string): SeenState | undefined {
     if (verified !== undefined) state.verified = verified
     const pending = parsePending(record.pending)
     if (pending !== undefined) state.pending = pending
+    const commands = parseCommandLedger(record.commands)
+    if (commands.length > 0) state.commands = commands
     return state
   } catch {
     return undefined
@@ -114,6 +135,9 @@ export function seenStateFingerprint(state: SeenState | undefined): string {
     pending: state.pending === undefined
       ? null
       : { tag: state.pending.tag, version: state.pending.version, pr: state.pending.pr },
+    // The ledger is part of what the branch holds, so a run that only appended
+    // a command record is a change worth writing rather than a no-op.
+    commands: state.commands ?? [],
   })
 }
 
@@ -139,6 +163,10 @@ export function applyRunToSeenState(
     recordedAt,
     ...(previous?.verified === undefined ? {} : { verified: previous.verified }),
     ...(previous?.pending === undefined ? {} : { pending: previous.pending }),
+    // A watch run replaces the cursor and the verification state; it must not
+    // also erase what commands have already been answered, or the next
+    // redelivery of one of them would run it a second time.
+    ...(previous?.commands === undefined ? {} : { commands: previous.commands }),
   }
   if (input.status === 'compatible') {
     next.verified = { tag: input.target.tag, version: input.target.version }
@@ -266,7 +294,7 @@ export function persistStateBranch(
   }
   const tree = treed.stdout.trim()
   const message = options.message
-    ?? (files.seen === undefined ? 'dsh-migrate: refresh badge' : `dsh-migrate: record ${files.seen.tag}`)
+    ?? (files.seen === undefined ? 'dsh-migrate: refresh badge' : `dsh-migrate: record ${inline(files.seen.tag, 80)}`)
   const commitArgs = ['commit-tree', tree, '-m', message]
   if (parent !== undefined && parent !== '') commitArgs.push('-p', parent)
   const committed = git(cwd, commitArgs, { env: authorEnv(options.env ?? process.env) })
