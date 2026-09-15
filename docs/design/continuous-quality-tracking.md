@@ -1,6 +1,6 @@
 # Continuous migration-quality tracking
 
-Research and design for measuring whether a change to this Action made migrations worse. Status: **planned, not implemented** — the pieces that make it cheap to add later are already in place, and this document records what they are and why.
+Research and design for measuring whether a change to this Action made migrations worse. Status: **partly implemented** — a benchmark record now carries the repetition, token usage, and subject identity this framework consumes (schema 2 in [reports/README.md](../../reports/README.md#the-record-format-schema-2)), while the trend, the threshold, and the regression gate below are still open. This document records what exists and why the rest is shaped the way it is.
 
 ## 1. The gap
 
@@ -19,11 +19,12 @@ Migration quality moves for reasons none of the fast layers can see: a prompt re
 ## 2. What is already reserved
 
 1. **A versioned record per invocation** — `reports/README.md` defines
-   `schema: 1`, and both benchmark entry points write it through
-   `tools/harbor/summarize.py`: producer commit, frozen upstream snapshot, agent
-   configuration, and per task `reward` / `durationSeconds` / `exception` /
-   `usage`. A tracking framework needs exactly this shape, so adding one should
-   not require changing the producers.
+   `schema: 2`, and both benchmark entry points write it through
+   `tools/harbor/summarize.py`: producer commit, frozen upstream snapshot, the
+   migration mode and the skills commit it loaded, the served model build and
+   its fingerprint, every attempt with its `reward` / `durationSeconds` /
+   `exception` / token counts, and a cost carrying the price table it came from.
+   A tracking framework needs exactly this shape, and the producers now write it.
 2. **A free measurement and a paid one.** The oracle self-check detects
    environment drift at no API cost; the benchmark measures quality and costs a
    real agent session per task.
@@ -144,7 +145,7 @@ The suite is 56 tasks and 30 are hands-on. A per-commit trigger wants a small fi
 |---|---|---|
 | 0 (done) | report format with `schema`, both producers writing records, the oracle self-check separated from the paid benchmark | — |
 | 1 | an adapter that turns a record into the `customBiggerIsBetter` metric shape, plus a workflow that runs it on the behavioural paths | no new API spend; consumes existing records |
-| 2 | repeat runs (N=3, median and range) over a fixed 3-task subset, recorded | recurring agent sessions |
+| 2 (done) | repeat runs recorded per task: `BENCH_RUNS` attempts, every attempt kept, `reward` reported as their median with its range | recurring agent sessions |
 | 3 | regression gate: fail the workflow on a mean drop beyond a threshold calibrated from phase 2 | as phase 2 |
 | 4 | chart history on a branch, and the record directory pruned by policy | — |
 

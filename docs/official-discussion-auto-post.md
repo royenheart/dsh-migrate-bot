@@ -1,10 +1,10 @@
-# Future: auto-open official harness discussions
+# Posting official harness discussions
 
-Status: **deferred**. The Action does not create topics on [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness). When a migrate run still needs a dsh-side patch and no official issue / PR / discussion exists, it writes a discussion draft, comments that draft on the plugin Issue, then posts a follow-up comment with an Ideas “new discussion” link. A human copies the draft and submits it.
+Why a **migrate run** never opens a topic on [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) itself, and what a maintainer has to arrange for anything else to.
 
-This note records why unattended posting was sketched and then withdrawn, so the work can be resumed without repeating the same design dead ends.
+Status of the capability: the draft is still written during the run and submitted by hand from the plugin Issue, which is what this document's original decision produced. Unattended posting now exists in one place only — the `harness-discussion` [feedback channel](installation.md#feedback-channels), which runs after a migrate pull request is **merged**, is off by default, and needs a token the plugin repository's `GITHUB_TOKEN` cannot supply. This note records why the migration run was never given that power, so the reasoning survives the feature shipping next to it.
 
-## What shipped instead
+## What a migrate run does instead
 
 For each `.dsh-migrate/patch-reports/<slug>/report.md` that has **no** official `deepseek-ai/deepseek-harness` issue / PR / discussion URL:
 
@@ -19,9 +19,9 @@ reliably fill the form. A full patch appendix would also exceed URL limits. The 
 
 No extra secret or workflow permission is required. The built-in `GITHUB_TOKEN` (plus **Allow GitHub Actions to create and approve pull requests** on the plugin repo) is enough.
 
-## What a future auto-post would do
+## What the opt-in auto-post does
 
-If a later change opts in to creating the official topic automatically:
+The `harness-discussion` feedback channel performs exactly this, once a maintainer enables it and supplies a token:
 
 1. Keep today’s search-and-draft step. Do not open a topic when the report
    already cites an official issue / PR / discussion.
@@ -34,7 +34,7 @@ If a later change opts in to creating the official topic automatically:
 
 There is no public REST create endpoint; GraphQL is required (`repositoryId`, `categoryId`, `title`, `body`).
 
-## Why it is not enabled
+## Why a migrate run does not post
 
 `GITHUB_TOKEN` is minted for the **plugin** repository. It can open the plugin Issue and PR. It cannot write Discussions on `deepseek-ai/deepseek-harness`. Workflow `permissions:` and the “create and approve pull requests” checkbox only affect that same plugin repo.
 
@@ -50,7 +50,7 @@ Narrower credentials do not reach a third-party repo:
 
 A dedicated bot account plus a classic PAT would shrink blast radius (the bot owns nothing else) but is still a classic PAT. That is an operational choice, not a smaller GitHub permission.
 
-## If this is revisited
+## Rules for any unattended posting
 
 - Keep auto-post **off** unless a consumer explicitly opts in.
 - Do not recommend a personal classic PAT in plugin-repo secrets.

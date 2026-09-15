@@ -125,6 +125,8 @@ main ──┬──────────────────────
        dsh-migrate/<version>-<stamp> ──► PR   ← never carries suite files
 ```
 
+**One migrate pull request at a time.** The name carries the moment a run started, so two runs are two branches and two pull requests: the second is built from the same unmigrated base and reviews the same migration twice, and the recorded pending row — one row, by design — would be the second's, so merging the first would promote a tag nothing verified. A run that would publish therefore stops while one is open, and `allow_second_pull_request` is the override that accepts a second — not `force`, which means "run though dsh has not changed" and has nothing to do with how many pull requests are open.
+
 | Decision | Value | Why |
 |---|---|---|
 | Branch name | `e2e.branch`, default `dsh-migrate/e2e` | configurable |
