@@ -123,3 +123,16 @@ test('the suite directory cannot escape the repository', () => {
   assert.throws(() => parseConfig({ e2e: { dir: '/abs' } }), /e2e\.dir/)
   assert.equal(parseConfig({ e2e: { dir: 'tests/e2e/' } }).e2e.dir, 'tests/e2e')
 })
+
+test('an extend that asks for more days than the ceiling is a configuration error', () => {
+  const bad = () => parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test', preview: { extendDays: 100, ttlDays: 7 } } })
+  assert.throws(bad, /deploy.preview.extendDays \(100\) must not exceed deploy.preview.ttlDays \(7\)/)
+  // Equal is fine: one command may buy the whole remaining lifetime.
+  const equal = parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test', preview: { extendDays: 7, ttlDays: 7 } } })
+  assert.equal(equal.deploy.preview.extendDays, 7)
+  const sane = parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test', preview: { extendDays: 3, ttlDays: 21 } } })
+  assert.deepEqual(
+    [sane.deploy.preview.extendDays, sane.deploy.preview.ttlDays],
+    [3, 21],
+  )
+})

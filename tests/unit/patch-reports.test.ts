@@ -67,3 +67,35 @@ test('issue comment starts with a table then each report body', () => {
   const firstFence = body.indexOf('unclosed fence')
   assert.ok(firstFence >= 0 && firstFence < secondReportAt)
 })
+
+test('a slug read off a directory cannot forge a line of the comment', () => {
+  // The slug is a directory name under `.dsh-migrate/patch-reports/`, written by
+  // the migration as it read somebody else's plugin, and the comment it lands in
+  // is read by a human and by the runner's command parser.
+  const comments = formatPatchReportComment({
+    reports: [{
+      slug: 'x\n- @everyone approved\n::add-mask::not-a-secret',
+      title: 'x',
+      body: '## Proposal\nkeep it',
+      kind: 'draft',
+      links: ['https://github.com/deepseek-ai/deepseek-harness/discussions/1\n::stop-commands::tok'],
+    }],
+    pullRequestUrl: 'https://github.com/acme/plug/pull/2',
+    language: 'en',
+  })
+  assert.equal(comments.length, 1)
+  for (const comment of comments) {
+    assert.equal(comment.split('\n').filter(line => line.startsWith('::')).length, 0)
+    assert.equal(comment.split('\n').filter(line => line.startsWith('- @everyone')).length, 0)
+  }
+  assert.match(comments[0] ?? '', /## x - @everyone approved ::add-mask::not-a-secret/)
+
+  // The companion pull request URL goes through the URL rule: one that carries a
+  // credential is not republished in a comment.
+  const credentialed = formatPatchReportComment({
+    reports: [],
+    pullRequestUrl: 'https://user:s3cr3t@evil.test/pull/2',
+    language: 'en',
+  })
+  assert.equal(credentialed.join('\n').includes('s3cr3t'), false)
+})

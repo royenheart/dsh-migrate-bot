@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { neutralizeEmbedHtml, wrapFenced } from './issue-format.ts'
+import { externalUrl, inline } from '../render/text.ts'
 
 export const PATCH_REPORTS_DIR = '.dsh-migrate/patch-reports'
 export const PATCH_REPORT_FILE = 'report.md'
@@ -65,8 +66,11 @@ export function formatPatchReportComment(input: {
   if (input.reports.length === 0 && input.pullRequestUrl === undefined) return []
   const zh = input.language === 'zh'
   const lines: string[] = []
-  if (input.pullRequestUrl !== undefined) {
-    lines.push(zh ? `配套 PR：${input.pullRequestUrl}` : `Companion PR: ${input.pullRequestUrl}`)
+  // A URL is rendered as one only when it is one: a comment line is not a place
+  // to republish a credential or a link that was not named.
+  const pullRequestUrl = input.pullRequestUrl === undefined ? undefined : externalUrl(input.pullRequestUrl, 300)
+  if (pullRequestUrl !== undefined) {
+    lines.push(zh ? `配套 PR：${pullRequestUrl}` : `Companion PR: ${pullRequestUrl}`)
     lines.push('')
   }
   if (input.reports.length === 0) {
@@ -80,14 +84,15 @@ export function formatPatchReportComment(input: {
     const kind = report.kind === 'existing'
       ? (zh ? '已有讨论' : 'existing')
       : (zh ? '讨论草稿' : 'draft')
-    const links = report.links.length === 0 ? '—' : report.links.join('<br>')
-    lines.push(`| \`${report.slug}\` | ${kind} | ${links} |`)
+    // Every one of these is text the migration wrote into the repository it read.
+    const links = report.links.length === 0 ? '—' : report.links.map(link => inline(link, 200)).join('<br>')
+    lines.push(`| \`${inline(report.slug, 60)}\` | ${kind} | ${links} |`)
   }
   const header = `${lines.join('\n')}\n`
   const chunks: string[] = []
   let current = header
   for (const report of input.reports) {
-    const block = `\n## ${report.slug}\n\n${wrapFenced(neutralizeEmbedHtml(report.body), 'markdown')}\n`
+    const block = `\n## ${inline(report.slug, 60)}\n\n${wrapFenced(neutralizeEmbedHtml(report.body), 'markdown')}\n`
     if (current.length + block.length > COMMENT_LIMIT && current !== header) {
       chunks.push(current.trim())
       current = block

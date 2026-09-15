@@ -143,6 +143,81 @@ export interface TimeoutConfig {
   checkoutMs: number
 }
 
+/**
+ * How a feedback channel delivers what the model wrote.
+ *
+ * `issue` and `discussion` are the two a maintainer can act on without a review
+ * round; `pull` exists for channels whose payload is files rather than prose;
+ * `issue+pull` opens the issue first so the pull request can reference it.
+ */
+export type FeedbackMethod = 'issue' | 'pull' | 'issue+pull' | 'discussion'
+
+/**
+ * One feedback channel: where it writes, how, and with which credential.
+ *
+ * The three built-ins (`upgrade-skill`, `migrate-bot`, `harness-discussion`)
+ * carry every field as a default, so enabling one is a single `enabled: true`.
+ * A channel the user names themselves has no defaults and must declare `repo`,
+ * `method`, and `prompt`.
+ */
+export interface FeedbackChannelConfig {
+  /** Off unless a user turns it on; every built-in ships `false`. */
+  enabled: boolean
+  /** `owner/name` the channel writes to. */
+  repo?: string
+  method?: FeedbackMethod
+  /** Env var / repository-secret name holding the token that may write to `repo`. */
+  tokenEnv?: string
+  /** Replaces the channel's shipped prompt. Required for a user-defined channel. */
+  prompt?: string
+  /** Labels applied when the delivery method creates an issue. */
+  labels?: string[]
+  /** Discussion category slug, for `method: discussion`. */
+  discussionCategory?: string
+}
+
+export interface FeedbackConfig {
+  /** Master switch for the whole stage; a channel still needs its own `enabled`. */
+  enabled: boolean
+  channels: Record<string, FeedbackChannelConfig>
+}
+
+/**
+ * A deploy target the user runs: the service behind the live view, the preview
+ * instances, and the command surface.
+ *
+ * Optional in every sense. The Action never hosts it, never assumes it is
+ * reachable, and never fails a migration because it is absent — the same
+ * posture the feedback channels take toward their destinations, for the same
+ * reason: it holds the user's key and serves the user's code.
+ */
+export interface DeployConfig {
+  enabled: boolean
+  /** Base URL of the target. Required once the target is enabled. */
+  endpoint?: string
+  /** Env var / repository-secret name holding the token this Action sends. */
+  tokenEnv: string
+  /** Stream what a run is doing, for a read-only view. */
+  liveView: boolean
+  preview: {
+    enabled: boolean
+    /** Days before an instance is destroyed whatever else is true. */
+    ttlDays: number
+    /** Minutes without a request before the container stops. */
+    idleMinutes: number
+    /**
+     * Days one `/dsh-migrate extend` asks for.
+     *
+     * The Action asks; the target enforces, and it needs a number to enforce
+     * something other than "yes" — this is the number it is given, together with
+     * `ttlDays` as the ceiling the instance may not be pushed past.
+     */
+    extendDays: number
+  }
+  /** Accept `/dsh-migrate …` commands from a comment. */
+  commands: boolean
+}
+
 export interface MigrateConfig {
   dshVersion: string
   review: { policy: ReviewPolicy }
@@ -157,6 +232,8 @@ export interface MigrateConfig {
   verify: VerifyConfig
   e2e: E2EConfig
   timeouts: TimeoutConfig
+  feedback: FeedbackConfig
+  deploy: DeployConfig
 }
 
 export const DEFAULT_CONFIG: MigrateConfig = {
@@ -192,5 +269,20 @@ export const DEFAULT_CONFIG: MigrateConfig = {
     agentMs: 60 * 60_000,
     commandMs: 20 * 60_000,
     checkoutMs: 10 * 60_000,
+  },
+  deploy: {
+    enabled: false,
+    tokenEnv: 'DSH_MIGRATE_DEPLOY_TOKEN',
+    liveView: true,
+    preview: { enabled: true, ttlDays: 7, idleMinutes: 120, extendDays: 7 },
+    commands: true,
+  },
+  feedback: {
+    enabled: true,
+    channels: {
+      'upgrade-skill': { enabled: false },
+      'migrate-bot': { enabled: false },
+      'harness-discussion': { enabled: false },
+    },
   },
 }
