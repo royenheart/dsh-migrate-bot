@@ -25,6 +25,14 @@ inputs:
     description: If true, run even when dsh has not changed since the last successful run
     required: false
     default: 'false'
+  allow_second_pull_request:
+    description: If true, run even while a migrate pull request is open, which opens a second one
+    required: false
+    default: 'false'
+  feedback_resend:
+    description: If true, report a merge to channels it was already reported to
+    required: false
+    default: 'false'
   api_key_env:
     description: Env var name for the DeepSeek API key (default DEEPSEEK_API_KEY_DSH_MIGRATE_BOT)
     required: false
@@ -41,6 +49,38 @@ inputs:
     description: If true, only reconcile a pending migrate PR and rewrite badge.json (no pipeline).
     required: false
     default: 'false'
+  feedback_only:
+    description: If true, report a merged migrate PR to the enabled feedback channels (no pipeline).
+    required: false
+    default: 'false'
+  pull_request:
+    description: Pull request number to report on. Empty = the pending migrate PR recorded on the state branch.
+    required: false
+    default: ''
+  comment_command:
+    description: If true, treat this run as a /dsh-migrate command taken from a comment (no pipeline).
+    required: false
+    default: 'false'
+  comment_body:
+    description: The comment text to read the command from. Only used when comment_command is true.
+    required: false
+    default: ''
+  comment_id:
+    description: The comment's id, which makes a redelivered or repeated command a repeat rather than a second command.
+    required: false
+    default: ''
+  comment_author:
+    description: Login of the commenter, for the bot check.
+    required: false
+    default: ''
+  comment_author_association:
+    description: The comment's author_association; OWNER, MEMBER, and COLLABORATOR may run commands.
+    required: false
+    default: ''
+  issue_number:
+    description: Issue or pull request number the reply is posted to.
+    required: false
+    default: ''
 outputs:
   status:
     description: compatible, migrated, failed, or skipped (dsh unchanged)
@@ -62,6 +102,14 @@ outputs:
     description: Last verified dsh-v* tag (compatible run or merged migrate PR)
   badge_message:
     description: shields.io badge message (verified tag, pending, or unverified)
+  feedback_status:
+    description: One line per feedback channel — delivered, dry-run, held, skipped (with its reason), or failed
+  live_view_url:
+    description: Read-only URL where this run can be watched, when a deploy target is configured
+  command_repeat:
+    description: '"true" if this delivery did nothing: a suppressed repeat, a target that replayed the request, or a publish whose revision the branch already carried'
+  command_reply:
+    description: The markdown answer a /dsh-migrate command produced, also posted to the thread
 runs:
   using: docker
   image: Dockerfile

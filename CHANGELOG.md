@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/).
 Entries are generated from the commit history by [Commitizen](https://commitizen-tools.github.io/commitizen/); do not edit them by hand.
 
+## v0.3.4 (2026-09-15)
+
+### Fix
+
+- price each request under the rules that applied when it was made
+
+## v0.3.3 (2026-09-15)
+
+### Feat
+
+- make benchmark records reproducible across migration modes
+- report a merged migration to configurable feedback channels
+
+### Docs
+
+- report what the two migration modes measured and what the suite exposed
+
 ## v0.3.2 (2026-09-12)
 
 ### Feat

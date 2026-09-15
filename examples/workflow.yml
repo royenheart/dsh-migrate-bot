@@ -3,8 +3,9 @@
 #
 # After a successful run, last processed dsh-v* is stored on branch
 # `dsh-migrate/state` (`seen.json` + `badge.json`). Do not merge that branch
-# into main. `seen.json` is the watch cursor; `badge.json` is the shields.io
-# endpoint for default-branch support (verified / pending / unverified).
+# into main. `seen.json` is the watch cursor and the record of which commands
+# have already been carried out; `badge.json` is the shields.io endpoint for
+# default-branch support (verified / pending / unverified).
 
 name: dsh-migrate
 
@@ -26,6 +27,12 @@ on:
     types: [dsh-release]
   pull_request:
     types: [closed]
+  # Commands are read from comments. GitHub runs a comment workflow from the
+  # DEFAULT branch, so this file must reach the default branch before the
+  # command surface works, and the parser must stay compatible with comments
+  # left against older versions of it.
+  issue_comment:
+    types: [created]
 
 # Also enable: Settings → Actions → General → Workflow permissions →
 # "Allow GitHub Actions to create and approve pull requests".
@@ -51,11 +58,17 @@ jobs:
           workdir: .
           config: .github/dsh-migrate.yml
           force: ${{ inputs.force || false }}
+          # Uncomment to run while an earlier migrate PR is still open. Without
+          # it such a run is skipped and the open PR's number is logged.
+          # allow_second_pull_request: true
           # To use another secret, set api_key_env and map that name below.
           # api_key_env: MY_DEEPSEEK_KEY
         env:
           DEEPSEEK_API_KEY_DSH_MIGRATE_BOT: ${{ secrets.DEEPSEEK_API_KEY_DSH_MIGRATE_BOT }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Needed for the live view and a preview: without it a configured
+          # deploy target is a logged skip and no live_view_url is produced.
+          DSH_MIGRATE_DEPLOY_TOKEN: ${{ secrets.DSH_MIGRATE_DEPLOY_TOKEN }}
       - name: Upload A/B/C and patch reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -77,3 +90,66 @@ jobs:
           refresh_only: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Only a MERGED pull request is reported: the merge is the maintainer's verdict
+  # on the migration. A closed one proves nothing and sends nothing.
+  # Backends default to disabled; add the secrets for the channels you enabled.
+  feedback:
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: royenheart/dsh-migrate-bot@v0
+        with:
+          feedback_only: true
+          pull_request: ${{ github.event.pull_request.number }}
+          config: .github/dsh-migrate.yml
+          # Report this merge to channels that already received it, for a
+          # channel whose configuration or prompt you have just changed.
+          # feedback_resend: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEEPSEEK_API_KEY_DSH_MIGRATE_BOT: ${{ secrets.DEEPSEEK_API_KEY_DSH_MIGRATE_BOT }}
+          # One token per enabled channel. Each needs write access to the
+          # repository it reports to, which GITHUB_TOKEN cannot provide.
+          DSH_MIGRATE_FEEDBACK_UPGRADE_SKILL_TOKEN: ${{ secrets.DSH_MIGRATE_FEEDBACK_UPGRADE_SKILL_TOKEN }}
+          DSH_MIGRATE_FEEDBACK_BOT_TOKEN: ${{ secrets.DSH_MIGRATE_FEEDBACK_BOT_TOKEN }}
+          DSH_MIGRATE_FEEDBACK_HARNESS_TOKEN: ${{ secrets.DSH_MIGRATE_FEEDBACK_HARNESS_TOKEN }}
+
+  # `/dsh-migrate <verb>` from anyone with write access to this repository.
+  # The filter below keeps unrelated comments from starting the job at all;
+  # the permission check happens inside the Action, from the comment's own
+  # author association rather than from its text.
+  command:
+    if: >-
+      github.event_name == 'issue_comment'
+      && github.event.issue.pull_request != null
+      && contains(github.event.comment.body, '/dsh-migrate')
+      && github.event.comment.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: royenheart/dsh-migrate-bot@v0
+        with:
+          comment_command: true
+          # The comment's id is what makes a redelivery of this comment the same
+          # command rather than a second one. Map it.
+          comment_body: ${{ github.event.comment.body }}
+          comment_id: ${{ github.event.comment.id }}
+          comment_author: ${{ github.event.comment.user.login }}
+          comment_author_association: ${{ github.event.comment.author_association }}
+          issue_number: ${{ github.event.issue.number }}
+          pull_request: ${{ github.event.issue.number }}
+          config: .github/dsh-migrate.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A `feedback` command runs the channel sessions, so it needs the key.
+          DEEPSEEK_API_KEY_DSH_MIGRATE_BOT: ${{ secrets.DEEPSEEK_API_KEY_DSH_MIGRATE_BOT }}
+          DSH_MIGRATE_FEEDBACK_UPGRADE_SKILL_TOKEN: ${{ secrets.DSH_MIGRATE_FEEDBACK_UPGRADE_SKILL_TOKEN }}
+          DSH_MIGRATE_FEEDBACK_BOT_TOKEN: ${{ secrets.DSH_MIGRATE_FEEDBACK_BOT_TOKEN }}
+          DSH_MIGRATE_FEEDBACK_HARNESS_TOKEN: ${{ secrets.DSH_MIGRATE_FEEDBACK_HARNESS_TOKEN }}
+          DSH_MIGRATE_DEPLOY_TOKEN: ${{ secrets.DSH_MIGRATE_DEPLOY_TOKEN }}
