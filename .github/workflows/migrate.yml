@@ -1,0 +1,96 @@
+# The reusable workflow consumers call. It owns the triggers' jobs, the secret
+# mapping, and the concurrency group, so a consumer's workflow is only the
+# triggers and one `uses:` line (examples/workflow.yml).
+
+name: dsh-migrate
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: Override the configured target release
+        type: string
+        required: false
+        default: ''
+      force:
+        description: Migrate even when the target release was already processed
+        type: boolean
+        required: false
+        default: false
+      config:
+        description: The configuration file, relative to the repository root
+        type: string
+        required: false
+        default: .github/dsh-migrate.yml
+
+env:
+  DEEPSEEK_API_KEY_DSH_MIGRATE_BOT: ${{ secrets.DEEPSEEK_API_KEY_DSH_MIGRATE_BOT }}
+  GITHUB_TOKEN: ${{ github.token }}
+  DSH_MIGRATE_REPORT_UPGRADE_SKILL_TOKEN: ${{ secrets.DSH_MIGRATE_REPORT_UPGRADE_SKILL_TOKEN }}
+  DSH_MIGRATE_REPORT_BOT_TOKEN: ${{ secrets.DSH_MIGRATE_REPORT_BOT_TOKEN }}
+  DSH_MIGRATE_REPORT_HARNESS_TOKEN: ${{ secrets.DSH_MIGRATE_REPORT_HARNESS_TOKEN }}
+  DSH_MIGRATE_DEPLOY_TOKEN: ${{ secrets.DSH_MIGRATE_DEPLOY_TOKEN }}
+
+jobs:
+  migrate:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    concurrency:
+      group: dsh-migrate-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: royenheart/dsh-migrate-bot@v1
+        with:
+          command: run
+          config: ${{ inputs.config }}
+          target: ${{ inputs.target }}
+          force: ${{ inputs.force }}
+
+  pull-request-closed:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: read
+    concurrency:
+      group: dsh-migrate-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: royenheart/dsh-migrate-bot@v1
+        with:
+          command: pull-request-closed
+          config: ${{ inputs.config }}
+          pull_request: ${{ github.event.pull_request.number }}
+          merged: ${{ github.event.pull_request.merged }}
+
+  comment:
+    if: >-
+      github.event_name == 'issue_comment'
+      && contains(github.event.comment.body, '/dsh-migrate')
+      && github.event.comment.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    concurrency:
+      group: dsh-migrate-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: royenheart/dsh-migrate-bot@v1
+        with:
+          command: comment
+          config: ${{ inputs.config }}
+          comment_body: ${{ github.event.comment.body }}
+          comment_id: ${{ github.event.comment.id }}
+          comment_author: ${{ github.event.comment.user.login }}
+          comment_author_association: ${{ github.event.comment.author_association }}
+          issue_number: ${{ github.event.issue.number }}

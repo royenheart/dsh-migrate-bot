@@ -7,11 +7,12 @@ version_scheme = "semver"
 # Repo-owned so a full `cz changelog` regeneration reproduces the header too.
 template = "CHANGELOG.j2"
 update_changelog_on_bump = true
-major_version_zero = true
+major_version_zero = false
 version_files = [
     "VERSION",
     "package.json:version",
     "package-lock.json:version",
+    "action.yml:ghcr.io/royenheart/dsh-migrate-bot",
 ]
 
 # `cz_conventional_commits` hardcodes which commit types can reach the

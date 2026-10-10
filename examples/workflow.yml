@@ -1,5 +1,6 @@
 # Copy to .github/workflows/dsh-migrate.yml in the plugin repository and set
-# the cron. docs/operations/install.md explains every part.
+# the cron. The jobs live in the reusable workflow this calls; this file only
+# chooses the triggers. docs/operations/install.md explains every part.
 
 name: dsh-migrate
 
@@ -27,64 +28,10 @@ permissions:
   issues: write
   pull-requests: write
 
-# One writer of the dsh-migrate/state branch at a time.
-concurrency:
-  group: dsh-migrate-${{ github.repository }}
-  cancel-in-progress: false
-
 jobs:
-  migrate:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: royenheart/dsh-migrate-bot@v1
-        with:
-          command: run
-          target: ${{ inputs.target }}
-          force: ${{ inputs.force || false }}
-        env:
-          DEEPSEEK_API_KEY_DSH_MIGRATE_BOT: ${{ secrets.DEEPSEEK_API_KEY_DSH_MIGRATE_BOT }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DSH_MIGRATE_DEPLOY_TOKEN: ${{ secrets.DSH_MIGRATE_DEPLOY_TOKEN }}
-
-  pull-request-closed:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: royenheart/dsh-migrate-bot@v1
-        with:
-          command: pull-request-closed
-          pull_request: ${{ github.event.pull_request.number }}
-          merged: ${{ github.event.pull_request.merged }}
-        env:
-          DEEPSEEK_API_KEY_DSH_MIGRATE_BOT: ${{ secrets.DEEPSEEK_API_KEY_DSH_MIGRATE_BOT }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DSH_MIGRATE_REPORT_UPGRADE_SKILL_TOKEN: ${{ secrets.DSH_MIGRATE_REPORT_UPGRADE_SKILL_TOKEN }}
-          DSH_MIGRATE_REPORT_BOT_TOKEN: ${{ secrets.DSH_MIGRATE_REPORT_BOT_TOKEN }}
-          DSH_MIGRATE_REPORT_HARNESS_TOKEN: ${{ secrets.DSH_MIGRATE_REPORT_HARNESS_TOKEN }}
-
-  comment:
-    if: >-
-      github.event_name == 'issue_comment'
-      && contains(github.event.comment.body, '/dsh-migrate')
-      && github.event.comment.user.type != 'Bot'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: royenheart/dsh-migrate-bot@v1
-        with:
-          command: comment
-          comment_body: ${{ github.event.comment.body }}
-          comment_id: ${{ github.event.comment.id }}
-          comment_author: ${{ github.event.comment.user.login }}
-          comment_author_association: ${{ github.event.comment.author_association }}
-          issue_number: ${{ github.event.issue.number }}
-        env:
-          DEEPSEEK_API_KEY_DSH_MIGRATE_BOT: ${{ secrets.DEEPSEEK_API_KEY_DSH_MIGRATE_BOT }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DSH_MIGRATE_REPORT_UPGRADE_SKILL_TOKEN: ${{ secrets.DSH_MIGRATE_REPORT_UPGRADE_SKILL_TOKEN }}
-          DSH_MIGRATE_REPORT_BOT_TOKEN: ${{ secrets.DSH_MIGRATE_REPORT_BOT_TOKEN }}
-          DSH_MIGRATE_REPORT_HARNESS_TOKEN: ${{ secrets.DSH_MIGRATE_REPORT_HARNESS_TOKEN }}
-          DSH_MIGRATE_DEPLOY_TOKEN: ${{ secrets.DSH_MIGRATE_DEPLOY_TOKEN }}
+  dsh-migrate:
+    uses: royenheart/dsh-migrate-bot/.github/workflows/migrate.yml@v1
+    with:
+      target: ${{ inputs.target || '' }}
+      force: ${{ inputs.force || false }}
+    secrets: inherit

@@ -7,12 +7,14 @@ description: Setting the Action up in a plugin repository: secrets, the workflow
 
 ## The workflow
 
-1. Add the repository secret `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` with a DeepSeek API key. Another name works when `secrets.apiKeyEnv` names it and the workflow maps it.
-2. Copy [examples/workflow.yml](../../examples/workflow.yml) to `.github/workflows/dsh-migrate.yml` and set the cron. It has three jobs: `migrate` on the schedule and on manual dispatch, `pull-request-closed` when a pull request closes, and `comment` when a comment contains `/dsh-migrate`.
+1. Add the repository secret `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` with a DeepSeek API key. Another name works when `secrets.apiKeyEnv` names it.
+2. Copy [examples/workflow.yml](../../examples/workflow.yml) to `.github/workflows/dsh-migrate.yml` and set the cron. The file chooses the triggers and calls the reusable workflow [`.github/workflows/migrate.yml`](../../.github/workflows/migrate.yml) of this repository with `secrets: inherit`; the reusable workflow maps the secrets, holds the concurrency group that keeps one writer of the state branch at a time, and runs the job each trigger needs: `migrate` on the schedule and on manual dispatch, `pull-request-closed` when a pull request closes, and `comment` when a comment contains `/dsh-migrate`.
 3. Optionally copy [examples/dsh-migrate.yml](../../examples/dsh-migrate.yml) to `.github/dsh-migrate.yml`. Every key is optional and listed in the [configuration reference](../reference/configuration.md); an unknown or renamed key fails the run with a message that names the replacement.
 4. In Settings → Actions → General → Workflow permissions, enable **Allow GitHub Actions to create and approve pull requests**. Without it the workflow token pushes the proposal branch and opens the issue, and then gets HTTP 403 when it opens the pull request.
 
-The workflow needs `contents: write` (the proposal branch and the state branch), `issues: write` and `pull-requests: write`. Its concurrency group keeps one writer of the state branch at a time; keep it when you edit the workflow.
+The caller grants `contents: write` (the proposal branch and the state branch), `issues: write` and `pull-requests: write`. The reusable workflow takes three inputs: `target` and `force` for a manual run, and `config` for a configuration file at another path.
+
+The Action runs the image `ghcr.io/royenheart/dsh-migrate-bot` of its release. The image is built and self-tested once per release, so every consumer run uses the same agent runtime and the same system packages.
 
 The first scheduled run migrates to the target release. Later runs skip a release that was already processed; a manual run with `force` migrates it again. A failure of the Action itself (status `error`) is retried by the next run.
 
@@ -45,7 +47,7 @@ Each channel writes to a repository the consumer does not own, so whoever config
 
 ## Comment commands
 
-The `comment` job runs the [comment commands](../reference/commands.md) for users whose `author_association` is `OWNER`, `MEMBER` or `COLLABORATOR`. It needs the comment id mapped (`comment_id`): a second delivery of the same comment then has no second effect and no second reply. `deploy.commands: false` refuses every command.
+The `comment` job runs the [comment commands](../reference/commands.md) for users whose `author_association` is `OWNER`, `MEMBER` or `COLLABORATOR`. A second delivery of the same comment has no second effect and no second reply. `deploy.commands: false` refuses every command.
 
 ## The deploy service
 
@@ -58,4 +60,4 @@ deploy:
   tokenEnv: DSH_MIGRATE_DEPLOY_TOKEN
 ```
 
-The token is a repository secret mapped in the workflow. A `publish` command runs the checks in the `comment` job before it pushes, so that job needs whatever the plugin's own test commands need.
+The token is the repository secret `DSH_MIGRATE_DEPLOY_TOKEN`. A `publish` command runs the checks in the `comment` job before it pushes, so that job needs whatever the plugin's own test commands need.

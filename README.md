@@ -17,7 +17,7 @@ A newer release takes over the open proposal instead of opening a second one. Ev
 ## Install
 
 1. Add the repository secret `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT`.
-2. Copy [examples/workflow.yml](examples/workflow.yml) to `.github/workflows/dsh-migrate.yml`.
+2. Copy [examples/workflow.yml](examples/workflow.yml) to `.github/workflows/dsh-migrate.yml`. It chooses the triggers and calls the reusable workflow `royenheart/dsh-migrate-bot/.github/workflows/migrate.yml@v1`, which runs the jobs.
 3. Optionally copy [examples/dsh-migrate.yml](examples/dsh-migrate.yml) to `.github/dsh-migrate.yml`.
 4. Enable **Allow GitHub Actions to create and approve pull requests** in the repository settings.
 

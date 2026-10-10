@@ -74,4 +74,6 @@ outputs:
     description: comment only. The reply posted on the thread
 runs:
   using: docker
-  image: Dockerfile
+  # Built, self-tested and published by the release workflow; the version is
+  # bumped with the release.
+  image: docker://ghcr.io/royenheart/dsh-migrate-bot:v0.3.4
