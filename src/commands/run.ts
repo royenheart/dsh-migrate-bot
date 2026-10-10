@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { createDeployClient, parseFrozenRevision, parsePreviewState, type DeployService, type PreviewKey } from '../deploy/client.ts'
+import { createDeployClient, parseFrozenRevision, parsePreviewState, resolveDeployService, type DeployService, type PreviewKey } from '../deploy/client.ts'
 import { applyHandback, invalidBranch, invalidCommit, invalidRevision, type HandbackResult } from '../deploy/handback.ts'
 import { excludeIgnoredPaths } from '../git/worktree.ts'
 import { externalUrl, inline } from '../render/text.ts'
@@ -49,14 +49,6 @@ export interface CommandRunInput {
 export interface CommandOutcome {
   ok: boolean
   reply: string
-}
-
-/** The deploy service from config and environment, or why there is none. */
-export function resolveDeployService(config: MigrateConfig, env: NodeJS.ProcessEnv): DeployService | { reason: string } {
-  if (!config.deploy.enabled || config.deploy.endpoint === undefined) return { reason: 'no deploy service is configured (`deploy.enabled` is false)' }
-  const token = env[config.deploy.tokenEnv]
-  if (token === undefined || token === '') return { reason: `\`${config.deploy.tokenEnv}\` is not set, so the deploy service cannot be reached` }
-  return { endpoint: config.deploy.endpoint, token }
 }
 
 /** The idempotency key the deploy service receives: one per comment and verb. */

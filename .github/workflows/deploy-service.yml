@@ -1,0 +1,81 @@
+# The reference deploy service: build and unit-test it, run the conformance
+# suite against it, then drive it end to end with the real CLI. Keyless: no
+# API key and no repository secret is used; the token below protects a service
+# that lives and dies inside the job.
+
+name: deploy-service
+
+on:
+  pull_request:
+    paths:
+      - deploy-service/**
+      - src/deploy/**
+      - src/commands/**
+      - tests/e2e/deploy-service.test.ts
+      - .github/workflows/deploy-service.yml
+  push:
+    branches: [main]
+    paths:
+      - deploy-service/**
+      - src/deploy/**
+      - src/commands/**
+      - tests/e2e/deploy-service.test.ts
+      - .github/workflows/deploy-service.yml
+
+permissions:
+  contents: read
+
+jobs:
+  service:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: deploy-service
+    env:
+      DEPLOY_TOKEN: conformance-token-0123456789
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - name: Start the service in conformance mode
+        run: |
+          data_dir="$(mktemp -d)"
+          GITHUB_WEBHOOK_SECRET=conformance-secret-0123456789 \
+          DATA_DIR="$data_dir" \
+          PUBLIC_URL=http://127.0.0.1:8080 \
+          PROVIDER=process \
+          DSH_BIN=/nonexistent/dsh \
+          HOST=127.0.0.1 \
+          PORT=8080 \
+          nohup node dist/src/main.js --conformance > "$RUNNER_TEMP/service.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8080/healthz && exit 0
+            sleep 1
+          done
+          exit 1
+      - name: Conformance suite
+        run: node dist/conformance/run.js --url http://127.0.0.1:8080 --conformance
+      - name: Service log
+        if: always()
+        run: cat "$RUNNER_TEMP/service.log"
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run deploy-service:build
+      - run: npm run build
+      - name: The CLI against the reference service, with real dsh web previews
+        env:
+          DEPLOY_SERVICE_E2E: required
+        run: node --test dist/tests/e2e/deploy-service.test.js

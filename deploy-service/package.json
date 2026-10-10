@@ -1,0 +1,27 @@
+{
+  "name": "dsh-migrate-deploy-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The reference deploy service of dsh-migrate-bot: the run log stream, preview deployments and the publish hand-back.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "imports": {
+    "#action/*": "./dist/action/*"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.action.json && tsc -p tsconfig.json",
+    "test": "node --test dist/test/*.test.js",
+    "start": "node dist/src/main.js",
+    "conformance": "node dist/conformance/run.js"
+  },
+  "dependencies": {
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2"
+  }
+}

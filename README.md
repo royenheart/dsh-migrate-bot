@@ -33,7 +33,7 @@ The Action keeps its record on the branch `dsh-migrate/state`: one event log per
 
 ## Comment commands
 
-On a proposal's issue or pull request, a user with write access can comment `/dsh-migrate status`, `/dsh-migrate report`, and, with a deploy service configured, the preview deployment commands. The [command reference](docs/reference/commands.md) lists them.
+On a proposal's issue or pull request, a user with write access can comment `/dsh-migrate status`, `/dsh-migrate report`, and, with a deploy service configured, the preview deployment commands. The [command reference](docs/reference/commands.md) lists them. A deploy service is an HTTP service the consumer runs; this repository ships [a reference implementation](docs/operations/deploy-service.md) and a conformance suite for any other.
 
 ## Run it locally
 

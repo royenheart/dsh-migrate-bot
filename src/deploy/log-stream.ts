@@ -1,5 +1,4 @@
-import { deployRequest } from './client.ts'
-import { resolveDeployService } from '../commands/run.ts'
+import { deployRequest, resolveDeployService } from './client.ts'
 import { externalUrl } from '../render/text.ts'
 import type { MigrateConfig } from '../config/schema.ts'
 

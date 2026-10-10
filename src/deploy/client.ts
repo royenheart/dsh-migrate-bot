@@ -10,12 +10,29 @@
 
 import { z } from 'zod'
 import { inline } from '../render/text.ts'
+import type { MigrateConfig } from '../config/schema.ts'
 
 /** Where and with which token to reach the deploy service. */
 export interface DeployService {
   /** Base URL, without a trailing slash. */
   endpoint: string
   token: string
+}
+
+/**
+ * The deploy service from config and environment, or why there is none.
+ *
+ * It lives beside the client rather than with the commands so the run log
+ * stream, and anything else that only talks to the service, can be built
+ * without the command executor.
+ * @param config - the validated configuration.
+ * @param env - where the token is read from.
+ */
+export function resolveDeployService(config: MigrateConfig, env: NodeJS.ProcessEnv): DeployService | { reason: string } {
+  if (!config.deploy.enabled || config.deploy.endpoint === undefined) return { reason: 'no deploy service is configured (`deploy.enabled` is false)' }
+  const token = env[config.deploy.tokenEnv]
+  if (token === undefined || token === '') return { reason: `\`${config.deploy.tokenEnv}\` is not set, so the deploy service cannot be reached` }
+  return { endpoint: config.deploy.endpoint, token }
 }
 
 export type DeployResult =

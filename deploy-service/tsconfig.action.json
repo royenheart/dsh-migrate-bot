@@ -1,0 +1,36 @@
+// The Action's own client modules, compiled from the repository's src/ into dist/action/ and imported as #action/*.
+// The conformance suite drives the service through exactly the code a consumer's run uses, and the boot check classifies output with the Action's classifier.
+// `paths` resolves zod from this package, so the build does not need the root package installed.
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "rootDir": "../src",
+    "outDir": "dist/action",
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "rewriteRelativeImportExtensions": true,
+    "types": [
+      "node"
+    ],
+    "typeRoots": [
+      "./node_modules/@types"
+    ],
+    "paths": {
+      "zod": [
+        "./node_modules/zod/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "../src/deploy/client.ts",
+    "../src/deploy/log-stream.ts",
+    "../src/config/schema.ts",
+    "../src/verify/boot.ts",
+    "../src/render/text.ts"
+  ]
+}

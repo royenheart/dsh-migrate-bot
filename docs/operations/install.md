@@ -51,13 +51,12 @@ The `comment` job runs the [comment commands](../reference/commands.md) for user
 
 ## The deploy service
 
-A deploy service is an HTTP service you run; it serves the run log stream and the preview deployments, and receives the preview commands. The Action never hosts one, and an absent or failing service is a log line, never a failed migration. [The preview design](../design/preview-and-live-view.md) describes what it serves.
+A deploy service is an HTTP service you run; it serves the run log stream and the preview deployments, and receives the preview commands. An absent or failing service is a log line, never a failed migration. [The deploy service design](../design/deploy-service.md) describes what it serves, and [running the deploy service](deploy-service.md) is how to run the reference implementation and point a repository at it.
 
 ```yaml
 deploy:
   enabled: true
   endpoint: https://deploy.example.com
-  tokenEnv: DSH_MIGRATE_DEPLOY_TOKEN
 ```
 
 The token is the repository secret `DSH_MIGRATE_DEPLOY_TOKEN`. A `publish` command runs the checks in the `comment` job before it pushes, so that job needs whatever the plugin's own test commands need.

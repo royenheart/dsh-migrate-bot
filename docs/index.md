@@ -20,13 +20,16 @@ The entry point for progressive disclosure: `AGENTS.md` carries the standing ord
 | The agent runtime and its self-test | `docs/design/checks.md` | [The agent runtime](design/checks.md#the-agent-runtime) |
 | The 2026-09-29 outage of every agent session | `docs/postmortems/2026-09-29-agent-runtime-drift.md` | [What broke](postmortems/2026-09-29-agent-runtime-drift.md#what-broke) |
 | Every configuration key, its type and its default | `docs/reference/configuration.md` | [Configuration reference](reference/configuration.md#configuration-reference) |
-| The two places a migration session can run, one of them shipped | `docs/design/preview-and-live-view.md` | [Two run paths, one of them shipped](design/preview-and-live-view.md#2-two-run-paths-one-of-them-shipped) |
-| The read-only live view of a running migration | `docs/design/preview-and-live-view.md` | [The live view](design/preview-and-live-view.md#3-the-live-view) |
-| The calls a deploy target must serve, and what it owes beyond their shape | `docs/design/preview-and-live-view.md` | [The target's API](design/preview-and-live-view.md#8-the-targets-api) |
-| What a target must answer for a publish, and who pushes the change | `docs/design/preview-and-live-view.md` | [The publish hand-back](design/preview-and-live-view.md#81-the-publish-hand-back) |
-| The preview instance: scratch iteration, the safe entry, lifetime, and what it may not do | `docs/design/preview-and-live-view.md` | [The preview instance](design/preview-and-live-view.md#4-the-preview-instance) |
-| Access control for a preview, and why a URL is not a secret | `docs/design/preview-and-live-view.md` | [Access control](design/preview-and-live-view.md#5-access-control) |
-| Which actions run the gates, and which are advice | `docs/design/preview-and-live-view.md` | [Gate policy](design/preview-and-live-view.md#7-gate-policy) |
+| Where a migration session runs, and why only on the runner | `docs/design/deploy-service.md` | [Where a migration session runs](design/deploy-service.md#2-where-a-migration-session-runs) |
+| The run log stream of a running migration | `docs/design/deploy-service.md` | [The run log stream](design/deploy-service.md#3-the-run-log-stream) |
+| The preview deployment: the working copy, the safe entry, lifetime, and what it may not do | `docs/design/deploy-service.md` | [The preview deployment](design/deploy-service.md#4-the-preview-deployment) |
+| Access control for the deploy service, and why a URL is not a secret | `docs/design/deploy-service.md` | [Access control](design/deploy-service.md#5-access-control) |
+| Which actions run the checks, and which are advice | `docs/design/deploy-service.md` | [Check policy](design/deploy-service.md#7-check-policy) |
+| The calls a deploy service must serve, and what it owes beyond their shape | `docs/design/deploy-service.md` | [The HTTP contract](design/deploy-service.md#8-the-http-contract) |
+| What a deploy service answers for a publish, and who pushes the change | `docs/design/deploy-service.md` | [The publish hand-back](design/deploy-service.md#81-the-publish-hand-back) |
+| How the reference deploy service is built: run store, idempotency, preview manager, instance providers | `docs/design/deploy-service.md` | [The reference implementation](design/deploy-service.md#9-the-reference-implementation) |
+| Checking any deploy service against the Action's client | `docs/design/deploy-service.md` | [The conformance suite](design/deploy-service.md#10-the-conformance-suite) |
+| Running the reference deploy service: images, configuration, compose, Terraform, wiring a repository, verifying | `docs/operations/deploy-service.md` | [Configuration](operations/deploy-service.md#configuration) |
 | Standing orders for every agent session in this repository | `AGENTS.md` | [Rules](../AGENTS.md#rules) |
 | How documentation is organised, written, and kept from drifting | `docs/AGENTS.md` | [The tier taxonomy: one home per fact](AGENTS.md#the-tier-taxonomy-one-home-per-fact) |
 | Scoring this Action against the community benchmark suite | `docs/upstream-benchmark.md` | [Preparations](upstream-benchmark.md#preparations) |

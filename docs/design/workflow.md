@@ -116,4 +116,4 @@ A channel without its token, or a run without an API key, is skipped with the re
 
 ## 9. Comment commands
 
-A comment on a proposal's issue or pull request runs one command from the [command reference](../reference/commands.md). Only commenters whose `author_association` is `OWNER`, `MEMBER` or `COLLABORATOR` may run commands, and a bot never may. The reply is posted once per comment: it carries the comment id in a hidden marker, and a second delivery of the same comment finds it. The deploy-service commands send an `Idempotency-Key` derived from the comment, as [the preview design](preview-and-live-view.md) specifies.
+A comment on a proposal's issue or pull request runs one command from the [command reference](../reference/commands.md). Only commenters whose `author_association` is `OWNER`, `MEMBER` or `COLLABORATOR` may run commands, and a bot never may. The reply is posted once per comment: it carries the comment id in a hidden marker, and a second delivery of the same comment finds it. The deploy-service commands send an `Idempotency-Key` derived from the comment, as [the deploy service contract](deploy-service.md#8-the-http-contract) specifies.

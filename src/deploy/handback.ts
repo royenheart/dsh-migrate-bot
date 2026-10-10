@@ -13,7 +13,7 @@
  * because a publishing path deciding its own checks is how two paths start
  * disagreeing about what "verified" means.
  *
- * [the publish hand-back]: ../../docs/design/preview-and-live-view.md#81-the-publish-hand-back
+ * [the publish hand-back]: ../../docs/design/deploy-service.md#81-the-publish-hand-back
  */
 
 import { spawnSync } from 'node:child_process'

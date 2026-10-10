@@ -13,6 +13,7 @@ node dist/scripts/references.js --write   # regenerate docs/reference/ after cha
 npm run sync:readme         # regenerate the README benchmark block from reports/
 npm run check:upstream      # benchmark oracle self-check; no API key, no Harbor
 npm run bench:upstream      # score this repository's agent on the upstream suite
+npm run deploy-service:build && npm run deploy-service:test   # the reference deploy service in deploy-service/
 ```
 
 ## Rules

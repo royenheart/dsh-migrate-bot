@@ -1,0 +1,76 @@
+# Provision the reference deploy service on a throwaway Hetzner server with the
+# Terraform module, run the conformance suite against its public HTTPS
+# endpoint, and destroy everything, whatever happened. Manual only: it is the
+# one check that costs money (one small server for well under an hour).
+#
+# Repository secrets: HCLOUD_TOKEN (a Hetzner Cloud project API token) and
+# DSH_DEPLOY_CHECK_WEBHOOK_SECRET (any string of 16 or more characters). The
+# server builds the images from this repository at the dispatched commit, so
+# the repository must be readable without credentials.
+
+name: deploy-service-cloud-check
+
+on:
+  workflow_dispatch:
+    inputs:
+      location:
+        description: Hetzner location
+        default: fsn1
+        type: string
+      server_type:
+        description: Hetzner server type
+        default: cpx21
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-service-cloud-check
+
+jobs:
+  cloud-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: deploy-service/terraform
+    env:
+      HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+      TF_VAR_github_webhook_secret: ${{ secrets.DSH_DEPLOY_CHECK_WEBHOOK_SECRET }}
+      TF_VAR_name: dsh-deploy-check-${{ github.run_id }}
+      TF_VAR_location: ${{ inputs.location }}
+      TF_VAR_server_type: ${{ inputs.server_type }}
+      TF_VAR_source_repository: ${{ github.server_url }}/${{ github.repository }}.git
+      TF_VAR_source_ref: ${{ github.sha }}
+      TF_VAR_conformance_mode: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - name: Build the conformance suite
+        working-directory: deploy-service
+        run: npm ci && npm run build
+      - run: terraform init -input=false
+      - run: terraform apply -input=false -auto-approve
+      - name: Wait until the service answers over HTTPS
+        run: |
+          endpoint="$(terraform output -raw endpoint)"
+          for _ in $(seq 1 90); do
+            curl -fsS "$endpoint/healthz" && exit 0
+            sleep 10
+          done
+          echo "$endpoint never answered /healthz" >&2
+          exit 1
+      - name: Conformance suite against the public endpoint
+        run: |
+          token="$(terraform output -raw deploy_token)"
+          echo "::add-mask::$token"
+          DEPLOY_TOKEN="$token" node ../dist/conformance/run.js --url "$(terraform output -raw endpoint)" --conformance
+      - name: Destroy
+        if: always()
+        run: terraform destroy -input=false -auto-approve

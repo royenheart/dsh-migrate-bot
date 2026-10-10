@@ -1,0 +1,71 @@
+# The reference deploy service on one machine with Docker.
+#
+#   cp .env.example .env    # then fill it in
+#   docker compose --profile build-only build preview-image
+#   docker compose --profile public up -d --build    # TLS by Caddy on PUBLIC_HOSTNAME
+#   docker compose --profile tunnel up -d --build    # or: a Cloudflare Tunnel, no inbound port
+#
+# The profile `public` needs PUBLIC_HOSTNAME, and `tunnel` needs
+# CLOUDFLARE_TUNNEL_TOKEN. DATA_DIR is bind-mounted at the same path inside
+# the service container, because the service starts preview containers
+# through the host's Docker daemon, which resolves their bind mounts on the
+# host. The Docker socket is mounted into the service container and into
+# nothing else. A serving preview has no network; the service reaches it over
+# Unix sockets under DATA_DIR.
+
+name: dsh-deploy
+
+services:
+  service:
+    build:
+      context: ..
+      dockerfile: deploy-service/Dockerfile
+    image: ${DEPLOY_SERVICE_IMAGE:-dsh-migrate-deploy-service:local}
+    command: ${DEPLOY_SERVICE_FLAGS:-}
+    restart: unless-stopped
+    environment:
+      DEPLOY_TOKEN: ${DEPLOY_TOKEN:?set DEPLOY_TOKEN in .env}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:?set GITHUB_WEBHOOK_SECRET in .env}
+      DATA_DIR: ${DATA_DIR:?set DATA_DIR in .env}
+      PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL in .env}
+      PUBLIC_VIEWS: ${PUBLIC_VIEWS:-false}
+      PROVIDER: docker
+      DSH_IMAGE: ${DSH_IMAGE:-dsh-migrate-preview:0.2.0-rc.2}
+      IDLE_MINUTES: ${IDLE_MINUTES:-120}
+      TTL_DAYS: ${TTL_DAYS:-3}
+      PORT: "8080"
+    volumes:
+      - ${DATA_DIR}:${DATA_DIR}
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [edge]
+
+  # Builds the preview image only; it never runs as a service.
+  preview-image:
+    profiles: [build-only]
+    build:
+      context: ./preview-image
+      args:
+        DSH_VERSION: ${DSH_VERSION:-0.2.0-rc.2}
+    image: ${DSH_IMAGE:-dsh-migrate-preview:0.2.0-rc.2}
+
+  caddy:
+    profiles: [public]
+    image: caddy:2
+    restart: unless-stopped
+    command: caddy reverse-proxy --from ${PUBLIC_HOSTNAME:-} --to service:8080
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ${DATA_DIR}/caddy:/data
+    networks: [edge]
+
+  cloudflared:
+    profiles: [tunnel]
+    image: cloudflare/cloudflared:2025.9.1
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks: [edge]
+
+networks:
+  edge: {}
