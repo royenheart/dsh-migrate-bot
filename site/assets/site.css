@@ -1,0 +1,29 @@
+:root { --fg: #1f2328; --muted: #59636e; --line: #d1d9e0; --bg: #ffffff; --soft: #f6f8fa; --pass: #1a7f37; --part: #9a6700; --fail: #cf222e; --infra: #8250df; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; color: var(--fg); background: var(--bg); }
+header { display: flex; gap: 1.5rem; align-items: baseline; padding: .75rem 1.5rem; border-bottom: 1px solid var(--line); background: var(--soft); }
+header strong { font-size: 15px; }
+header a { color: var(--muted); text-decoration: none; }
+header a[aria-current="page"] { color: var(--fg); font-weight: 600; }
+main { padding: 1rem 1.5rem 3rem; max-width: 1400px; }
+h1 { font-size: 20px; margin: .5rem 0 1rem; }
+h2 { font-size: 16px; margin: 1.5rem 0 .5rem; }
+table { border-collapse: collapse; width: 100%; margin: .5rem 0 1rem; }
+th, td { border-bottom: 1px solid var(--line); padding: .35rem .5rem; text-align: left; vertical-align: top; }
+th { font-weight: 600; background: var(--soft); position: sticky; top: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+.muted { color: var(--muted); }
+.controls { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; align-items: center; margin: .5rem 0 1rem; }
+.controls label { display: flex; gap: .4rem; align-items: center; }
+select, button { font: inherit; padding: .2rem .4rem; }
+.chip { display: inline-block; min-width: 2.6em; padding: 0 .3em; margin: 0 .15em .15em 0; border-radius: 3px; color: #fff; text-align: center; font-size: 12px; text-decoration: none; }
+.chip.pass { background: var(--pass); } .chip.part { background: var(--part); } .chip.fail { background: var(--fail); } .chip.infra { background: var(--infra); }
+.regression { color: var(--fail); font-weight: 600; } .improvement { color: var(--pass); font-weight: 600; }
+.warning { padding: .5rem .75rem; border: 1px solid var(--part); background: #fff8c5; border-radius: 4px; }
+.diffstat { display: inline-flex; gap: 1px; vertical-align: middle; margin-left: .4rem; }
+.diffstat i { width: 8px; height: 8px; display: inline-block; background: var(--line); }
+.diffstat i.add { background: var(--pass); } .diffstat i.del { background: var(--fail); }
+#editor { height: 70vh; border: 1px solid var(--line); }
+.files { columns: 2; font-size: 12px; margin: .25rem 0 .75rem; }
+#chart { width: 100%; }

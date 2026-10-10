@@ -222,7 +222,7 @@ async function run(runtime: Runtime, force: boolean): Promise<number> {
     force,
     maintainerCommits: proposal === undefined || runtime.github === undefined
       ? 0
-      : await maintainerCommits(runtime.github.client, runtime.github.repository, proposal),
+      : await maintainerCommits(runtime.github.client, runtime.github.repository, proposal.pullRequest.number),
   })
   if (decision.action === 'skip') {
     log(`skipped (${decision.reason}): ${inline(decision.detail, 300)}`)

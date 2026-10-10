@@ -53,7 +53,7 @@ git -C .bench/records push origin bench/records
 gh workflow run bench-records.yml
 ```
 
-`compare` exits non-zero on a regression. `validate` checks that every record parses, its metrics recompute to the stored values, and its kept files match their hashes; [the `bench-records` workflow](../../.github/workflows/bench-records.yml) runs it on request and on every push to `main`, so a change to the metric library is checked against every stored record. A pushed record is public.
+`compare` exits non-zero on a regression. `validate` checks that every record parses, its metrics recompute to the stored values, and its kept files match their hashes. [The `bench-records` workflow](../../.github/workflows/bench-records.yml) builds the report from the pushed records, refusing any that do not validate, and publishes it to GitHub Pages; it runs on request, daily, and on every push to `main`. `npm run site` builds the same site into `.bench/site` to look at before pushing. A pushed record is public.
 
 An oracle run exits non-zero when a reference solution scored below 1.0, after writing its record: those tasks are infeasible on this machine, and the other subjects skip them.
 

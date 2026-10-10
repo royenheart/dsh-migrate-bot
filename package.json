@@ -25,6 +25,7 @@
     "commit": "cz commit",
     "bump": "cz bump --changelog",
     "bench": "npm run build && node dist/scripts/bench.js",
+    "site": "npm run build && node dist/scripts/site.js",
     "deploy-service:build": "npm --prefix deploy-service ci && npm --prefix deploy-service run build",
     "deploy-service:test": "npm --prefix deploy-service test"
   },

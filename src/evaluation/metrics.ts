@@ -1,4 +1,3 @@
-import { AGENT_TIMEOUT } from './harbor.ts'
 import type { Attempt, TaskEntry } from './record.ts'
 
 /**
@@ -10,15 +9,23 @@ import type { Attempt, TaskEntry } from './record.ts'
  * `docs/reference/metrics.md` is generated from {@link METRICS}.
  *
  * The conventions every metric applies are stated in that reference.
+ *
+ * The module has no runtime import, so the report site loads the compiled file
+ * as it is and compares records with the same code as `npm run bench`.
  */
 
 export const FORMULA = 'v1'
+
+/** The exception type Harbor records when the agent run exceeds its timeout. */
+export const AGENT_TIMEOUT = 'AgentTimeoutError'
 
 /** The success threshold of a full migration; `passRate@0.7` uses the lower one. */
 const FULL = 1
 const USABLE = 0.7
 const BOOTSTRAP_SAMPLES = 10_000
 const BOOTSTRAP_SEED = 0x5eed
+/** The fewest tasks two records must share for a comparison to give a verdict. */
+export const MIN_PAIRED_TASKS = 10
 
 export type Quality = 'effectiveness' | 'consistency' | 'efficiency' | 'infrastructure'
 
@@ -227,7 +234,9 @@ export interface Comparison {
  *
  * A difference is a regression or an improvement only when its 95% paired
  * bootstrap interval excludes zero; the tasks are resampled, not the attempts,
- * because attempts of one task share their failure causes.
+ * because attempts of one task share their failure causes. Below
+ * {@link MIN_PAIRED_TASKS} the resamples repeat a handful of values and the
+ * interval says nothing, so the pair is not comparable.
  */
 export function compare(base: MetricInput, head: MetricInput): Comparison[] {
   const before = new Map(taskScores(base).map(score => [score.task, score]))
@@ -240,10 +249,11 @@ export function compare(base: MetricInput, head: MetricInput): Comparison[] {
       ? mean(rewards) ?? 0
       : rewards.filter(reward => reward >= FULL).length / rewards.length
     const deltaOf = (sample: readonly (typeof pairs)[number][]): number | null => mean(sample.map(pair => value(pair.after) - value(pair.before)))
-    if (pairs.length === 0) return { metric, tasks: 0, delta: null, verdict: 'not-comparable' as const }
     const delta = deltaOf(pairs)
+    const rounded = delta === null ? null : round(delta)
+    if (pairs.length < MIN_PAIRED_TASKS) return { metric, tasks: pairs.length, delta: rounded, verdict: 'not-comparable' as const }
     const interval = bootstrap(pairs, deltaOf)
     const verdict = interval === undefined ? 'no-change' as const : interval[1] < 0 ? 'regression' as const : interval[0] > 0 ? 'improvement' as const : 'no-change' as const
-    return { metric, tasks: pairs.length, delta: delta === null ? null : round(delta), interval, verdict }
+    return { metric, tasks: pairs.length, delta: rounded, interval, verdict }
   })
 }

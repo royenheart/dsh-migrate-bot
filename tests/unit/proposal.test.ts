@@ -90,6 +90,6 @@ test('only commits this Action did not author count as maintainer commits', asyn
       { login: 'maintainer', email: 'maintainer@example.test' },
     ],
   })
-  const count = await maintainerCommits(new GitHubClient('token', ENV, github.fetch), { owner: 'acme', name: 'plugin' }, open)
+  const count = await maintainerCommits(new GitHubClient('token', ENV, github.fetch), { owner: 'acme', name: 'plugin' }, open.pullRequest.number)
   assert.equal(count, 1)
 })

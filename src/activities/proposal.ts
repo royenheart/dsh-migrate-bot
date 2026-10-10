@@ -90,13 +90,14 @@ const commitSchema = z.object({
 })
 
 /**
- * Commits on the proposal's pull request that this Action did not author: a
- * newer migration must not force-push over them.
+ * Commits on a proposal's pull request that this Action did not author: a
+ * newer migration must not force-push over them, and the report counts them as
+ * the maintainer's rework.
  * @param github - a client that can read the consumer repository.
  * @param repository - the consumer repository.
- * @param proposal - the open proposal.
+ * @param pullRequest - the proposal's pull request number.
  */
-export async function maintainerCommits(github: GitHubClient, repository: Repository, proposal: Proposal): Promise<number> {
-  const commits = await github.paginate(`/repos/${slugOf(repository)}/pulls/${String(proposal.pullRequest.number)}/commits`, commitSchema)
+export async function maintainerCommits(github: GitHubClient, repository: Repository, pullRequest: number): Promise<number> {
+  const commits = await github.paginate(`/repos/${slugOf(repository)}/pulls/${String(pullRequest)}/commits`, commitSchema)
   return commits.filter(commit => commit.commit.author?.email !== BOT_EMAIL && commit.author?.login.endsWith('[bot]') !== true).length
 }

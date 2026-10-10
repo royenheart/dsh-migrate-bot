@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
+import { AGENT_TIMEOUT } from './metrics.ts'
 import type { Attempt, Outcome, Usage } from './record.ts'
 
 /**
@@ -10,9 +11,6 @@ import type { Attempt, Outcome, Usage } from './record.ts'
  * Only the fields an attempt is built from are parsed; the format is Harbor
  * 0.24's `TrialResult`, and any other field passes through unread.
  */
-
-/** The exception type Harbor records when the agent run exceeds its timeout. */
-export const AGENT_TIMEOUT = 'AgentTimeoutError'
 
 const timing = z.object({ started_at: z.string().nullish(), finished_at: z.string().nullish() }).nullish()
 

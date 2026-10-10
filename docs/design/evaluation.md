@@ -57,11 +57,11 @@ A task is *feasible* when every attempt of the newest `oracle` record of the sam
 
 The metrics, their qualities (effectiveness, consistency, efficiency, infrastructure) and the conventions they share are in [the metrics reference](../reference/metrics.md), generated from the table that computes them. CI recomputes every record's metrics from its attempts and refuses a record whose stored values differ, so a change to a formula changes `FORMULA` and every record keeps the version that computed it.
 
-What the metrics do not cover: whether a change is confined to what the migration needed (no reference-diff comparison), the agreement of the verifiers with themselves (no regrading), steps per attempt (the adapter writes no trajectory), and what happens to proposals in consumer repositories.
+What the metrics do not cover: whether a change is confined to what the migration needed (no reference-diff comparison), the agreement of the verifiers with themselves (no regrading), and steps per attempt (the adapter writes no trajectory). What happens to proposals in the consumer repositories is [the Field page](#7-the-report).
 
 ## 5. Comparing two records
 
-`npm run bench -- compare <base> <head>` pairs the tasks both records scored and reports, for `meanReward` and `passRate@1.0`, the mean per-task difference with its 95% paired bootstrap interval (`compare` in `src/evaluation/metrics.ts`). The verdict is `regression` when the interval lies below zero, `improvement` when it lies above, and `no-change` otherwise; the command exits non-zero on a regression. Records of different suite commits are paired over the tasks they share, and the command says so.
+`npm run bench -- compare <base> <head>` pairs the tasks both records scored and reports, for `meanReward` and `passRate@1.0`, the mean per-task difference with its 95% paired bootstrap interval (`compare` in `src/evaluation/metrics.ts`). The verdict is `regression` when the interval lies below zero, `improvement` when it lies above, and `no-change` otherwise; with fewer than ten shared tasks the resamples repeat a handful of values, so the pair is `not-comparable`. The command exits non-zero on a regression, and [the Compare page](#7-the-report) runs the same function. Records of different suite commits are paired over the tasks they share, and the command says so.
 
 ## 6. Records
 
@@ -69,7 +69,23 @@ A record is `records/<id>/record.json` on the `bench/records` branch, beside the
 
 The working tree must be clean, or the run passes `--allow-dirty` and the record says `producer.dirty`.
 
-## 7. The suite
+## 7. The report
+
+`npm run site` builds a static site from the records, and [the `bench-records` workflow](../../.github/workflows/bench-records.yml) publishes it to GitHub Pages. The pages are `site/`; the build adds the data they read and the compiled metric library, so a page computes a comparison with the same code as the command line. Every page keeps its state in the URL, so a view is a link.
+
+| Page | Shows |
+|---|---|
+| Trend | Per subject, `meanReward` with its interval band and `passRate@1.0` over the records, and a table of every record; a point opens the comparison with the record before it |
+| Compare | Two records: the paired verdicts, every metric side by side, and every attempt of every task as a chip that opens its diff |
+| Task | One task across the records of a subject: the reward of each attempt, durations and cost |
+| Diff | One artifact of two attempts, of two records or of one, in a Monaco diff editor; a `proposed.diff` also gets its file list and diffstat. `?subject&task&from&fromAttempt&to&toAttempt&artifact&view`, and `range=latest` for the two newest records |
+| Field | The proposals in the consumer repositories |
+
+The Field page is built from the consumers' state branches at build time, not from records: the event log keeps when each proposal was published and when its pull request closed, merged or not, so storing that again would be a copy to keep in step. The build asks GitHub only for the maintainer commits on merged proposals. It reports, per consumer and overall, the merge rate over decided proposals, the share merged without a maintainer commit, and the median hours from publishing to merging. The consumer list is `CONSUMERS` in `scripts/site.ts`.
+
+The charts are [Vega-Lite](https://vega.github.io/vega-lite/), which draws an interval band declaratively; the diff editor is [Monaco](https://microsoft.github.io/monaco-editor/), loaded on the Diff page only. Both come from a pinned CDN version, so the site has no build step of its own. Record data is fetched per page as it is needed, not embedded, because the records grow with every run.
+
+## 8. The suite
 
 `vendor/dsh-plugin-upgrade-skill` is a submodule pinned to one commit, never a branch: the suite's own comparability rules require a frozen snapshot, and a record names the commit and the task list it ran.
 

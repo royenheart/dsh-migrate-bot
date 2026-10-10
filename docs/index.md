@@ -31,6 +31,7 @@ The entry point for progressive disclosure: `AGENTS.md` carries the standing ord
 | Checking any deploy service against the Action's client | `docs/design/deploy-service.md` | [The conformance suite](design/deploy-service.md#10-the-conformance-suite) |
 | Running the reference deploy service: images, configuration, compose, Terraform, wiring a repository, verifying | `docs/operations/deploy-service.md` | [Configuration](operations/deploy-service.md#configuration) |
 | What is evaluated, the outcomes of an attempt, and the comparison rule | `docs/design/evaluation.md` | [Subjects](design/evaluation.md#2-subjects) |
+| The benchmark report: its pages, the diff viewer, and the field outcomes of proposals | `docs/design/evaluation.md` | [The report](design/evaluation.md#7-the-report) |
 | Running the benchmark, comparing records, and publishing them | `docs/operations/benchmark.md` | [A run](operations/benchmark.md#a-run) |
 | Every benchmark metric and its definition | `docs/reference/metrics.md` | [Metrics reference](reference/metrics.md#metrics-reference) |
 | Every field of a benchmark record | `docs/reference/records.md` | [Benchmark record reference](reference/records.md#benchmark-record-reference) |

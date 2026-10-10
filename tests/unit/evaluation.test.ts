@@ -5,8 +5,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { validateRecords } from '../../scripts/bench.ts'
-import { AGENT_TIMEOUT, attemptOf, outcomeOf, type TrialResult } from '../../src/evaluation/harbor.ts'
-import { bootstrap, compare, computeMetrics, taskScores, type MetricInput } from '../../src/evaluation/metrics.ts'
+import { attemptOf, outcomeOf, type TrialResult } from '../../src/evaluation/harbor.ts'
+import { AGENT_TIMEOUT, bootstrap, compare, computeMetrics, MIN_PAIRED_TASKS, taskScores, type MetricInput } from '../../src/evaluation/metrics.ts'
 import type { Attempt, BenchmarkRecord, TaskEntry } from '../../src/evaluation/record.ts'
 
 const task = (id: string, extra: Partial<TaskEntry> = {}): TaskEntry => ({ id, family: id[0] ?? 'M', networkMode: 'public', agentTimeoutSec: 1800, applicable: true, feasible: true, ...extra })
@@ -96,6 +96,9 @@ test('a paired comparison reports a regression only when its interval excludes z
   const flipped = tasks.map((entry, index) => attempt(entry.id, index % 2 === 0 ? 0 : 1))
   assert.equal(compare(run(tasks, noisy), run(tasks, flipped))[0]?.verdict, 'no-change')
   assert.equal(compare(run([task('M1')], [attempt('M1', 1)]), run([task('M2')], [attempt('M2', 1)]))[0]?.verdict, 'not-comparable')
+  // Too few shared tasks give no verdict, however consistent their deltas.
+  const few = tasks.slice(0, MIN_PAIRED_TASKS - 1)
+  assert.deepEqual(compare(run(few, few.map(entry => attempt(entry.id, 1))), run(few, few.map(entry => attempt(entry.id, 0))))[0], { metric: 'meanReward', tasks: MIN_PAIRED_TASKS - 1, delta: -1, verdict: 'not-comparable' })
 })
 
 const trial = (extra: Partial<TrialResult>): TrialResult => ({ task_name: 'M1', trial_name: 'M1__abc', ...extra })
