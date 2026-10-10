@@ -24,7 +24,6 @@ One migrate pull request at a time: while one is open, a run that would open a s
 | `dsh.provider` | `deepseek-official` |
 | `dsh.model` | `deepseek-v4-flash` |
 | `dsh.thinking` / `dsh.reasoningEffort` | enabled / `max` |
-| `dsh.mode` | `standard` (a dsh agent preset id: `standard`, `minimal`, `cordis`, `ptc`) |
 | `review.policy` | `always` (`skip-if-mechanical-pass` skips the A/B reviews when the fast gate passed) |
 | `watch.enabled` | `true` |
 | `verify.boot` | enabled, 180s watchdog |

@@ -18,7 +18,7 @@ export DSH_MIGRATE_APP_ROOT="${DSH_MIGRATE_APP_ROOT:-/opt/dsh-migrate}"
 export DSH_MIGRATE_HOME="${DSH_MIGRATE_HOME:-$workspace/.dsh-migrate}"
 
 args=("$@")
-if [[ ${#args[@]} -eq 0 || ( "${args[0]}" != run && "${args[0]}" != check-config && "${args[0]}" != refresh-badge && "${args[0]}" != feedback && "${args[0]}" != command ) ]]; then
+if [[ ${#args[@]} -eq 0 || ( "${args[0]}" != run && "${args[0]}" != check-config && "${args[0]}" != self-test && "${args[0]}" != refresh-badge && "${args[0]}" != feedback && "${args[0]}" != command ) ]]; then
   args=(run "${args[@]}")
 fi
 if [[ "${INPUT_REFRESH_ONLY:-false}" == [Tt]rue ]]; then

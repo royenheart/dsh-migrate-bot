@@ -74,6 +74,9 @@ function fixture(tag: string, target = 'dsh-v0.1.6'): Fixture {
   const harness = join(home, 'harness')
   mkdirSync(join(harness, '.git'), { recursive: true })
   writeFileSync(join(harness, '.dsh-migrate-tag'), `${target}\n`)
+  // An agent runtime that passes its self-test: it stops at the credential check.
+  const dsh = join(home, 'dsh')
+  writeFileSync(dsh, '#!/bin/sh\necho "dsh-migrate: MISSING_CREDENTIAL: stub" >&2\nexit 1\n', { mode: 0o755 })
   return {
     work,
     home,
@@ -82,6 +85,7 @@ function fixture(tag: string, target = 'dsh-v0.1.6'): Fixture {
       PATH: process.env.PATH ?? '',
       HOME: process.env.HOME ?? '',
       DSH_MIGRATE_HOME: home,
+      DSH_BIN: dsh,
       GITHUB_REPOSITORY: 'acme/plugin',
       // A key that authenticates nothing: the run stops at the first API call, and
       // the lines under test are written before it.

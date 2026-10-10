@@ -2,8 +2,6 @@ import { readFileSync } from 'node:fs'
 import { parse as parseYaml } from 'yaml'
 import {
   DEFAULT_CONFIG,
-  PRESET_ID_PATTERN,
-  REMOVED_PRESET_IDS,
   THINKING_EFFORTS,
   type IssuePrLanguage,
   type MigrateConfig,
@@ -51,23 +49,6 @@ function asEnum<T extends string>(value: unknown, path: string, allowed: readonl
     throw new ConfigError(`${path} must be one of: ${allowed.join(', ')}`)
   }
   return value as T
-}
-
-function asPresetId(value: unknown, path: string): string {
-  const id = asString(value, path)
-  if ((REMOVED_PRESET_IDS as readonly string[]).includes(id)) {
-    throw new ConfigError(
-      `${path}: preset '${id}' was installed from dsh-anchored-standard, which this Action no longer ships;`
-      + " use 'standard'",
-    )
-  }
-  if (!PRESET_ID_PATTERN.test(id)) {
-    throw new ConfigError(
-      `${path} must be a dsh agent preset id (lowercase letters, digits, and dashes;`
-      + ' shipped ids: standard, minimal, cordis, ptc)',
-    )
-  }
-  return id
 }
 
 function asBoolean(value: unknown, path: string): boolean {
@@ -317,9 +298,6 @@ export function parseConfig(raw: unknown): MigrateConfig {
     if (dshRaw.thinking !== undefined) dsh.thinking = asEnum(dshRaw.thinking, 'dsh.thinking', ['enabled', 'disabled'] as const)
     if (dshRaw.reasoningEffort !== undefined) {
       dsh.reasoningEffort = asEnum(dshRaw.reasoningEffort, 'dsh.reasoningEffort', THINKING_EFFORTS)
-    }
-    if (dshRaw.mode !== undefined) {
-      dsh.mode = asPresetId(dshRaw.mode, 'dsh.mode')
     }
   }
 

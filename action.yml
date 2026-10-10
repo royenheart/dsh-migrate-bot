@@ -83,7 +83,7 @@ inputs:
     default: ''
 outputs:
   status:
-    description: compatible, migrated, failed, or skipped (dsh unchanged)
+    description: compatible, migrated, failed, skipped (dsh unchanged), or error (the agent runtime failed its self-test)
   run_dir:
     description: Absolute path of this run's A/B/C reports (under .dsh-migrate/)
   mechanical_ok:

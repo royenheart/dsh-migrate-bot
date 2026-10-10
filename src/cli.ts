@@ -32,6 +32,7 @@ import type { FeedbackOutcome } from './feedback/types.ts'
 import { skillsSource, syncUpgradeSkills, upgradeSkillsEnabled } from './skills/upgrade.ts'
 import { createReportStore } from './reports/store.ts'
 import { createDshRunner, formatSessionProgress } from './agents/dsh.ts'
+import { runSelfTest } from './agents/self-test.ts'
 import { createGateRunner } from './verify/gates.ts'
 import { createGithubPublisher } from './github/publish.ts'
 import { finishRun } from './pipeline/finish.ts'
@@ -580,6 +581,11 @@ async function main(argv: readonly string[]): Promise<number> {
     logLine(JSON.stringify(config, null, 2))
     return 0
   }
+  if (command === 'self-test') {
+    const result = runSelfTest({ bin: process.env.DSH_BIN, dshHome: process.env.DSH_HOME })
+    logLine(`self-test: ${result.ok ? 'pass' : 'fail'}: ${result.detail}`)
+    return result.ok ? 0 : 1
+  }
   if (command === 'refresh-badge') {
     return refreshBadge(argv)
   }
@@ -590,7 +596,7 @@ async function main(argv: readonly string[]): Promise<number> {
     return commentCommand(argv)
   }
   if (command !== 'run') {
-    process.stderr.write('usage: dsh-migrate run|check-config|refresh-badge|feedback|command [--workdir DIR] [--config FILE] [--dsh-version VER] [--api-key-env NAME] [--quota-limit N] [--pull-request N] [--dry-run] [--comment-body TEXT] [--comment-id ID] [--comment-author LOGIN] [--comment-author-association ASSOC] [--issue-number N] [--mechanical-only] [--skip-github] [--force] [--allow-second-pr] [--resend]\n')
+    process.stderr.write('usage: dsh-migrate run|check-config|self-test|refresh-badge|feedback|command [--workdir DIR] [--config FILE] [--dsh-version VER] [--api-key-env NAME] [--quota-limit N] [--pull-request N] [--dry-run] [--comment-body TEXT] [--comment-id ID] [--comment-author LOGIN] [--comment-author-association ASSOC] [--issue-number N] [--mechanical-only] [--skip-github] [--force] [--allow-second-pr] [--resend]\n')
     return 2
   }
 
@@ -716,6 +722,18 @@ async function main(argv: readonly string[]): Promise<number> {
     // The run page is already open and its URL has been handed out: a viewer
     // must not be left with a page that never ends and no reason why.
     liveView?.publish(`dsh-migrate: ${reason}`)
+    await view.close()
+    return 1
+  }
+
+  // A runtime that cannot start a session would fail every agent stage and be
+  // reported as a failed migration; it is a fault of this Action instead.
+  const selfTest = runSelfTest({ bin: process.env.DSH_BIN, dshHome: process.env.DSH_HOME })
+  if (!selfTest.ok) {
+    const reason = `the agent runtime failed its self-test: ${selfTest.detail}`
+    process.stderr.write(`${reason}\n`)
+    liveView?.publish(`dsh-migrate: ${inline(reason, 300)}`)
+    writeGithubOutput({ status: 'error', run_dir: runDir, target_tag: target.tag })
     await view.close()
     return 1
   }

@@ -83,7 +83,7 @@ test('a session that outlives its watchdog throws instead of holding the job', a
       kind: 'fix',
       prompt: 'p',
       workdir: process.cwd(),
-      dsh: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max', mode: 'standard' },
+      dsh: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max' },
       apiKey: 'k',
     }),
     (error: unknown) => {
@@ -107,7 +107,7 @@ test('a session that finishes normally still returns its report', async () => {
     kind: 'absorption',
     prompt: 'p',
     workdir: process.cwd(),
-    dsh: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max', mode: 'standard' },
+    dsh: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max' },
     apiKey: 'k',
   })
   assert.equal(result.report, '# Report\nok')

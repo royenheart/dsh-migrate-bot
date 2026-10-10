@@ -6,28 +6,6 @@ export type ReviewPolicy = 'always' | 'skip-if-mechanical-pass'
 /** Language used for the GitHub Issue and pull request bodies. */
 export type IssuePrLanguage = 'en' | 'zh'
 
-/**
- * Agent preset id shape, as the `@deepseek-ai/dsh-agent-presets` roster
- * accepts it: the id is both the mounted preset's name and (for user presets)
- * its directory under `<dshHome>/.agent-presets`. The presets shipped with the
- * roster are `standard`, `minimal`, `cordis`, and `ptc`.
- */
-export const PRESET_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/
-
-/**
- * Preset ids carried over from the external `dsh-anchored-standard`
- * repository, which this Action no longer clones or installs. Rejected by
- * name so an old config fails at validation instead of at preset mount.
- */
-export const REMOVED_PRESET_IDS = [
-  'anchored-standard',
-  'zero-anchored-standard',
-  'whoami-standard',
-  'eternal-minimal',
-  'wire-think-standard',
-  'combo-anchored',
-] as const
-
 /** DeepSeek thinking effort accepted by `@deepseek-ai/dsh-llm-deepseek`. */
 export const THINKING_EFFORTS = ['off', 'low', 'high', 'max'] as const
 
@@ -50,8 +28,6 @@ export interface DshBackendConfig {
   model: string
   thinking: 'enabled' | 'disabled'
   reasoningEffort: ThinkingEffort
-  /** dsh agent preset id the sessions mount (see {@link PRESET_ID_PATTERN}). */
-  mode: string
 }
 
 export interface IssuePrConfig {
@@ -245,7 +221,6 @@ export const DEFAULT_CONFIG: MigrateConfig = {
     model: 'deepseek-v4-flash',
     thinking: 'enabled',
     reasoningEffort: 'max',
-    mode: 'standard',
   },
   issuePr: { language: 'en' },
   loop: { maxAttempts: 5 },
