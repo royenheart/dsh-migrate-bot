@@ -1,6 +1,3 @@
-const VERDICT_LABELED = /verdict\s*[:.)\]]\s*`?(keep|shrink|retire)`?/i
-const VERDICT_HEADING = /^#{1,6}\s*(?:\d+\.\s*)?verdict\b[^\n]*\n+`?(keep|shrink|retire)`?/im
-
 export function longestRun(text: string, char: string): number {
   let max = 0
   let current = 0
@@ -68,16 +65,6 @@ export function reportTitle(markdown: string): string | undefined {
   return title === undefined || title === '' ? undefined : title
 }
 
-/**
- * keep | shrink | retire when the report labels a verdict.
- */
-export function reportVerdict(markdown: string): string | undefined {
-  const labeled = markdown.match(VERDICT_LABELED) ?? markdown.match(VERDICT_HEADING)
-  const value = labeled?.[1]?.toLowerCase()
-  if (value !== undefined) return value
-  return undefined
-}
-
 function sentenceTrim(text: string, maxChars: number): string {
   const collapsed = text.replace(/\s+/g, ' ').trim()
   if (collapsed.length <= maxChars) return collapsed
@@ -94,10 +81,9 @@ export function reportPreview(markdown: string, maxChars = 800): string {
   const lines = markdown.split(/\r?\n/).filter(line => !/^#{1,6}\s/.test(line.trim()))
   const paras = lines.join('\n').split(/\n\s*\n/)
     .map(para => para.replace(/\s+/g, ' ').trim())
-    .filter(para => para.length >= 20 && !/^verdict\b/i.test(para))
+    .filter(para => para.length >= 20)
   let out = ''
   for (const para of paras) {
-    if (VERDICT_LABELED.test(para) && para.length < 40) continue
     const next = out === '' ? para : `${out}\n\n${para}`
     if (next.length > maxChars) {
       if (out === '') return sentenceTrim(para, maxChars)
@@ -151,26 +137,17 @@ export function splitReportSections(markdown: string): { title: string | undefin
   return { title, lead, sections: rest }
 }
 
-function findSection(markdown: string | undefined, title: RegExp): string | undefined {
-  if (markdown === undefined) return undefined
-  const found = splitReportSections(markdown).sections.find(section => title.test(section.title))
-  if (found === undefined || found.body.trim() === '') return undefined
-  return found.body.trim()
-}
-
 /**
- * Structured A/B/C body: title, verdict, then each prompt section as `###`.
- * Headings stay at ### so they cannot steal the Issue `##` outline.
+ * An agent report inside an issue: its title, then each section as `###`, so
+ * its headings cannot steal the issue's `##` outline.
  */
 export function formatAgentReport(markdown: string | undefined, fallback: string): string {
   if (markdown === undefined || markdown.trim() === '') return fallback
   const text = markdown.trim()
   const split = splitReportSections(text)
   const title = split.title ?? reportTitle(text)
-  const verdict = reportVerdict(text)
   const lines: string[] = []
   if (title !== undefined) lines.push(boldLine(title))
-  if (verdict !== undefined) lines.push(`Verdict: ${inlineCode(verdict)}`)
   if (split.sections.length === 0) {
     const preview = sanitizeFlowingMarkdown(reportPreview(text) || split.lead)
     if (preview !== '') {
@@ -193,46 +170,6 @@ export function formatAgentReport(markdown: string | undefined, fallback: string
     }
   }
   return lines.length === 0 ? fallback : lines.join('\n')
-}
-
-/** @deprecated Use {@link formatAgentReport}. */
-export function summarizeAgentReport(markdown: string | undefined, fallback: string): string {
-  return formatAgentReport(markdown, fallback)
-}
-
-export function formatRootCause(input: {
-  mechanicalOk: boolean
-  reportA?: string | undefined
-  reportB?: string | undefined
-  reportC?: string | undefined
-}): string {
-  const fromC = findSection(input.reportC, /root cause/i)
-  if (fromC !== undefined) return sanitizeFlowingMarkdown(truncateBlock(fromC, SECTION_BODY))
-  const parts: string[] = []
-  const verdict = input.reportA === undefined ? undefined : reportVerdict(input.reportA)
-  if (verdict !== undefined) {
-    parts.push(`Overlap verdict: ${inlineCode(verdict)}`)
-  }
-  const gaps = findSection(input.reportB, /remaining|gap|patch/i)
-    ?? findSection(input.reportA, /remaining|gap|patch|overlap/i)
-  const edits = findSection(input.reportA, /edit|concrete/i)
-    ?? findSection(input.reportB, /edit/i)
-  if (gaps !== undefined) parts.push(sanitizeFlowingMarkdown(truncateBlock(gaps, SECTION_BODY)))
-  else if (edits !== undefined) parts.push(sanitizeFlowingMarkdown(truncateBlock(edits, SECTION_BODY)))
-  if (!input.mechanicalOk) {
-    parts.push('Mechanical checks still fail; see the excerpt below.')
-  }
-  if (parts.length === 0) {
-    return input.mechanicalOk
-      ? 'Mechanical checks passed. See the overlap and extension-point review sections below.'
-      : 'Mechanical checks still fail. The error excerpt is the immediate cause; the review sections describe the intended change.'
-  }
-  return parts.join('\n\n')
-}
-
-export function formatErrorExcerpt(errors: string, empty: string): string {
-  const text = errors.trim() === '' ? empty : errors.replace(/\s+$/, '')
-  return wrapFenced(neutralizeEmbedHtml(text))
 }
 
 /**

@@ -1,7 +1,7 @@
 import type { AgentConfig } from '../config/schema.ts'
 import type { SessionProgress } from './session-status.ts'
 
-export type AgentKind = 'absorption' | 'alignment' | 'fix' | 'e2e' | 'feedback'
+export type AgentKind = 'overlap' | 'extension-points' | 'repair' | 'e2e-authoring' | 'report'
 
 export interface AgentRequest {
   kind: AgentKind

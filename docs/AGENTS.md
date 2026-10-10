@@ -8,18 +8,18 @@ Each fact has exactly one home — the tier whose job it is. Everywhere else, li
 
 | Tier | Job | Does not belong there |
 |---|---|---|
-| [../README.md](../README.md) | The product: what the Action does, and how to consume it | Design rationale, benchmark methodology, open work, and the exhaustive configuration table, which [installation.md](installation.md) owns |
-| [../AGENTS.md](../AGENTS.md) | Standing orders an agent needs in context every session, one to three lines each | Worked examples, war stories, anything restated from a linked home |
+| [../README.md](../README.md) | The product: what the Action does, and how to consume it | Design rationale, benchmark methodology, open work, and the configuration table, which [reference/](reference/configuration.md) owns |
+| [../AGENTS.md](../AGENTS.md) | Standing orders an agent needs in context every session, one to three lines each | Worked examples, incident narratives, anything restated from a linked home |
 | [index.md](index.md) | The lookup table: subject → owning document → owning section | Any fact of its own; every row points somewhere else |
-| [installation.md](installation.md) | Installing the Action, every configuration key and its default, the feedback channels, the deploy target and the commands a comment can drive, and the checklist an agent follows when configuring it | Design rationale, which belongs in `design/`; a contract a third party must implement, which belongs in the design document that describes it |
-| [design/](design/e2e-migration-pipeline.md) | Reference for a designed mechanism: how it works, why it is ordered that way, what it guarantees | Measured results, procedures, current task state |
+| [reference/](reference/workflow.md) | Generated: the configuration keys, the workflow statechart, the comment commands | Hand edits; change the source the page names |
+| [design/](design/workflow.md) | How a mechanism works, why it is shaped that way, what it guarantees | Measured results, procedures, current task state |
+| [operations/](operations/install.md) | Procedures: installing the Action, releasing it | Design rationale |
+| [postmortems/](postmortems/2026-09-29-agent-runtime-drift.md) | What broke, why, and what changed | Rules, which link their reasoning instead |
 | [upstream-benchmark.md](upstream-benchmark.md) | What a benchmark run applies, what it measures, and what the exercise found | The numbers themselves — those live in `reports/` |
-| [plans/README.md](plans/README.md) | Open work and deliberate non-goals, each with its owning document | Design of the work itself, which belongs in `design/` |
 | [../reports/README.md](../reports/README.md) | The record format every run writes, and what consumes it | Analysis of what the numbers mean |
-| [official-discussion-auto-post.md](official-discussion-auto-post.md) | A designed-but-not-shipped capability and the conditions for revisiting it | Procedures that ship today |
 | [../CHANGELOG.md](../CHANGELOG.md) | Generated release history | Hand-written entries |
 
-Placement in one line: current behaviour → README; installation and configuration → `installation.md`; a rule → AGENTS.md; how a mechanism works → `design/`; how it is measured → the benchmark document; what it scored → `reports/`; what is next → `plans/`.
+Placement in one line: current behaviour → README; configuration, workflow and commands → `reference/`, generated; installation and releasing → `operations/`; a rule → AGENTS.md; how a mechanism works → `design/`; how it is measured → the benchmark document; what it scored → `reports/`.
 
 ## The index is computed, not trusted
 

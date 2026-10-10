@@ -32,28 +32,27 @@ function officialLinks(body: string): string[] {
 }
 
 /**
- * Read one `report.md` per subdirectory of `.dsh-migrate/patch-reports/`.
+ * One patch report: it is a draft unless it links an existing official thread.
+ * @param slug - the report's directory name.
+ * @param text - the report's markdown.
  */
+export function parsePatchReport(slug: string, text: string): PatchReport | undefined {
+  const body = text.trim()
+  if (body === '') return undefined
+  const links = officialLinks(body)
+  return { slug, title: firstHeading(body, slug), body, kind: links.length > 0 ? 'existing' : 'draft', links }
+}
+
+/** Read one `report.md` per subdirectory of `.dsh-migrate/patch-reports/`. */
 export function collectPatchReports(workdir: string): PatchReport[] {
   const root = patchReportsRoot(workdir)
   if (!existsSync(root)) return []
-  const slugs = readdirSync(root).sort()
   const reports: PatchReport[] = []
-  for (const slug of slugs) {
-    const dir = join(root, slug)
-    if (!statSync(dir).isDirectory()) continue
-    const file = join(dir, PATCH_REPORT_FILE)
-    if (!existsSync(file)) continue
-    const body = readFileSync(file, 'utf8').trim()
-    if (body === '') continue
-    const links = officialLinks(body)
-    reports.push({
-      slug,
-      title: firstHeading(body, slug),
-      body,
-      kind: links.length > 0 ? 'existing' : 'draft',
-      links,
-    })
+  for (const slug of readdirSync(root).sort()) {
+    const file = join(root, slug, PATCH_REPORT_FILE)
+    if (!statSync(join(root, slug)).isDirectory() || !existsSync(file)) continue
+    const report = parsePatchReport(slug, readFileSync(file, 'utf8'))
+    if (report !== undefined) reports.push(report)
   }
   return reports
 }

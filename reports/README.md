@@ -89,7 +89,7 @@ Both are written together by `tools/harbor/summarize.py`, which every benchmark 
 
 `docs/design/continuous-quality-tracking.md` designs the framework that turns a sequence of these records into a trend, compares a revision against the one before it, and fails a workflow when migration quality drops. The format above is its input contract, and both benchmark entry points already write it.
 
-Two consumers read these records today. `scripts/sync-readme-benchmark.ts` renders the benchmark table in [README.md](../README.md#upstream-benchmark) from the newest record of each kind, and `npm run gates` fails when that table is stale, so a run that is not reflected in the README breaks the build rather than drifting. `npm run bench:upstream` writes the records themselves.
+Two consumers read these records today. `scripts/sync-readme-benchmark.ts` renders the benchmark table in [README.md](../README.md#benchmark) from the newest record of each kind, and `npm run gates` fails when that table is stale, so a run that is not reflected in the README breaks the build rather than drifting. `npm run bench:upstream` writes the records themselves.
 
 ## What is not here yet
 

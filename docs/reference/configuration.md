@@ -5,7 +5,7 @@ description: Every key of .github/dsh-migrate.yml with its type, default and mea
 
 # Configuration reference
 
-A consumer configures the Action in `.github/dsh-migrate.yml`. Every key is optional. An unknown key is an error. This page is generated from `src/config/schema.ts` by `scripts/gen-config-reference.ts`; edit the schema, not this page.
+A consumer configures the Action in `.github/dsh-migrate.yml`. Every key is optional, and an unknown key is an error. This page is generated from `src/config/schema.ts` by `scripts/references.ts`; edit the source, not this page.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -19,6 +19,7 @@ A consumer configures the Action in `.github/dsh-migrate.yml`. Every key is opti
 | `agent.model` | string | `deepseek-v4-flash` | Model of the agent sessions. |
 | `agent.thinking` | `enabled` \| `disabled` | `enabled` | Provider thinking mode. |
 | `agent.reasoningEffort` | `off` \| `low` \| `high` \| `max` | `max` | Provider reasoning effort. |
+| `agent.upgradeSkills` | boolean | `false` | Load the `plugin-upgrade` skill of the community upgrade skills into the review and repair sessions. |
 | `repair.maxAttempts` | integer | `5` | Attempt limit: the most repair attempts one migration runs. |
 | `secrets.apiKeyEnv` | string | `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` | Environment variable holding the DeepSeek API key. |
 | `quota.limit` | number | — | Spend cap: the most USD one migration may spend, priced from its own usage. |

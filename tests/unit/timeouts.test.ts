@@ -81,10 +81,10 @@ test('a session that outlives its watchdog throws instead of holding the job', a
   })
   await assert.rejects(
     () => runner.run({
-      kind: 'fix',
+      kind: 'repair',
       prompt: 'p',
       workdir: process.cwd(),
-      agent: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max' },
+      agent: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max', upgradeSkills: false },
       apiKey: 'k',
     }),
     (error: unknown) => {
@@ -105,10 +105,10 @@ test('a session that finishes normally still returns its report', async () => {
     },
   })
   const result = await runner.run({
-    kind: 'absorption',
+    kind: 'overlap',
     prompt: 'p',
     workdir: process.cwd(),
-    agent: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max' },
+    agent: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max', upgradeSkills: false },
     apiKey: 'k',
   })
   assert.equal(result.report, '# Report\nok')

@@ -1,126 +1,88 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
-import { spawnSync, type SpawnSyncReturns } from 'node:child_process'
 import { join } from 'node:path'
-
-const GIT_SAFE = ['-c', 'safe.directory=*'] as const
-
-function git(args: readonly string[], cwd: string): SpawnSyncReturns<string> {
-  return spawnSync('git', [...GIT_SAFE, ...args], { cwd, encoding: 'utf8' })
-}
+import { git, gitOut } from './run.ts'
 
 /**
- * Paths that live in the plugin worktree for convenience (reports, local
- * secrets) but must not count as a dirty migration or be committed.
+ * The plugin working tree the migration edits.
  *
- * `.agents/notes/` is the harness's own Agent Notes tree. The prompts tell the
- * agent to read those notes as evidence and never to write them into a plugin
- * repository, but a language model is not a guarantee: ignoring the path here
- * makes "an Agent Note never reaches a migration pull request" a structural
- * fact rather than a hope.
+ * Four paths live in it without ever being part of a migration: this Action's
+ * own run directory, a local secrets file, the harness Agent Notes tree, which
+ * the prompts forbid the agent to write and which is ignored here so that rule
+ * does not depend on the model obeying it, and `node_modules/`, which the checks
+ * install. In `.git/info/exclude` a directory pattern matches at any depth;
+ * files already tracked stay tracked.
  */
-export function isMigrateNoisePath(relativePath: string): boolean {
-  const normalized = relativePath.replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/$/, '')
-  const file = normalized.includes(' -> ')
-    ? normalized.slice(normalized.lastIndexOf(' -> ') + 4).trim()
-    : normalized
-  return file === '.dsh-migrate'
-    || file.startsWith('.dsh-migrate/')
-    || file === '.secrets.local.json'
-    || file === '.agents/notes'
-    || file.startsWith('.agents/notes/')
+export const IGNORED_PATHS = ['.dsh-migrate/', '.secrets.local.json', '.agents/notes/', 'node_modules/'] as const
+
+/** Whether a repository-relative path is one of the ignored paths. */
+export function isIgnoredPath(path: string): boolean {
+  const normalized = path.replaceAll('\\', '/').replace(/^\.\//, '')
+  return IGNORED_PATHS.some(ignored => ignored.endsWith('/')
+    ? normalized === ignored.slice(0, -1) || normalized.startsWith(ignored)
+    : normalized === ignored)
 }
 
-function porcelainPath(line: string): string {
-  return line.slice(3).trim()
-}
-
-function gitDir(cwd: string): string | undefined {
+/** Add the ignored paths to `.git/info/exclude`, so git never reports them. */
+export function excludeIgnoredPaths(cwd: string): void {
   const dotGit = join(cwd, '.git')
-  if (!existsSync(dotGit)) return undefined
-  try {
-    if (statSync(dotGit).isDirectory()) return dotGit
-  } catch {
-    return undefined
-  }
-  return undefined
-}
-
-/**
- * Ignore the migrate-owned paths in this clone without committing a
- * `.gitignore`: `.dsh-migrate/` (reports stay on disk for Action artifacts),
- * `.secrets.local.json`, and the harness Agent Notes tree, which the prompts
- * tell the agent never to write but which is not worth trusting to a language
- * model when an ignore rule makes it structural.
- */
-export function ensureMigrateGitExclude(cwd: string): void {
-  const dir = gitDir(cwd)
-  if (dir === undefined) return
-  const info = join(dir, 'info')
-  mkdirSync(info, { recursive: true })
-  const exclude = join(info, 'exclude')
+  if (!existsSync(dotGit) || !statSync(dotGit).isDirectory()) return
+  const exclude = join(dotGit, 'info', 'exclude')
+  mkdirSync(join(dotGit, 'info'), { recursive: true })
   const existing = existsSync(exclude) ? readFileSync(exclude, 'utf8') : ''
-  const lines = existing.split(/\r?\n/)
-  const additions: string[] = []
-  if (!lines.some(line => line.trim() === '.dsh-migrate/')) additions.push('.dsh-migrate/')
-  if (!lines.some(line => line.trim() === '.secrets.local.json')) additions.push('.secrets.local.json')
-  if (!lines.some(line => line.trim() === '.agents/notes/')) additions.push('.agents/notes/')
-  if (additions.length === 0) return
-  const prefix = existing === '' || existing.endsWith('\n') ? '' : '\n'
-  writeFileSync(exclude, `${existing}${prefix}${additions.join('\n')}\n`, 'utf8')
+  const present = new Set(existing.split('\n').map(line => line.trim()))
+  const missing = IGNORED_PATHS.filter(path => !present.has(path))
+  if (missing.length === 0) return
+  const separator = existing === '' || existing.endsWith('\n') ? '' : '\n'
+  writeFileSync(exclude, `${existing}${separator}${missing.join('\n')}\n`)
 }
 
-/**
- * True when the working tree or index differs from HEAD, ignoring migrate noise.
- * @param cwd - git repository root
- */
-export function isWorktreeDirty(cwd: string): boolean {
-  const result = git(['status', '--porcelain'], cwd)
-  if (result.status !== 0) {
-    throw new Error(`git status failed: ${result.stderr}`)
+/** Paths that differ from `HEAD`, ignored paths left out. */
+export function changedPaths(cwd: string): string[] {
+  const status = git(['status', '--porcelain=v1', '-z', '--untracked-files=all'], { cwd })
+  if (status.status !== 0) throw new Error(`git status failed: ${status.stderr.trim()}`)
+  const paths: string[] = []
+  // Not trimmed: the first column of an entry may be a space.
+  const entries = status.stdout.split('\0')
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index] ?? ''
+    if (entry.length < 4) continue
+    // A rename is followed by its source path, which is not a second change.
+    if (entry[0] === 'R' || entry[0] === 'C') index += 1
+    const path = entry.slice(3)
+    if (!isIgnoredPath(path)) paths.push(path)
   }
-  return result.stdout.split(/\r?\n/).some(line => {
-    if (line.trim() === '') return false
-    return !isMigrateNoisePath(porcelainPath(line))
-  })
+  return paths
+}
+
+/** Whether the tree differs from `HEAD` outside the ignored paths. */
+export function isTreeChanged(cwd: string): boolean {
+  return changedPaths(cwd).length > 0
 }
 
 /**
- * Stage plugin changes for the migration commit.
+ * Stage every change except the ignored paths.
  *
- * Do not pass `:!.dsh-migrate` (or other ignored paths) to `git add`. Git
- * treats an exclude pathspec as an explicit path and exits 1 when that path
- * is ignored via `.gitignore` or `.git/info/exclude` — the failure both
- * consumer Actions hit after A+B:
- * `The following paths are ignored by one of your .gitignore files: .dsh-migrate`.
+ * The ignored paths are never named in the pathspec: git refuses an explicit
+ * path that `.git/info/exclude` ignores, so they are staged and then reset.
  */
-export function stagePluginChanges(cwd: string): void {
-  const add = git(['add', '-A', '--', '.'], cwd)
-  if (add.status !== 0) {
-    throw new Error(`git add failed: ${add.stderr}`)
-  }
-  const staged = git(['diff', '--cached', '--name-only', '-z'], cwd)
-  if (staged.status !== 0) {
-    throw new Error(`git diff --cached failed: ${staged.stderr}`)
-  }
-  const noise = staged.stdout.split('\0').filter(path => path !== '' && isMigrateNoisePath(path))
-  if (noise.length === 0) return
-  const reset = git(['reset', '-q', '--', ...noise], cwd)
-  if (reset.status !== 0) {
-    throw new Error(`git reset failed: ${reset.stderr}`)
-  }
+export function stageChanges(cwd: string): void {
+  gitOut(['add', '-A', '--', '.'], { cwd })
+  const staged = gitOut(['diff', '--cached', '--name-only', '-z'], { cwd }).split('\0').filter(Boolean)
+  const ignored = staged.filter(isIgnoredPath)
+  if (ignored.length > 0) gitOut(['reset', '-q', '--', ...ignored], { cwd })
+}
+
+/** The working tree's diff against `HEAD`, ignored paths left out. */
+export function treeDiff(cwd: string): string {
+  return gitOut(['diff', 'HEAD', '--', '.', ...IGNORED_PATHS.map(path => `:!${path.replace(/\/$/, '')}`)], { cwd })
 }
 
 /**
- * `git diff` text for the Issue/PR body. Empty when clean.
- * @param cwd - git repository root
+ * The consumer's default branch: `origin/HEAD` when the checkout has it, the
+ * branch the checkout is on otherwise.
  */
-export function worktreeDiff(cwd: string): string {
-  const result = git(
-    ['diff', 'HEAD', '--', '.', ':!.dsh-migrate', ':!.secrets.local.json', ':!.agents/notes'],
-    cwd,
-  )
-  if (result.status !== 0) {
-    throw new Error(`git diff failed: ${result.stderr}`)
-  }
-  return result.stdout
+export function defaultBranch(cwd: string): string {
+  const head = git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], { cwd })
+  if (head.status === 0 && head.stdout.trim() !== '') return head.stdout.trim().replace(/^origin\//, '')
+  return gitOut(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd })
 }

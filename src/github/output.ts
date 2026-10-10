@@ -11,8 +11,8 @@ import { randomUUID } from 'node:crypto'
  * next output.
  * @param fields - the outputs to write; `undefined` values are skipped.
  */
-export function writeGithubOutput(fields: Record<string, string | undefined>): void {
-  const file = process.env.GITHUB_OUTPUT
+export function writeGithubOutput(fields: Record<string, string | undefined>, env: NodeJS.ProcessEnv = process.env): void {
+  const file = env.GITHUB_OUTPUT
   if (file === undefined || file === '') return
   const delimiter = `MIGRATE_EOF_${randomUUID().replace(/-/g, '')}`
   const lines: string[] = []

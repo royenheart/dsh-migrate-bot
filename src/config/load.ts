@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 import { configSchema, type MigrateConfig } from './schema.ts'
-import { BUILTIN_CHANNELS } from '../feedback/channels.ts'
+import { BUILTIN_CHANNELS } from '../merge-reports/channels.ts'
 
 export class ConfigError extends Error {
   override readonly name = 'ConfigError'

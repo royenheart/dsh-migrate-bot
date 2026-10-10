@@ -153,11 +153,6 @@ export function isDeepseekPeak(at: Date): boolean {
   return (minutes >= 60 && minutes < 240) || (minutes >= 360 && minutes < 600)
 }
 
-/** Whether a usage sample was billed at the peak rate. */
-export function tierOf(at: Date): 'peak' | 'off-peak' {
-  return isDeepseekPeak(at) ? 'peak' : 'off-peak'
-}
-
 /** Why a cost is reported the way it is. */
 export type PriceStatus = 'ok' | 'stale-table' | 'unknown-model'
 
@@ -179,11 +174,6 @@ export interface PricedUsage {
 export function priceTableAgeDays(now: Date = new Date()): number {
   const fetched = Date.parse(`${PRICE_TABLE_FETCHED_AT}T00:00:00Z`)
   return Math.max(0, Math.floor((now.getTime() - fetched) / 86_400_000))
-}
-
-/** Whether the vendored snapshot is old enough that its figures need re-checking. */
-export function priceTableStale(now: Date = new Date()): boolean {
-  return priceTableAgeDays(now) > PRICE_TABLE_STALE_AFTER_DAYS
 }
 
 /**

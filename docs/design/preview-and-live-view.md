@@ -99,7 +99,7 @@ Rules that hold regardless of the fronting service:
 
 ## 6. Commands
 
-The deploy target and the pull request share one command interface: a fixed set of verbs, one permission check, and one audit line per invocation. It is described in [the migration feedback stage](migration-feedback.md#6-commands), which owns the verb table, because the same interface also carries the feedback channels' manual and dry-run forms.
+The deploy target and the pull request share one command interface: a fixed set of verbs, one permission check, and one audit line per invocation. It is described in [the migration feedback stage](../reference/commands.md), which owns the verb table, because the same interface also carries the feedback channels' manual and dry-run forms.
 
 ## 7. Gate policy
 
@@ -132,7 +132,7 @@ A user implementing a deploy target has to serve this much. Every call carries `
 What the target owes beyond the shape of these calls:
 
 - It resolves the pull request's current head itself on a redeploy: a command handler has no checkout of that branch, and a commit guessed from the runner would be the wrong one to rebuild from.
-- It answers an `Idempotency-Key` it has already served with the result it gave then, and says so with `Idempotency-Replayed: true` — compared without regard to case — so the Action can report a repeat as already done instead of implying a second rebuild. This is the lock that holds when the Action's own record could not be written: [the Action suppresses a repeat](migration-feedback.md#6-commands) only while it can read the state branch it remembers in, and a crash or a refused push leaves a window in which the same key arrives twice.
+- It answers an `Idempotency-Key` it has already served with the result it gave then, and says so with `Idempotency-Replayed: true` — compared without regard to case — so the Action can report a repeat as already done instead of implying a second rebuild. This is the lock that holds when the Action's own record could not be written: [the Action suppresses a repeat](../reference/commands.md) only while it can read the state branch it remembers in, and a crash or a refused push leaves a window in which the same key arrives twice.
 - It never treats a repeated key as a conflict: the answer to a replayed publish is the same frozen revision, not an error, because the runner may be retrying a delivery whose reply it never saw.
 - It runs the boot probe before promoting a build, and keeps the previous good build serving when the probe fails.
 - It never returns its own control surface to the instance it runs, and never lets an instance reach the runtime socket of the machine it is on.

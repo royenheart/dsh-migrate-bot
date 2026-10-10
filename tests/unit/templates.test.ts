@@ -1,83 +1,65 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { renderDocuments } from '../../src/github/templates.ts'
+import { PROPOSAL_MARKER, renderProposal } from '../../src/github/templates.ts'
+import { contextOf, input } from '../support/migration.ts'
+import type { MigrationEvent } from '../../src/workflow/model.ts'
 
-const base = {
-  status: 'migrated' as const,
-  target: { tag: 'dsh-v0.1.1-rc.2', version: '0.1.1-rc.2' },
-  pluginName: '@me/dsh-plugin-x',
-  skippedReview: false,
-  fixAttempts: 2,
-  mechanical: { ok: true, errors: '', log: 'ok', checks: 1 },
-  verdictA: '## Verdict\nshrink',
-  verdictB: '## Edits\nuse official slot',
-  diff: '+ key: x',
+const repaired: MigrationEvent[] = [
+  { type: 'check.done', result: { check: 'mechanical', outcome: 'fail', fingerprint: 'mechanical: TS2304', detail: '' } },
+  { type: 'session.done', kind: 'overlap', outcome: 'completed', blocker: 'none', detail: '' },
+  { type: 'session.done', kind: 'extension-points', outcome: 'completed', blocker: 'none', detail: '' },
+  { type: 'check.done', result: { check: 'mechanical', outcome: 'fail', fingerprint: 'mechanical: TS2551', detail: '' } },
+  { type: 'session.done', kind: 'repair', outcome: 'completed', blocker: 'none', detail: '' },
+]
+
+function render(pluginName = '@acme/plugin') {
+  return renderProposal({
+    context: contextOf(input('0.2.0', { source: { release: { tag: 'dsh-v0.1.7', version: '0.1.7' }, origin: 'verified' } }), repaired),
+    pluginName,
+    checks: [
+      { check: 'mechanical', outcome: 'pass', fingerprint: '', detail: '' },
+      { check: 'e2e', outcome: 'fail', fingerprint: 'e2e: login spec', detail: 'expected heading' },
+    ],
+    reports: { overlap: '# Overlap\n\n## 3. Decision\nshrink', extensionPoints: '## Edits\nuse the official slot', repairs: ['## Root cause\nrenamed export'] },
+    diff: 'diff --git a/index.ts b/index.ts\n+ key: x',
+    runUrl: 'https://github.com/acme/plugin/actions/runs/1',
+  })
 }
 
-test('English documents have root-cause and test sections', () => {
-  const docs = renderDocuments(base)
-  assert.match(docs.title, /0\.1\.1-rc\.2/)
-  assert.match(docs.issue, /## Root cause/)
-  assert.match(docs.issue, /Overlap verdict: `shrink`/)
-  assert.match(docs.issue, /## Mechanical test report/)
-  assert.match(docs.issue, /patch-reports/)
-  assert.match(docs.pr, /## Test plan/)
-  assert.match(docs.pr, /## Risk/)
+test('the proposal names the release range, the attempts and every check', () => {
+  const docs = render()
+  assert.match(docs.title, /^Migrate @acme\/plugin to DeepSeek Harness 0\.2\.0$/)
+  assert.match(docs.issue, /Source release: `dsh-v0\.1\.7` \(verified\)/)
+  assert.match(docs.issue, /Repair attempts: 1/)
+  assert.match(docs.issue, /End-to-end check: fail \(e2e: login spec\)/)
+  assert.match(docs.pullRequest, /expected heading/)
+  assert.match(docs.pullRequest, /actions\/runs\/1/)
 })
 
-test('the report renders the baseline attribution and the verification layer', () => {
-  const docs = renderDocuments({
-    status: 'failed',
-    target: { tag: 'dsh-v0.1.5-rc.1', version: '0.1.5-rc.1' },
-    pluginName: '@acme/plugin',
-    skippedReview: false,
-    fixAttempts: 2,
-    mechanical: { ok: true, errors: '', log: '', checks: 1 },
-    diff: '',
-    attribution: { preExisting: true, regression: false, summary: 'baseline already broken (state): look further back' },
-    verification: {
-      ok: false,
-      layer: 'web',
-      signature: 'web: exited before serving',
-      detail: 'dsh web: exited before serving',
-    },
-  })
-  assert.match(docs.issue, /## Checks/)
-  assert.match(docs.issue, /Baseline: baseline already broken/)
-  assert.match(docs.issue, /web check: fail/)
-  assert.match(docs.issue, /dsh web: exited before serving/)
+test('the issue carries each review and repair report under its own heading', () => {
+  const docs = render()
+  const outline = docs.issue.split('\n').filter(line => /^#{1,2} /.test(line))
+  assert.deepEqual(outline, [
+    '# Migration of @acme/plugin to dsh-v0.2.0',
+    '## Summary',
+    '## Checks',
+    '## Overlap review',
+    '## Extension-point review',
+    '## Repair attempts',
+    '## Working tree',
+  ])
+  assert.match(docs.issue, /### Decision\n\nshrink/)
+  assert.match(docs.issue, /### Repair attempt 1/)
 })
 
-test('a report with no verification section stays unchanged', () => {
-  const docs = renderDocuments({
-    status: 'compatible',
-    target: { tag: 'dsh-v0.1.5-rc.1', version: '0.1.5-rc.1' },
-    pluginName: '@acme/plugin',
-    skippedReview: true,
-    fixAttempts: 0,
-    mechanical: { ok: true, errors: '', log: '', checks: 1 },
-    diff: '',
-  })
-  assert.doesNotMatch(docs.issue, /## Layered verification/)
+test('both bodies carry the marker that finds them again', () => {
+  const docs = render()
+  assert.ok(docs.issue.startsWith(PROPOSAL_MARKER))
+  assert.ok(docs.pullRequest.startsWith(PROPOSAL_MARKER))
 })
 
-test('a harness tag from an input cannot forge a line of the issue or the pull request', () => {
-  // `dsh_version` is a free-form action input, so the tag is operator text until
-  // the resolver turns it into one: it lands in an issue title and body.
-  const docs = renderDocuments({
-    ...base,
-    target: { tag: 'dsh-v0.1.6\n## Injected heading\n- @everyone', version: '0.1.6\n::add-mask::x' },
-    verification: {
-      ok: false,
-      layer: 'boot',
-      signature: 'load: failed',
-      detail: 'the plugin did not load\n```\n</details>\n# Injected\n',
-    },
-  })
-  assert.equal(docs.title.split('\n').length, 1)
-  assert.equal(docs.issue.split('\n').filter(line => line.startsWith('## Injected')).length, 0)
-  assert.equal(docs.issue.split('\n').filter(line => line.startsWith('- @everyone')).length, 0)
-  assert.equal(docs.pr.split('\n').filter(line => line.startsWith('::')).length, 0)
-  assert.equal(docs.issue.includes('```\n</details>'), false)
-  assert.match(docs.issue, /dsh-v0\.1\.6 ## Injected heading - @everyone/)
+test('a plugin name cannot forge a line of the title or the issue', () => {
+  const docs = render('evil\n## Forged\n- item')
+  assert.equal(docs.title.includes('\n'), false)
+  assert.equal(docs.issue.split('\n').some(line => line.startsWith('## Forged')), false)
 })

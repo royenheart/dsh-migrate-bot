@@ -1,115 +1,77 @@
 name: DSH Plugin Migrate Bot
-description: Migrate a third-party DeepSeek Harness plugin across official dsh-v* releases.
+description: Migrate a DeepSeek Harness plugin to new dsh-v* releases, and propose the change as a pull request.
 author: royenheart
 branding:
   icon: refresh-cw
   color: blue
 inputs:
-  dsh_version:
-    description: Target harness version (0.1.1-rc.2, dsh-v0.1.1-rc.2, or latest)
+  command:
+    description: run, pull-request-closed, comment, check, or status
     required: false
-    default: ''
+    default: run
+  workdir:
+    description: The plugin checkout, relative to the workspace
+    required: false
+    default: '.'
   config:
-    description: Path to dsh-migrate.yml relative to the plugin repository root
+    description: The configuration file, relative to the plugin checkout
     required: false
     default: .github/dsh-migrate.yml
-  mechanical_only:
-    description: If true, run mechanical tests only (no agent, no Issue/PR)
+  target:
+    description: Override the configured target release (latest, a version, or a dsh-v* tag)
+    required: false
+    default: ''
+  force:
+    description: run only. Migrate even when the target release was already processed
     required: false
     default: 'false'
   skip_github:
-    description: If true, do not open an Issue or PR
-    required: false
-    default: 'false'
-  force:
-    description: If true, run even when dsh has not changed since the last successful run
-    required: false
-    default: 'false'
-  allow_second_pull_request:
-    description: If true, run even while a migrate pull request is open, which opens a second one
-    required: false
-    default: 'false'
-  feedback_resend:
-    description: If true, report a merge to channels it was already reported to
-    required: false
-    default: 'false'
-  api_key_env:
-    description: Env var name for the DeepSeek API key (default DEEPSEEK_API_KEY_DSH_MIGRATE_BOT)
-    required: false
-    default: ''
-  workdir:
-    description: Plugin repository root inside the runner
-    required: false
-    default: '.'
-  quota_limit:
-    description: Max USD this Action run may spend (this run's official usage estimate). Empty = no cap.
-    required: false
-    default: ''
-  refresh_only:
-    description: If true, only reconcile a pending migrate PR and rewrite badge.json (no pipeline).
-    required: false
-    default: 'false'
-  feedback_only:
-    description: If true, report a merged migrate PR to the enabled feedback channels (no pipeline).
+    description: run only. Do not publish a proposal
     required: false
     default: 'false'
   pull_request:
-    description: Pull request number to report on. Empty = the pending migrate PR recorded on the state branch.
+    description: pull-request-closed only. The number of the closed pull request
     required: false
     default: ''
-  comment_command:
-    description: If true, treat this run as a /dsh-migrate command taken from a comment (no pipeline).
+  merged:
+    description: pull-request-closed only. Whether it was merged (true or false)
     required: false
-    default: 'false'
+    default: ''
   comment_body:
-    description: The comment text to read the command from. Only used when comment_command is true.
+    description: comment only. The comment text
     required: false
     default: ''
   comment_id:
-    description: The comment's id, which makes a redelivered or repeated command a repeat rather than a second command.
+    description: comment only. The comment id; a second delivery of the same comment has no second effect
     required: false
     default: ''
   comment_author:
-    description: Login of the commenter, for the bot check.
+    description: comment only. The commenter's login
     required: false
     default: ''
   comment_author_association:
-    description: The comment's author_association; OWNER, MEMBER, and COLLABORATOR may run commands.
+    description: comment only. The comment's author_association; OWNER, MEMBER and COLLABORATOR may run commands
     required: false
     default: ''
   issue_number:
-    description: Issue or pull request number the reply is posted to.
+    description: comment only. The issue or pull request the comment is on
     required: false
     default: ''
 outputs:
   status:
-    description: compatible, migrated, failed, skipped (dsh unchanged), or error (the agent runtime failed its self-test)
-  run_dir:
-    description: Absolute path of this run's A/B/C reports (under .dsh-migrate/)
-  mechanical_ok:
-    description: '"true" if the last mechanical suite passed'
-  skipped_review:
-    description: '"true" if review A/B was skipped'
-  issue_url:
-    description: Opened Issue URL, if any
-  pull_request_url:
-    description: Opened pull request URL, if any
+    description: compatible, proposed, unpublished, failed, error, skipped, or the state an event left the migration in
   target_tag:
-    description: Resolved dsh-v* tag for this run
-  previous_tag:
-    description: Last recorded dsh-v* tag (set when status is skipped)
+    description: The target release tag
   verified_tag:
-    description: Last verified dsh-v* tag (compatible run or merged migrate PR)
+    description: The newest verified release tag
   badge_message:
-    description: shields.io badge message (verified tag, pending, or unverified)
-  feedback_status:
-    description: One line per feedback channel — delivered, dry-run, held, skipped (with its reason), or failed
-  live_view_url:
-    description: Read-only URL where this run can be watched, when a deploy target is configured
-  command_repeat:
-    description: '"true" if this delivery did nothing: a suppressed repeat, a target that replayed the request, or a publish whose revision the branch already carried'
+    description: The badge message on the state branch
+  pull_request_url:
+    description: The proposal pull request, when there is one
+  log_stream_url:
+    description: The run log stream, when a deploy service serves one
   command_reply:
-    description: The markdown answer a /dsh-migrate command produced, also posted to the thread
+    description: comment only. The reply posted on the thread
 runs:
   using: docker
   image: Dockerfile

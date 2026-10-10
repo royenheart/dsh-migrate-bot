@@ -63,7 +63,7 @@ The migration runner needs two things the stock runner does not, both fixed in t
 | `BENCH_RUNS` | attempts per task; the record keeps every attempt and reports their median | `3` |
 | `BENCH_CONCURRENCY` | concurrent trials | `1` |
 
-The two modes are different subjects — one has the version cards and the corridor index available, the other does not — so a record names its mode and the table in [README.md](../README.md#upstream-benchmark) renders one section per mode rather than one mean across both. What every record pins, and what a comparison between two records is allowed to conclude, is in [reports/README.md](../reports/README.md#rules-that-make-the-record-reproducible).
+The two modes are different subjects — one has the version cards and the corridor index available, the other does not — so a record names its mode and the table in [README.md](../README.md#benchmark) renders one section per mode rather than one mean across both. What every record pins, and what a comparison between two records is allowed to conclude, is in [reports/README.md](../reports/README.md#rules-that-make-the-record-reproducible).
 
 ## Running the suite on a shared machine
 
@@ -102,7 +102,7 @@ What is not a fix is letting the install fail: an `apt-get install ... || true` 
 
 ## Reading the results
 
-The rewards and durations themselves are generated into [README.md](../README.md#upstream-benchmark) from the records in [reports/](../reports/README.md). This document does not restate them: two copies of a number drift apart, and the generated one is checked by `npm run gates`.
+The rewards and durations themselves are generated into [README.md](../README.md#benchmark) from the records in [reports/](../reports/README.md). This document does not restate them: two copies of a number drift apart, and the generated one is checked by `npm run gates`.
 
 Two facts about the shape of those results belong here rather than in a table.
 
@@ -112,7 +112,7 @@ The scored tasks reproduce their rewards across runs and across both build paths
 
 ### The two modes are the point of the table
 
-`native` and `upgrade-skills` run against the same frozen snapshot, the same build of the served model, and the same task set; the only difference is whether the community skills are loaded. Both records cover all 56 tasks with three attempts each, and the figures are in [README.md](../README.md#upstream-benchmark) — this document does not restate them.
+`native` and `upgrade-skills` run against the same frozen snapshot, the same build of the served model, and the same task set; the only difference is whether the community skills are loaded. Both records cover all 56 tasks with three attempts each, and the figures are in [README.md](../README.md#benchmark) — this document does not restate them.
 
 What the comparison says today: the mode with the skills loaded scores **higher**, on the mean and on the count of full-score tasks, in the same direction. What it does not say: how much of that is the skills and how much is the sampling. Three attempts per task is enough for a median to mean something, but the gap is small next to the spread a stochastic subject produces, and two tasks per mode carry no score at all, so a difference of that size is a direction and not a measurement. Treat it as a reason to keep measuring, not as a number to quote.
 

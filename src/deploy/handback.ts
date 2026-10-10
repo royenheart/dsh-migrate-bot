@@ -1,16 +1,16 @@
 /**
  * The Action's half of the publish hand-back.
  *
- * A deploy target has no write access to the pull request branch and never will:
+ * A deploy service has no write access to the pull request branch and never will:
  * it holds the user's code, the runner holds the credentials. So `publish` is a
  * request, and this is what fulfils it — fetch the frozen revision as a diff,
- * apply it to the pull request's head, run the same gate stack every other
+ * apply it to the pull request's head, run the same checks every other
  * change goes through, and push only if that passes. The contract is
  * [the publish hand-back]; this module is the runner's side of it.
  *
- * It owns git and nothing else. The gates arrive as a port, because that is what
+ * It owns git and nothing else. The checks arrive as a port, because that is what
  * makes this testable against a real repository without a harness install, and
- * because a publishing path deciding its own gates is how two paths start
+ * because a publishing path deciding its own checks is how two paths start
  * disagreeing about what "verified" means.
  *
  * [the publish hand-back]: ../../docs/design/preview-and-live-view.md#81-the-publish-hand-back
@@ -19,12 +19,11 @@
 import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
-import type { GateReport } from '../verify/gates.ts'
+import type { TreeCheckReport } from '../activities/check-tree.ts'
+import { BOT_EMAIL, BOT_NAME } from '../git/run.ts'
 import { inline } from '../render/text.ts'
 
 const GIT_SAFE = ['-c', 'safe.directory=*', '-c', 'commit.gpgsign=false'] as const
-const BOT_NAME = 'dsh-migrate[bot]'
-const BOT_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com'
 
 export interface HandbackInput {
   /** The consumer's checkout, which is where the worktree is added from. */
@@ -33,24 +32,16 @@ export interface HandbackInput {
   branch: string
   /** The commit the diff is applied to: the pull request head when frozen. */
   headSha: string
-  /** The frozen revision, as the target named it. */
+  /** The frozen revision, as the deploy service named it. */
   revision: string
-  /**
-   * The commit the scratch tree was built from, as the target named it.
-   *
-   * Not used to decide anything: the diff is applied at `headSha`, and the case
-   * where the two disagree is exactly the conflict the apply reports. Kept in
-   * the input so the caller passes what it received rather than dropping it.
-   */
-  baseSha?: string | undefined
-  /** The diff the target served for that revision. */
+  /** The diff the deploy service served for that revision. */
   diff: string
   repository: string
   pullRequest: number
   /** Where the temporary worktree goes. */
   treeDir: string
-  /** The gate stack, injected: this module knows git, not how a plugin is verified. */
-  runGates: (tree: string) => Promise<GateReport>
+  /** The tree check, injected: this module knows git, not how a plugin is verified. */
+  checkTree: (tree: string) => Promise<TreeCheckReport>
   log: (message: string) => void
   /** Injectable for tests; defaults to the process. */
   run?: GitRunner | undefined
@@ -71,7 +62,8 @@ export type HandbackResult =
     commit: string
     /** True when the branch already carried this revision, so nothing was pushed again. */
     alreadyPublished: boolean
-    gates: GateReport
+    /** Absent when the revision was already on the branch and nothing was checked again. */
+    checks?: TreeCheckReport
     detail: string
   }
   | {
@@ -81,17 +73,17 @@ export type HandbackResult =
      *
      * `error` is the one this function never returns: it is what the caller
      * reports when the hand-back itself threw, and it is in the same vocabulary
-     * so a target can read one shape.
+     * so a deploy service can read one shape.
      */
-    stage: 'remote' | 'base' | 'apply' | 'gates' | 'push' | 'error'
+    stage: 'remote' | 'base' | 'apply' | 'checks' | 'push' | 'error'
     detail: string
-    gates?: GateReport
+    checks?: TreeCheckReport
   }
 
 /**
- * Whether the values a target sent can be used in git commands.
+ * Whether the values a deploy service sent can be used in git commands.
  *
- * Everything a target sends is somebody else's input, and a branch name or a
+ * Everything a deploy service sends is somebody else's input, and a branch name or a
  * revision that starts with `-` is a git option rather than a value. The rules
  * are here so both the caller that reports and the function that runs agree on
  * what is acceptable.
@@ -126,12 +118,12 @@ export function invalidCommit(headSha: string): string | undefined {
  *
  * It is written into a commit message, into argv, into a log line, and into the
  * reply a human reads. A NUL cannot be passed to a process at all, a newline
- * forges a comment or a log line, and a backtick would let the target author the
+ * forges a comment or a log line, and a backtick would let the deploy service author the
  * account of what this Action did.
  */
 export function invalidRevision(revision: string): string | undefined {
   if (!/^[\x20-\x7e]{1,200}$/.test(revision) || revision.includes('`')) {
-    return 'the target named a revision that cannot be used in a commit message or a report'
+    return 'the deploy service named a revision that cannot be used in a commit message or a report'
   }
   return undefined
 }
@@ -141,7 +133,7 @@ export function invalidRevision(revision: string): string | undefined {
  *
  * The log is read as records rather than grepped so the comparison is equality:
  * `--grep` matches anywhere in a commit message, and the revision inside the
- * subject is a string the target chose.
+ * subject is a string the deploy service chose.
  * @param run - the git runner.
  * @param workdir - the checkout the branch ref is read from.
  * @param branch - the pull request branch.
@@ -209,7 +201,7 @@ function stillOnBranch(run: GitRunner, root: string, commit: string, tip: string
  *
  * The URL read is the one the push uses, not the one a fetch uses: `git push
  * origin` honours `remote.origin.pushurl` and `url.<base>.pushInsteadOf`, so a
- * gate that wrote either would otherwise send the verified commit somewhere the
+ * check that wrote either would otherwise send the verified commit somewhere the
  * fetch URL never mentions — and `--push` falls back to the fetch URL when
  * neither is set, so an ordinary checkout reads exactly as it did.
  *
@@ -387,7 +379,7 @@ function defaultRun(args: readonly string[], cwd: string, input?: string): GitOu
     ...(input === undefined ? {} : { input }),
     env: {
       ...process.env,
-      // Every path this module passes to git came from a diff a target supplied,
+      // Every path this module passes to git came from a diff a deploy service supplied,
       // and git reads a path starting with `:` as pathspec magic: a file named
       // `:(exclude)*` would match nothing, and `git diff --quiet` would then say
       // a reverted change is still on the branch. Literal pathspecs make a path
@@ -415,7 +407,7 @@ function defaultRun(args: readonly string[], cwd: string, input?: string): GitOu
 /**
  * Apply a frozen revision, verify it, and push it.
  *
- * The order is the contract: the gates run on the applied tree and before the
+ * The order is the contract: the checks run on the applied tree and before the
  * push, so a refusal leaves the branch exactly as it was. A revision that is
  * already on the branch is not applied twice — that is what makes a retry after
  * a reply that never arrived a no-op rather than a conflict.
@@ -427,7 +419,7 @@ export async function applyHandback(input: HandbackInput): Promise<HandbackResul
   const run = input.run ?? defaultRun
   const subject = publishSubject(input.revision, input.pullRequest)
   // Each invocation gets its own directory: two publishes in one checkout would
-  // otherwise delete each other's worktree while the other's gates were running,
+  // otherwise delete each other's worktree while the other's checks were running,
   // and the loser would go on to push a tree that no longer existed.
   mkdirSync(dirname(input.treeDir), { recursive: true })
   const treeDir = mkdtempSync(`${input.treeDir}-`)
@@ -469,7 +461,7 @@ export async function applyHandback(input: HandbackInput): Promise<HandbackResul
 
     // Already published: the same revision reached the branch in an earlier
     // attempt whose reply never arrived. The subject is compared in full — a
-    // revision is a string the target chose and a substring match would let
+    // revision is a string the deploy service chose and a substring match would let
     // `rev-1` be found by a commit about `rev-12` — and the change has to still
     // be there, because a reverted publish is not a published one.
     const published = alreadyPublishedCommit(run, input.workdir, input.branch, tip, subject)
@@ -479,20 +471,19 @@ export async function applyHandback(input: HandbackInput): Promise<HandbackResul
         ok: true,
         commit: published,
         alreadyPublished: true,
-        gates: { ok: true, steps: [], detail: 'not re-run: the revision is already on the branch' },
         detail: `revision ${input.revision} is already on ${input.branch}`,
       }
     }
 
-    // The diff was taken against the tree the target froze. If the branch has
+    // The diff was taken against the tree the deploy service froze. If the branch has
     // moved since, applying it here and pushing would be a non-fast-forward, so
-    // it is refused before the gate stack is spent — and the remedy is the one
-    // the contract names: the target rebuilds scratch onto the new head.
+    // it is refused before the checks are spent — and the remedy is the one
+    // the contract names: the deploy service rebuilds scratch onto the new head.
     if (tip !== input.headSha) {
       return {
         ok: false,
         stage: 'base',
-        detail: `the target froze ${input.headSha.slice(0, 8)} but \`${input.branch}\` is at ${tip.slice(0, 8)}; rebuild scratch onto the new head and publish again`,
+        detail: `the deploy service froze ${input.headSha.slice(0, 8)} but \`${input.branch}\` is at ${tip.slice(0, 8)}; rebuild scratch onto the new head and publish again`,
       }
     }
 
@@ -504,7 +495,7 @@ export async function applyHandback(input: HandbackInput): Promise<HandbackResul
       return { ok: false, stage: 'apply', detail: `could not check out ${input.headSha.slice(0, 8)}: ${tree.detail}` }
     }
     added = true
-    // Where the push will go, as it stands before the gates run, read where the
+    // Where the push will go, as it stands before the checks run, read where the
     // push will run: a worktree with `extensions.worktreeConfig` has a
     // configuration of its own, and reading the checkout would compare a URL
     // nothing is about to use.
@@ -521,7 +512,7 @@ export async function applyHandback(input: HandbackInput): Promise<HandbackResul
     const applied = run(['apply', '--3way', '--whitespace=nowarn', '-'], treeDir, input.diff)
     // A three-way apply that conflicts is not a patch that does not fit: the
     // scratch tree was built from an older base than the frozen head, and the
-    // remedy is the one the contract names — the target rebuilds it. Git says so
+    // remedy is the one the contract names — the deploy service rebuilds it. Git says so
     // by leaving unmerged entries, which is a fact about the index rather than a
     // sentence in whatever language the runner is set to.
     if (!applied.ok) {
@@ -545,7 +536,7 @@ export async function applyHandback(input: HandbackInput): Promise<HandbackResul
 
     const staged = run(['add', '-A'], treeDir)
     if (!staged.ok) return { ok: false, stage: 'apply', detail: `could not stage the diff: ${staged.detail}` }
-    // A diff can apply cleanly and change nothing — a target can freeze a
+    // A diff can apply cleanly and change nothing — a deploy service can freeze a
     // revision whose content is already at the head. Asking git what is staged
     // answers that in the exit code, which does not change with the locale the
     // way `nothing to commit` does.
@@ -562,36 +553,26 @@ export async function applyHandback(input: HandbackInput): Promise<HandbackResul
       return { ok: false, stage: 'apply', detail: inline(`could not commit the diff: ${committed.detail}`, 300) }
     }
     const commit = run(['rev-parse', 'HEAD'], treeDir).stdout
-    input.log(`publish: committed ${commit.slice(0, 8)}; running the gates`)
+    input.log(`publish: committed ${commit.slice(0, 8)}; running the checks`)
 
-    const gates = await input.runGates(treeDir)
-    // A verdict that names no layer is not a verdict, and this is the last point
-    // at which nothing has been pushed.
-    if (gates.ok && gates.steps.length === 0) {
-      return {
-        ok: false,
-        stage: 'gates',
-        detail: 'the gate stack returned no layer verdict, so the tree cannot be called verified',
-        gates,
-      }
-    }
-    if (!gates.ok) {
+    const checks = await input.checkTree(treeDir)
+    if (!checks.ok) {
       // Nothing is pushed, so the branch is untouched and the reason goes back
       // to whoever asked for the publish.
-      return { ok: false, stage: 'gates', detail: gates.detail, gates }
+      return { ok: false, stage: 'checks', detail: checks.detail, checks }
     }
-    // The gates run the plugin's own code, and `npm install` in a fresh worktree
+    // The checks run the plugin's own code, and `npm install` in a fresh worktree
     // creates `node_modules` and can rewrite a lockfile: what they leave behind
     // is theirs, not the change under review. Nothing has to refuse it, because
     // the commit was taken before they ran and the push names that commit.
     const leftovers = run(['status', '--porcelain'], treeDir)
     if (leftovers.ok && leftovers.stdout !== '') {
-      input.log('publish: the gates left files in the worktree; the verified commit is what is pushed')
+      input.log('publish: the checks left files in the worktree; the verified commit is what is pushed')
     }
 
-    // The gates run the plugin's own code in a worktree that shares the
+    // The checks run the plugin's own code in a worktree that shares the
     // checkout's git config, so the remote the push will use is compared with
-    // what it was before them: a gate that points the push somewhere else would
+    // what it was before them: a check that points the push somewhere else would
     // land the verified commit in a repository nobody asked about while the reply
     // says it landed. It is read where the push runs, which is the worktree.
     const retargeted = originMismatch(run, input.workdir, input.repository)
@@ -599,9 +580,9 @@ export async function applyHandback(input: HandbackInput): Promise<HandbackResul
       ?? pushDestination(run, treeDir)
       ?? (run(['remote', 'get-url', '--all', '--push', 'origin'], treeDir).stdout === remoteBefore
         ? undefined
-        : 'the gates changed where this checkout pushes to')
+        : 'the checks changed where this checkout pushes to')
     if (retargeted !== undefined) {
-      return { ok: false, stage: 'remote', detail: retargeted, gates }
+      return { ok: false, stage: 'remote', detail: retargeted, checks }
     }
 
     input.log(`publish: pushing ${commit.slice(0, 8)} to ${input.branch}`)
@@ -609,9 +590,9 @@ export async function applyHandback(input: HandbackInput): Promise<HandbackResul
     // that goes to the branch.
     const pushed = run(['push', 'origin', `${commit}:refs/heads/${input.branch}`], treeDir)
     if (!pushed.ok) {
-      return { ok: false, stage: 'push', detail: `could not push to ${input.branch}: ${pushed.detail}`, gates }
+      return { ok: false, stage: 'push', detail: `could not push to ${input.branch}: ${pushed.detail}`, checks }
     }
-    return { ok: true, commit, alreadyPublished: false, gates, detail: `pushed ${commit.slice(0, 8)}` }
+    return { ok: true, commit, alreadyPublished: false, checks, detail: `pushed ${commit.slice(0, 8)}` }
   } finally {
     cleanup()
   }
