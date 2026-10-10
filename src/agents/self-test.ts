@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { PACKAGE_ROOT } from '../paths.ts'
 
 /**
  * The agent runtime self-test.
@@ -43,7 +44,7 @@ export function classifySelfTest(output: { code: number | null; stdout: string; 
 export function runSelfTest(options: { bin?: string | undefined; dshHome?: string | undefined } = {}): SelfTestResult {
   const cwd = mkdtempSync(join(tmpdir(), 'dsh-migrate-self-test-'))
   try {
-    const env: NodeJS.ProcessEnv = { ...process.env, DSH_MIGRATE_STATUS_INTERVAL_MS: '60000' }
+    const env: NodeJS.ProcessEnv = { ...process.env, DSH_MIGRATE_STATUS_INTERVAL_MS: '60000', DSH_MIGRATE_APP_ROOT: PACKAGE_ROOT }
     delete env.DEEPSEEK_API_KEY
     if (options.dshHome !== undefined) env.DSH_HOME = options.dshHome
     const result = spawnSync(options.bin ?? 'dsh', ['--profile', 'migrate', 'self-test'], {

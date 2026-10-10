@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -8,6 +8,7 @@ import { parseConfig } from '../../src/config/load.ts'
 import { runMechanical } from '../../src/mechanical/run.ts'
 import { checkoutHarness } from '../../src/harness/checkout.ts'
 import { AgentTimeoutError, createDshRunner } from '../../src/agents/dsh.ts'
+import { PACKAGE_ROOT } from '../../src/paths.ts'
 
 function fixture(files: Record<string, string>): string {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-mig-timeout-'))
@@ -111,4 +112,8 @@ test('a session that finishes normally still returns its report', async () => {
     apiKey: 'k',
   })
   assert.equal(result.report, '# Report\nok')
+})
+
+test('the package root a session is given holds the accounting that prices it', () => {
+  assert.ok(existsSync(join(PACKAGE_ROOT, 'dist', 'src', 'agents', 'session-status.js')), `no session accounting under ${PACKAGE_ROOT}`)
 })

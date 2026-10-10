@@ -43,65 +43,17 @@ function fail(io, error) {
   io.exit(1)
 }
 
-function fallbackProgress(events, elapsedSeconds) {
-  let turns = 0
-  let steps = 0
-  let inputTokens = 0
-  let outputTokens = 0
-  let cacheHitTokens = 0
-  let cacheMissTokens = 0
-  for (const event of events) {
-    const type = event?.type
-    const data = event?.data ?? event
-    if (type === 'turn/start') turns += 1
-    if (type === 'step/start') steps += 1
-    const usage = data?.usage
-      ?? (data?.chunk?.type === 'usage' ? data.chunk.usage : undefined)
-    if (usage === undefined || typeof usage !== 'object') continue
-    if (typeof usage.inputTokens === 'number' && typeof usage.outputTokens === 'number') {
-      inputTokens += usage.inputTokens
-      outputTokens += usage.outputTokens
-      cacheHitTokens += usage.cacheReadTokens ?? 0
-      cacheMissTokens += usage.cacheMissTokens ?? usage.inputTokens
-      continue
-    }
-    if (typeof usage.prompt_tokens === 'number' && typeof usage.completion_tokens === 'number') {
-      const hit = usage.prompt_cache_hit_tokens
-        ?? usage.prompt_tokens_details?.cached_tokens
-        ?? 0
-      const miss = usage.prompt_cache_miss_tokens ?? Math.max(0, usage.prompt_tokens - hit)
-      inputTokens += miss
-      outputTokens += usage.completion_tokens
-      cacheHitTokens += hit
-      cacheMissTokens += miss
-    }
-  }
-  return {
-    turns,
-    steps,
-    elapsedSeconds: Math.max(0, Math.floor(elapsedSeconds)),
-    inputTokens,
-    outputTokens,
-    cacheHitTokens,
-    cacheMissTokens,
-  }
-}
-
 function usageUnits(progress) {
   return typeof progress.costUsd === 'number' ? progress.costUsd : 0
 }
 
 async function loadProgress() {
+  // The session accounting is the Action's own, so a session is counted and
+  // priced exactly as the spend cap and the reports count it.
   const root = process.env.DSH_MIGRATE_APP_ROOT
-  if (root) {
-    try {
-      const mod = await import(`${root}/dist/src/agents/session-status.js`)
-      return mod.summarizeSessionEvents
-    } catch {
-      return fallbackProgress
-    }
-  }
-  return fallbackProgress
+  if (!root) throw new Error('DSH_MIGRATE_APP_ROOT is not set; dsh-migrate passes it to every session')
+  const mod = await import(`${root}/dist/src/agents/session-status.js`)
+  return mod.summarizeSessionEvents
 }
 
 function isQuotaReason(reason) {

@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { PACKAGE_ROOT } from '../paths.ts'
 import { QuotaError } from '../quota/errors.ts'
 import {
   decodeStatusLine,
@@ -152,6 +153,7 @@ export function createDshRunner(options: {
         DSH_MIGRATE_TASK: request.prompt,
         DSH_MIGRATE_STATUS_INTERVAL_MS: process.env.DSH_MIGRATE_STATUS_INTERVAL_MS ?? '10000',
         DSH_MIGRATE_USAGE_SO_FAR: String(request.usageSoFar ?? 0),
+        DSH_MIGRATE_APP_ROOT: PACKAGE_ROOT,
       }
       if (request.usageLimit !== undefined) env.DSH_MIGRATE_USAGE_LIMIT = String(request.usageLimit)
       if (options.dshHome !== undefined) env.DSH_HOME = options.dshHome
