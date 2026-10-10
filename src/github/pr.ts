@@ -108,7 +108,7 @@ export function parsePullRequestNumber(url: string | undefined): number | undefi
 
 export function resolveRepo(
   cwd: string,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv,
 ): { owner: string; repo: string } {
   const origin = spawnSync('git', ['-c', 'safe.directory=*', 'remote', 'get-url', 'origin'], {
     cwd,

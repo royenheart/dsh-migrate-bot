@@ -13,9 +13,10 @@ export async function postIssueComment(input: {
   workdir: string
   issueNumber: number
   body: string
+  env: NodeJS.ProcessEnv
   fetchImpl?: typeof fetch
 }): Promise<{ ok: true; url?: string } | { ok: false; reason: string }> {
-  const { owner, repo } = resolveRepo(input.workdir)
+  const { owner, repo } = resolveRepo(input.workdir, input.env)
   const created = await githubRequest(
     input.token,
     'POST',

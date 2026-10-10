@@ -158,7 +158,7 @@ async function refreshBadge(argv: readonly string[]): Promise<number> {
   const appRoot = resolve(process.env.DSH_MIGRATE_APP_ROOT ?? resolve(here, '../..'))
   const secrets = loadSecrets([workdir, appRoot, process.cwd()])
   const previous = readSeenState(workdir)
-  const seen = await reconcilePendingState(workdir, previous, secrets.githubToken, logLine)
+  const seen = await reconcilePendingState(workdir, previous, secrets.githubToken, logLine, process.env)
   const code = persistState(workdir, seen, 'dsh-migrate: refresh badge')
   const badge = badgeFromSeenState(seen)
   writeGithubOutput({
@@ -230,6 +230,7 @@ async function commentCommand(argv: readonly string[]): Promise<number> {
           workdir,
           issueNumber,
           body: text,
+          env: process.env,
         })
         if (!posted.ok) process.stderr.write(`could not answer on the thread: ${posted.reason}\n`)
       } catch (error) {
@@ -619,7 +620,7 @@ async function main(argv: readonly string[]): Promise<number> {
   const loaded = mechanicalOnly ? undefined : readSeenState(workdir)
   const previous = mechanicalOnly
     ? undefined
-    : await reconcilePendingState(workdir, loaded, secrets.githubToken, logLine)
+    : await reconcilePendingState(workdir, loaded, secrets.githubToken, logLine, process.env)
   if (!mechanicalOnly && config.watch.enabled && previous !== loaded) {
     const code = persistState(workdir, previous, 'dsh-migrate: refresh badge')
     if (code !== 0) return code

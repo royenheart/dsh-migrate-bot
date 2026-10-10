@@ -68,7 +68,7 @@ export async function openLiveView(input: {
 
   let repository = 'unknown'
   try {
-    const resolved = resolveRepo(input.workdir)
+    const resolved = resolveRepo(input.workdir, input.env)
     repository = `${resolved.owner}/${resolved.repo}`
   } catch {
     // A run outside a GitHub checkout can still stream; it just cannot say

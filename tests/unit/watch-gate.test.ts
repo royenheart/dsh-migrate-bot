@@ -143,6 +143,7 @@ test('a merge report does not let a tag from the state branch rewrite the line',
     state,
     'ghs_token',
     (message: string) => lines.push(message),
+    {},
     async () => new Response(JSON.stringify({ state: 'closed', merged: true, merged_at: '2026-01-02T00:00:00Z' }), {
       status: 200,
       headers: { 'content-type': 'application/json' },

@@ -13,9 +13,16 @@ function runGit(args: string[], cwd: string): string {
   return result.stdout
 }
 
+/**
+ * The repository this run acts on: `GITHUB_REPOSITORY` when the environment
+ * names one, otherwise the origin URL.
+ * @param originUrl - the checkout's origin remote.
+ * @param env - the environment to read; passed explicitly so a test cannot
+ *   pick up the repository of the job that runs it.
+ */
 export function parseGithubRepo(
   originUrl: string,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv,
 ): { owner: string; repo: string } {
   const fromEnv = env.GITHUB_REPOSITORY
   if (fromEnv !== undefined && fromEnv.includes('/')) {
@@ -35,7 +42,7 @@ export function parseGithubRepo(
 
 function remoteRepo(cwd: string): { owner: string; repo: string } {
   const url = runGit(['remote', 'get-url', 'origin'], cwd).trim()
-  return parseGithubRepo(url)
+  return parseGithubRepo(url, process.env)
 }
 
 export function detectBaseBranch(cwd: string, env: NodeJS.ProcessEnv = process.env): string {

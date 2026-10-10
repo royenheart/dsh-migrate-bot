@@ -153,7 +153,7 @@ export async function runFeedback(input: FeedbackRunInput): Promise<FeedbackResu
   try {
     detail = await fetchPullRequestDetail({
       token: readToken,
-      ...repositoryOf(input.workdir),
+      ...repositoryOf(input.workdir, input.env),
       number,
       fetchImpl: input.fetchImpl ?? fetch,
     })
@@ -178,6 +178,7 @@ export async function runFeedback(input: FeedbackRunInput): Promise<FeedbackResu
   try {
     evidence = await collectEvidence({
       workdir: input.workdir,
+      env: input.env,
       seen: input.seen,
       token: readToken,
       pullRequest: detail,
@@ -299,8 +300,8 @@ function message(error: unknown): string {
 }
 
 /** The plugin repository, read from the git remote like the rest of the Action. */
-function repositoryOf(workdir: string): { owner: string; repo: string } {
-  return resolveRepo(workdir)
+function repositoryOf(workdir: string, env: NodeJS.ProcessEnv): { owner: string; repo: string } {
+  return resolveRepo(workdir, env)
 }
 
 /**
@@ -315,7 +316,7 @@ function channelReport(pullRequest: number, input: FeedbackRunInput): CommandRec
   if (input.resend === true) return undefined
   let repository: string
   try {
-    const resolved = repositoryOf(input.workdir)
+    const resolved = repositoryOf(input.workdir, input.env)
     repository = `${resolved.owner}/${resolved.repo}`
   } catch {
     // Without a repository there is no key to look up, and guessing one would

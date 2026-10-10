@@ -26,6 +26,7 @@ export async function reconcilePendingState(
   previous: SeenState | undefined,
   token: string | undefined,
   log: (message: string) => void,
+  env: NodeJS.ProcessEnv,
   fetchImpl: typeof fetch = fetch,
 ): Promise<SeenState | undefined> {
   if (previous?.pending === undefined) return previous
@@ -34,7 +35,7 @@ export async function reconcilePendingState(
     return previous
   }
   try {
-    const { owner, repo } = resolveRepo(workdir)
+    const { owner, repo } = resolveRepo(workdir, env)
     const prState = await fetchPullRequestState({
       token,
       owner,

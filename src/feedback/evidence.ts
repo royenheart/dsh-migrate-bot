@@ -224,12 +224,13 @@ export function corridorOf(seen: SeenState | undefined): { from?: string; to?: s
  */
 export async function collectEvidence(input: {
   workdir: string
+  env: NodeJS.ProcessEnv
   seen: SeenState | undefined
   token: string
   pullRequest: PullRequestDetail
   fetchImpl: typeof fetch
 }): Promise<FeedbackEvidence> {
-  const { owner, repo } = resolveRepo(input.workdir)
+  const { owner, repo } = resolveRepo(input.workdir, input.env)
   const issueNumber = companionIssueNumber(input.pullRequest.body)
   const comments = await collectComments({
     token: input.token,

@@ -268,7 +268,7 @@ test('a repeated command reaches nothing and says so', async () => {
   const parsed = parseCommand('/dsh-migrate redeploy')
   // The key the executor derives: the repository comes from the checkout, not
   // from anything a comment says.
-  const repo = resolveRepo(process.cwd())
+  const repo = resolveRepo(process.cwd(), TARGET_ENV)
   const key = commandKey({
     repository: `${repo.owner}/${repo.repo}`,
     issueNumber: 7,
