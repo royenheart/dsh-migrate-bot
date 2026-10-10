@@ -1,19 +1,19 @@
 /**
- * The Action's half of the publish hand-back.
+ * The Action's half of a preview publish.
  *
  * A deploy service has no write access to the pull request branch and never will:
  * it holds the user's code, the runner holds the credentials. So `publish` is a
  * request, and this is what fulfils it — fetch the frozen revision as a diff,
  * apply it to the pull request's head, run the same checks every other
  * change goes through, and push only if that passes. The contract is
- * [the publish hand-back]; this module is the runner's side of it.
+ * [preview publish]; this module is the runner's side of it.
  *
  * It owns git and nothing else. The checks arrive as a port, because that is what
  * makes this testable against a real repository without a harness install, and
  * because a publishing path deciding its own checks is how two paths start
  * disagreeing about what "verified" means.
  *
- * [the publish hand-back]: ../../docs/design/deploy-service.md#81-the-publish-hand-back
+ * [preview publish]: ../../docs/design/deploy-service.md#81-preview-publish
  */
 
 import { spawnSync } from 'node:child_process'

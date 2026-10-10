@@ -3,9 +3,9 @@
  *
  * Two callers depend on it being exactly these sections: the A/B harness-context
  * note, which asks the migration agent to draft a topic when no official thread
- * covers a required dsh-side patch, and the `harness-discussion` feedback
- * channel, which posts a draft that already exists by the time a migrate PR is
- * merged. Writing a second "open a discussion" prompt for the feedback channel
+ * covers a required dsh-side patch, and the `harness-discussion` report
+ * channel, which posts a draft that already exists by the time a proposal is
+ * merged. Writing a second "open a discussion" prompt for the report channel
  * would let the two drift apart, so the field list lives here and both reference
  * it.
  */

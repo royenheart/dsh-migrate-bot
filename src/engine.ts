@@ -1,10 +1,10 @@
 import { transition } from 'xstate'
-import { BADGE_FILE, logPath, migrationFile, serializeLog, type StateSnapshot, type StateStore } from '../state/store.ts'
-import { badgeOf } from './badge.ts'
-import { inline } from '../render/text.ts'
-import { migrationMachine, type ActivityRequest, type MigrationContext } from './machine.ts'
-import { project, replay, stateOf, type MigrationView, type Projection } from './projection.ts'
-import type { LogEntry, MigrationEvent, MigrationInput } from './model.ts'
+import { BADGE_FILE, logPath, migrationFile, serializeLog, type StateSnapshot, type StateStore } from './state/store.ts'
+import { badgeOf } from './workflow/badge.ts'
+import { inline } from './render/text.ts'
+import { migrationMachine, type ActivityRequest, type MigrationContext } from './workflow/machine.ts'
+import { project, replay, stateOf, type MigrationView, type Projection } from './workflow/projection.ts'
+import type { LogEntry, MigrationEvent, MigrationInput } from './workflow/model.ts'
 
 /**
  * The in-job engine: it executes the migration machine inside one GitHub

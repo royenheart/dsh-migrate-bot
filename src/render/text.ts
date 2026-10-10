@@ -1,7 +1,7 @@
 /**
  * Rendering text somebody else wrote.
  *
- * A value that arrives from a deploy target, a pull request, or an API is data:
+ * A value that arrives from a deploy service, a pull request, or an API is data:
  * the place it lands is a comment, a step summary, or a log line, and a newline
  * in it forges a row, a mention, or a link in something a human reads. Every
  * path that puts such a value into rendered output uses this, so there is one

@@ -96,7 +96,7 @@ test('stageChanges unstages .dsh-migrate even when it is not ignored', () => {
 test('Agent Notes are ignored paths, not migration content', () => {
   // Belt and braces behind the prompt: a live run left
   // `.agents/notes/implemented/architecture/…md` in the plugin tree, and the
-  // mechanical publish path would have committed it into the migration PR.
+  // mechanical publish path would have committed it into the proposal.
   assert.equal(isIgnoredPath('.agents/notes'), true)
   assert.equal(isIgnoredPath('.agents/notes/'), true)
   assert.equal(isIgnoredPath('.agents/notes/implemented/architecture/2026-09-10-x.md'), true)

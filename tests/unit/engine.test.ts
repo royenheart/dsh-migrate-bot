@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { InJobEngine, type ActivityRunner } from '../../src/workflow/engine.ts'
+import { InJobEngine, type ActivityRunner } from '../../src/engine.ts'
 import { BADGE_FILE, logPath, serializeLog, StateStore, STATE_BRANCH } from '../../src/state/store.ts'
 import { checkout, type Checkout } from '../support/repository.ts'
 import { input, logOf, proposal, proposedEvents, settings } from '../support/migration.ts'

@@ -48,7 +48,7 @@ test('user commands can still fail', () => {
 
 test('the boot-break fixture is a valid plugin package that only fails at activation', () => {
   // It must pass every static check: the counter-example is only useful if a
-  // shallow gate would wave it through and the boot probe catches it.
+  // shallow gate would wave it through and the boot check catches it.
   const result = runMechanical(resolve(fixtures, 'boot-break'), parseConfig({}))
   assert.equal(result.ok, true, result.errors)
 })

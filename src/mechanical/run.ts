@@ -70,7 +70,7 @@ function readPackageJson(root: string): unknown {
  *
  * The package.json belongs to the tree being migrated, so a file that is not
  * JSON, or a name that is not a non-empty string, is nothing rather than a
- * crash: this is read once to name the plugin in the boot probe's profile and
+ * crash: this is read once to name the plugin in the boot check's profile and
  * again to name it in a report, and neither is worth failing a run over.
  * @param workdir - the plugin working tree.
  */

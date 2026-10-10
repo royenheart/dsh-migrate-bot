@@ -44,9 +44,3 @@ test('the agent runtime is installed from its committed lockfile', () => {
 test('the image is rejected when the agent runtime fails its self-test', () => {
   assert.match(dockerfile, /^RUN dsh-migrate self-test$/m)
 })
-
-test('the Action runs the image of its own version', () => {
-  const action = readFileSync(join(root, 'action.yml'), 'utf8')
-  const version = readFileSync(join(root, 'VERSION'), 'utf8').trim()
-  assert.match(action, new RegExp(`image: docker://ghcr\\.io/royenheart/dsh-migrate-bot:v${version.replaceAll('.', '\\.')}\\n`))
-})

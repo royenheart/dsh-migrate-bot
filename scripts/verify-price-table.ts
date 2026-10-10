@@ -39,13 +39,14 @@ interface RateRow {
 
 /**
  * Compare the data file with the runtime table.
+ * @param read - reads the data file; a parameter so a test can feed a drifted one.
  * @returns one entry per disagreement, and the snapshot's age in days.
  */
-export function verifyPriceTable(): { violations: PriceViolation[]; ageDays: number } {
+export function verifyPriceTable(read: () => string = () => readText(resolve(REPO_ROOT, PRICE_TABLE_PATH))): { violations: PriceViolation[]; ageDays: number } {
   const violations: PriceViolation[] = []
   let parsed: unknown
   try {
-    parsed = JSON.parse(readText(resolve(REPO_ROOT, PRICE_TABLE_PATH)))
+    parsed = JSON.parse(read())
   } catch (error) {
     return {
       violations: [{ detail: `${PRICE_TABLE_PATH} is unreadable: ${error instanceof Error ? error.message : String(error)}` }],

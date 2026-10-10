@@ -5,7 +5,7 @@ import { inline } from '../render/text.ts'
 
 /**
  * The agent-authored end-to-end suite lives on its own branch, never in a
- * migration PR. The migration worktree stays untouched: the agent writes a
+ * proposal. The migration worktree stays untouched: the agent writes a
  * draft under the run directory (already migrate-noise, never committed) and
  * this module transplants it into a scratch worktree of the suite branch.
  */

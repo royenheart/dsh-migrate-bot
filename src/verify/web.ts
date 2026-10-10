@@ -6,7 +6,7 @@ import { classifyBoot, writeProbeProfile, type BootProbeResult } from './boot.ts
 import { readPackageName } from '../mechanical/run.ts'
 
 /**
- * Headless web smoke: boot the real `dsh web` server with the plugin mounted
+ * The web check: boot the real `dsh web` server with the plugin mounted
  * and no browser, then report whether the host came up with the plugin
  * attached. It catches the "the UI plugin never registered anything" class
  * without paying for a browser, and it runs before the suite so a tree that
@@ -126,7 +126,7 @@ function defaultSpawn(
 /**
  * Boot the web profile in a scratch home with the plugin mounted.
  *
- * Keyless like the boot probe: the model route points at a dead port, so
+ * Keyless like the boot check: the model route points at a dead port, so
  * reaching the server-ready line proves the composition and the plugin's
  * client entry resolved.
  * @param options - workdir, dsh binary, timeout, injectable spawn

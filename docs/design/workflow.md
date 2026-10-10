@@ -12,7 +12,7 @@ A migration is one consumer repository moving to one target release. This docume
 | Question | Decision | Reason |
 |---|---|---|
 | Where the workflow is defined | One XState v5 statechart, `src/workflow/machine.ts`, used as data | The machine is the only list of states, events and activities; the reference is generated from it and the tests replay it, so the three cannot disagree |
-| How it is executed | The in-job engine, `src/workflow/engine.ts`, inside one GitHub Actions job | The project runs no long-lived host; a job is the only place code runs |
+| How it is executed | The in-job engine, `src/engine.ts`, inside one GitHub Actions job | The project runs no long-lived host; a job is the only place code runs |
 | Where state lives | An append-only event log per migration on the `dsh-migrate/state` branch of the consumer | A job keeps nothing between runs; the branch is the one durable store a consumer already grants write access to |
 | What is stored | Events only; the processed release, the verified release and the open proposal are derived | A stored summary next to the log could disagree with it |
 | How effects are made safe to repeat | Every effect finds what an earlier attempt made before it creates anything | A job can be cancelled between an effect and the log write that records it |

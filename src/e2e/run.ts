@@ -8,7 +8,7 @@ import { join } from 'node:path'
  *
  * The suite lives on its own branch, so it is materialized into a scratch
  * worktree and the plugin's current (dirty, migrated) files are overlaid on top
- * of it. That keeps the migration worktree untouched — the migration PR never
+ * of it. That keeps the migration worktree untouched — the proposal never
  * carries test assets — while still exercising the code this run produced.
  */
 

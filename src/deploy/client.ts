@@ -4,8 +4,8 @@
  * Every call is best effort. The deploy service is somebody else's service: it can be
  * down, misconfigured, rate-limited, or not exist, and none of that may fail a
  * migration that is otherwise fine. A refusal is returned as a reason for the
- * caller to report, never thrown, which is the same posture the feedback
- * channels take toward their destinations.
+ * caller to report, never thrown, which is how the report channels treat their
+ * destinations too.
  */
 
 import { z } from 'zod'
