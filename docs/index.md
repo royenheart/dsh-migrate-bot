@@ -30,11 +30,9 @@ The entry point for progressive disclosure: `AGENTS.md` carries the standing ord
 | How the reference deploy service is built: run store, idempotency, preview manager, instance providers | `docs/design/deploy-service.md` | [The reference implementation](design/deploy-service.md#9-the-reference-implementation) |
 | Checking any deploy service against the Action's client | `docs/design/deploy-service.md` | [The conformance suite](design/deploy-service.md#10-the-conformance-suite) |
 | Running the reference deploy service: images, configuration, compose, Terraform, wiring a repository, verifying | `docs/operations/deploy-service.md` | [Configuration](operations/deploy-service.md#configuration) |
+| What is evaluated, the outcomes of an attempt, and the comparison rule | `docs/design/evaluation.md` | [Subjects](design/evaluation.md#2-subjects) |
+| Running the benchmark, comparing records, and publishing them | `docs/operations/benchmark.md` | [A run](operations/benchmark.md#a-run) |
+| Every benchmark metric and its definition | `docs/reference/metrics.md` | [Metrics reference](reference/metrics.md#metrics-reference) |
+| Every field of a benchmark record | `docs/reference/records.md` | [Benchmark record reference](reference/records.md#benchmark-record-reference) |
 | Standing orders for every agent session in this repository | `AGENTS.md` | [Rules](../AGENTS.md#rules) |
 | How documentation is organised, written, and kept from drifting | `docs/AGENTS.md` | [The tier taxonomy: one home per fact](AGENTS.md#the-tier-taxonomy-one-home-per-fact) |
-| Scoring this Action against the community benchmark suite | `docs/upstream-benchmark.md` | [Preparations](upstream-benchmark.md#preparations) |
-| The latest measured rewards, generated from the run records | `README.md` | [Upstream benchmark](../README.md#benchmark) |
-| What those results mean, and which of them are not defects | `docs/upstream-benchmark.md` | [Reading the results](upstream-benchmark.md#reading-the-results) |
-| What the benchmark exercise found wrong in our own code | `docs/upstream-benchmark.md` | [What this exercise exposed in our own code](upstream-benchmark.md#what-this-exercise-exposed-in-our-own-code) |
-| The record format each benchmark run writes, and the rules that make it reproducible | `reports/README.md` | [The record format](../reports/README.md#the-record-format-schema-2) |
-| The continuous quality-tracking framework this repository is converging on | `docs/design/continuous-quality-tracking.md` | [Proposed design](design/continuous-quality-tracking.md#5-proposed-design) |

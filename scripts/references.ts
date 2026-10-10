@@ -6,6 +6,8 @@
  * - docs/reference/configuration.md from the configuration schema
  * - docs/reference/workflow.md from the migration statechart
  * - docs/reference/commands.md from the comment command table
+ * - docs/reference/metrics.md from the metric library
+ * - docs/reference/records.md from the benchmark record schema
  *
  * Without `--write` it lists the documents that differ from the generated
  * text, which is how the `references` gate runs it.
@@ -19,6 +21,8 @@ import { configSchema } from '../src/config/schema.ts'
 import { checksFor, GUARD_DESCRIPTIONS, migrationMachine, type Scope } from '../src/workflow/machine.ts'
 import { migrationEventSchema, type Settings } from '../src/workflow/model.ts'
 import { COMMAND_PREFIX, COMMANDS } from '../src/commands/table.ts'
+import { FORMULA, METRICS } from '../src/evaluation/metrics.ts'
+import { recordSchema, RECORD_SCHEMA } from '../src/evaluation/record.ts'
 import { REPO_ROOT } from './repo.ts'
 
 function page(description: string, title: string, intro: string, body: string[]): string {
@@ -49,17 +53,23 @@ function typeOf(schema: JsonSchema): string {
   return schema.type ?? 'any'
 }
 
-function configRows(schema: JsonSchema, prefix: string): string[] {
+function row(key: string, type: string, fallback: string, description: string | undefined, defaults: boolean): string {
+  return defaults ? `| \`${key}\` | ${type} | ${fallback} | ${description ?? ''} |` : `| \`${key}\` | ${type} | ${description ?? ''} |`
+}
+
+function configRows(schema: JsonSchema, prefix: string, defaults = true): string[] {
   const rows: string[] = []
   for (const [name, child] of Object.entries(schema.properties ?? {})) {
     const key = prefix === '' ? name : `${prefix}.${name}`
     if (child.properties !== undefined) {
-      rows.push(...configRows(child, key))
+      rows.push(...configRows(child, key, defaults))
+    } else if (child.type === 'array' && child.items?.properties !== undefined) {
+      rows.push(row(key, 'list', '—', child.description, defaults), ...configRows(child.items, `${key}[]`, defaults))
     } else if (typeof child.additionalProperties === 'object' && child.additionalProperties.properties !== undefined) {
-      rows.push(`| \`${key}\` | mapping | — | ${child.description ?? ''} |`, ...configRows(child.additionalProperties, `${key}.<id>`))
+      rows.push(row(key, 'mapping', '—', child.description, defaults), ...configRows(child.additionalProperties, `${key}.<id>`, defaults))
     } else {
       const fallback = child.default === undefined || typeof child.default === 'object' ? '—' : `\`${String(child.default)}\``
-      rows.push(`| \`${key}\` | ${typeOf(child)} | ${fallback} | ${child.description ?? ''} |`)
+      rows.push(row(key, typeOf(child), fallback, child.description, defaults))
     }
   }
   return rows
@@ -218,12 +228,47 @@ function commands(): string {
   )
 }
 
+// ── evaluation ─────────────────────────────────────────────────────────────
+
+function metrics(): string {
+  return page(
+    'Every benchmark metric: its quality, its definition and the conventions all of them share.',
+    'Metrics reference',
+    `The metrics of a benchmark record, formula \`${FORMULA}\`. ${generatedFrom('src/evaluation/metrics.ts')}`,
+    [
+      'Conventions, applied by every metric:',
+      '',
+      '- An *eligible* task is applicable to the subject and feasible in the environment.',
+      '- A *counted* attempt is one on an eligible task whose outcome is `scored` (its reward), `timeout` or `exception` (reward 0). `infrastructure` attempts are not counted; `infrastructureRate` measures them.',
+      '- Suite means weight every task equally: the attempts of a task are averaged first.',
+      '- A metric with an interval reports a 95% percentile bootstrap over tasks, 10,000 resamples with a fixed seed, so a recomputed interval equals the stored one.',
+      '- A metric without its inputs, such as a cost when no attempt reported one, is `null`, never 0.',
+      '',
+      '| Metric | Quality | Interval | Definition |',
+      '| --- | --- | --- | --- |',
+      ...METRICS.map(metric => `| \`${metric.id}\` | ${metric.quality} | ${metric.interval === undefined ? 'no' : 'yes'} | ${metric.description} |`),
+    ],
+  )
+}
+
+function records(): string {
+  const schema = z.toJSONSchema(recordSchema, { io: 'output' }) as JsonSchema
+  return page(
+    'Every field of a benchmark record, schema 3.',
+    'Benchmark record reference',
+    `A record is \`records/<id>/record.json\` on the \`bench/records\` branch, schema ${String(RECORD_SCHEMA)}, beside the files its attempts kept. ${generatedFrom('src/evaluation/record.ts')}`,
+    ['| Field | Type | Description |', '| --- | --- | --- |', ...configRows(schema, '', false)],
+  )
+}
+
 /** Every reference document, by repository-relative path. */
 export function generateReferences(): Map<string, string> {
   return new Map([
     ['docs/reference/configuration.md', configuration()],
     ['docs/reference/workflow.md', workflow()],
     ['docs/reference/commands.md', commands()],
+    ['docs/reference/metrics.md', metrics()],
+    ['docs/reference/records.md', records()],
   ])
 }
 

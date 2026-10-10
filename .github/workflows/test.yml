@@ -19,3 +19,23 @@ jobs:
       - run: npm ci
       - run: npm run gates
       - run: npm test
+
+  # The benchmark's keyless path: Harbor runs the reference solutions of two
+  # tasks, and the record they produce must validate.
+  oracle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install harbor==0.24.0
+      - run: npm ci
+      - run: mkdir -p "$RUNNER_TEMP/records"
+      - run: npm run bench -- run --subject oracle --attempts 1 --tasks M1-host-migration,H1-plane-trap --records "$RUNNER_TEMP/records"
+      - run: node dist/scripts/bench.js validate "$RUNNER_TEMP/records"

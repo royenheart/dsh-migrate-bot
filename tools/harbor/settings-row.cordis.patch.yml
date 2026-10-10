@@ -1,9 +1,0 @@
-
-# Required by the `standard` preset on dsh >= 0.1.2-alpha.2. Its host composition
-# must provide the `modelSelectionSettings` service the subagent delegation group
-# injects; the web-app bundle normally supplies this row, but a headless profile
-# does not. On 0.1.1-rc.2 the export does not exist, so the adapter appends this
-# only after probing for it.
-- insert:
-    - id: subagent-model-selection-settings
-      name: '@deepseek-ai/dsh-tool-subagent/model-selection-settings'

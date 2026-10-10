@@ -14,7 +14,6 @@ import { verifyDocIndex } from './verify-doc-index.ts'
 import { verifyMarkdownLinks } from './verify-md-links.ts'
 import { verifySkillsPin } from './verify-skills-pin.ts'
 import { verifyPriceTable } from './verify-price-table.ts'
-import { syncReadme } from './sync-readme-benchmark.ts'
 import { staleReferences } from './references.ts'
 
 /** What one gate reported. */
@@ -22,19 +21,6 @@ interface GateResult {
   name: string
   ok: boolean
   detail: string
-}
-
-/**
- * Run the README benchmark block gate without writing.
- * @returns whether the block matches the records on disk.
- */
-function checkReadmeBenchmark(): GateResult {
-  const { changed } = syncReadme(true)
-  return {
-    name: 'readme-benchmark',
-    ok: !changed,
-    detail: changed ? 'README benchmark block is stale; run `npm run sync:readme`' : 'up to date',
-  }
 }
 
 /**
@@ -88,7 +74,6 @@ export function runGates(): GateResult[] {
           ? `pricing/deepseek.json matches the runtime table (${String(priceTable.ageDays)} days old)`
           : priceTable.violations.map(v => v.detail).join('; '),
     },
-    checkReadmeBenchmark(),
     (() => {
       const stale = staleReferences()
       return {

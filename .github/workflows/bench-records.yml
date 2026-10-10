@@ -1,0 +1,30 @@
+name: bench-records
+
+# Every record on the bench/records branch must validate against the metric
+# library of main: it parses, its metrics recompute to the stored values, and
+# its kept files match their hashes. Records are pushed by hand and the run
+# is requested after the push; a push to main revalidates them under the new
+# code.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: bench/records
+          path: .bench/records
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run bench -- validate

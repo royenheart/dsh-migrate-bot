@@ -12,12 +12,11 @@ import { dirname, join, relative } from 'node:path'
 
 /** Directory names never scanned, at any depth. */
 export const EXCLUDED_DIRS = new Set([
+  '.bench',
   '.git',
   '.dsh-migrate',
-  '.harbor-venv',
   '.venv',
   'dist',
-  'jobs',
   'node_modules',
   'vendor',
 ])
