@@ -35,7 +35,6 @@ test('collects one report.md per patch directory', () => {
 
 test('issue comment starts with a table then each report body', () => {
   const comments = formatPatchReportComment({
-    language: 'en',
     pullRequestUrl: 'https://example.test/p/2',
     reports: [
       {
@@ -81,7 +80,6 @@ test('a slug read off a directory cannot forge a line of the comment', () => {
       links: ['https://github.com/deepseek-ai/deepseek-harness/discussions/1\n::stop-commands::tok'],
     }],
     pullRequestUrl: 'https://github.com/acme/plug/pull/2',
-    language: 'en',
   })
   assert.equal(comments.length, 1)
   for (const comment of comments) {
@@ -95,7 +93,6 @@ test('a slug read off a directory cannot forge a line of the comment', () => {
   const credentialed = formatPatchReportComment({
     reports: [],
     pullRequestUrl: 'https://user:s3cr3t@evil.test/pull/2',
-    language: 'en',
   })
   assert.equal(credentialed.join('\n').includes('s3cr3t'), false)
 })

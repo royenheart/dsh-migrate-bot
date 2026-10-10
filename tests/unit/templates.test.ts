@@ -15,7 +15,7 @@ const base = {
 }
 
 test('English documents have root-cause and test sections', () => {
-  const docs = renderDocuments({ ...base, language: 'en' })
+  const docs = renderDocuments(base)
   assert.match(docs.title, /0\.1\.1-rc\.2/)
   assert.match(docs.issue, /## Root cause/)
   assert.match(docs.issue, /Overlap verdict: `shrink`/)
@@ -25,17 +25,8 @@ test('English documents have root-cause and test sections', () => {
   assert.match(docs.pr, /## Risk/)
 })
 
-test('Chinese documents keep the same section set', () => {
-  const docs = renderDocuments({ ...base, language: 'zh' })
-  assert.match(docs.issue, /## 根因/)
-  assert.match(docs.issue, /## 机械测试报告/)
-  assert.match(docs.issue, /patch-reports/)
-  assert.match(docs.pr, /## 测试计划/)
-})
-
 test('the report renders the baseline attribution and the verification layer', () => {
   const docs = renderDocuments({
-    language: 'en',
     status: 'failed',
     target: { tag: 'dsh-v0.1.5-rc.1', version: '0.1.5-rc.1' },
     pluginName: '@acme/plugin',
@@ -51,31 +42,14 @@ test('the report renders the baseline attribution and the verification layer', (
       detail: 'dsh web: exited before serving',
     },
   })
-  assert.match(docs.issue, /## Layered verification/)
+  assert.match(docs.issue, /## Checks/)
   assert.match(docs.issue, /Baseline: baseline already broken/)
-  assert.match(docs.issue, /web smoke: fail/)
+  assert.match(docs.issue, /web check: fail/)
   assert.match(docs.issue, /dsh web: exited before serving/)
-})
-
-test('the Chinese report names every layer in Chinese', () => {
-  const docs = renderDocuments({
-    language: 'zh',
-    status: 'migrated',
-    target: { tag: 'dsh-v0.1.5-rc.1', version: '0.1.5-rc.1' },
-    pluginName: '@acme/plugin',
-    skippedReview: false,
-    fixAttempts: 0,
-    mechanical: { ok: true, errors: '', log: '', checks: 1 },
-    diff: '',
-    verification: { ok: true, layer: 'boot', signature: 'pass', detail: '' },
-  })
-  assert.match(docs.issue, /## 分层验证/)
-  assert.match(docs.issue, /boot 探针: pass/)
 })
 
 test('a report with no verification section stays unchanged', () => {
   const docs = renderDocuments({
-    language: 'en',
     status: 'compatible',
     target: { tag: 'dsh-v0.1.5-rc.1', version: '0.1.5-rc.1' },
     pluginName: '@acme/plugin',
@@ -92,7 +66,6 @@ test('a harness tag from an input cannot forge a line of the issue or the pull r
   // the resolver turns it into one: it lands in an issue title and body.
   const docs = renderDocuments({
     ...base,
-    language: 'en',
     target: { tag: 'dsh-v0.1.6\n## Injected heading\n- @everyone', version: '0.1.6\n::add-mask::x' },
     verification: {
       ok: false,

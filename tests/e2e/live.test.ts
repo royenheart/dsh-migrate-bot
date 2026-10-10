@@ -29,7 +29,7 @@ test('live dsh review against the overlap fixture', async (t) => {
   const runDir = join(tmpdir(), `dsh-mig-live-${Date.now()}`)
   mkdirSync(runDir, { recursive: true })
   const result = await runPipeline({
-    config: parseConfig({ loop: { maxAttempts: 1 } }),
+    config: parseConfig({ repair: { maxAttempts: 1 } }),
     workdir,
     target: { tag: 'dsh-v0.1.1-rc.2', version: '0.1.1-rc.2' },
     store: createReportStore(runDir),

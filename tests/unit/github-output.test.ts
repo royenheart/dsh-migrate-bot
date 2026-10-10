@@ -48,7 +48,7 @@ test('dsh runner passes profile, prompt, and DSH_MIGRATE_* env', async () => {
     kind: 'absorption',
     prompt: 'review the plugin',
     workdir: process.cwd(),
-    dsh: {
+    agent: {
       provider: 'deepseek-official',
       model: 'deepseek-v4-flash',
       thinking: 'enabled',

@@ -1,4 +1,4 @@
-import type { DshBackendConfig } from '../config/schema.ts'
+import type { AgentConfig } from '../config/schema.ts'
 import type { SessionProgress } from './session-status.ts'
 
 export type AgentKind = 'absorption' | 'alignment' | 'fix' | 'e2e' | 'feedback'
@@ -7,7 +7,7 @@ export interface AgentRequest {
   kind: AgentKind
   prompt: string
   workdir: string
-  dsh: DshBackendConfig
+  agent: AgentConfig
   apiKey: string
   usageSoFar?: number | undefined
   usageLimit?: number | undefined

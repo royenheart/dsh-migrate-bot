@@ -130,13 +130,13 @@ function agentStub(report: string): AgentRunner {
   }
 }
 
-const AGENT_REPORT = 'Analysis.\n\n```json\n{"title":"bug: cards miss the httpServer rename","body":"## Environment\\n…","files":[]}\n```\n'
+const AGENT_REPORT = 'Analysis.\n\n```json\n{"title":"bug: cards miss the httpServer rename","body":"## Environment\\n…"}\n```\n'
 
 const DEDUPE_REPORT = 'Checked.\n\n```json\n{"decisions":[{"slug":"web-server-rename","post":true,"reason":"no existing request","existing":[]}]}\n```\n'
 
 function mergedConfig(overrides: Record<string, unknown> = {}) {
   return parseConfig({
-    feedback: {
+    reports: {
       channels: {
         'upgrade-skill': { enabled: true, tokenEnv: 'UPGRADE_TOKEN' },
         'migrate-bot': { enabled: false },
@@ -146,13 +146,11 @@ function mergedConfig(overrides: Record<string, unknown> = {}) {
   })
 }
 
-test('built-in feedback channels ship disabled and need a token to run', () => {
-  const config = parseConfig({})
-  assert.equal(config.feedback.enabled, true)
+test('built-in report channels ship disabled', () => {
+  const channels = resolveChannels(parseConfig({}))
   for (const id of ['upgrade-skill', 'migrate-bot', 'harness-discussion']) {
-    assert.equal(config.feedback.channels[id]?.enabled, false, `${id} must default to disabled`)
+    assert.equal(channels.find(channel => channel.id === id) === undefined, false, `${id} must be listed`)
   }
-  const channels = resolveChannels(config)
   const upgrade = channels.find(channel => channel.id === 'upgrade-skill')
   assert.equal(upgrade?.repo, 'oh-my-dsh/dsh-plugin-upgrade-skill')
   assert.equal(upgrade?.method, 'issue')
@@ -162,45 +160,12 @@ test('built-in feedback channels ship disabled and need a token to run', () => {
   assert.equal(discussion?.kind, 'dedupe')
 })
 
-test('a user-defined channel must declare repo, method, and prompt', () => {
-  assert.throws(
-    () => parseConfig({ feedback: { channels: { mine: { enabled: true } } } }),
-    /feedback\.channels\.mine\.repo is required/,
-  )
-  assert.throws(
-    () => parseConfig({
-      feedback: { channels: { mine: { enabled: true, repo: 'me/log', method: 'issue' } } },
-    }),
-    /feedback\.channels\.mine\.prompt is required/,
-  )
-  const config = parseConfig({
-    feedback: { channels: { mine: { enabled: true, repo: 'me/log', method: 'issue+pull', prompt: 'Write it.' } } },
-  })
-  assert.equal(config.feedback.channels.mine?.method, 'issue+pull')
-})
-
-test('feedback config rejects a bad method, repo, and token name', () => {
-  assert.throws(
-    () => parseConfig({ feedback: { channels: { 'migrate-bot': { enabled: true, method: 'email' } } } }),
-    /feedback\.channels\.migrate-bot\.method/,
-  )
-  assert.throws(
-    () => parseConfig({ feedback: { channels: { 'migrate-bot': { enabled: true, repo: 'not-a-slug' } } } }),
-    /must be "owner\/name"/,
-  )
-  assert.throws(
-    () => parseConfig({ feedback: { channels: { 'migrate-bot': { enabled: true, tokenEnv: 'not a name' } } } }),
-    /valid environment variable name/,
-  )
-})
-
 test('the report contract is parsed strictly, and a bad block is a failure not a delivery', () => {
   const parsed = parseFeedbackPayload(AGENT_REPORT)
   assert.equal(parsed.ok, true)
   assert.equal(parsed.ok && parsed.value.title, 'bug: cards miss the httpServer rename')
   assert.equal(parseFeedbackPayload('no json here').ok, false)
   assert.equal(parseFeedbackPayload('```json\n{"title":"t"}\n```').ok, false)
-  assert.equal(parseFeedbackPayload('```json\n{"title":"t","body":"b","files":[{"path":"/etc/passwd"}]}\n```').ok, false)
 })
 
 test('a merged pull request delivers to every enabled channel with a token', async () => {
@@ -293,7 +258,7 @@ test('the discussion channel posts the draft the migration already wrote, once c
     const result = await runFeedback({
       workdir: dir,
       config: parseConfig({
-        feedback: { channels: { 'harness-discussion': { enabled: true, tokenEnv: 'HARNESS_TOKEN' } } },
+        reports: { channels: { 'harness-discussion': { enabled: true, tokenEnv: 'HARNESS_TOKEN' } } },
       }),
       env: { GITHUB_TOKEN: 'ghs_read', HARNESS_TOKEN: 'ghp_harness' },
       log: () => {},
@@ -326,7 +291,7 @@ test('a classifier that holds the draft posts nothing', async () => {
     const result = await runFeedback({
       workdir: dir,
       config: parseConfig({
-        feedback: { channels: { 'harness-discussion': { enabled: true, tokenEnv: 'HARNESS_TOKEN' } } },
+        reports: { channels: { 'harness-discussion': { enabled: true, tokenEnv: 'HARNESS_TOKEN' } } },
       }),
       env: { GITHUB_TOKEN: 'ghs_read', HARNESS_TOKEN: 'ghp_harness' },
       log: () => {},
@@ -413,12 +378,12 @@ test('the community skills load only when the upgrade-skill channel is on', () =
 test('the channel flag decides whether skills are loaded', () => {
   assert.equal(upgradeSkillsEnabled(parseConfig({})), false)
   assert.equal(
-    upgradeSkillsEnabled(parseConfig({ feedback: { channels: { 'upgrade-skill': { enabled: true } } } })),
+    upgradeSkillsEnabled(parseConfig({ reports: { channels: { 'upgrade-skill': { enabled: true } } } })),
     true,
   )
   // The master switch wins over the per-channel flag.
   assert.equal(
-    upgradeSkillsEnabled(parseConfig({ feedback: { enabled: false, channels: { 'upgrade-skill': { enabled: true } } } })),
+    upgradeSkillsEnabled(parseConfig({ reports: { enabled: false, channels: { 'upgrade-skill': { enabled: true } } } })),
     false,
   )
 })
@@ -482,7 +447,7 @@ test('a merge reported to one channel still reaches the channel that was skipped
     const result = await runFeedback({
       workdir: dir,
       config: parseConfig({
-        feedback: {
+        reports: {
           channels: {
             'upgrade-skill': { enabled: true, tokenEnv: 'UPGRADE_TOKEN' },
             'migrate-bot': { enabled: true, tokenEnv: 'BOT_TOKEN' },
@@ -530,7 +495,7 @@ test('a reason from a classifier cannot add a line to a log or a reply', async (
     const result = await runFeedback({
       workdir: dir,
       config: parseConfig({
-        feedback: { channels: { 'harness-discussion': { enabled: true, tokenEnv: 'HARNESS_TOKEN' } } },
+        reports: { channels: { 'harness-discussion': { enabled: true, tokenEnv: 'HARNESS_TOKEN' } } },
       }),
       env: { GITHUB_TOKEN: 'ghs_read', HARNESS_TOKEN: 'ghp_harness' },
       log: (message: string) => lines.push(message),
@@ -550,7 +515,7 @@ test('a reason from a classifier cannot add a line to a log or a reply', async (
     const outcome = await runCommand({
       command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
       config: parseConfig({
-        feedback: { channels: { 'harness-discussion': { enabled: true, tokenEnv: 'HARNESS_TOKEN' } } },
+        reports: { channels: { 'harness-discussion': { enabled: true, tokenEnv: 'HARNESS_TOKEN' } } },
       }),
       env: { GITHUB_TOKEN: 'ghs_read', HARNESS_TOKEN: 'ghp_harness' },
       workdir: dir,

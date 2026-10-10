@@ -18,41 +18,13 @@ One migrate pull request at a time: while one is open, a run that would open a s
 
 ## Configuration
 
-| Field | Default |
-|---|---|
-| `dshVersion` | `latest` (the newest `dsh-v*` release) |
-| `dsh.provider` | `deepseek-official` |
-| `dsh.model` | `deepseek-v4-flash` |
-| `dsh.thinking` / `dsh.reasoningEffort` | enabled / `max` |
-| `review.policy` | `always` (`skip-if-mechanical-pass` skips the A/B reviews when the fast gate passed) |
-| `watch.enabled` | `true` |
-| `verify.boot` | enabled, 180s watchdog |
-| `verify.web` | enabled (runs only when the plugin declares a `dsh.client` surface) |
-| `e2e` | enabled, branch `dsh-migrate/e2e`, `forceRebase: true`, gate `advisory` |
-| `timeouts` | agent session 60m, each mechanical command 20m, harness checkout 10m |
-| `loop.maxAttempts` | 5 (the full budget; an early stop is evidence-driven) |
-| `issuePr.language` | `en` |
-| `secrets.apiKeyEnv` | `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` |
-| `quota.limit` | unset (caps this run's own official USD estimate) |
-| `feedback.enabled` | `true` (the master switch; every channel still needs its own `enabled`) |
-| `feedback.channels.*.enabled` | `false` for all three built-in channels |
-| `deploy.enabled` | `false` (no deploy target is configured) |
-| `deploy.endpoint` | unset (the target's base URL) |
-| `deploy.tokenEnv` | `DSH_MIGRATE_DEPLOY_TOKEN` |
-| `deploy.liveView` | `true` (streams only when `deploy.enabled` is true) |
-| `deploy.preview.enabled` | `true` (a preview needs a deploy target) |
-| `deploy.preview.ttlDays` / `idleMinutes` | 7 days / 120 minutes |
-| `deploy.preview.extendDays` | 7 days — what one `extend` asks for. It is never more than `ttlDays`: shortening `ttlDays` on its own clamps it, and setting an `extendDays` above the ceiling is a configuration error. The target is what enforces the ceiling |
-| `deploy.commands` | `true`; `false` refuses every `/dsh-migrate` verb from a comment, including `status` and `feedback` |
-| `tests.commands` | unset (the built-in suite runs; setting this list **replaces** it) |
-
-Override the review prompts under `prompts.absorption`, `prompts.alignment`, and `prompts.fix` in `.github/dsh-migrate.yml`.
+Every key of `.github/dsh-migrate.yml`, with its type and default, is in the [configuration reference](reference/configuration.md). An unknown or renamed key fails the run with a message that names the replacement.
 
 Action inputs: `dsh_version`, `config`, `mechanical_only`, `skip_github`, `force`, `api_key_env`, `workdir`, `quota_limit`, `refresh_only`, `feedback_only`, `pull_request`, `comment_command`, `comment_body`, `comment_id`, `comment_author`, `comment_author_association`, `issue_number`, `allow_second_pull_request`, `feedback_resend`. Outputs: `status`, `run_dir`, `mechanical_ok`, `skipped_review`, `issue_url`, `pull_request_url`, `target_tag`, `previous_tag`, `verified_tag`, `badge_message`, `feedback_status`, `live_view_url`, `command_reply`, `command_repeat`. To use a different API-key secret, set `api_key_env` (or `secrets.apiKeyEnv`) and map that name in the workflow `env:` block.
 
 Before each agent session the Action queries official remaining balance (`GET /user/balance` for DeepSeek). If the account is unavailable the run stops. `quota.limit` / `quota_limit` caps this run's own official USD estimate (this run's cache-miss / cache-hit / output tokens × [published rates](https://api-docs.deepseek.com/quick_start/pricing), peak/off-peak from each request timestamp). Other model providers have no official balance query or rate table yet.
 
-The verification layers (`verify`, `e2e`) need no API key: the boot probe points the model route at a dead port, and E2E runs against a local `dsh web`. Only the A/B/C agent sessions and the feedback sessions spend tokens.
+The checks (`checks.boot`, `checks.web`, `checks.e2e`) need no API key: the boot probe points the model route at a dead port, and E2E runs against a local `dsh web`. Only the A/B/C agent sessions and the feedback sessions spend tokens.
 
 ## Feedback channels
 
@@ -112,7 +84,7 @@ The name is configurable per channel through `tokenEnv`, and the workflow must m
 ### Enabling a channel
 
 ```yaml
-feedback:
+reports:
   channels:
     migrate-bot:
       enabled: true
@@ -125,7 +97,7 @@ That is the whole configuration for a built-in: `repo`, `method`, `tokenEnv`, `l
 Any key that is not one of the three built-ins is a channel you define. `repo`, `method`, and `prompt` are required, because nothing can default them:
 
 ```yaml
-feedback:
+reports:
   channels:
     my-team-log:
       enabled: true
@@ -162,7 +134,7 @@ deploy:
   enabled: true
   endpoint: https://deploy.example.com
   tokenEnv: DSH_MIGRATE_DEPLOY_TOKEN   # repository secret holding the target's token
-  liveView: true
+  logStream: true
   preview:
     enabled: true
     ttlDays: 7

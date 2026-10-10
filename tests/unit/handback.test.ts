@@ -428,7 +428,7 @@ test('the gate runner refuses on mechanical, on boot, and on a blocking suite', 
   assert.match(renderGateReport(advisoryReport), /e2e`: fail/)
 
   const blocking = createGateRunner({
-    config: parseConfig({ e2e: { gate: 'blocking' } }),
+    config: parseConfig({ checks: { e2e: { failurePolicy: 'blocking' } } }),
     dshTag: 'dsh-v0.1.6',
     dshCache: join(tmpdir(), 'dsh-gates-cache'),
     log: () => {},
@@ -676,7 +676,7 @@ test('a publish that cannot gate never asks the target to freeze anything', asyn
 })
 
 test('a blocking suite this invocation cannot run refuses instead of passing quietly', async () => {
-  const config = parseConfig({ e2e: { gate: 'blocking' } })
+  const config = parseConfig({ checks: { e2e: { failurePolicy: 'blocking' } } })
   const runner = createGateRunner({
     config,
     dshTag: 'dsh-v0.1.6',
@@ -894,7 +894,7 @@ test('the gate runner refuses a boot probe that timed out, and a stack that ran 
   assert.match(renderGateReport(hung), /boot`: fail/)
 
   const unchecked = createGateRunner({
-    config: parseConfig({ verify: { boot: { enabled: false } }, e2e: { enabled: false } }),
+    config: parseConfig({ checks: { boot: { enabled: false }, e2e: { enabled: false } } }),
     dshTag: 'dsh-v0.1.6',
     dshCache: join(tmpdir(), 'dsh-gates-cache'),
     log: () => {},
@@ -1355,17 +1355,17 @@ test('the CLI drives a publish end to end: freeze, diff, gates, push, report', a
       join(f.work, '.dsh-migrate.yml'),
       [
         // Pinned, so the gate stack resolves the harness without a release lookup.
-        'dshVersion: 0.1.6',
+        'target: 0.1.6',
         'deploy:',
         '  enabled: true',
         `  endpoint: http://127.0.0.1:${String(port)}`,
-        'verify:',
+        'checks:',
         '  boot:',
         '    enabled: false',
         '  web:',
         '    enabled: false',
-        'e2e:',
-        '  enabled: false',
+        '  e2e:',
+        '    enabled: false',
         '',
       ].join('\n'),
     )
@@ -2176,8 +2176,7 @@ test('a diff that changes nothing says so, and the branch keeps its head', async
 test('a skipped layer is not a verdict, and one resolver run is one harness', async () => {
   const config = parseConfig({
     deploy: { enabled: true, endpoint: 'https://deploy.test' },
-    verify: { boot: { enabled: false } },
-    e2e: { enabled: true, gate: 'advisory' },
+    checks: { boot: { enabled: false }, e2e: { enabled: true, failurePolicy: 'advisory' } },
   })
   let resolved = 0
   const runner = createGateRunner({
@@ -2209,8 +2208,7 @@ test('the default layers verify against the harness the run resolved once', asyn
   const tree = mkdtempSync(join(tmpdir(), 'dsh-gates-default-'))
   try {
     const config = parseConfig({
-      verify: { boot: { enabled: false }, web: { enabled: false } },
-      e2e: { enabled: false },
+      checks: { boot: { enabled: false }, web: { enabled: false }, e2e: { enabled: false } },
     })
     let resolved = 0
     const runner = createGateRunner({

@@ -121,7 +121,7 @@ export function createGateRunner(input: GateRunnerInput): (tree: string) => Prom
         workdir: tree,
         bin: installed.bin,
         dshTag,
-        timeoutMs: config.verify.boot.timeoutMs,
+        timeoutMs: config.checks.boot.timeoutMs,
       })
     })
 
@@ -178,7 +178,7 @@ export function createGateRunner(input: GateRunnerInput): (tree: string) => Prom
     // which is not evidence that anything works.
     if ((fast.checks ?? 0) > 0) executed = true
 
-    if (config.verify.boot.enabled) {
+    if (config.checks.boot.enabled) {
       input.log('gates: boot probe')
       let probed: BootProbeResult
       try {
@@ -224,7 +224,7 @@ export function createGateRunner(input: GateRunnerInput): (tree: string) => Prom
       steps.push({ layer: 'boot', ok: true, detail: '', skipped: 'verify.boot.enabled is false' })
     }
 
-    if (config.verify.web.enabled && input.web !== undefined) {
+    if (config.checks.web.enabled && input.web !== undefined) {
       input.log('gates: web smoke')
       let smoke: VerificationResult
       try {
@@ -256,7 +256,7 @@ export function createGateRunner(input: GateRunnerInput): (tree: string) => Prom
           detail: inline(`the web smoke failed: ${smoke.signature}`, 300),
         }
       }
-    } else if (config.verify.web.enabled) {
+    } else if (config.checks.web.enabled) {
       // The web smoke is not a configured gate the way `e2e.gate` is, so a
       // caller that cannot run it says so in the report rather than refusing:
       // the publish path always provides it, and a report that names the gap is
@@ -266,8 +266,8 @@ export function createGateRunner(input: GateRunnerInput): (tree: string) => Prom
       steps.push({ layer: 'web', ok: true, detail: '', skipped: 'verify.web.enabled is false' })
     }
 
-    const blocking = config.e2e.gate === 'blocking'
-    if (config.e2e.enabled && input.e2e !== undefined) {
+    const blocking = config.checks.e2e.failurePolicy === 'blocking'
+    if (config.checks.e2e.enabled && input.e2e !== undefined) {
       input.log('gates: end-to-end suite')
       let run: VerificationResult
       try {
@@ -297,7 +297,7 @@ export function createGateRunner(input: GateRunnerInput): (tree: string) => Prom
           detail: inline(`the end-to-end suite failed: ${run.signature}`, 300),
         }
       }
-    } else if (config.e2e.enabled && blocking) {
+    } else if (config.checks.e2e.enabled && blocking) {
       // A configured blocking suite that this invocation cannot run must not
       // become a silent pass: the user's configuration says nothing reaches the
       // branch without it.
@@ -313,7 +313,7 @@ export function createGateRunner(input: GateRunnerInput): (tree: string) => Prom
         layer: 'e2e',
         ok: true,
         detail: '',
-        skipped: config.e2e.enabled ? 'no end-to-end runner in this invocation' : 'e2e.enabled is false',
+        skipped: config.checks.e2e.enabled ? 'no end-to-end runner in this invocation' : 'e2e.enabled is false',
       })
     }
 

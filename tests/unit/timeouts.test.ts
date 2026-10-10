@@ -28,7 +28,7 @@ test('the watchdog defaults are set and overridable', () => {
 test('nonsense watchdog values are rejected rather than silently ignored', () => {
   assert.throws(() => parseConfig({ timeouts: { agentMs: 10 } }), /timeouts\.agentMs/)
   assert.throws(() => parseConfig({ timeouts: { commandMs: 'soon' } }), /timeouts\.commandMs/)
-  assert.throws(() => parseConfig({ timeouts: [] }), /timeouts must be a mapping/)
+  assert.throws(() => parseConfig({ timeouts: [] }), /expected object[\s\S]*at timeouts/)
 })
 
 test('a hung mechanical command is killed by the watchdog and reported as a failure', () => {
@@ -84,7 +84,7 @@ test('a session that outlives its watchdog throws instead of holding the job', a
       kind: 'fix',
       prompt: 'p',
       workdir: process.cwd(),
-      dsh: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max' },
+      agent: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max' },
       apiKey: 'k',
     }),
     (error: unknown) => {
@@ -108,7 +108,7 @@ test('a session that finishes normally still returns its report', async () => {
     kind: 'absorption',
     prompt: 'p',
     workdir: process.cwd(),
-    dsh: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max' },
+    agent: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max' },
     apiKey: 'k',
   })
   assert.equal(result.report, '# Report\nok')

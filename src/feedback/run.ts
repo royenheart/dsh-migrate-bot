@@ -82,12 +82,11 @@ export interface FeedbackRunInput {
 export function resolveChannels(config: MigrateConfig): ResolvedChannel[] {
   const ids = [
     ...BUILTIN_CHANNEL_IDS,
-    ...Object.keys(config.feedback.channels).filter(id => !(id in BUILTIN_CHANNELS)),
+    ...Object.keys(config.reports.channels).filter(id => !(id in BUILTIN_CHANNELS)),
   ]
   const channels: ResolvedChannel[] = []
   for (const id of ids) {
-    const entry = config.feedback.channels[id]
-    if (entry === undefined) continue
+    const entry = config.reports.channels[id] ?? { enabled: false }
     const builtin = BUILTIN_CHANNELS[id]
     const repo = entry.repo ?? builtin?.repo
     const method = entry.method ?? builtin?.method
@@ -139,7 +138,7 @@ export async function runFeedback(input: FeedbackRunInput): Promise<FeedbackResu
     return { ran: false, reason, outcomes }
   }
 
-  if (!input.config.feedback.enabled) return settle('feedback is disabled (feedback.enabled: false)')
+  if (!input.config.reports.enabled) return settle('feedback is disabled (feedback.enabled: false)')
 
   const number = resolvePullRequestNumber(input)
   if (number === undefined) return settle('no migrate pull request recorded; nothing to report on')
@@ -264,7 +263,7 @@ export async function runFeedback(input: FeedbackRunInput): Promise<FeedbackResu
 }
 
 function enabledChannel(channel: ResolvedChannel, config: MigrateConfig): boolean {
-  return config.feedback.channels[channel.id]?.enabled === true
+  return config.reports.channels[channel.id]?.enabled === true
 }
 
 /**
@@ -345,22 +344,20 @@ async function runChannel(input: {
     kind: 'feedback',
     prompt,
     workdir: input.workdir,
-    dsh: input.config.dsh,
+    agent: input.config.agent,
     apiKey: input.apiKey,
   })
 
-  const branch = `dsh-migrate-feedback/${input.channel.id}-${(input.now?.() ?? new Date()).toISOString().replace(/[:.]/g, '-')}`
   const target = {
     repo: input.channel.repo,
     method: input.channel.method,
     labels: input.channel.labels,
     category: input.channel.discussionCategory,
-    channel: input.channel.id,
   }
   const delivery = {
     token: input.token,
+    channel: input.channel.id,
     target,
-    branch,
     ...(input.fetchImpl === undefined ? {} : { fetchImpl: input.fetchImpl }),
   }
 
@@ -376,7 +373,7 @@ async function runChannel(input: {
         bodyPreview: parsed.value.body.slice(0, 1_200),
       }
     }
-    const delivered = await deliver({ ...delivery, payload: parsed.value })
+    const delivered = await deliver({ token: delivery.token, target, payload: parsed.value, ...(input.fetchImpl === undefined ? {} : { fetchImpl: input.fetchImpl }) })
     return {
       channel: input.channel.id,
       status: 'delivered',
@@ -412,8 +409,8 @@ async function runChannel(input: {
  */
 async function deliverDrafts(input: {
   token: string
+  channel: string
   target: Parameters<typeof deliver>[0]['target']
-  branch: string
   decisions: DedupeDecision[]
   evidence: Awaited<ReturnType<typeof collectEvidence>>
   fetchImpl?: typeof fetch
@@ -437,13 +434,12 @@ async function deliverDrafts(input: {
     const delivered = await deliver({
       token: input.token,
       target: input.target,
-      payload: { title: draft.title, body: draft.body, files: [] },
-      branch: `${input.branch}-${draft.slug}`,
+      payload: { title: draft.title, body: draft.body },
       ...(input.fetchImpl === undefined ? {} : { fetchImpl: input.fetchImpl }),
     })
     posted.push(`${draft.slug}${delivered.url === undefined ? '' : ` ${delivered.url}`}`)
   }
-  const channel = input.target.channel
+  const channel = input.channel
   if (posted.length === 0) {
     return { channel, status: 'held', reason: held.join('; ') || 'no draft was cleared to post' }
   }

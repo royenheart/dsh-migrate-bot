@@ -44,7 +44,6 @@ test('a package name cannot forge a line in the report it names', () => {
     assert.match(pluginName, /^evil ## Forged - item$/)
 
     const docs = renderDocuments({
-      language: 'en',
       status: 'migrated',
       target: { tag: 'dsh-v0.1.5', version: '0.1.5' },
       pluginName,

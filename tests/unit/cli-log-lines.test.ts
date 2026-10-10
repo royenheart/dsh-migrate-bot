@@ -45,7 +45,7 @@ function fixture(tag: string, target = 'dsh-v0.1.6'): Fixture {
   mkdirSync(join(work, '.github'), { recursive: true })
   writeFileSync(
     join(work, '.github/dsh-migrate.yml'),
-    'feedback:\n  enabled: true\n  channels:\n    upgrade-skill:\n      enabled: true\n',
+    'reports:\n  enabled: true\n  channels:\n    upgrade-skill:\n      enabled: true\n',
   )
   git(['add', '.'])
   git(['commit', '-m', 'init'])

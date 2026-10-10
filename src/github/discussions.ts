@@ -1,4 +1,3 @@
-import type { IssuePrLanguage } from '../config/schema.ts'
 import type { PatchReport } from './patch-reports.ts'
 import { inline } from '../render/text.ts'
 
@@ -32,21 +31,9 @@ export function officialDiscussionNewUrl(title: string): string {
  */
 export function formatOfficialDiscussionInvite(input: {
   report: PatchReport
-  language: IssuePrLanguage
 }): string {
   const title = discussionTitleFromReport(input.report)
   const url = officialDiscussionNewUrl(title)
-  if (input.language === 'zh') {
-    return [
-      `### 去官方开帖：\`${inline(input.report.slug, 60)}\``,
-      '',
-      '未找到对应的官方 discussion / issue / PR。请复制上一条评论里的讨论草稿，再到官方 Ideas 开帖：',
-      '',
-      `[在 deepseek-harness 打开 Ideas](${url})`,
-      '',
-      '分类会进 Ideas。标题有时能预填；正文请从上一评论的草稿粘贴（GitHub 不保证 `body=` 生效）。',
-    ].join('\n')
-  }
   return [
     `### Open official discussion: \`${inline(input.report.slug, 60)}\``,
     '',

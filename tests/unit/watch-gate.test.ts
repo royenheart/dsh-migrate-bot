@@ -7,7 +7,6 @@ const previous = { tag: 'dsh-v0.1.0-rc.8', version: '0.1.0-rc.8', recordedAt: '2
 
 test('first run with no saved state proceeds', () => {
   const decision = decideWatch({
-    watchEnabled: true,
     force: false,
     mechanicalOnly: false,
     current,
@@ -19,7 +18,6 @@ test('first run with no saved state proceeds', () => {
 
 test('same dsh version is skipped', () => {
   const decision = decideWatch({
-    watchEnabled: true,
     force: false,
     mechanicalOnly: false,
     current,
@@ -35,7 +33,6 @@ test('same dsh version is skipped', () => {
 
 test('a newer dsh version proceeds', () => {
   const decision = decideWatch({
-    watchEnabled: true,
     force: false,
     mechanicalOnly: false,
     current,
@@ -47,26 +44,17 @@ test('a newer dsh version proceeds', () => {
 test('force and mechanical-only bypass the unchanged gate', () => {
   const same = { ...previous, tag: current.tag, version: current.version }
   assert.equal(decideWatch({
-    watchEnabled: true,
     force: true,
     mechanicalOnly: false,
     current,
     previous: same,
   }).reason, 'forced')
   assert.equal(decideWatch({
-    watchEnabled: true,
     force: false,
     mechanicalOnly: true,
     current,
     previous: same,
   }).reason, 'mechanical-only')
-  assert.equal(decideWatch({
-    watchEnabled: false,
-    force: false,
-    mechanicalOnly: false,
-    current,
-    previous: same,
-  }).reason, 'watch-disabled')
 })
 
 test('an open migrate pull request blocks a run that would open a second one', () => {
@@ -101,7 +89,6 @@ test('a tag from the state branch cannot add a line to what the runner reads', (
   // parses workflow commands.
   const poisoned = { tag: 'dsh-v0.1.5\n::add-mask::not-a-secret', version: '0.1.5', recordedAt: '2026-01-01T00:00:00.000Z' }
   const skip = decideWatch({
-    watchEnabled: true,
     force: false,
     mechanicalOnly: false,
     current: { tag: 'dsh-v0.1.5\n::add-mask::not-a-secret', version: '0.1.5' },
@@ -117,10 +104,9 @@ test('a tag from the state branch cannot add a line to what the runner reads', (
   // takes: the first-run line is what every new install logs.
   const next = { tag: 'dsh-v0.1.6\n::add-mask::forged', version: '0.1.6' }
   const branches = [
-    decideWatch({ watchEnabled: true, force: false, mechanicalOnly: false, current: next, previous: undefined }),
-    decideWatch({ watchEnabled: true, force: false, mechanicalOnly: false, current: next, previous }),
-    decideWatch({ watchEnabled: true, force: true, mechanicalOnly: false, current: next, previous }),
-    decideWatch({ watchEnabled: false, force: false, mechanicalOnly: false, current: next, previous }),
+    decideWatch({ force: false, mechanicalOnly: false, current: next, previous: undefined }),
+    decideWatch({ force: false, mechanicalOnly: false, current: next, previous }),
+    decideWatch({ force: true, mechanicalOnly: false, current: next, previous }),
   ]
   for (const decision of branches) {
     const line = describeWatchDecision(decision, next)

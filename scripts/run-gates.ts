@@ -15,6 +15,7 @@ import { verifyMarkdownLinks } from './verify-md-links.ts'
 import { verifySkillsPin } from './verify-skills-pin.ts'
 import { verifyPriceTable } from './verify-price-table.ts'
 import { syncReadme } from './sync-readme-benchmark.ts'
+import { configReferenceIsCurrent } from './gen-config-reference.ts'
 
 /** What one gate reported. */
 interface GateResult {
@@ -88,6 +89,13 @@ export function runGates(): GateResult[] {
           : priceTable.violations.map(v => v.detail).join('; '),
     },
     checkReadmeBenchmark(),
+    {
+      name: 'config-reference',
+      ok: configReferenceIsCurrent(),
+      detail: configReferenceIsCurrent()
+        ? 'docs/reference/configuration.md matches the schema'
+        : 'docs/reference/configuration.md is stale; run `node dist/scripts/gen-config-reference.js --write`',
+    },
   ]
 }
 

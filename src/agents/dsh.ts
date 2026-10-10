@@ -143,10 +143,10 @@ export function createDshRunner(options: {
       const env: NodeJS.ProcessEnv = {
         ...process.env,
         DEEPSEEK_API_KEY: request.apiKey,
-        DSH_MIGRATE_PROVIDER: request.dsh.provider,
-        DSH_MIGRATE_MODEL: request.dsh.model,
-        DSH_MIGRATE_THINKING: request.dsh.thinking,
-        DSH_MIGRATE_EFFORT: request.dsh.reasoningEffort,
+        DSH_MIGRATE_PROVIDER: request.agent.provider,
+        DSH_MIGRATE_MODEL: request.agent.model,
+        DSH_MIGRATE_THINKING: request.agent.thinking,
+        DSH_MIGRATE_EFFORT: request.agent.reasoningEffort,
         // The job's container is the isolation boundary, and a headless session
         // has nobody to answer an approval prompt.
         DSH_PERMISSION_MODE: 'danger-full-access',

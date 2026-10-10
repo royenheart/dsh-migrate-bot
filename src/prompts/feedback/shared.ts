@@ -13,14 +13,11 @@ export const FEEDBACK_REPORT_CONTRACT = `Print exactly one fenced \`\`\`json blo
 
 {
   "title": "<the issue or pull request title, one line, no markdown>",
-  "body": "<the complete markdown body>",
-  "files": [{ "path": "<repository-relative path>", "content": "<full file content>" }]
+  "body": "<the complete markdown body>"
 }
 
 Rules for that block:
 - \`title\` and \`body\` are always required and are never empty.
-- \`files\` is required only when this channel delivers a pull request; use an empty array otherwise.
-- Write only files the report genuinely needs. Never write into a repository's protected or generated paths.
 - Reproduce evidence exactly: exact \`dsh-v*\` tags, full card ids, file paths and line numbers. Never invent a version, a card, or a URL.
 - State what you could not check. An unverified boundary is reported, never implied away.
 - Do not print anything after the block.`

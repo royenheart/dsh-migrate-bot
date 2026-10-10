@@ -1,11 +1,11 @@
-import { githubGet, githubRequest } from '../github/api.ts'
-import type { FeedbackMethod } from '../config/schema.ts'
+import { githubRequest } from '../github/api.ts'
+import type { ReportMethod } from '../config/schema.ts'
 
 /**
  * Where a channel's report goes.
  *
- * Four methods, all of them plain REST except `discussion`, which has no public
- * create endpoint and needs GraphQL. None of them can use the workflow's
+ * Two methods: `issue` over REST, and `discussion`, which has no public create
+ * endpoint and needs GraphQL. None of them can use the workflow's
  * `GITHUB_TOKEN`: that token is minted for the plugin repository, and every
  * built-in channel writes somewhere else. The caller supplies the token, and a
  * missing one is a skip, never a failure.
@@ -16,19 +16,16 @@ const GITHUB_GRAPHQL = 'https://api.github.com/graphql'
 export interface DeliveryTarget {
   /** `owner/name`. */
   repo: string
-  method: FeedbackMethod
+  method: ReportMethod
   /** Issue labels, applied when the method creates an issue. */
   labels: readonly string[]
   /** Discussion category slug, used when the method creates a discussion. */
   category: string
-  /** Channel id, used to build a branch name for pull delivery. */
-  channel: string
 }
 
 export interface DeliveryPayload {
   title: string
   body: string
-  files: ReadonlyArray<{ path: string; content: string }>
 }
 
 export interface DeliveryResult {
@@ -176,85 +173,16 @@ export async function deliverDiscussion(
 }
 
 /**
- * Open a pull request carrying files, on a fresh branch.
- *
- * Used only by a channel whose payload is files; the built-ins all deliver
- * issues or a discussion, because generating cards or registry entries for
- * another project is exactly what its rules forbid as a side effect of somebody
- * else's migration.
- * @param input.token - a token that may write to `input.target.repo`.
- * @param input.target - where and how to deliver.
- * @param input.payload - title, body, and the files to commit.
- * @param input.branch - branch to create; must not already exist.
- * @param input.fetchImpl - injectable fetch.
- */
-export async function deliverPullRequest(
-  input: {
-    token: string
-    target: DeliveryTarget
-    payload: DeliveryPayload
-    branch: string
-    fetchImpl?: typeof fetch
-  },
-): Promise<DeliveryResult> {
-  const fetchImpl = input.fetchImpl ?? fetch
-  const { owner, name } = splitRepo(input.target.repo)
-  if (input.payload.files.length === 0) {
-    throw new Error('pull delivery needs at least one file')
-  }
-  const repoInfo = await githubGet(input.token, `/repos/${owner}/${name}`, fetchImpl)
-  if (!repoInfo.ok) throw new Error(`cannot read ${input.target.repo}: ${String(repoInfo.status)}`)
-  const defaultBranch = (repoInfo.body as { default_branch?: unknown }).default_branch
-  const base = typeof defaultBranch === 'string' && defaultBranch !== '' ? defaultBranch : 'main'
-
-  const headRef = await githubGet(input.token, `/repos/${owner}/${name}/git/ref/heads/${base}`, fetchImpl)
-  if (!headRef.ok) throw new Error(`cannot read ${base} in ${input.target.repo}: ${String(headRef.status)}`)
-  const sha = (headRef.body as { object?: { sha?: unknown } }).object?.sha
-  if (typeof sha !== 'string') throw new Error(`no head sha for ${base} in ${input.target.repo}`)
-
-  await githubRequest(
-    input.token,
-    'POST',
-    `/repos/${owner}/${name}/git/refs`,
-    { ref: `refs/heads/${input.branch}`, sha },
-    fetchImpl,
-  )
-
-  for (const file of input.payload.files) {
-    await githubRequest(input.token, 'PUT', `/repos/${owner}/${name}/contents/${file.path}`, {
-      message: input.payload.title,
-      content: Buffer.from(file.content, 'utf8').toString('base64'),
-      branch: input.branch,
-    }, fetchImpl)
-  }
-
-  const pr = await githubRequest(input.token, 'POST', `/repos/${owner}/${name}/pulls`, {
-    title: input.payload.title,
-    body: input.payload.body,
-    head: input.branch,
-    base,
-  }, fetchImpl) as { html_url?: unknown; number?: unknown }
-  const url = typeof pr.html_url === 'string' ? pr.html_url : undefined
-  const number = typeof pr.number === 'number' ? pr.number : undefined
-  return {
-    ...(url === undefined ? {} : { url }),
-    detail: `pull request ${number === undefined ? '' : `#${String(number)} `}created in ${input.target.repo}`.trim(),
-  }
-}
-
-/**
  * Deliver one payload through the channel's method.
  * @param input.token - the channel's token.
  * @param input.target - where and how to deliver.
  * @param input.payload - the report.
- * @param input.branch - branch name used by pull delivery.
  * @param input.fetchImpl - injectable fetch.
  */
 export async function deliver(input: {
   token: string
   target: DeliveryTarget
   payload: DeliveryPayload
-  branch: string
   fetchImpl?: typeof fetch
 }): Promise<DeliveryResult> {
   const common = {
@@ -268,17 +196,6 @@ export async function deliver(input: {
       return await deliverIssue(common)
     case 'discussion':
       return await deliverDiscussion(common)
-    case 'pull':
-      return await deliverPullRequest({ ...common, branch: input.branch })
-    case 'issue+pull': {
-      const issue = await deliverIssue(common)
-      const pr = await deliverPullRequest({
-        ...common,
-        payload: { ...input.payload, body: `${input.payload.body}\n\nRefs ${issue.url ?? ''}`.trim() },
-        branch: input.branch,
-      })
-      return { ...pr, detail: `${issue.detail}; ${pr.detail}` }
-    }
     default: {
       const exhaustive: never = input.target.method
       throw new Error(`unsupported feedback method: ${String(exhaustive)}`)

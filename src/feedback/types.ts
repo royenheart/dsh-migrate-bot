@@ -1,4 +1,4 @@
-import type { FeedbackMethod } from '../config/schema.ts'
+import type { ReportMethod } from '../config/schema.ts'
 import type { PatchReport } from '../github/patch-reports.ts'
 
 /** How a channel decides what to write. */
@@ -8,7 +8,7 @@ export type FeedbackChannelKind = 'analysis' | 'dedupe'
 export interface ResolvedChannel {
   id: string
   repo: string
-  method: FeedbackMethod
+  method: ReportMethod
   tokenEnv: string
   kind: FeedbackChannelKind
   labels: string[]
@@ -75,10 +75,10 @@ export interface FeedbackEvidence {
 
 /** What one channel did. */
 export type FeedbackOutcome =
-  | { channel: string; status: 'delivered'; method: FeedbackMethod; url?: string | undefined; detail?: string | undefined }
+  | { channel: string; status: 'delivered'; method: ReportMethod; url?: string | undefined; detail?: string | undefined }
   | { channel: string; status: 'held'; reason: string }
   /** A dry run produced the payload and delivered nothing. */
-  | { channel: string; status: 'dry-run'; method: FeedbackMethod; title: string; bodyPreview: string }
+  | { channel: string; status: 'dry-run'; method: ReportMethod; title: string; bodyPreview: string }
   | { channel: string; status: 'skipped'; reason: string }
   | { channel: string; status: 'failed'; reason: string }
 

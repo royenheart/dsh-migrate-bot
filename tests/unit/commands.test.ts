@@ -120,7 +120,7 @@ test('status reports the recorded state and every channel, on or off', async () 
   const outcome = await runCommand({
     command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
     config: parseConfig({
-      feedback: { channels: { 'upgrade-skill': { enabled: true }, 'migrate-bot': { enabled: false } } },
+      reports: { channels: { 'upgrade-skill': { enabled: true }, 'migrate-bot': { enabled: false } } },
     }),
     env: {},
     workdir: process.cwd(),

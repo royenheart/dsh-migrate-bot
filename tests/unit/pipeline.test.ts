@@ -37,7 +37,7 @@ test('skip-if-mechanical-pass on a clean tree does not review or publish', async
   }
   const agent = fakeAgent()
   const result = await runPipeline({
-    config: parseConfig({ review: { policy: 'skip-if-mechanical-pass' } }),
+    config: parseConfig({ review: { policy: 'when-checks-fail' } }),
     workdir: process.cwd(),
     target: target(),
     store,
@@ -116,7 +116,7 @@ test('failed retest starts C-loop with errors only and stops when green', async 
     },
   }
   const result = await runPipeline({
-    config: parseConfig({ loop: { maxAttempts: 3 } }),
+    config: parseConfig({ repair: { maxAttempts: 3 } }),
     workdir: process.cwd(),
     target: target(),
     store,
@@ -222,7 +222,7 @@ test('dirty tree publishes Issue and PR; clean tree never does', async () => {
     },
   }
   const dirty = await runPipeline({
-    config: parseConfig({ review: { policy: 'skip-if-mechanical-pass' } }),
+    config: parseConfig({ review: { policy: 'when-checks-fail' } }),
     workdir: process.cwd(),
     target: target(),
     store,
@@ -257,7 +257,7 @@ test('a package name that carries a newline cannot forge a line of the report', 
     },
   }
   const result = await runPipeline({
-    config: parseConfig({ review: { policy: 'skip-if-mechanical-pass' } }),
+    config: parseConfig({ review: { policy: 'when-checks-fail' } }),
     workdir,
     target: { tag: 'dsh-v0.1.1\n::add-mask::forged-by-a-version-string', version: '0.1.1' },
     store,
@@ -298,7 +298,7 @@ test('opened Issue gets a comment with the patch-report table and bodies', async
     },
   }
   await runPipeline({
-    config: parseConfig({ review: { policy: 'skip-if-mechanical-pass' } }),
+    config: parseConfig({ review: { policy: 'when-checks-fail' } }),
     workdir,
     target: target(),
     store: createReportStore(mkdtempSync(join(tmpdir(), 'dsh-mig-'))),
@@ -338,7 +338,7 @@ test('existing official links do not get an open-discussion follow-up', async ()
     },
   }
   await runPipeline({
-    config: parseConfig({ review: { policy: 'skip-if-mechanical-pass' } }),
+    config: parseConfig({ review: { policy: 'when-checks-fail' } }),
     workdir,
     target: target(),
     store: createReportStore(mkdtempSync(join(tmpdir(), 'dsh-mig-'))),

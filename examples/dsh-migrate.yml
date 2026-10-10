@@ -1,76 +1,62 @@
-# Copy to .github/dsh-migrate.yml in the plugin repository.
-# Schedule lives in the workflow file, not here — GitHub only honors on.schedule there.
+# Copy to .github/dsh-migrate.yml in the plugin repository. Every key is
+# optional; docs/reference/configuration.md lists them all with their defaults.
+# The schedule lives in the workflow file: GitHub only honors on.schedule there.
 
-dshVersion: latest
+target: latest
 
-dsh:
+agent:
   provider: deepseek-official
   model: deepseek-v4-flash
   thinking: enabled
   reasoningEffort: max
 
 review:
-  # always | skip-if-mechanical-pass
-  # skip-if-mechanical-pass is for plugins whose npm test already proves host
-  # behavior, usage, and UI against the pinned target @deepseek-ai/dsh-* packages.
+  # always | when-checks-fail
+  # when-checks-fail skips the overlap and extension-point reviews when the
+  # unmodified tree already passes every check on the target release.
   policy: always
 
-# Skip the pipeline when dsh-v* is unchanged since the last successful run.
-# First run (no dsh-migrate/state seen.json yet) always proceeds.
-watch:
-  enabled: true
+repair:
+  maxAttempts: 5
 
 # Repository secret / env var that holds the DeepSeek API key.
 # secrets:
 #   apiKeyEnv: MY_DEEPSEEK_KEY
 
-# Uncomment to **replace** (not append) the built-in mechanical suite.
+# Replaces (does not extend) the built-in mechanical checks.
 # tests:
 #   commands:
 #     - npm test
 #     - npm run typecheck
 
 # prompts:
-#   absorption: |
-#     custom A
-#   alignment: |
-#     custom B
-#   fix: |
-#     custom C
+#   overlap: |
+#     custom overlap review prompt
+#   extensionPoints: |
+#     custom extension-point review prompt
+#   repair: |
+#     custom repair prompt
 
-issuePr:
-  language: en
-
-loop:
-  maxAttempts: 5
-
-# Optional cap on this Action run's official USD estimate (not account-wide spend).
-# Also available as the Action input quota_limit. Insufficient official balance
-# always aborts, even when this is unset.
+# Spend cap: the most USD one migration may spend, priced from its own usage.
 # quota:
 #   limit: 2
 
-# Feedback: after a migrate pull request is MERGED, report it to the channels you
-# enable. Every channel is off by default and needs its own token, because none
-# of these targets is the plugin repository your GITHUB_TOKEN belongs to.
-# A channel that is on without its token is skipped and logged, never an error.
-#feedback:
-#  channels:
-#    upgrade-skill:
-#      enabled: false          # issue -> oh-my-dsh/dsh-plugin-upgrade-skill
-#      # tokenEnv: DSH_MIGRATE_FEEDBACK_UPGRADE_SKILL_TOKEN
-#    migrate-bot:
-#      enabled: false          # issue -> royenheart/dsh-migrate-bot
-#      # tokenEnv: DSH_MIGRATE_FEEDBACK_BOT_TOKEN
-#    harness-discussion:
-#      enabled: false          # discussion -> deepseek-ai/deepseek-harness (Ideas)
-#      # tokenEnv: DSH_MIGRATE_FEEDBACK_HARNESS_TOKEN
-#    my-team-log:              # a channel of your own
-#      enabled: false
-#      repo: my-org/migration-log
-#      method: issue           # issue | pull | issue+pull | discussion
-#      tokenEnv: MY_MIGRATION_LOG_TOKEN
-#      prompt: |
-#        Report this migration to our team log. Say which plugin moved which
-#        corridor, what the maintainer changed before merging, and what we should
-#        do differently next time.
+# Report channels receive a report after a proposal is merged. Every channel is
+# off by default and needs its own token, because none of them writes to the
+# plugin repository the workflow token belongs to.
+# reports:
+#   channels:
+#     upgrade-skill:
+#       enabled: false          # issue -> oh-my-dsh/dsh-plugin-upgrade-skill
+#     migrate-bot:
+#       enabled: false          # issue -> royenheart/dsh-migrate-bot
+#     harness-discussion:
+#       enabled: false          # discussion -> deepseek-ai/deepseek-harness (Ideas)
+#     my-team-log:              # a channel of your own
+#       enabled: false
+#       repo: my-org/migration-log
+#       method: issue           # issue | discussion
+#       tokenEnv: MY_MIGRATION_LOG_TOKEN
+#       prompt: |
+#         Report this migration to our team log: which plugin moved to which
+#         release, and what the maintainer changed before merging.

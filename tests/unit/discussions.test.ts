@@ -33,13 +33,10 @@ test('new-discussion URL selects Ideas and encodes the title', () => {
 })
 
 test('invite comment is a follow-up under the draft', () => {
-  const en = formatOfficialDiscussionInvite({ report: draft, language: 'en' })
+  const en = formatOfficialDiscussionInvite({ report: draft })
   assert.match(en, /Open official discussion: `pre-step`/)
   assert.match(en, /Open Ideas on deepseek-harness/)
   assert.match(en, /category=ideas/)
-  const zh = formatOfficialDiscussionInvite({ report: draft, language: 'zh' })
-  assert.match(zh, /去官方开帖：`pre-step`/)
-  assert.match(zh, /打开 Ideas/)
 })
 
 test('a slug from the workspace cannot forge a line of the invite', async () => {
@@ -51,9 +48,7 @@ test('a slug from the workspace cannot forge a line of the invite', async () => 
     kind: 'draft' as const,
     links: [],
   }
-  for (const language of ['en', 'zh'] as const) {
-    const invite = formatOfficialDiscussionInvite({ report, language })
-    assert.equal(invite.split('\n').filter(line => line.startsWith('::')).length, 0)
-    assert.equal(invite.split('\n').filter(line => line.startsWith('- @everyone')).length, 0)
-  }
+  const invite = formatOfficialDiscussionInvite({ report })
+  assert.equal(invite.split('\n').filter(line => line.startsWith('::')).length, 0)
+  assert.equal(invite.split('\n').filter(line => line.startsWith('- @everyone')).length, 0)
 })

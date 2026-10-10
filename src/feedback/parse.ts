@@ -11,7 +11,6 @@
 export interface FeedbackPayload {
   title: string
   body: string
-  files: Array<{ path: string; content: string }>
 }
 
 export interface DedupeDecision {
@@ -59,7 +58,7 @@ function asText(value: unknown): string | undefined {
 }
 
 /**
- * Read a `{ title, body, files }` payload.
+ * Read a `{ title, body }` payload.
  * @param text - the whole session output.
  */
 export function parseFeedbackPayload(text: string): ParseResult<FeedbackPayload> {
@@ -69,23 +68,7 @@ export function parseFeedbackPayload(text: string): ParseResult<FeedbackPayload>
   const body = asText(record.body)
   if (title === undefined) return { ok: false, reason: 'the report block has no title' }
   if (body === undefined) return { ok: false, reason: 'the report block has no body' }
-  const files: Array<{ path: string; content: string }> = []
-  if (record.files !== undefined) {
-    if (!Array.isArray(record.files)) return { ok: false, reason: 'the report block has a non-list "files"' }
-    for (const entry of record.files) {
-      const file = asRecord(entry)
-      const path = file === undefined ? undefined : asText(file.path)
-      const content = file === undefined ? undefined : file.content
-      if (path === undefined || typeof content !== 'string') {
-        return { ok: false, reason: 'a "files" entry is missing "path" or "content"' }
-      }
-      if (path.startsWith('/') || path.split('/').includes('..')) {
-        return { ok: false, reason: `file path \`${path}\` is not a repository-relative path` }
-      }
-      files.push({ path, content })
-    }
-  }
-  return { ok: true, value: { title, body, files } }
+  return { ok: true, value: { title, body } }
 }
 
 /**

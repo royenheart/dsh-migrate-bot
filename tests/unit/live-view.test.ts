@@ -54,7 +54,7 @@ test('no deploy target means no view, and saying so once', async () => {
 test('a view turned off on its own says which switch to look at', async () => {
   const logs: string[] = []
   const view = await openLiveView({
-    config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test', liveView: false } }),
+    config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test', logStream: false } }),
     env: ENV,
     workdir: process.cwd(),
     runId: 'run-1',

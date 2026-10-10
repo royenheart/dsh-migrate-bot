@@ -293,7 +293,7 @@ async function commentCommand(argv: readonly string[]): Promise<number> {
   const gateRunner = createGateRunner({
     config,
     dshTag: recordedTag
-      ?? (async () => (await resolveDshVersion(config.dshVersion, { token: secrets.githubToken })).tag),
+      ?? (async () => (await resolveDshVersion(config.target, { token: secrets.githubToken })).tag),
     dshCache: resolve(migrateHome, 'dsh'),
     log: logLine,
     // The whole stack, including the suite: a publish claims to be verified the
@@ -302,7 +302,7 @@ async function commentCommand(argv: readonly string[]): Promise<number> {
     e2e: (tree: string): VerificationResult => {
       const run = runE2E({
         workdir: tree,
-        branch: config.e2e.branch,
+        branch: config.checks.e2e.branch,
         mode: 'full',
         failing: [],
         worktreeDir: resolve(migrateHome, 'publish-e2e'),
@@ -332,7 +332,7 @@ async function commentCommand(argv: readonly string[]): Promise<number> {
       const smoke = await runWebSmoke({
         workdir: tree,
         bin: installed.bin,
-        timeoutMs: config.verify.web.timeoutMs,
+        timeoutMs: config.checks.web.timeoutMs,
         dshTag: tag,
       })
       return {
@@ -606,7 +606,7 @@ async function main(argv: readonly string[]): Promise<number> {
   const config = configPath === undefined || !existsSync(configPath)
     ? parseConfig({})
     : loadConfigFile(configPath)
-  const requested = argValue(argv, '--dsh-version') ?? config.dshVersion
+  const requested = argValue(argv, '--dsh-version') ?? config.target
   const apiKeyEnv = argValue(argv, '--api-key-env') ?? config.secrets.apiKeyEnv
   const secrets = loadSecrets([workdir, appRoot, process.cwd()], { apiKeyEnv })
   // Authenticate the releases call: unauthenticated it shares a 60/hour
@@ -627,12 +627,11 @@ async function main(argv: readonly string[]): Promise<number> {
   const previous = mechanicalOnly
     ? undefined
     : await reconcilePendingState(workdir, loaded, secrets.githubToken, logLine, process.env)
-  if (!mechanicalOnly && config.watch.enabled && previous !== loaded) {
+  if (!mechanicalOnly && previous !== loaded) {
     const code = persistState(workdir, previous, 'dsh-migrate: refresh badge')
     if (code !== 0) return code
   }
   const decision = decideWatch({
-    watchEnabled: config.watch.enabled,
     force,
     mechanicalOnly,
     current: target,
@@ -772,13 +771,13 @@ async function main(argv: readonly string[]): Promise<number> {
     ? { path: harnessResult.path, tag: target.tag }
     : undefined
 
-  const quotaQuery = createQuotaQuery({ provider: config.dsh.provider })
+  const quotaQuery = createQuotaQuery({ provider: config.agent.provider })
   const quota = {
     query: () => quotaQuery.query({ apiKey }),
   }
 
   const dshCache = resolve(migrateHome, 'dsh')
-  const probeEnv = { timeoutMs: config.verify.boot.timeoutMs }
+  const probeEnv = { timeoutMs: config.checks.boot.timeoutMs }
 
   /** V2: boot the tree under one harness version through a scratch profile. */
   const probeAt = async (tag: string): Promise<BootProbeResult> => {
@@ -793,13 +792,13 @@ async function main(argv: readonly string[]): Promise<number> {
   // back the agent has to look.
   const baselineRef = resolveBaseline(previous, workdir)
   let baselineProbe: BootProbeResult | undefined
-  if (config.verify.boot.enabled && baselineRef.tag !== undefined) {
+  if (config.checks.boot.enabled && baselineRef.tag !== undefined) {
     // The recorded tag is read out of the state branch: one line of it, because
     // this goes to stdout where the runner parses workflow commands.
     logLine(`stage: baseline probe ${inline(baselineRef.tag, 80)} (${inline(baselineRef.source, 40)})`)
     baselineProbe = await probeAt(baselineRef.tag)
     logLine(`baseline probe: ${baselineProbe.outcome} (${inline(baselineProbe.signature, 200)})`)
-  } else if (config.verify.boot.enabled) {
+  } else if (config.checks.boot.enabled) {
     logLine('baseline probe skipped: no recorded tag and no declared harness version')
   }
 
@@ -836,7 +835,7 @@ async function main(argv: readonly string[]): Promise<number> {
       ...(skipGithub || githubToken === undefined
         ? {}
         : { github: createGithubPublisher(githubToken) }),
-      ...(config.verify.boot.enabled
+      ...(config.checks.boot.enabled
         ? {
           probeTarget: async (): Promise<VerificationResult> => {
             const probe = await probeAt(target.tag)
@@ -849,7 +848,7 @@ async function main(argv: readonly string[]): Promise<number> {
           },
         }
         : {}),
-      ...(config.verify.web.enabled
+      ...(config.checks.web.enabled
         ? {
           probeWeb: async (): Promise<VerificationResult> => {
             if (!hasClientSurface(workdir)) {
@@ -862,7 +861,7 @@ async function main(argv: readonly string[]): Promise<number> {
             const smoke = await webSmoke({
               workdir,
               bin: installed.bin,
-              timeoutMs: config.verify.web.timeoutMs,
+              timeoutMs: config.checks.web.timeoutMs,
               dshTag: target.tag,
             })
             return {
@@ -875,13 +874,13 @@ async function main(argv: readonly string[]): Promise<number> {
           },
         }
         : {}),
-      ...(config.e2e.enabled
+      ...(config.checks.e2e.enabled
         ? {
           runE2E: async (mode: 'subset' | 'full'): Promise<VerificationResult> => {
             const run = runE2E({
               workdir,
-              branch: config.e2e.branch,
-              mode: config.e2e.subsetFirst ? mode : 'full',
+              branch: config.checks.e2e.branch,
+              mode: config.checks.e2e.subsetFirst ? mode : 'full',
               failing: lastE2EFailure,
               worktreeDir: worktreeRoot,
               timeoutMs: config.timeouts.commandMs,
@@ -902,7 +901,7 @@ async function main(argv: readonly string[]): Promise<number> {
             const pluginNameForBrief = readPluginName(workdir)
             const brief = renderAuthoringBrief({
               workdir,
-              suiteDir: config.e2e.dir,
+              suiteDir: config.checks.e2e.dir,
               framework,
               dshTag: target.tag,
               pluginName: pluginNameForBrief,
@@ -912,7 +911,7 @@ async function main(argv: readonly string[]): Promise<number> {
               kind: 'e2e',
               prompt: brief,
               workdir,
-              dsh: config.dsh,
+              agent: config.agent,
               apiKey,
             })
             const index = readIndex(resolve(staging, INDEX_FILE))
@@ -922,10 +921,10 @@ async function main(argv: readonly string[]): Promise<number> {
             const defaultBranch = detectBaseBranch(workdir)
             return syncE2EBranch({
               workdir,
-              branch: config.e2e.branch,
-              baseRef: config.e2e.baseRef === 'migration' ? `origin/${defaultBranch}` : config.e2e.baseRef,
+              branch: config.checks.e2e.branch,
+              baseRef: config.checks.e2e.baseRef === 'migration' ? `origin/${defaultBranch}` : config.checks.e2e.baseRef,
               defaultBranch,
-              forceRebase: config.e2e.forceRebase,
+              forceRebase: config.checks.e2e.forceRebase,
               stagingDir: staging,
               worktreeDir: resolve(runDir, 'e2e-branch'),
               index,
@@ -981,7 +980,7 @@ async function main(argv: readonly string[]): Promise<number> {
   })
 
   let seen = previous
-  if (config.watch.enabled) {
+  {
     const pullRequest = publishedPullRequest(result.published)
     const next = applyRunToSeenState(previous, {
       target,

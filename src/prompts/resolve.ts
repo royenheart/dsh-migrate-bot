@@ -15,8 +15,8 @@ export function resolvePrompts(
   harness?: { path: string; tag: string } | undefined,
 ): ResolvedPrompts {
   return {
-    absorption: withHarnessContext(config.prompts.absorption ?? ABSORPTION_PROMPT, harness),
-    alignment: withHarnessContext(config.prompts.alignment ?? ALIGNMENT_PROMPT, harness),
-    fix: config.prompts.fix ?? FIX_PROMPT,
+    absorption: withHarnessContext(config.prompts.overlap ?? ABSORPTION_PROMPT, harness),
+    alignment: withHarnessContext(config.prompts.extensionPoints ?? ALIGNMENT_PROMPT, harness),
+    fix: config.prompts.repair ?? FIX_PROMPT,
   }
 }

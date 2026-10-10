@@ -310,8 +310,8 @@ async function statusCommand(
   // having no token name at all.
   const channels = resolveChannels(input.config)
   for (const channel of channels) {
-    const entry = input.config.feedback.channels[channel.id]
-    const enabled = input.config.feedback.enabled && entry?.enabled === true
+    const entry = input.config.reports.channels[channel.id]
+    const enabled = input.config.reports.enabled && entry?.enabled === true
     if (!enabled) {
       lines.push(`- \`${channel.id}\`: off`)
       continue

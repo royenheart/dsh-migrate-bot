@@ -60,7 +60,7 @@ export async function openLiveView(input: {
   if (!input.config.deploy.enabled) {
     return disabledLiveView('no deploy target is configured (`deploy.enabled` is false)', input.log)
   }
-  if (!input.config.deploy.liveView) {
+  if (!input.config.deploy.logStream) {
     return disabledLiveView('`deploy.liveView` is false', input.log)
   }
   const target = resolveDeployTarget(input.config, input.env)

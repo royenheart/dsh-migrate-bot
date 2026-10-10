@@ -42,7 +42,6 @@ function maybePublish(
     return Promise.resolve({})
   }
   const docs = renderDocuments({
-    language: ports.config.issuePr.language,
     status,
     target: ports.target,
     pluginName: readPluginName(ports.workdir),
@@ -72,7 +71,6 @@ function maybePublish(
     const comments = formatPatchReportComment({
       reports,
       pullRequestUrl: published.pullRequestUrl,
-      language: ports.config.issuePr.language,
     })
     for (const body of comments) {
       await github.commentIssue(published.issueNumber, body, ports.workdir)
@@ -81,10 +79,7 @@ function maybePublish(
       if (report.kind !== 'draft') continue
       await github.commentIssue(
         published.issueNumber,
-        formatOfficialDiscussionInvite({
-          report,
-          language: ports.config.issuePr.language,
-        }),
+        formatOfficialDiscussionInvite({ report }),
         ports.workdir,
       )
     }
@@ -175,7 +170,12 @@ export async function runPipeline(
   ports.store.write('mechanical', mechanical.errors || mechanical.log)
   logger.info(`fast gate: ${mechanical.ok ? 'pass' : 'fail'}`)
 
-  const skipReview = mechanical.ok && ports.config.review.policy === 'skip-if-mechanical-pass'
+  // `when-checks-fail` skips the reviews only when the unmodified tree passes
+  // every check on the target release, not only the mechanical ones.
+  const initial = mechanical.ok && ports.config.review.policy === 'when-checks-fail'
+    ? await verifyRound(ports, 'full')
+    : undefined
+  const skipReview = initial?.ok === true
   if (skipReview) {
     const published = await maybePublish(ports, 'compatible', {
       skippedReview: true,
@@ -202,7 +202,7 @@ export async function runPipeline(
     kind: 'absorption',
     prompt: prompts.absorption,
     workdir: ports.workdir,
-    dsh: ports.config.dsh,
+    agent: ports.config.agent,
     apiKey: ports.apiKey,
     ...agentInput(ports, used),
   })
@@ -215,7 +215,7 @@ export async function runPipeline(
     kind: 'alignment',
     prompt: prompts.alignment,
     workdir: ports.workdir,
-    dsh: ports.config.dsh,
+    agent: ports.config.agent,
     apiKey: ports.apiKey,
     ...agentInput(ports, used),
   })
@@ -241,7 +241,7 @@ export async function runPipeline(
   let stoppedBy: PipelineResult['stoppedBy'] = 'budget'
   let previousSignature: string | undefined
 
-  while (!verification.ok && fixAttempts < ports.config.loop.maxAttempts) {
+  while (!verification.ok && fixAttempts < ports.config.repair.maxAttempts) {
     if (signatureStalled(previousSignature, verification.signature)) {
       // A signature is the probe's own output, which comes from whatever the
       // harness printed: one line of it, since this is a log line.
@@ -268,7 +268,7 @@ export async function runPipeline(
       kind: 'fix',
       prompt,
       workdir: ports.workdir,
-      dsh: ports.config.dsh,
+      agent: ports.config.agent,
       apiKey: ports.apiKey,
       ...agentInput(ports, used),
     })
@@ -321,7 +321,7 @@ export async function runPipeline(
 
   // `advisory` keeps an E2E failure visible in the report without failing the
   // run; `blocking` makes it a gate. V2 boot failures always fail the run.
-  const e2eBlocking = ports.config.e2e.gate === 'blocking'
+  const e2eBlocking = ports.config.checks.e2e.failurePolicy === 'blocking'
   const verificationBlocks = verification.ok || (verification.layer === 'e2e' && !e2eBlocking)
   const status: RunStatus = !(mechanical.ok && verificationBlocks)
     ? 'failed'

@@ -1,263 +1,132 @@
+import { z } from 'zod'
 import { DEFAULT_API_KEY_ENV } from '../secrets.ts'
 
-/** User-facing review policy after the first mechanical pass. */
-export type ReviewPolicy = 'always' | 'skip-if-mechanical-pass'
+/**
+ * The consumer configuration, `.github/dsh-migrate.yml`.
+ *
+ * This schema is the only definition of the configuration: `parseConfig`
+ * validates against it, and `docs/reference/configuration.md` is generated from
+ * it by `scripts/gen-config-reference.ts`. Every object is strict, so a
+ * misspelled or removed key fails validation instead of being ignored.
+ */
 
-/** Language used for the GitHub Issue and pull request bodies. */
-export type IssuePrLanguage = 'en' | 'zh'
+const envName = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'must be a valid environment variable name')
+const repoSlug = z.string().regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/, 'must be "owner/name"')
+const branchName = z.string().min(1).refine(
+  name => !/[\s~^:?*[\\]/.test(name) && !name.includes('..') && !name.startsWith('-') && !name.endsWith('/'),
+  'must be a valid git branch name',
+)
+const relativeDir = z.string().min(1)
+  .refine(dir => !dir.startsWith('/') && !dir.split('/').includes('..'), 'must be a repository-relative path without ".."')
+const normalizeDir = (dir: string): string => dir.replace(/^\.\//, '').replace(/\/+$/, '')
+const milliseconds = z.number().int().min(1000)
 
-/** DeepSeek thinking effort accepted by `@deepseek-ai/dsh-llm-deepseek`. */
 export const THINKING_EFFORTS = ['off', 'low', 'high', 'max'] as const
+export const REVIEW_POLICIES = ['always', 'when-checks-fail'] as const
+export const E2E_FAILURE_POLICIES = ['advisory', 'blocking'] as const
+export const REPORT_METHODS = ['issue', 'discussion'] as const
 
+const checkSchema = (timeoutMs: number, what: string) => z.strictObject({
+  enabled: z.boolean().default(true).describe(`Run the ${what}.`),
+  timeoutMs: milliseconds.default(timeoutMs).describe(`Watchdog for one ${what}, in milliseconds.`),
+})
+
+const reportChannelSchema = z.strictObject({
+  enabled: z.boolean().default(false).describe('Send merge reports to this channel.'),
+  repo: repoSlug.optional().describe('Repository the channel writes to. Required for a channel that is not built in.'),
+  method: z.enum(REPORT_METHODS).optional().describe('`issue` or `discussion`. Required for a channel that is not built in.'),
+  tokenEnv: envName.optional().describe('Environment variable holding a token that may write to `repo`.'),
+  prompt: z.string().min(1).optional().describe('Replaces the channel prompt. Required for a channel that is not built in.'),
+  labels: z.array(z.string().min(1)).optional().describe('Labels applied to a created issue.'),
+  discussionCategory: z.string().min(1).optional().describe('Discussion category slug, for `method: discussion`.'),
+})
+
+export const configSchema = z.strictObject({
+  target: z.string().min(1).default('latest')
+    .describe('Target release: `latest`, a version such as `0.2.0-rc.2`, or a `dsh-v*` tag.'),
+  review: z.strictObject({
+    policy: z.enum(REVIEW_POLICIES).default('always')
+      .describe('`always` runs the overlap and extension-point reviews; `when-checks-fail` skips them when the unmodified tree passes every check on the target release.'),
+  }).prefault({}),
+  tests: z.strictObject({
+    commands: z.array(z.string().min(1)).min(1).describe('Shell commands that replace the built-in mechanical checks.'),
+  }).optional(),
+  prompts: z.strictObject({
+    overlap: z.string().min(1).optional().describe('Replaces the overlap review prompt.'),
+    extensionPoints: z.string().min(1).optional().describe('Replaces the extension-point review prompt.'),
+    repair: z.string().min(1).optional().describe('Replaces the repair prompt.'),
+  }).prefault({}),
+  agent: z.strictObject({
+    provider: z.string().min(1).default('deepseek-official').describe('Model provider route of the agent sessions.'),
+    model: z.string().min(1).default('deepseek-v4-flash').describe('Model of the agent sessions.'),
+    thinking: z.enum(['enabled', 'disabled']).default('enabled').describe('Provider thinking mode.'),
+    reasoningEffort: z.enum(THINKING_EFFORTS).default('max').describe('Provider reasoning effort.'),
+  }).prefault({}),
+  repair: z.strictObject({
+    maxAttempts: z.number().int().min(1).default(5).describe('Attempt limit: the most repair attempts one migration runs.'),
+  }).prefault({}),
+  secrets: z.strictObject({
+    apiKeyEnv: envName.default(DEFAULT_API_KEY_ENV).describe('Environment variable holding the DeepSeek API key.'),
+  }).prefault({}),
+  quota: z.strictObject({
+    limit: z.number().positive().optional().describe('Spend cap: the most USD one migration may spend, priced from its own usage.'),
+  }).prefault({}),
+  checks: z.strictObject({
+    boot: checkSchema(180_000, 'boot check').prefault({}),
+    web: checkSchema(120_000, 'web check').prefault({}),
+    e2e: z.strictObject({
+      enabled: z.boolean().default(true).describe('Run and maintain the agent-authored end-to-end suite.'),
+      branch: branchName.default('dsh-migrate/e2e').describe('Branch that holds the end-to-end suite.'),
+      baseRef: z.string().min(1).default('migration')
+        .describe('Ref the suite branch is rebased onto; `migration` means the consumer default branch.'),
+      forceRebase: z.boolean().default(true).describe('Rebase the suite branch onto `baseRef` before updating it.'),
+      dir: relativeDir.default('e2e').describe('Directory for a new suite when the repository has no end-to-end framework.')
+        .transform(normalizeDir),
+      failurePolicy: z.enum(E2E_FAILURE_POLICIES).default('advisory')
+        .describe('`advisory` reports an end-to-end failure in the proposal; `blocking` fails the migration.'),
+      subsetFirst: z.boolean().default(true)
+        .describe('During repair attempts, run only previously failing tests plus smoke tests.'),
+    }).prefault({}),
+  }).prefault({}),
+  timeouts: z.strictObject({
+    agentMs: milliseconds.default(60 * 60_000).describe('Watchdog for one agent session.'),
+    commandMs: milliseconds.default(20 * 60_000).describe('Watchdog for one mechanical command.'),
+    checkoutMs: milliseconds.default(10 * 60_000).describe('Watchdog for the harness checkout.'),
+  }).prefault({}),
+  reports: z.strictObject({
+    enabled: z.boolean().default(true).describe('Send merge reports at all; each channel also needs its own `enabled`.'),
+    channels: z.record(z.string().regex(/^[a-z0-9][a-z0-9-]*$/, 'must be a lowercase channel id'), reportChannelSchema)
+      .default({}).describe('Report channels by id. Built-in ids: `upgrade-skill`, `migrate-bot`, `harness-discussion`.'),
+  }).prefault({}),
+  deploy: z.strictObject({
+    enabled: z.boolean().default(false).describe('Use a deploy service.'),
+    endpoint: z.url({ protocol: /^https?$/ }).optional().transform(url => url?.replace(/\/+$/, ''))
+      .describe('Base URL of the deploy service. Required when `enabled`.'),
+    tokenEnv: envName.default('DSH_MIGRATE_DEPLOY_TOKEN').describe('Environment variable holding the deploy service token.'),
+    logStream: z.boolean().default(true).describe('Stream the run log to the deploy service.'),
+    commands: z.boolean().default(true).describe('Accept `/dsh-migrate` comment commands.'),
+    preview: z.strictObject({
+      enabled: z.boolean().default(true).describe('Allow preview deployments.'),
+      ttlDays: z.number().int().min(1).default(7).describe('Days before a preview deployment is destroyed.'),
+      idleMinutes: z.number().int().min(1).default(120).describe('Minutes without a request before a preview deployment stops.'),
+      extendDays: z.number().int().min(1).optional().describe('Days one `extend` command asks for; at most `ttlDays`, which is also the default.'),
+    }).prefault({})
+      .refine(preview => preview.extendDays === undefined || preview.extendDays <= preview.ttlDays, {
+        path: ['extendDays'],
+        message: 'must not exceed deploy.preview.ttlDays',
+      })
+      .transform(preview => ({ ...preview, extendDays: preview.extendDays ?? preview.ttlDays })),
+  }).prefault({}),
+})
+  .superRefine((config, context) => {
+    if (config.deploy.enabled && config.deploy.endpoint === undefined) {
+      context.addIssue({ code: 'custom', path: ['deploy', 'endpoint'], message: 'is required when deploy.enabled is true' })
+    }
+  })
+
+export type MigrateConfig = z.output<typeof configSchema>
+export type ReviewPolicy = (typeof REVIEW_POLICIES)[number]
 export type ThinkingEffort = (typeof THINKING_EFFORTS)[number]
-
-/** Prompt files the user may override in config. */
-export interface PromptOverrides {
-  absorption?: string
-  alignment?: string
-  fix?: string
-}
-
-/** Commands that replace the built-in mechanical suite when present. */
-export interface TestConfig {
-  commands: string[]
-}
-
-export interface DshBackendConfig {
-  provider: string
-  model: string
-  thinking: 'enabled' | 'disabled'
-  reasoningEffort: ThinkingEffort
-}
-
-export interface IssuePrConfig {
-  language: IssuePrLanguage
-}
-
-export interface LoopConfig {
-  maxAttempts: number
-}
-
-export interface WatchConfig {
-  /** When true (default), skip the pipeline if dsh has not changed since last success. */
-  enabled: boolean
-}
-
-export interface SecretsConfig {
-  /** Env var / repository-secret name that holds the DeepSeek API key. */
-  apiKeyEnv: string
-}
-
-export interface QuotaConfig {
-  /**
-   * Max USD this Action run may spend, priced from this run's own usage
-   * at official DeepSeek rates. Insufficient official balance still aborts
-   * when unset.
-   */
-  limit?: number
-}
-
-/** dsh boot probe: install the tree into a scratch profile and start the host. */
-export interface VerifyBootConfig {
-  enabled: boolean
-  /**
-   * Watchdog in milliseconds. dsh has no hang protection of its own: a plugin
-   * whose `apply` never resolves hangs the boot instead of failing it.
-   */
-  timeoutMs: number
-}
-
-/** Keyless browser-free web smoke: boot `dsh web` and assert the plugin attached. */
-export interface VerifyWebConfig {
-  enabled: boolean
-  timeoutMs: number
-}
-
-export interface VerifyConfig {
-  boot: VerifyBootConfig
-  web: VerifyWebConfig
-}
-
-/**
- * How an E2E failure is treated. `advisory` reports it; `blocking` fails the
- * run. The default is advisory because the first run authors the suite after
- * the migration, which is a weak signal.
- */
-export type E2EGate = 'advisory' | 'blocking'
-
-/** Agent-authored end-to-end suite, kept on its own branch. */
-export interface E2EConfig {
-  enabled: boolean
-  branch: string
-  /** Rebase the suite branch onto {@link E2EConfig.baseRef} before updating it. */
-  forceRebase: boolean
-  /**
-   * Branch the suite branch is rebased onto. `migration` follows the branch the
-   * current run produced (falling back to the default branch when it is gone);
-   * any other value is used verbatim.
-   */
-  baseRef: string
-  /** Directory used only when the repository has no E2E framework to extend. */
-  dir: string
-  gate: E2EGate
-  /** During the repair loop run only the previous failing tests plus smoke. */
-  subsetFirst: boolean
-}
-
-/**
- * Wall-clock watchdogs. Nothing here is a budget: they exist so a hung
- * subprocess fails loudly instead of holding a job until the runner's own
- * limit kills it six hours later. A hung session is not hypothetical — dsh has
- * no hang protection of its own, and neither did this Action.
- */
-export interface TimeoutConfig {
-  /** One agent session (A, B, C or the E2E authoring session). */
-  agentMs: number
-  /** One mechanical command: install, build, typecheck, the plugin's own tests. */
-  commandMs: number
-  /** The sparse harness checkout. */
-  checkoutMs: number
-}
-
-/**
- * How a feedback channel delivers what the model wrote.
- *
- * `issue` and `discussion` are the two a maintainer can act on without a review
- * round; `pull` exists for channels whose payload is files rather than prose;
- * `issue+pull` opens the issue first so the pull request can reference it.
- */
-export type FeedbackMethod = 'issue' | 'pull' | 'issue+pull' | 'discussion'
-
-/**
- * One feedback channel: where it writes, how, and with which credential.
- *
- * The three built-ins (`upgrade-skill`, `migrate-bot`, `harness-discussion`)
- * carry every field as a default, so enabling one is a single `enabled: true`.
- * A channel the user names themselves has no defaults and must declare `repo`,
- * `method`, and `prompt`.
- */
-export interface FeedbackChannelConfig {
-  /** Off unless a user turns it on; every built-in ships `false`. */
-  enabled: boolean
-  /** `owner/name` the channel writes to. */
-  repo?: string
-  method?: FeedbackMethod
-  /** Env var / repository-secret name holding the token that may write to `repo`. */
-  tokenEnv?: string
-  /** Replaces the channel's shipped prompt. Required for a user-defined channel. */
-  prompt?: string
-  /** Labels applied when the delivery method creates an issue. */
-  labels?: string[]
-  /** Discussion category slug, for `method: discussion`. */
-  discussionCategory?: string
-}
-
-export interface FeedbackConfig {
-  /** Master switch for the whole stage; a channel still needs its own `enabled`. */
-  enabled: boolean
-  channels: Record<string, FeedbackChannelConfig>
-}
-
-/**
- * A deploy target the user runs: the service behind the live view, the preview
- * instances, and the command surface.
- *
- * Optional in every sense. The Action never hosts it, never assumes it is
- * reachable, and never fails a migration because it is absent — the same
- * posture the feedback channels take toward their destinations, for the same
- * reason: it holds the user's key and serves the user's code.
- */
-export interface DeployConfig {
-  enabled: boolean
-  /** Base URL of the target. Required once the target is enabled. */
-  endpoint?: string
-  /** Env var / repository-secret name holding the token this Action sends. */
-  tokenEnv: string
-  /** Stream what a run is doing, for a read-only view. */
-  liveView: boolean
-  preview: {
-    enabled: boolean
-    /** Days before an instance is destroyed whatever else is true. */
-    ttlDays: number
-    /** Minutes without a request before the container stops. */
-    idleMinutes: number
-    /**
-     * Days one `/dsh-migrate extend` asks for.
-     *
-     * The Action asks; the target enforces, and it needs a number to enforce
-     * something other than "yes" — this is the number it is given, together with
-     * `ttlDays` as the ceiling the instance may not be pushed past.
-     */
-    extendDays: number
-  }
-  /** Accept `/dsh-migrate …` commands from a comment. */
-  commands: boolean
-}
-
-export interface MigrateConfig {
-  dshVersion: string
-  review: { policy: ReviewPolicy }
-  tests?: TestConfig
-  prompts: PromptOverrides
-  dsh: DshBackendConfig
-  issuePr: IssuePrConfig
-  loop: LoopConfig
-  watch: WatchConfig
-  secrets: SecretsConfig
-  quota: QuotaConfig
-  verify: VerifyConfig
-  e2e: E2EConfig
-  timeouts: TimeoutConfig
-  feedback: FeedbackConfig
-  deploy: DeployConfig
-}
-
-export const DEFAULT_CONFIG: MigrateConfig = {
-  dshVersion: 'latest',
-  review: { policy: 'always' },
-  prompts: {},
-  dsh: {
-    provider: 'deepseek-official',
-    model: 'deepseek-v4-flash',
-    thinking: 'enabled',
-    reasoningEffort: 'max',
-  },
-  issuePr: { language: 'en' },
-  loop: { maxAttempts: 5 },
-  watch: { enabled: true },
-  secrets: { apiKeyEnv: DEFAULT_API_KEY_ENV },
-  quota: {},
-  verify: {
-    boot: { enabled: true, timeoutMs: 180_000 },
-    web: { enabled: true, timeoutMs: 120_000 },
-  },
-  e2e: {
-    enabled: true,
-    branch: 'dsh-migrate/e2e',
-    forceRebase: true,
-    baseRef: 'migration',
-    dir: 'e2e',
-    gate: 'advisory',
-    subsetFirst: true,
-  },
-  timeouts: {
-    agentMs: 60 * 60_000,
-    commandMs: 20 * 60_000,
-    checkoutMs: 10 * 60_000,
-  },
-  deploy: {
-    enabled: false,
-    tokenEnv: 'DSH_MIGRATE_DEPLOY_TOKEN',
-    liveView: true,
-    preview: { enabled: true, ttlDays: 7, idleMinutes: 120, extendDays: 7 },
-    commands: true,
-  },
-  feedback: {
-    enabled: true,
-    channels: {
-      'upgrade-skill': { enabled: false },
-      'migrate-bot': { enabled: false },
-      'harness-discussion': { enabled: false },
-    },
-  },
-}
+export type ReportMethod = (typeof REPORT_METHODS)[number]
+export type ReportChannelConfig = z.output<typeof reportChannelSchema>
+export type AgentConfig = MigrateConfig['agent']

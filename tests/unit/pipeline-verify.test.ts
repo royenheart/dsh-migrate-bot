@@ -101,7 +101,7 @@ test('a changing signature keeps spending the full budget', async () => {
   const agent = agentReturning()
   const result = await runPipeline(ports({
     agent,
-    config: parseConfig({ loop: { maxAttempts: 3 } }),
+    config: parseConfig({ repair: { maxAttempts: 3 } }),
     probeTarget: async () => {
       round += 1
       return boot(false, `load: failure ${round}`)
@@ -135,7 +135,7 @@ test('a blocker without evidence does not stop the loop', async () => {
     : `${request.kind} ok`))
   const result = await runPipeline(ports({
     agent,
-    config: parseConfig({ loop: { maxAttempts: 2 } }),
+    config: parseConfig({ repair: { maxAttempts: 2 } }),
     // Signatures differ so the stalled-signature rule cannot end it either.
     probeTarget: (() => {
       let round = 0
@@ -160,7 +160,7 @@ test('a boot failure fails the run even when the e2e gate is advisory', async ()
 
 test('an e2e failure is reported but not fatal under the advisory gate', async () => {
   const result = await runPipeline(ports({
-    config: parseConfig({ e2e: { gate: 'advisory' } }),
+    config: parseConfig({ checks: { e2e: { failurePolicy: 'advisory' } } }),
     probeTarget: async () => boot(true),
     runE2E: async () => e2e(false),
   }))
@@ -171,7 +171,7 @@ test('an e2e failure is reported but not fatal under the advisory gate', async (
 
 test('the same e2e failure is fatal under the blocking gate', async () => {
   const result = await runPipeline(ports({
-    config: parseConfig({ e2e: { gate: 'blocking' }, loop: { maxAttempts: 1 } }),
+    config: parseConfig({ checks: { e2e: { failurePolicy: 'blocking' } }, repair: { maxAttempts: 1 } }),
     probeTarget: async () => boot(true),
     runE2E: async () => e2e(false),
   }))
@@ -194,7 +194,7 @@ test('a passing loop still runs the full suite once at the end', async () => {
 test('the boot probe short-circuits the browser suite while it is failing', async () => {
   let e2eCalls = 0
   await runPipeline(ports({
-    config: parseConfig({ loop: { maxAttempts: 1 } }),
+    config: parseConfig({ repair: { maxAttempts: 1 } }),
     probeTarget: async () => boot(false, 'load: broken'),
     runE2E: async () => {
       e2eCalls += 1
@@ -208,7 +208,7 @@ test('a failed fast gate skips verification entirels and reports it', async () =
   const result = await runPipeline(ports({
     runMechanical: () => ({ ok: false, errors: 'TS2304: cannot find name', log: '', checks: 1 }),
     probeTarget: async () => boot(true),
-    config: parseConfig({ loop: { maxAttempts: 1 } }),
+    config: parseConfig({ repair: { maxAttempts: 1 } }),
   }))
   assert.equal(result.status, 'failed')
   assert.match(result.verification?.signature ?? '', /fast-gate/)
@@ -245,7 +245,7 @@ test('attribution reaches the result and the fix prompt', async () => {
   const result = await runPipeline(ports({
     agent,
     attribution,
-    config: parseConfig({ loop: { maxAttempts: 1 } }),
+    config: parseConfig({ repair: { maxAttempts: 1 } }),
     probeTarget: async () => boot(false, 'load: broken'),
   }))
   assert.equal(result.attribution?.preExisting, true)

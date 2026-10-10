@@ -201,35 +201,31 @@ export function summarizeAgentReport(markdown: string | undefined, fallback: str
 }
 
 export function formatRootCause(input: {
-  language: 'en' | 'zh'
   mechanicalOk: boolean
   reportA?: string | undefined
   reportB?: string | undefined
   reportC?: string | undefined
 }): string {
-  const zh = input.language === 'zh'
-  const fromC = findSection(input.reportC, /root cause|根因/i)
+  const fromC = findSection(input.reportC, /root cause/i)
   if (fromC !== undefined) return sanitizeFlowingMarkdown(truncateBlock(fromC, SECTION_BODY))
   const parts: string[] = []
   const verdict = input.reportA === undefined ? undefined : reportVerdict(input.reportA)
   if (verdict !== undefined) {
-    parts.push(zh ? `重叠结论：${inlineCode(verdict)}` : `Overlap verdict: ${inlineCode(verdict)}`)
+    parts.push(`Overlap verdict: ${inlineCode(verdict)}`)
   }
-  const gaps = findSection(input.reportB, /remaining|gap|patch|缺口/i)
-    ?? findSection(input.reportA, /remaining|gap|patch|缺口|overlap|重叠/i)
-  const edits = findSection(input.reportA, /edit|concrete|改动/i)
-    ?? findSection(input.reportB, /edit|改动/i)
+  const gaps = findSection(input.reportB, /remaining|gap|patch/i)
+    ?? findSection(input.reportA, /remaining|gap|patch|overlap/i)
+  const edits = findSection(input.reportA, /edit|concrete/i)
+    ?? findSection(input.reportB, /edit/i)
   if (gaps !== undefined) parts.push(sanitizeFlowingMarkdown(truncateBlock(gaps, SECTION_BODY)))
   else if (edits !== undefined) parts.push(sanitizeFlowingMarkdown(truncateBlock(edits, SECTION_BODY)))
   if (!input.mechanicalOk) {
-    parts.push(zh
-      ? '机械测试仍失败，错误摘录见下方。'
-      : 'Mechanical tests still fail; see the excerpt below.')
+    parts.push('Mechanical checks still fail; see the excerpt below.')
   }
   if (parts.length === 0) {
     return input.mechanicalOk
-      ? (zh ? '工作区机械检测已通过。产品层结论见下方重叠与对齐各节。' : 'Mechanical checks passed. See overlap and alignment sections below.')
-      : (zh ? '机械检测仍失败。错误摘录是直接原因；重叠/对齐各节说明预期改法。' : 'Mechanical checks still fail. The error excerpt is the immediate cause; overlap and alignment sections describe the intended fix.')
+      ? 'Mechanical checks passed. See the overlap and extension-point review sections below.'
+      : 'Mechanical checks still fail. The error excerpt is the immediate cause; the review sections describe the intended change.'
   }
   return parts.join('\n\n')
 }
@@ -261,17 +257,15 @@ function excerptDiff(raw: string, maxChars: number): string {
   return `${cut.trimEnd()}\n…`
 }
 
-export function formatWorkingTree(diff: string, language: 'en' | 'zh'): string {
+export function formatWorkingTree(diff: string): string {
   const trimmed = diff.trim()
-  if (trimmed === '') return language === 'zh' ? '_无文件改动。_' : '_No file changes._'
+  if (trimmed === '') return '_No file changes._'
   const files = parseDiffPaths(trimmed)
-  const heading = language === 'zh' ? '变更文件' : 'Changed files'
-  const excerptLabel = language === 'zh' ? 'Diff 摘录' : 'Diff excerpt'
-  const more = language === 'zh'
-    ? '_已截断。完整 diff 见配套 PR。_'
-    : '_Truncated. Full diff is on the pull request._'
+  const heading = 'Changed files'
+  const excerptLabel = 'Diff excerpt'
+  const more = '_Truncated. Full diff is on the pull request._'
   const list = files.length === 0
-    ? (language === 'zh' ? '- （未能解析路径）' : '- (could not parse paths)')
+    ? '- (could not parse paths)'
     : files.map(file => `- ${inlineCode(file)}`).join('\n')
   const truncated = trimmed.length > DIFF_EXCERPT
   const excerpt = neutralizeEmbedHtml(excerptDiff(trimmed, DIFF_EXCERPT))

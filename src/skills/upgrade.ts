@@ -37,7 +37,7 @@ export interface SkillsSyncResult {
  * @param config - the parsed configuration.
  */
 export function upgradeSkillsEnabled(config: MigrateConfig): boolean {
-  return config.feedback.enabled && config.feedback.channels[UPGRADE_SKILL_CHANNEL]?.enabled === true
+  return config.reports.enabled && config.reports.channels[UPGRADE_SKILL_CHANNEL]?.enabled === true
 }
 
 /** The vendored skills directory, or `undefined` when it is not present. */

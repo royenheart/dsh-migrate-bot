@@ -1,415 +1,93 @@
 import { readFileSync } from 'node:fs'
 import { parse as parseYaml } from 'yaml'
-import {
-  DEFAULT_CONFIG,
-  THINKING_EFFORTS,
-  type IssuePrLanguage,
-  type MigrateConfig,
-  type ReviewPolicy,
-  type ThinkingEffort,
-} from './schema.ts'
+import { z } from 'zod'
+import { configSchema, type MigrateConfig } from './schema.ts'
 import { BUILTIN_CHANNELS } from '../feedback/channels.ts'
 
 export class ConfigError extends Error {
   override readonly name = 'ConfigError'
 }
 
+/**
+ * Keys and values that 1.0 renamed or removed, with what replaced them.
+ *
+ * Strict validation already rejects them; this table only makes the error name
+ * the replacement. It is deleted in 2.0.
+ */
+const REPLACED: readonly { path: readonly string[]; value?: string; replacement: string }[] = [
+  { path: ['dshVersion'], replacement: 'renamed to `target`' },
+  { path: ['dsh'], replacement: 'renamed to `agent`; `dsh.mode` was removed because the agent runtime composes no preset' },
+  { path: ['loop'], replacement: 'renamed to `repair` (`loop.maxAttempts` is `repair.maxAttempts`)' },
+  { path: ['watch'], replacement: 'removed; an unchanged target release is always skipped unless the run is forced' },
+  { path: ['issuePr'], replacement: 'removed; every issue and pull request body is English' },
+  { path: ['verify'], replacement: 'renamed to `checks` (`verify.boot` is `checks.boot`, `verify.web` is `checks.web`)' },
+  { path: ['e2e'], replacement: 'moved to `checks.e2e` (`e2e.gate` is `checks.e2e.failurePolicy`)' },
+  { path: ['feedback'], replacement: 'renamed to `reports`' },
+  { path: ['prompts', 'absorption'], replacement: 'renamed to `prompts.overlap`' },
+  { path: ['prompts', 'alignment'], replacement: 'renamed to `prompts.extensionPoints`' },
+  { path: ['prompts', 'fix'], replacement: 'renamed to `prompts.repair`' },
+  { path: ['deploy', 'liveView'], replacement: 'renamed to `deploy.logStream`' },
+  {
+    path: ['review', 'policy'],
+    value: 'skip-if-mechanical-pass',
+    replacement: 'replaced by `when-checks-fail`, which also requires the boot, web and end-to-end checks to pass',
+  },
+]
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function asString(value: unknown, path: string): string {
-  if (typeof value !== 'string' || value.trim() === '') {
-    throw new ConfigError(`${path} must be a non-empty string`)
+function valueAt(document: unknown, path: readonly string[]): unknown {
+  let current = document
+  for (const key of path) {
+    if (!isRecord(current)) return undefined
+    current = current[key]
   }
-  return value
+  return current
 }
 
-function optionalString(value: unknown, path: string): string | undefined {
-  if (value === undefined) return undefined
-  return asString(value, path)
+/** The first replaced key or value in a decoded document, as an error message. */
+function replacedKey(document: unknown): string | undefined {
+  for (const entry of REPLACED) {
+    const found = valueAt(document, entry.path)
+    if (found === undefined || (entry.value !== undefined && found !== entry.value)) continue
+    const subject = entry.value === undefined ? entry.path.join('.') : `${entry.path.join('.')}: \`${entry.value}\``
+    return `${subject} was ${entry.replacement}`
+  }
+  return undefined
 }
 
-function asInt(value: unknown, path: string, min: number): number {
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < min) {
-    throw new ConfigError(`${path} must be an integer >= ${min}`)
-  }
-  return value
-}
-
-function asPositiveNumber(value: unknown, path: string): number {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-    throw new ConfigError(`${path} must be a number > 0`)
-  }
-  return value
-}
-
-function asEnum<T extends string>(value: unknown, path: string, allowed: readonly T[]): T {
-  if (typeof value !== 'string' || !allowed.includes(value as T)) {
-    throw new ConfigError(`${path} must be one of: ${allowed.join(', ')}`)
-  }
-  return value as T
-}
-
-function asBoolean(value: unknown, path: string): boolean {
-  if (typeof value !== 'boolean') throw new ConfigError(`${path} must be a boolean`)
-  return value
-}
-
-const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/
-const REPO_SLUG = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
-const FEEDBACK_METHODS = ['issue', 'pull', 'issue+pull', 'discussion'] as const
-
-/**
- * Parse one feedback channel.
- *
- * A built-in channel inherits every target field from its shipped default, so
- * `enabled: true` is the whole configuration. A channel the user names must
- * carry `repo`, `method`, and `prompt`: without a prompt there is nothing to
- * run, and without a target there is nowhere to deliver it.
- * @param id - channel id, which is also the key in `feedback.channels`.
- * @param raw - the channel's YAML value.
- */
-function parseFeedbackChannel(id: string, raw: unknown): MigrateConfig['feedback']['channels'][string] {
-  const path = `feedback.channels.${id}`
-  if (!isRecord(raw)) throw new ConfigError(`${path} must be a mapping`)
-  const channel: MigrateConfig['feedback']['channels'][string] = { enabled: false }
-  if (raw.enabled !== undefined) channel.enabled = asBoolean(raw.enabled, `${path}.enabled`)
-  if (raw.repo !== undefined) {
-    const repo = asString(raw.repo, `${path}.repo`)
-    if (!REPO_SLUG.test(repo)) throw new ConfigError(`${path}.repo must be "owner/name"`)
-    channel.repo = repo
-  }
-  if (raw.method !== undefined) channel.method = asEnum(raw.method, `${path}.method`, FEEDBACK_METHODS)
-  if (raw.tokenEnv !== undefined) {
-    const tokenEnv = asString(raw.tokenEnv, `${path}.tokenEnv`)
-    if (!ENV_NAME.test(tokenEnv)) {
-      throw new ConfigError(`${path}.tokenEnv must be a valid environment variable name`)
-    }
-    channel.tokenEnv = tokenEnv
-  }
-  if (raw.prompt !== undefined) channel.prompt = asString(raw.prompt, `${path}.prompt`)
-  if (raw.discussionCategory !== undefined) {
-    channel.discussionCategory = asString(raw.discussionCategory, `${path}.discussionCategory`)
-  }
-  if (raw.labels !== undefined) {
-    if (!Array.isArray(raw.labels)) throw new ConfigError(`${path}.labels must be a list of strings`)
-    channel.labels = raw.labels.map((label, index) => asString(label, `${path}.labels[${String(index)}]`))
-  }
-  return channel
-}
-
-/**
- * Parse `deploy`.
- *
- * Disabled is the default and needs no other key. Enabled must say where the
- * target is: a live view pointed at nothing is a run that silently reports to
- * nowhere, which is worse than not having the surface at all.
- * @param raw - the `deploy` YAML value.
- */
-function parseDeploy(raw: unknown): MigrateConfig['deploy'] {
-  const deploy: MigrateConfig['deploy'] = {
-    ...DEFAULT_CONFIG.deploy,
-    preview: { ...DEFAULT_CONFIG.deploy.preview },
-  }
-  if (raw === undefined) return deploy
-  if (!isRecord(raw)) throw new ConfigError('deploy must be a mapping')
-  if (raw.enabled !== undefined) deploy.enabled = asBoolean(raw.enabled, 'deploy.enabled')
-  if (raw.endpoint !== undefined) {
-    const endpoint = asString(raw.endpoint, 'deploy.endpoint')
-    if (!/^https?:\/\//.test(endpoint)) throw new ConfigError('deploy.endpoint must be an http(s) URL')
-    deploy.endpoint = endpoint.replace(/\/+$/, '')
-  }
-  if (raw.tokenEnv !== undefined) {
-    const tokenEnv = asString(raw.tokenEnv, 'deploy.tokenEnv')
-    if (!ENV_NAME.test(tokenEnv)) {
-      throw new ConfigError('deploy.tokenEnv must be a valid environment variable name')
-    }
-    deploy.tokenEnv = tokenEnv
-  }
-  if (raw.liveView !== undefined) deploy.liveView = asBoolean(raw.liveView, 'deploy.liveView')
-  if (raw.commands !== undefined) deploy.commands = asBoolean(raw.commands, 'deploy.commands')
-  if (raw.preview !== undefined) {
-    if (!isRecord(raw.preview)) throw new ConfigError('deploy.preview must be a mapping')
-    if (raw.preview.enabled !== undefined) {
-      deploy.preview.enabled = asBoolean(raw.preview.enabled, 'deploy.preview.enabled')
-    }
-    if (raw.preview.ttlDays !== undefined) {
-      deploy.preview.ttlDays = asInt(raw.preview.ttlDays, 'deploy.preview.ttlDays', 1)
-    }
-    if (raw.preview.idleMinutes !== undefined) {
-      deploy.preview.idleMinutes = asInt(raw.preview.idleMinutes, 'deploy.preview.idleMinutes', 1)
-    }
-    if (raw.preview.extendDays !== undefined) {
-      deploy.preview.extendDays = asInt(raw.preview.extendDays, 'deploy.preview.extendDays', 1)
-    }
-    if (raw.preview.extendDays !== undefined && deploy.preview.extendDays > deploy.preview.ttlDays) {
-      // The Action asks the target for `extendDays` and names `ttlDays` as the
-      // ceiling; a configuration that asks for more than the ceiling is a
-      // mistake worth naming, and sending it would contradict the request in the
-      // same breath.
-      throw new ConfigError(
-        `deploy.preview.extendDays (${String(deploy.preview.extendDays)}) must not exceed deploy.preview.ttlDays (${String(deploy.preview.ttlDays)})`,
-      )
-    }
-    if (raw.preview.extendDays === undefined) {
-      // Nobody asked for a longer window than the ceiling: shortening `ttlDays`
-      // is a legitimate thing to do on its own, and an `extend` that asked for
-      // the default would be asking for more than the instance may live.
-      deploy.preview.extendDays = Math.min(deploy.preview.extendDays, deploy.preview.ttlDays)
-    }
-  }
-  if (deploy.enabled && deploy.endpoint === undefined) {
-    throw new ConfigError('deploy.endpoint is required when deploy.enabled is true')
-  }
-  return deploy
-}
-
-/**
- * Parse `feedback`, folding the built-ins' shipped defaults under the user's
- * channel entries so a built-in needs only `enabled` and a user channel is
- * checked for the three fields nothing can default for it.
- * @param raw - the `feedback` YAML value.
- */
-function parseFeedback(raw: unknown): MigrateConfig['feedback'] {
-  const feedback: MigrateConfig['feedback'] = {
-    enabled: DEFAULT_CONFIG.feedback.enabled,
-    channels: {},
-  }
-  for (const [id, channel] of Object.entries(DEFAULT_CONFIG.feedback.channels)) {
-    feedback.channels[id] = { ...channel }
-  }
-  if (raw === undefined) return feedback
-  if (!isRecord(raw)) throw new ConfigError('feedback must be a mapping')
-  if (raw.enabled !== undefined) feedback.enabled = asBoolean(raw.enabled, 'feedback.enabled')
-  if (raw.channels === undefined) return feedback
-  if (!isRecord(raw.channels)) throw new ConfigError('feedback.channels must be a mapping')
-  for (const [id, value] of Object.entries(raw.channels)) {
-    if (!isRecord(value)) throw new ConfigError(`feedback.channels.${id} must be a mapping`)
-    const parsed = parseFeedbackChannel(id, value)
-    const builtin = BUILTIN_CHANNELS[id]
-    if (builtin === undefined) {
-      for (const field of ['repo', 'method', 'prompt'] as const) {
-        if (parsed[field] === undefined) {
-          throw new ConfigError(`feedback.channels.${id}.${field} is required for a channel that is not built in`)
-        }
+/** Report channels that are not built in must say where, how, and what to send. */
+function checkUserChannels(config: MigrateConfig): void {
+  for (const [id, channel] of Object.entries(config.reports.channels)) {
+    if (id in BUILTIN_CHANNELS) continue
+    for (const field of ['repo', 'method', 'prompt'] as const) {
+      if (channel[field] === undefined) {
+        throw new ConfigError(`reports.channels.${id}.${field} is required for a channel that is not built in`)
       }
     }
-    feedback.channels[id] = parsed
-  }
-  return feedback
-}
-
-/** Git ref name with the characters git refuses, plus the traversal cases. */
-function asBranchName(value: unknown, path: string): string {
-  const name = asString(value, path)
-  if (/[\s~^:?*[\\]/.test(name) || name.includes('..') || name.startsWith('-') || name.endsWith('/')) {
-    throw new ConfigError(`${path} must be a valid git branch name`)
-  }
-  return name
-}
-
-/** Repository-relative directory the Action creates the E2E suite in. */
-function asRelativeDir(value: unknown, path: string): string {
-  const dir = asString(value, path)
-  if (dir.startsWith('/') || dir.split('/').includes('..')) {
-    throw new ConfigError(`${path} must be a repository-relative path without ".."`)
-  }
-  return dir.replace(/^\.\//, '').replace(/\/+$/, '')
-}
-
-function asVerifyStep(
-  raw: unknown,
-  path: string,
-  fallback: { enabled: boolean; timeoutMs: number },
-): { enabled: boolean; timeoutMs: number } {
-  if (raw === undefined) return fallback
-  if (!isRecord(raw)) throw new ConfigError(`${path} must be a mapping`)
-  return {
-    enabled: raw.enabled === undefined ? fallback.enabled : asBoolean(raw.enabled, `${path}.enabled`),
-    timeoutMs: raw.timeoutMs === undefined ? fallback.timeoutMs : asInt(raw.timeoutMs, `${path}.timeoutMs`, 1000),
   }
 }
 
 /**
- * Merge a parsed YAML object onto the shipped defaults and reject unknown shapes.
- * @param raw - decoded YAML root
+ * Validate a decoded YAML document and fill in the defaults.
+ * @param raw - the decoded document; `null` or `undefined` is an empty file.
  */
 export function parseConfig(raw: unknown): MigrateConfig {
-  if (raw === null || raw === undefined) {
-    return {
-      ...DEFAULT_CONFIG,
-      dsh: { ...DEFAULT_CONFIG.dsh },
-      review: { ...DEFAULT_CONFIG.review },
-      prompts: {},
-      issuePr: { ...DEFAULT_CONFIG.issuePr },
-      loop: { ...DEFAULT_CONFIG.loop },
-      watch: { ...DEFAULT_CONFIG.watch },
-      secrets: { ...DEFAULT_CONFIG.secrets },
-      quota: { ...DEFAULT_CONFIG.quota },
-      verify: {
-        boot: { ...DEFAULT_CONFIG.verify.boot },
-        web: { ...DEFAULT_CONFIG.verify.web },
-      },
-      e2e: { ...DEFAULT_CONFIG.e2e },
-      timeouts: { ...DEFAULT_CONFIG.timeouts },
-      feedback: parseFeedback(undefined),
-      deploy: parseDeploy(undefined),
-    }
-  }
-  if (!isRecord(raw)) throw new ConfigError('config root must be a mapping')
-
-  const tests = raw.tests
-  let testConfig: MigrateConfig['tests']
-  if (tests !== undefined) {
-    if (!isRecord(tests) || !Array.isArray(tests.commands) || tests.commands.length === 0) {
-      throw new ConfigError('tests.commands must be a non-empty string list when tests is set')
-    }
-    testConfig = {
-      commands: tests.commands.map((command, index) => asString(command, `tests.commands[${index}]`)),
-    }
-  }
-
-  const reviewRaw = raw.review
-  const policy: ReviewPolicy = reviewRaw === undefined
-    ? DEFAULT_CONFIG.review.policy
-    : !isRecord(reviewRaw)
-      ? (() => { throw new ConfigError('review must be a mapping') })()
-      : asEnum(reviewRaw.policy, 'review.policy', ['always', 'skip-if-mechanical-pass'] as const)
-
-  const promptsRaw = raw.prompts
-  const prompts: MigrateConfig['prompts'] = {}
-  if (promptsRaw !== undefined) {
-    if (!isRecord(promptsRaw)) throw new ConfigError('prompts must be a mapping')
-    const absorption = optionalString(promptsRaw.absorption, 'prompts.absorption')
-    const alignment = optionalString(promptsRaw.alignment, 'prompts.alignment')
-    const fix = optionalString(promptsRaw.fix, 'prompts.fix')
-    if (absorption !== undefined) prompts.absorption = absorption
-    if (alignment !== undefined) prompts.alignment = alignment
-    if (fix !== undefined) prompts.fix = fix
-  }
-
-  const dshRaw = raw.dsh
-  const dsh = { ...DEFAULT_CONFIG.dsh }
-  if (dshRaw !== undefined) {
-    if (!isRecord(dshRaw)) throw new ConfigError('dsh must be a mapping')
-    if (dshRaw.provider !== undefined) dsh.provider = asString(dshRaw.provider, 'dsh.provider')
-    if (dshRaw.model !== undefined) dsh.model = asString(dshRaw.model, 'dsh.model')
-    if (dshRaw.thinking !== undefined) dsh.thinking = asEnum(dshRaw.thinking, 'dsh.thinking', ['enabled', 'disabled'] as const)
-    if (dshRaw.reasoningEffort !== undefined) {
-      dsh.reasoningEffort = asEnum(dshRaw.reasoningEffort, 'dsh.reasoningEffort', THINKING_EFFORTS)
-    }
-  }
-
-  const issueRaw = raw.issuePr
-  const language: IssuePrLanguage = issueRaw === undefined
-    ? DEFAULT_CONFIG.issuePr.language
-    : !isRecord(issueRaw)
-      ? (() => { throw new ConfigError('issuePr must be a mapping') })()
-      : issueRaw.language === undefined
-        ? DEFAULT_CONFIG.issuePr.language
-        : asEnum(issueRaw.language, 'issuePr.language', ['en', 'zh'] as const)
-
-  const loopRaw = raw.loop
-  const maxAttempts = loopRaw === undefined
-    ? DEFAULT_CONFIG.loop.maxAttempts
-    : !isRecord(loopRaw)
-      ? (() => { throw new ConfigError('loop must be a mapping') })()
-      : asInt(loopRaw.maxAttempts, 'loop.maxAttempts', 1)
-
-  const watchRaw = raw.watch
-  let watchEnabled = DEFAULT_CONFIG.watch.enabled
-  if (watchRaw !== undefined) {
-    if (!isRecord(watchRaw)) throw new ConfigError('watch must be a mapping')
-    if (watchRaw.enabled !== undefined) {
-      if (typeof watchRaw.enabled !== 'boolean') {
-        throw new ConfigError('watch.enabled must be a boolean')
-      }
-      watchEnabled = watchRaw.enabled
-    }
-  }
-
-  const secretsRaw = raw.secrets
-  let apiKeyEnv = DEFAULT_CONFIG.secrets.apiKeyEnv
-  if (secretsRaw !== undefined) {
-    if (!isRecord(secretsRaw)) throw new ConfigError('secrets must be a mapping')
-    if (secretsRaw.apiKeyEnv !== undefined) {
-      apiKeyEnv = asString(secretsRaw.apiKeyEnv, 'secrets.apiKeyEnv')
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(apiKeyEnv)) {
-        throw new ConfigError('secrets.apiKeyEnv must be a valid environment variable name')
-      }
-    }
-  }
-
-  const quotaRaw = raw.quota
-  const quota: MigrateConfig['quota'] = {}
-  if (quotaRaw !== undefined) {
-    if (!isRecord(quotaRaw)) throw new ConfigError('quota must be a mapping')
-    if (quotaRaw.limit !== undefined) quota.limit = asPositiveNumber(quotaRaw.limit, 'quota.limit')
-  }
-
-  const verifyRaw = raw.verify
-  const verify: MigrateConfig['verify'] = {
-    boot: { ...DEFAULT_CONFIG.verify.boot },
-    web: { ...DEFAULT_CONFIG.verify.web },
-  }
-  if (verifyRaw !== undefined) {
-    if (!isRecord(verifyRaw)) throw new ConfigError('verify must be a mapping')
-    verify.boot = asVerifyStep(verifyRaw.boot, 'verify.boot', verify.boot)
-    verify.web = asVerifyStep(verifyRaw.web, 'verify.web', verify.web)
-  }
-
-  const e2eRaw = raw.e2e
-  const e2e: MigrateConfig['e2e'] = { ...DEFAULT_CONFIG.e2e }
-  if (e2eRaw !== undefined) {
-    if (!isRecord(e2eRaw)) throw new ConfigError('e2e must be a mapping')
-    if (e2eRaw.enabled !== undefined) e2e.enabled = asBoolean(e2eRaw.enabled, 'e2e.enabled')
-    if (e2eRaw.forceRebase !== undefined) e2e.forceRebase = asBoolean(e2eRaw.forceRebase, 'e2e.forceRebase')
-    if (e2eRaw.subsetFirst !== undefined) e2e.subsetFirst = asBoolean(e2eRaw.subsetFirst, 'e2e.subsetFirst')
-    if (e2eRaw.branch !== undefined) e2e.branch = asBranchName(e2eRaw.branch, 'e2e.branch')
-    if (e2eRaw.baseRef !== undefined) e2e.baseRef = asString(e2eRaw.baseRef, 'e2e.baseRef')
-    if (e2eRaw.dir !== undefined) e2e.dir = asRelativeDir(e2eRaw.dir, 'e2e.dir')
-    if (e2eRaw.gate !== undefined) e2e.gate = asEnum(e2eRaw.gate, 'e2e.gate', ['advisory', 'blocking'] as const)
-  }
-
-  const timeoutsRaw = raw.timeouts
-  const timeouts: MigrateConfig['timeouts'] = { ...DEFAULT_CONFIG.timeouts }
-  if (timeoutsRaw !== undefined) {
-    if (!isRecord(timeoutsRaw)) throw new ConfigError('timeouts must be a mapping')
-    for (const key of ['agentMs', 'commandMs', 'checkoutMs'] as const) {
-      if (timeoutsRaw[key] !== undefined) timeouts[key] = asInt(timeoutsRaw[key], `timeouts.${key}`, 1000)
-    }
-  }
-
-  const feedback = parseFeedback(raw.feedback)
-  const deploy = parseDeploy(raw.deploy)
-
-  return {
-    dshVersion: raw.dshVersion === undefined ? DEFAULT_CONFIG.dshVersion : asString(raw.dshVersion, 'dshVersion'),
-    review: { policy },
-    ...(testConfig === undefined ? {} : { tests: testConfig }),
-    prompts,
-    dsh,
-    issuePr: { language },
-    loop: { maxAttempts },
-    watch: { enabled: watchEnabled },
-    secrets: { apiKeyEnv },
-    quota,
-    verify,
-    e2e,
-    timeouts,
-    feedback,
-    deploy,
-  }
+  const document = raw ?? {}
+  const replaced = replacedKey(document)
+  if (replaced !== undefined) throw new ConfigError(replaced)
+  const parsed = configSchema.safeParse(document)
+  if (!parsed.success) throw new ConfigError(z.prettifyError(parsed.error))
+  checkUserChannels(parsed.data)
+  return parsed.data
 }
 
 /**
- * Load and validate a YAML config file.
- * @param filePath - absolute or relative path
+ * Load and validate a configuration file.
+ * @param filePath - absolute or relative path.
  */
 export function loadConfigFile(filePath: string): MigrateConfig {
-  const text = readFileSync(filePath, 'utf8')
-  return parseConfig(parseYaml(text))
+  return parseConfig(parseYaml(readFileSync(filePath, 'utf8')))
 }
-
-export type { ThinkingEffort }

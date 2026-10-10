@@ -1,5 +1,5 @@
 import type { FeedbackChannelKind } from './types.ts'
-import type { FeedbackMethod } from '../config/schema.ts'
+import type { ReportMethod } from '../config/schema.ts'
 
 /**
  * The three channels this Action ships.
@@ -16,7 +16,7 @@ import type { FeedbackMethod } from '../config/schema.ts'
 export interface BuiltinChannel {
   /** `owner/name` this channel writes to. */
   repo: string
-  method: FeedbackMethod
+  method: ReportMethod
   /** Env var (and repository secret name) holding a token that may write to `repo`. */
   tokenEnv: string
   kind: FeedbackChannelKind

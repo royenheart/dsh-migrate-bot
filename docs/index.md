@@ -8,7 +8,8 @@ The entry point for progressive disclosure: `AGENTS.md` carries the standing ord
 |---|---|---|
 | The product, its inputs and outputs, and how to consume the Action | `README.md` | [Usage](../README.md#usage) |
 | Where to start as a contributor, and what to run before pushing | `README.md` | [Contributing](../README.md#contributing) |
-| Installing the Action, and every configuration key and its default | `docs/installation.md` | [Install](installation.md#install) |
+| Installing the Action | `docs/installation.md` | [Install](installation.md#install) |
+| Every configuration key, its type and its default | `docs/reference/configuration.md` | [Configuration reference](reference/configuration.md#configuration-reference) |
 | Enabling a feedback channel, the token each one needs, and writing your own | `docs/installation.md` | [Feedback channels](installation.md#feedback-channels) |
 | Configuring a deploy target, and the commands a comment can drive | `docs/installation.md` | [Deploy target](installation.md#deploy-target) |
 | The checklist an agent follows when configuring this Action for someone | `docs/installation.md` | [Agent checklist](installation.md#agent-checklist) |

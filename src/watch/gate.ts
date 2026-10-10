@@ -2,7 +2,7 @@ import type { ResolvedVersion } from './dsh-version.ts'
 import type { PendingMigration, SeenState } from './seen.ts'
 import { inline } from '../render/text.ts'
 
-export type WatchRunReason = 'first-run' | 'updated' | 'forced' | 'watch-disabled' | 'mechanical-only'
+export type WatchRunReason = 'first-run' | 'updated' | 'forced' | 'mechanical-only'
 export type WatchSkipReason = 'unchanged'
 
 export type WatchDecision =
@@ -15,7 +15,6 @@ export type WatchDecision =
  * when the resolved target differs, unless the caller forces a run.
  */
 export function decideWatch(input: {
-  watchEnabled: boolean
   force: boolean
   mechanicalOnly: boolean
   current: ResolvedVersion
@@ -23,7 +22,6 @@ export function decideWatch(input: {
 }): WatchDecision {
   if (input.mechanicalOnly) return { action: 'run', reason: 'mechanical-only' }
   if (input.force) return { action: 'run', reason: 'forced' }
-  if (!input.watchEnabled) return { action: 'run', reason: 'watch-disabled' }
   if (input.previous === undefined) return { action: 'run', reason: 'first-run' }
   if (input.previous.version !== input.current.version) return { action: 'run', reason: 'updated' }
   return { action: 'skip', reason: 'unchanged', previous: input.previous }
@@ -51,8 +49,6 @@ export function describeWatchDecision(decision: WatchDecision, current: Resolved
       return `dsh updated, processing ${tag}`
     case 'forced':
       return `forced run, processing ${tag}`
-    case 'watch-disabled':
-      return `watch disabled, processing ${tag}`
     case 'mechanical-only':
       return `mechanical-only, skipping dsh update gate`
   }

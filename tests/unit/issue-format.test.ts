@@ -20,7 +20,6 @@ const reportB = readFileSync(fixture('report-b.md'), 'utf8')
 const worktree = readFileSync(fixture('worktree.diff'), 'utf8')
 
 const omo = {
-  language: 'en' as const,
   status: 'migrated' as const,
   target: { tag: 'dsh-v0.1.1-rc.2', version: '0.1.1-rc.2' },
   pluginName: '@royenheart/dsh-plugin-opencode-omo',
@@ -59,7 +58,7 @@ test('omo issue #1 diff lists files and does not leak nested fences', () => {
     'patches/0001-agent-pre-step-assistant-prefill.patch',
     'patches/README.md',
   ])
-  const block = formatWorkingTree(worktree, 'en')
+  const block = formatWorkingTree(worktree)
   assert.match(block, /`README\.md`/)
   assert.match(block, /~~~~diff/)
   assert.match(block, /```sh/)
