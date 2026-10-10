@@ -132,13 +132,15 @@ test('differing failures keep differing signatures', () => {
   assert.notEqual(one.signature, two.signature)
 })
 
-test('the scratch profile names the plugin in its bundle list', () => {
+test('the scratch profile names the plugin in its bundle list and loads its patches once', () => {
   const home = mkdtempSync(join(tmpdir(), 'dsh-mig-home-'))
   try {
     writeProbeProfile(home, 'probe', '@acme/dsh-plugin-foo')
     const pkg: unknown = JSON.parse(readFileSync(join(home, 'profiles', 'probe', 'package.json'), 'utf8'))
-    const bundles = (pkg as { dsh: { profile: { bundles: string[] } } }).dsh.profile.bundles
-    assert.deepEqual(bundles, ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', '@acme/dsh-plugin-foo'])
+    assert.deepEqual((pkg as { dsh: { profile: unknown } }).dsh.profile, {
+      bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', '@acme/dsh-plugin-foo'],
+      patchReload: 'startup',
+    })
   } finally {
     rmSync(home, { recursive: true, force: true })
   }

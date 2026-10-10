@@ -214,6 +214,12 @@ export interface BootProbeOptions {
  * Build a scratch profile that mounts the plugin under test, without pnpm:
  * the plugin is symlinked into the profile's `node_modules` and named in its
  * bundle list, so Node resolution finds it exactly as an installed plugin.
+ *
+ * `patchReload: 'startup'` loads the profile's patches once instead of
+ * watching them. Releases before 0.2 watch by default, which needs the Cordis
+ * HMR service, and a fresh install of one of those releases resolves a Cordis
+ * that no longer provides it, so every check against them failed whatever
+ * the plugin did. Releases from 0.2 have no patch watching and ignore the field.
  * @param home - scratch dsh home
  * @param profile - profile id inside that home
  * @param pluginName - package name of the plugin under test
@@ -231,7 +237,7 @@ export function writeProbeProfile(
     name: `dsh-migrate-probe-${profile}`,
     private: true,
     type: 'module',
-    dsh: { profile: { bundles } },
+    dsh: { profile: { bundles, patchReload: 'startup' } },
   }, null, 2)}\n`, 'utf8')
 }
 
