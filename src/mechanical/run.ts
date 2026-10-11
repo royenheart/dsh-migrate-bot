@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { MigrateConfig } from '../config/schema.ts'
 import { extractMechanicalErrors } from './errors.ts'
+import { checkDependencyContract, npmPublishedVersions } from './dependencies.ts'
 import { dshPeerSpecs, pinDshPeersCommand } from './peers.ts'
 import { scanKeyedSlots, scanPluginShape } from './scan.ts'
 import { typecheckCommand } from './typecheck.ts'
@@ -33,6 +34,8 @@ export interface MechanicalOptions {
    * the runner's own six-hour limit.
    */
   timeoutMs?: number
+  /** Published versions of a package; the npm registry unless a test injects one. */
+  published?: (name: string) => readonly string[] | undefined
 }
 
 function runCommand(
@@ -153,6 +156,13 @@ export function runMechanical(
   options: MechanicalOptions = {},
 ): MechanicalResult {
   const pkg = readPackageJson(root)
+  if (options.dshVersion !== undefined) {
+    const contract = checkDependencyContract(pkg, options.dshVersion, options.published ?? npmPublishedVersions)
+    if (contract.length > 0) {
+      const text = contract.map(item => `error: ${item.message}`).join('\n')
+      return { ok: false, errors: text, log: text, checks: 0 }
+    }
+  }
   const extraEnv: NodeJS.ProcessEnv = options.dshVersion === undefined
     ? {}
     : { DSH_MIGRATE_TARGET_VERSION: options.dshVersion }

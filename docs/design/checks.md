@@ -18,10 +18,12 @@ A check looks at the plugin working tree under one release and produces a check 
 
 | Check | What it runs | Needs an API key | What it catches |
 |---|---|---|---|
-| `mechanical` | The plugin-shape scan, then `npm install`, the `@deepseek-ai/dsh-*` dependencies pinned to the release, and the plugin's `build`, `typecheck` and `test` scripts; `tests.commands` replaces the scripts | no | Type, build and unit-test failures |
+| `mechanical` | The dependency contract, the plugin-shape scan, then `npm install`, the `@deepseek-ai/dsh-*` dependencies pinned to the release, and the plugin's `build`, `typecheck` and `test` scripts; `tests.commands` replaces the scripts | no | A dependency the release no longer publishes or a range that does not admit it; type, build and unit-test failures |
 | `boot` | Installs the tree into a temporary profile and starts dsh | no | A plugin that fails to load, throws in `apply`, waits forever for a service, or hangs the host |
 | `web` | Starts `dsh web` headless with the plugin mounted and waits for the ready line; skipped when the plugin declares no `dsh.client` | no | A web client that never attaches |
 | `e2e` | The agent-authored suite from the suite branch, overlaid on the tree; `subset` runs the previously failing tests and the smoke tests, `full` runs everything; skipped while no suite exists | no | Runtime behaviour, layout and console errors |
+
+The dependency contract (`src/mechanical/dependencies.ts`) runs first, because pinning the dependencies to the release hides what a user installing the plugin would meet. Every `@deepseek-ai/dsh-*` package is published with the release's version and a removed one stops at its last release, so each package the plugin names must be published at the release, under a range that admits it by npm's rules, which compare a prerelease only within the same `major.minor.patch`. The published versions are read from the npm registry; when it cannot be read, the contract decides nothing and the install that follows fails instead.
 
 A plugin that declares no build, typecheck or test command produces a skipped mechanical check, not a passing one. Each release a check needs is installed once into its own cached prefix (`src/verify/dsh-install.ts`); an installation that fails is an error of the Action, not a failed check.
 
