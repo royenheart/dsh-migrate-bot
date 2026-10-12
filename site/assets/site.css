@@ -27,3 +27,11 @@ select, button { font: inherit; padding: .2rem .4rem; }
 #editor { height: 70vh; border: 1px solid var(--line); }
 .files { columns: 2; font-size: 12px; margin: .25rem 0 .75rem; }
 #chart { width: 100%; }
+.graphs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.graphs svg { max-width: 100%; height: auto; }
+.changes { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 1.25rem; align-items: start; }
+.changes nav { font-size: 13px; position: sticky; top: .5rem; max-height: 85vh; overflow: auto; }
+.changes nav h2 { font-size: 13px; text-transform: uppercase; color: var(--muted); margin: .9rem 0 .3rem; }
+.changes nav div { padding: .1rem 0; }
+.changes nav a.selected { font-weight: 700; color: var(--fg); }
+.changes #editor { height: 78vh; }

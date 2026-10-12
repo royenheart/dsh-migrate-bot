@@ -6,6 +6,7 @@
  *   npm run bench -- resume <job directory>
  *   npm run bench -- compare <base record id> <head record id>
  *   npm run bench -- validate [records dir]
+ *   npm run bench -- publish [records dir]
  *
  * docs/operations/benchmark.md is the procedure; docs/design/evaluation.md the
  * design. Records are written to the `bench/records` worktree at `.bench/records`
@@ -24,6 +25,7 @@ import { compare, computeMetrics } from '../src/evaluation/metrics.ts'
 import { recordSchema, RECORD_SCHEMA, SUBJECTS, type Attempt, type BenchmarkRecord, type SubjectId, type TaskEntry } from '../src/evaluation/record.ts'
 import { UPGRADE_SKILLS } from '../src/skills/upgrade.ts'
 import { REPO_ROOT } from './repo.ts'
+import { botSnapshot, checkSnapshot, storeSnapshot } from './snapshot.ts'
 
 const SUITE_REPOSITORY = 'oh-my-dsh/dsh-plugin-upgrade-skill'
 const SUITE_DIR = join(REPO_ROOT, 'vendor', 'dsh-plugin-upgrade-skill')
@@ -143,7 +145,13 @@ async function run(argv: string[]): Promise<number> {
   const concurrency = Number(values.concurrency)
   const multiplier = Number(values['agent-timeout-multiplier'])
   const [provider = '', model = ''] = values.model.split('/')
-  const producer = { commit: git(['rev-parse', 'HEAD']), version: (JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as { version: string }).version, dirty }
+  const producer = {
+    commit: git(['rev-parse', 'HEAD']),
+    version: (JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as { version: string }).version,
+    dirty,
+    message: git(['log', '-1', '--format=%s']),
+    snapshot: storeSnapshot(records, await botSnapshot()),
+  }
   const suiteCommit = git(['rev-parse', 'HEAD'], SUITE_DIR)
   const python = join(dirname(values.harbor), 'python3')
   const selected = values.tasks?.split(',').map(id => id.trim())
@@ -334,6 +342,7 @@ export function validateRecords(records: string): string[] {
       continue
     }
     if (record.id !== id) problems.push(`${id}: the record names itself ${record.id}`)
+    problems.push(...checkSnapshot(records, record.producer.snapshot).map(problem => `${id}: ${problem}`))
     const metrics = computeMetrics({ tasks: record.suite.tasks, attempts: record.attempts, k: record.subject.attempts })
     if (!isDeepStrictEqual(metrics, record.metrics)) problems.push(`${id}: the stored metrics differ from the metrics its attempts compute to`)
     for (const attempt of record.attempts) {
@@ -346,17 +355,42 @@ export function validateRecords(records: string): string[] {
   return problems
 }
 
+/**
+ * Commit the new records and snapshots in the records worktree. Pushing them
+ * publishes them, so that is left to the maintainer, and printed.
+ */
+function publish(argv: string[]): number {
+  const records = argv[0] ?? RECORDS_DIR
+  const problems = validateRecords(records)
+  for (const problem of problems) console.error(problem)
+  if (problems.length > 0) return 1
+  git(['add', 'records', 'snapshots'], records)
+  const added = git(['diff', '--cached', '--name-only', '--diff-filter=A'], records).split('\n').filter(path => path.endsWith('/record.json'))
+  if (git(['diff', '--cached', '--name-only'], records) === '') {
+    console.log('nothing to publish')
+    return 0
+  }
+  const lines = added.map((path) => {
+    const record = readRecord(join(records, path))
+    return `- ${record.id}: ${record.subject.id}, meanReward ${String(record.metrics.values.meanReward)} over ${String(record.metrics.values.eligibleTasks)} task(s) at "${record.producer.message}"`
+  })
+  git(['commit', '--quiet', '-m', `chore(bench): record ${String(added.length)} run(s)`, '-m', lines.join('\n')], records)
+  console.log(`committed in ${records}:\n${lines.join('\n')}\npublish with:\n  git -C ${records} push origin bench/records\n  gh workflow run bench-records.yml`)
+  return 0
+}
+
 async function main(): Promise<number> {
   const [command, ...rest] = process.argv.slice(2)
   if (command === 'run') return run(rest)
   if (command === 'resume') return resume(rest)
+  if (command === 'publish') return publish(rest)
   if (command === 'compare') return compareRecords(rest)
   if (command === 'validate') {
     const problems = validateRecords(rest[0] ?? RECORDS_DIR)
     for (const problem of problems) console.error(problem)
     return problems.length === 0 ? 0 : 1
   }
-  console.error('usage: npm run bench -- run|resume|compare|validate …')
+  console.error('usage: npm run bench -- run|resume|compare|validate|publish …')
   return 2
 }
 

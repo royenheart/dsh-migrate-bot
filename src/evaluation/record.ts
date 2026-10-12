@@ -75,6 +75,8 @@ export const recordSchema = z.strictObject({
     commit: z.string().regex(/^[0-9a-f]{40}$/).describe('The commit of this repository that ran.'),
     version: z.string().min(1).describe('Its package version.'),
     dirty: z.boolean().describe('A dirty tree is refused unless the run asked for it, and then the report labels it.'),
+    message: z.string().describe('The first line of the commit message; the commit may be rewritten later, the record keeps what it said.'),
+    snapshot: z.string().regex(/^[0-9a-f]{16}$/).describe('The hash of what the Action brought to the run, stored under `snapshots/<hash>/`: the statechart, the configuration defaults, the prompts, the agent runtime, the upgrade skills and the source.'),
   }),
   subject: z.strictObject({
     id: z.enum(SUBJECTS).describe('What ran as the Harbor agent; docs/design/evaluation.md defines each.'),

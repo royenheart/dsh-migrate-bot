@@ -31,7 +31,7 @@ export async function loadArtifact(id, path) {
 export const loadField = () => json('data/field.json')
 
 export function nav(current) {
-  const pages = [['index.html', 'Trend'], ['compare.html', 'Compare'], ['task.html', 'Task'], ['diff.html', 'Diff'], ['field.html', 'Field']]
+  const pages = [['index.html', 'Trend'], ['compare.html', 'Compare'], ['changes.html', 'Changes'], ['task.html', 'Task'], ['diff.html', 'Diff'], ['field.html', 'Field']]
   const header = document.createElement('header')
   header.innerHTML = `<strong>dsh-migrate benchmark</strong>${pages.map(([href, label]) => `<a href="${href}"${label === current ? ' aria-current="page"' : ''}>${label}</a>`).join('')}`
   document.body.prepend(header)

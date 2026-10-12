@@ -47,13 +47,15 @@ A run writes its plan beside Harbor's job directory before Harbor starts, and pr
 
 ```sh
 npm run bench -- compare <base record id> <head record id>
-npm run bench -- validate
-git -C .bench/records add records && git -C .bench/records commit -m "chore(bench): record <subject> at <commit>"
+npm run site                              # the report from .bench/records, in .bench/site
+npm run bench -- publish                  # validate, then commit the new records and snapshots
 git -C .bench/records push origin bench/records
 gh workflow run bench-records.yml
 ```
 
-`compare` exits non-zero on a regression. `validate` checks that every record parses, its metrics recompute to the stored values, and its kept files match their hashes. [The `bench-records` workflow](../../.github/workflows/bench-records.yml) builds the report from the pushed records, refusing any that do not validate, and publishes it to GitHub Pages; it runs on request, daily, and on every push to `main`. `npm run site` builds the same site into `.bench/site` to look at before pushing. A pushed record is public.
+`compare` exits non-zero on a regression. `validate`, which `publish` runs first, checks that every record parses, its metrics recompute to the stored values, its kept files match their hashes, and its snapshot matches its manifest. `publish` commits in the records worktree only, with one line per new record: its subject, its `meanReward` and the commit message of the run. [The `bench-records` workflow](../../.github/workflows/bench-records.yml) builds the report from the pushed records, refusing any that do not validate, and publishes it to GitHub Pages; it runs on request, daily, and on every push to `main`. A pushed record is public.
+
+While the Action is being changed, the loop is: commit the change, run the subject the change concerns (`--tasks` narrows it while iterating), then publish. The Trend page puts each run on the subject's line with its commit message, and the Changes page shows what the change did to the statechart, the prompts and the source next to what it did to the score. A run needs a commit, not a pushed one: the snapshot keeps what the commit held.
 
 An oracle run exits non-zero when a reference solution scored below 1.0, after writing its record: those tasks are infeasible on this machine, and the other subjects skip them.
 

@@ -5,6 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { validateRecords } from '../../scripts/bench.ts'
+import { botSnapshot, checkSnapshot, storeSnapshot } from '../../scripts/snapshot.ts'
 import { attemptOf, outcomeOf, type TrialResult } from '../../src/evaluation/harbor.ts'
 import { AGENT_TIMEOUT, bootstrap, compare, computeMetrics, MIN_PAIRED_TASKS, taskScores, type MetricInput } from '../../src/evaluation/metrics.ts'
 import type { Attempt, BenchmarkRecord, TaskEntry } from '../../src/evaluation/record.ts'
@@ -146,7 +147,7 @@ test('a record validates while its metrics and kept files are what its attempts 
       schema: 3,
       id,
       createdAt: '2026-10-10T00:00:00Z',
-      producer: { commit: 'a'.repeat(40), version: '1.0.0', dirty: false },
+      producer: { commit: 'a'.repeat(40), version: '1.0.0', dirty: false, message: 'feat: a change', snapshot: storeSnapshot(root, new Map([['prompts/overlap.md', 'Review the plugin.\n']])) },
       subject: { id: 'session', agentRuntime: '0.2.0-rc.2', attempts: 1, agentTimeoutMultiplier: 1 },
       suite: { repository: 'oh-my-dsh/dsh-plugin-upgrade-skill', commit: 'b'.repeat(40), tasks },
       model: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
@@ -165,4 +166,29 @@ test('a record validates while its metrics and kept files are what its attempts 
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+test('a snapshot is stored once per content, and a changed file or a missing snapshot fails validation', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-snapshot-'))
+  try {
+    const files = new Map([['prompts/overlap.md', 'Review the plugin.\n'], ['workflow.md', '# Workflow\n']])
+    const hash = storeSnapshot(root, files)
+    assert.equal(storeSnapshot(root, new Map([...files].reverse())), hash)
+    assert.notEqual(storeSnapshot(root, new Map([...files, ['workflow.md', '# Workflow v2\n']])), hash)
+    assert.deepEqual(checkSnapshot(root, hash), [])
+    writeFileSync(join(root, 'snapshots', hash, 'files', 'workflow.md'), '# edited\n')
+    assert.deepEqual(checkSnapshot(root, hash), [`snapshot ${hash}: workflow.md is missing or changed`])
+    assert.deepEqual(checkSnapshot(root, '0'.repeat(16)), [`snapshot ${'0'.repeat(16)} is missing`])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('the snapshot of this checkout holds the statechart, every prompt, the runtime and the skills', async () => {
+  const files = await botSnapshot()
+  for (const path of ['workflow.md', 'configuration.md', 'prompts/overlap.md', 'prompts/extension-points.md', 'prompts/repair.md', 'prompts/e2e-authoring.md', 'prompts/report-upgrade-skill.md', 'runtime/agent-runtime.json', 'runtime/profile/migrate-runner.js', 'skills.json']) {
+    assert.ok((files.get(path) ?? '').length > 0, path)
+  }
+  assert.match(files.get('prompts/repair.md') ?? '', /<output of the failing check>/)
+  assert.match(files.get('workflow.md') ?? '', /stateDiagram|flowchart|graph/)
 })

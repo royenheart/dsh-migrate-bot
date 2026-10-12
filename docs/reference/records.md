@@ -15,6 +15,8 @@ A record is `records/<id>/record.json` on the `bench/records` branch, schema 3, 
 | `producer.commit` | string | The commit of this repository that ran. |
 | `producer.version` | string | Its package version. |
 | `producer.dirty` | boolean | A dirty tree is refused unless the run asked for it, and then the report labels it. |
+| `producer.message` | string | The first line of the commit message; the commit may be rewritten later, the record keeps what it said. |
+| `producer.snapshot` | string | The hash of what the Action brought to the run, stored under `snapshots/<hash>/`: the statechart, the configuration defaults, the prompts, the agent runtime, the upgrade skills and the source. |
 | `subject.id` | `pipeline` \| `pipeline+skills` \| `session` \| `session+skills` \| `oracle` | What ran as the Harbor agent; docs/design/evaluation.md defines each. |
 | `subject.agentRuntime` | string | The dsh version of the agent runtime. |
 | `subject.skills.commit` | string | The upgrade-skill commit the skills came from, for a `+skills` subject. |

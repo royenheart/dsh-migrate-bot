@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Changes · dsh-migrate benchmark</title>
+<link rel="stylesheet" href="assets/site.css">
+<script src="https://cdn.jsdelivr.net/npm/diff@7.0.0/dist/diff.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+</head>
+<body>
+<main>
+  <h1>What changed in the Action</h1>
+  <p class="muted">The statechart, the configuration defaults, every prompt a session receives (runtime inputs shown as placeholders), the agent runtime, the upgrade skills and the source, as each record's run had them.</p>
+  <div class="controls">
+    <label>From <select id="from"></select></label>
+    <label>To <select id="to"></select></label>
+  </div>
+  <div id="summary"></div>
+  <div class="changes">
+    <nav id="files"></nav>
+    <section>
+      <div class="controls"><strong id="file" class="mono"></strong><label>View <select id="view"></select></label></div>
+      <div id="graphs" class="graphs"></div>
+      <div id="editor"></div>
+    </section>
+  </div>
+</main>
+<script type="module" src="assets/changes.js"></script>
+</body>
+</html>

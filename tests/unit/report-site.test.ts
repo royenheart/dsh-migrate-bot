@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { fieldMetrics, fieldMigrations, type FieldMigration } from '../../src/evaluation/field.ts'
 import { computeMetrics } from '../../src/evaluation/metrics.ts'
 import { buildSite } from '../../scripts/site.ts'
+import { storeSnapshot } from '../../scripts/snapshot.ts'
 import { input, logOf, proposal, proposedEvents } from '../support/migration.ts'
 import type { LogEntry } from '../../src/workflow/model.ts'
 import type { BenchmarkRecord } from '../../src/evaluation/record.ts'
@@ -56,7 +57,7 @@ function writeRecord(records: string, id: string, createdAt: string, mutate: (re
     schema: 3,
     id,
     createdAt,
-    producer: { commit: 'a'.repeat(40), version: '1.0.0', dirty: false },
+    producer: { commit: 'a'.repeat(40), version: '1.0.0', dirty: false, message: 'feat: a change', snapshot: storeSnapshot(records, new Map([['workflow.md', '# Workflow\n']])) },
     subject: { id: 'oracle', agentRuntime: 'none', attempts: 1, agentTimeoutMultiplier: 1 },
     suite: { repository: 'oh-my-dsh/dsh-plugin-upgrade-skill', commit: 'b'.repeat(40), tasks },
     model: { provider: 'none', model: 'none' },
@@ -77,7 +78,7 @@ test('the site carries the pages, the metric library, and the records newest fir
     writeRecord(records, 'new', '2026-10-02T00:00:00Z')
     const out = join(root, 'site')
     assert.equal(buildSite(records, out), 2)
-    for (const page of ['index.html', 'compare.html', 'task.html', 'diff.html', 'field.html', 'assets/metrics.js', 'data/records/new/record.json']) assert.ok(existsSync(join(out, page)), page)
+    for (const page of ['index.html', 'compare.html', 'changes.html', 'task.html', 'diff.html', 'field.html', 'assets/metrics.js', 'data/records/new/record.json', 'data/snapshots/' + JSON.parse(readFileSync(join(records, 'records', 'new', 'record.json'), 'utf8')).producer.snapshot + '/files/workflow.md']) assert.ok(existsSync(join(out, page)), page)
     assert.doesNotMatch(readFileSync(join(out, 'assets', 'metrics.js'), 'utf8'), /^import /m)
     const index = JSON.parse(readFileSync(join(out, 'data', 'index.json'), 'utf8')) as { records: Array<{ id: string; attempts?: unknown }> }
     assert.deepEqual(index.records.map(record => record.id), ['new', 'old'])

@@ -69,14 +69,17 @@ A record is `records/<id>/record.json` on the `bench/records` branch, beside the
 
 The working tree must be clean, or the run passes `--allow-dirty` and the record says `producer.dirty`.
 
+Each record also names a snapshot of what the Action brought to the run, `snapshots/<hash>/` beside the records (`scripts/snapshot.ts`): the statechart as `docs/reference/workflow.md` renders it, the configuration defaults, every prompt a session receives with its runtime inputs replaced by placeholders, the agent runtime and its profile, the upgrade-skill commit, and the source of `src/`. The snapshot is kept because the record's commit may not survive: development history is amended and rebased, and a record must still show what produced its score. It is stored once per content, so runs of an unchanged Action share one, and it is built from a built checkout, which is how a snapshot of an earlier commit is built. The record also keeps the first line of the commit message. `validate` checks every snapshot against its manifest and its name.
+
 ## 7. The report
 
 `npm run site` builds a static site from the records, and [the `bench-records` workflow](../../.github/workflows/bench-records.yml) publishes it to GitHub Pages. The pages are `site/`; the build adds the data they read and the compiled metric library, so a page computes a comparison with the same code as the command line. Every page keeps its state in the URL, so a view is a link.
 
 | Page | Shows |
 |---|---|
-| Trend | Per subject, `meanReward` with its interval band and `passRate@1.0` over the records, and a table of every record; a point opens the comparison with the record before it |
+| Trend | Per subject, `meanReward` with its interval band and `passRate@1.0` over the records, and a table of every record with its commit message and a link to what changed in the Action since the record before it; a point opens the comparison with that record |
 | Compare | Two records: the paired verdicts, every metric side by side, and every attempt of every task as a chip that opens its diff |
+| Changes | What changed in the Action between two records: the snapshot files grouped as statechart, configuration, prompts, agent runtime, upgrade skills and source, each with its diffstat, in a Monaco diff editor; the statechart also as its two diagrams side by side, with the states only one side has coloured. `?from&to&file&view`, and `range=latest` for the newest record and the newest earlier one whose Action differs |
 | Task | One task across the records of a subject: the reward of each attempt, durations and cost |
 | Diff | One artifact of two attempts, of two records or of one, in a Monaco diff editor; a `proposed.diff` also gets its file list and diffstat. `?subject&task&from&fromAttempt&to&toAttempt&artifact&view`, and `range=latest` for the two newest records |
 | Field | The proposals in the consumer repositories |

@@ -41,6 +41,7 @@ export function buildSite(records: string, out: string): number {
   rmSync(out, { recursive: true, force: true })
   cpSync(PAGES, out, { recursive: true })
   cpSync(METRICS_MODULE, join(out, 'assets', 'metrics.js'))
+  if (existsSync(join(records, 'snapshots'))) cpSync(join(records, 'snapshots'), join(out, 'data', 'snapshots'), { recursive: true })
   const dir = join(records, 'records')
   const summaries = (existsSync(dir) ? readdirSync(dir) : []).map((id) => {
     cpSync(join(dir, id), join(out, 'data', 'records', id), { recursive: true })

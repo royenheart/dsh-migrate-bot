@@ -14,6 +14,7 @@ async function show(baseId, headId) {
   if (base.suite.commit !== head.suite.commit) notes.push(`The suite commits differ (${short(base.suite.commit)} → ${short(head.suite.commit)}): only the tasks both scored are paired.`)
   if (base.producer.dirty || head.producer.dirty) notes.push('A record was produced from a tree with uncommitted changes.')
   document.getElementById('notes').innerHTML = notes.map(note => `<p class="warning">${escape(note)}</p>`).join('')
+    + `<p>${base.producer.snapshot === head.producer.snapshot ? 'The Action was the same in both runs.' : `<a href="changes.html?from=${encodeURIComponent(base.id)}&to=${encodeURIComponent(head.id)}">What changed in the Action between these runs</a>`}</p>`
 
   document.getElementById('verdicts').innerHTML = `<tr><th>Metric</th><th class="num">Paired tasks</th><th class="num">Δ</th><th>Verdict</th></tr>${compare(input(base), input(head)).map(row => `<tr><td><code>${row.metric}</code></td><td class="num">${row.tasks}</td><td class="num">${fmt(row.delta)}${interval(row.interval)}</td><td class="${row.verdict}">${row.verdict}</td></tr>`).join('')}`
 
