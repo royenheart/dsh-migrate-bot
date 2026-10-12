@@ -1,0 +1,104 @@
+diff --git a/fixture/index.js b/fixture/index.js
+index ccc5604..f5c7add 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,14 +1,52 @@
+-// 0.1.1-rc.2 era style: inject apiProxy and call through its dotted domain
+-export const inject = ["apiProxy"]
++// 0.1.2-alpha.2 style: the Host API Proxy service is gone. A Host plugin injects
++// the owning domain service directly — the migrated form of the old
++// `ctx.apiProxy.llm.providers()` unary operation (destination: `llm/listProviders`
++// plus `llm/listConfigurableProviders`, joined by provider route as the official
++// settings page does).
++export const inject = ["llm"]
++
++/**
++ * Join the live provider routes and the declared-but-possibly-dormant provider
++ * directory by route id, so the full provider directory is preserved.
++ * @param registered - routes with a registered adapter.
++ * @param directory - declared routes, registered or dormant.
++ * @returns directory entries in declaration order, extras last.
++ */
++export function joinProviderDirectory(registered, directory) {
++  const active = new Set(registered.map(provider => provider.id))
++  const declared = new Set(directory.map(entry => entry.provider))
++  const rows = directory.map(entry => ({
++    provider: entry.provider,
++    displayName: entry.displayName,
++    settingsNs: entry.settingsNs,
++    settingsPath: [...entry.settingsPath],
++    active: active.has(entry.provider),
++    ...entry.declared === undefined ? {} : { declared: entry.declared },
++  }))
++  for (const provider of registered) {
++    if (declared.has(provider.id)) continue
++    rows.push({
++      provider: provider.id,
++      displayName: provider.name,
++      settingsNs: '',
++      settingsPath: [],
++      active: true,
++    })
++  }
++  return rows
++}
+ 
+ export function apply(ctx) {
+-  console.error("[upgrade-demo] apply() 执行 — 旧 API（apiProxy）路径")
+-  ctx.effect(async () => {
++  console.error("[upgrade-demo] apply() 执行 — 新 API（llm 域服务）路径")
++  ctx.effect(() => {
+     try {
+-      const providers = await ctx.apiProxy.llm.providers()
+-      console.error("[upgrade-demo] apiProxy.llm.providers() 成功 →", JSON.stringify(providers).slice(0, 160))
++      const providers = joinProviderDirectory(
++        ctx.llm.listProviders(),
++        ctx.llm.listConfigurableProviders(),
++      )
++      console.error("[upgrade-demo] llm.listProviders() 成功 →", JSON.stringify(providers).slice(0, 160))
+     } catch (error) {
+-      console.error("[upgrade-demo] apiProxy.llm.providers() 失败 →", error.message)
++      console.error("[upgrade-demo] llm.listProviders() 失败 →", error.message)
+     }
+   })
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..45b1a6d
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-upgrade-demo",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-upgrade-demo",
++      "version": "0.1.0"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 623271c..7b215bf 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@demo/dsh-upgrade-demo",
+   "version": "0.1.0",
+-  "description": "DSH plugin upgrade validation demo (migrated to 0.1.2-alpha.2 @Remote)",
++  "description": "DSH plugin upgrade validation demo (migrated to 0.1.2-alpha.2: Host domain service instead of the removed API Proxy)",
+   "type": "module",
+   "main": "index.js",
+   "exports": {
+@@ -13,8 +13,5 @@
+       "patch": "./cordis.patch.yml"
+     }
+   },
+-  "dependencies": {
+-    "@deepseek-ai/dsh-host-apiproxy": "0.0.1-rc.1"
+-  },
+   "private": true
+ }

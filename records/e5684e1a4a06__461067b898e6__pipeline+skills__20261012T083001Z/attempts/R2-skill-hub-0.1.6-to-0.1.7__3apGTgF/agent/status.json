@@ -1,0 +1,142 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.7-alpha.1",
+      "target": {
+        "tag": "dsh-v0.1.7-alpha.1",
+        "version": "0.1.7-alpha.1"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.7-alpha.1",
+            "version": "0.1.7-alpha.1"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.6-alpha.2",
+              "version": "0.1.6-alpha.2"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 1,
+        "lastFingerprint": "mechanical: npm error dev @deepseek-ai/dsh-session@\"<n>.<n>-alpha.<n>\" from the root project",
+        "failure": {
+          "check": "mechanical",
+          "outcome": "fail",
+          "fingerprint": "mechanical: npm error dev @deepseek-ai/dsh-session@\"<n>.<n>-alpha.<n>\" from the root project",
+          "detail": "npm error   dev @deepseek-ai/dsh-session@\"0.1.7-alpha.1\" from the root project\nnpm error   peer @deepseek-ai/dsh-session@\"^0.1.7-alpha.1\" from @deepseek-ai/dsh-session-query@0.1.7-alpha.1\nnpm error   node_modules/@deepseek-ai/dsh-session-query\nnpm error     dev @deepseek-ai/dsh-session-query@\"0.1.7-alpha.1\" from the root project\nnpm error\nnpm error Could not resolve dependency:\nnpm error peer @deepseek-ai/dsh-session@\"0.1.7-rc.2\" from @deepseek-ai/dsh-agent@0.1.7-rc.2\nnpm error node_modules/@deepseek-ai/dsh-agent\nnpm error   peer @deepseek-ai/dsh-agent@\"0.1.7-rc.2\" from @deepseek-ai/dsh-session-title@0.1.7-rc.2\nnpm error   node_modules/@deepseek-ai/dsh-session-title\nnpm error     peer @deepseek-ai/dsh-session-title@\"^0.1.7-alpha.1\" from @deepseek-ai/dsh-session-query@0.1.7-alpha.1\nnpm error     node_modules/@deepseek-ai/dsh-session-query\nnpm error       dev @deepseek-ai/dsh-session-query@\"0.1.7-alpha.1\" from the root project\nnpm error\nnpm error Fix the upstream dependency conflict, or retry this command with --force or --legacy-peer-deps to accept an incorrect (and potentially broken) dependency resolution.\nnpm error\nnpm error\nnpm error For a full report see:\nnpm error /root/.npm/_logs/2026-10-12T09_22_35_535Z-eresolve-report.txt\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-12T09_22_35_535Z-debug-0.log"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [],
+        "warnings": [
+          "end-to-end suite not updated: dsh session (e2e-authoring) exceeded its 3600s watchdog and was killed\n--- last stderr ---\n27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3500,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3510,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3520,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3530,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3540,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3550,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3560,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3570,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3580,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3590,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3599,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}"
+        ],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-12T08-32-00-543Z",
+      "startedAt": "2026-10-12T08:32:01.337Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.7-alpha.1",
+    "target": {
+      "tag": "dsh-v0.1.7-alpha.1",
+      "version": "0.1.7-alpha.1"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.7-alpha.1",
+          "version": "0.1.7-alpha.1"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.6-alpha.2",
+            "version": "0.1.6-alpha.2"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 1,
+      "lastFingerprint": "mechanical: npm error dev @deepseek-ai/dsh-session@\"<n>.<n>-alpha.<n>\" from the root project",
+      "failure": {
+        "check": "mechanical",
+        "outcome": "fail",
+        "fingerprint": "mechanical: npm error dev @deepseek-ai/dsh-session@\"<n>.<n>-alpha.<n>\" from the root project",
+        "detail": "npm error   dev @deepseek-ai/dsh-session@\"0.1.7-alpha.1\" from the root project\nnpm error   peer @deepseek-ai/dsh-session@\"^0.1.7-alpha.1\" from @deepseek-ai/dsh-session-query@0.1.7-alpha.1\nnpm error   node_modules/@deepseek-ai/dsh-session-query\nnpm error     dev @deepseek-ai/dsh-session-query@\"0.1.7-alpha.1\" from the root project\nnpm error\nnpm error Could not resolve dependency:\nnpm error peer @deepseek-ai/dsh-session@\"0.1.7-rc.2\" from @deepseek-ai/dsh-agent@0.1.7-rc.2\nnpm error node_modules/@deepseek-ai/dsh-agent\nnpm error   peer @deepseek-ai/dsh-agent@\"0.1.7-rc.2\" from @deepseek-ai/dsh-session-title@0.1.7-rc.2\nnpm error   node_modules/@deepseek-ai/dsh-session-title\nnpm error     peer @deepseek-ai/dsh-session-title@\"^0.1.7-alpha.1\" from @deepseek-ai/dsh-session-query@0.1.7-alpha.1\nnpm error     node_modules/@deepseek-ai/dsh-session-query\nnpm error       dev @deepseek-ai/dsh-session-query@\"0.1.7-alpha.1\" from the root project\nnpm error\nnpm error Fix the upstream dependency conflict, or retry this command with --force or --legacy-peer-deps to accept an incorrect (and potentially broken) dependency resolution.\nnpm error\nnpm error\nnpm error For a full report see:\nnpm error /root/.npm/_logs/2026-10-12T09_22_35_535Z-eresolve-report.txt\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-12T09_22_35_535Z-debug-0.log"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [],
+      "warnings": [
+        "end-to-end suite not updated: dsh session (e2e-authoring) exceeded its 3600s watchdog and was killed\n--- last stderr ---\n27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3500,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3510,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3520,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3530,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3540,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3550,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3560,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3570,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3580,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3590,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}\ndsh-migrate-status: {\"turns\":1,\"steps\":176,\"elapsedSeconds\":3599,\"inputTokens\":135566,\"outputTokens\":125050,\"cacheHitTokens\":23091200,\"cacheMissTokens\":135566,\"costUsd\":0.27943176}"
+      ],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-12T08-32-00-543Z",
+    "startedAt": "2026-10-12T08:32:01.337Z"
+  }
+}

@@ -1,0 +1,138 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 2ed4a63..b7f9c36 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,8 +1,17 @@
+-# H7 fixture · locale trap
++# H7 fixture · session-header badge
+ 
+-A web plugin whose browser half locates the host session-header button by
+-matching the display text `/session\s*log/i`. The host client copy has been
+-fully localized (rollup R-13), so the selector silently stops matching on
+-non-English locales — the injected badge disappears with no error and no
+-console exception. The trap comment suggests adding a second regex. **Test
+-material only — do not execute or publish** (`"private": true`).
++A web plugin whose browser half contributes a small badge to the host Session
++header, in the right-aligned utilities row beside the host's Session-log
++button. The host half only registers the lifecycle; the badge is a registered
++occupant of the declared `conversation.session.header.utilities` slot, and its
++copy belongs to the plugin's `bench-locale` locale dictionary.
++
++The first revision located the host button by matching its display text
++(`/session\s*log/i`). Host client copy became locale-owned in the 0.1.2
++client-locale rollout (rollup R-13), so the selector silently stopped matching
++on non-English locales — the injected badge disappeared with no error and no
++console exception — and the suggested second regex would only break again on
++the next language. Localized display text is never an identity, so the badge
++anchors to the slot declaration instead of to copy.
++
++**Test material only — do not execute or publish** (`"private": true`).
+diff --git a/fixture/client.js b/fixture/client.js
+index 596702f..274c23b 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,13 +1,59 @@
+-// Browser half: anchors the host session-header by its display text.
+-// Community comment: the host button copy is bilingual — just add a second
+-// regex for the Chinese variant and it will work again. (Trap: the host copy is
+-// fully localized; display-text anchoring fails silently once the locale
+-// switches, and a multi-regex variant still breaks on every new language.)
+-export function apply(ctx) {
+-  const buttons = document.querySelectorAll('button')
+-  const anchor = [...buttons].find(b => /session\s*log/i.test(b.textContent || ''))
+-  if (!anchor) return
+-  const badge = document.createElement('span')
+-  badge.textContent = 'loc'
+-  anchor.parentElement.appendChild(badge)
+-}
++// Browser half of @demo/dsh-bench-locale, shipped in the client-bundle form the
++// web host serves under /plugins: a classic script that registers one factory
++// with the module-loader facade.
++//
++// The badge is a registered occupant of the declared Session-header utilities
++// slot, the right-aligned row that also holds the host's Session-log action.
++// Localized display text is never an identity, so the contribution anchors to
++// the slot declaration and owns its copy in a locale dictionary instead of
++// matching host DOM by copy.
++window.__ModuleLoader__.load({
++  id: '@demo/dsh-bench-locale',
++  factory: (require) => {
++    var module = { exports: {} }
++    var exports = module.exports
++
++    /** React is a shell-seeded baseline module of the browser module table. */
++    const { createElement } = require('react')
++
++    /** Services this browser half waits for: the slot registry and the locale seat. */
++    const inject = ['slots', 'locale']
++
++    /** Right-aligned Session utilities slot; the host's Session-log action lives here. */
++    const SLOT = 'conversation.session.header.utilities'
++
++    /** Dictionary namespace owned by this plugin. */
++    const NS = 'bench-locale'
++
++    /** Badge copy; the marker is deliberately locale-neutral. */
++    const en = { badge: 'loc' }
++    const zh = { badge: 'loc' }
++
++    /**
++     * The badge: one stable marker entry in the Session utilities row.
++     * @param props - slot props carrying the `t` seat bound to NS.
++     */
++    function LocaleBadge(props) {
++      return createElement('span', { 'data-bench-locale-badge': '' }, props.t('badge'))
++    }
++
++    /**
++     * Register the dictionaries and the Session-header contribution.
++     * @param ctx - browser context carrying the slots and locale services.
++     */
++    function apply(ctx) {
++      ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'bench-locale: dictionaries')
++      ctx.slots.inject(SLOT, () => ctx.slots.register({
++        name: SLOT,
++        id: 'bench-locale-badge',
++        // After the host's default-ordered utilities: Session log registers at 0.
++        order: 10,
++        locale: NS,
++      }, LocaleBadge))
++    }
++
++    exports.inject = inject
++    exports.apply = apply
++    return module.exports
++  },
++})
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..904b421
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-locale",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-locale",
++      "version": "0.1.0"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 88cdfca..326f2a2 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -16,7 +16,8 @@
+     "client": {
+       "platform": "web",
+       "inject": [
+-        "remote"
++        "@deepseek-ai/dsh-client-locale",
++        "@deepseek-ai/dsh-client-ui-conversation"
+       ]
+     }
+   }

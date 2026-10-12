@@ -1,0 +1,303 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index bc9bde1..a6006dd 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -3,9 +3,14 @@
+ A browser game overlay plugin: while the model generates, a teaser pops up in
+ the bottom-right corner of the web UI and clicking it opens a game menu
+ (wordle / match-3, extensible game registry). Client-only plugin — the host
+-half is a no-op stub. Written in the 0.1.1-era style (the browser half pulls
+-its client context type from the client-runtime package). The host is moving
+-to dsh 0.1.2-alpha.2.
++half is a no-op stub. Migrated to the dsh 0.1.2-alpha.2 cohort: the browser
++half takes its context type from `@deepseek-ai/cordis` plus the owning
++packages' type augmentations, contributes the teaser as an additive
++`shell.overlay` entry (bottom-right, while the current session is running),
++reads the model-generating signal through the framework `useSessions` hook
++instead of a private subscription to the sessions-list store, and keeps the
++teaser chrome on a document-level `document.body` portal so it stays on top
++of the shell's own floating surfaces (Modal / Toast / Menu).
+ 
+ Release procedure (internal):
+ 
+diff --git a/fixture/client.js b/fixture/client.js
+index e9ec395..186df96 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,68 +1,111 @@
+-// Browser half (game overlay): watches the current session's `running` flag
+-// (the model-generating signal) and mounts a `position: fixed` teaser in the
++// Browser half (game overlay) — migrated to the dsh 0.1.2-alpha.2 cohort.
++//
++// Product behaviour is unchanged: the overlay watches the current session's
++// `running` flag (the model-generating signal) and mounts a teaser in the
+ // bottom-right corner while the model generates; clicking the teaser button
+ // opens the game menu (wordle / match-3 / parametric registry games).
+ //
+-// The overlay is NOT a slot registration: it is a `position: fixed` DOM
+-// contribution portaled to document.body, so it subscribes to the sessions
+-// list snapshot store itself instead of receiving session-scoped hooks.
++// Seating on alpha.2 — the official seat carries the entry, the plugin's own
++// document-level layer carries the pixels (docs/subsystems/slots.md,
++// packages/client/AGENTS.md):
++//   * Entry: the teaser is an additive `shell.overlay` entry declared by
++//     `@deepseek-ai/dsh-client-ui-layout` (kind: list, scope: root, addressed
++//     by our own id; the layer is click-through and entries opt back into
++//     pointer events). The seat is the shipped home for a frame-wide surface,
++//     so mount/unmount rides its lifetime and — because the seat is
++//     root-scoped — the entry receives the framework-standard `useSessions`
++//     hook. The private getSnapshot()/subscribe() read is gone.
++//   * Layer: the teaser/chrome React tree is portaled to `document.body`
++//     (`react-dom`'s createPortal; `react-dom` is a platform-seeded module
++//     and must NOT be listed in `dsh.client.external`). The seat's own layer
++//     renders INSIDE the frame (`AppFrame.module.css`: position:absolute;
++//     inset:0; z-index:20) — below the shell's own document-level surfaces
++//     (Modal z-1000, Toast/Menu/Onboarding z-1100) and inside
++//     `.frame { overflow: hidden }` — so it cannot host this plugin's product
++//     contract: a bottom-right teaser that stays visible, on top, while the
++//     model generates (the real plugin pins z-index 2147483000 on its fixed
++//     layer). Until the harness offers a document-level seat, the chrome
++//     keeps its own portal — the same pattern the shipped floating surfaces
++//     use (ui-primitives Modal/Menu/Toast, ui-attachment DropOverlay, ui-chat
++//     TurnUsagePanel all portal to document.body). When the seat becomes
++//     document-level, the portal below can be dropped.
++//   * Client context types come from `@deepseek-ai/cordis` plus the owning
++//     packages' type-only augmentations. `@deepseek-ai/dsh-client-runtime`
++//     (the 0.1.1-era aggregation package) does not exist on alpha.2.
+ //
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the client context type lived on the
+-// client-runtime package.
++// Game bodies and the menu's React tree remain elided in this fixture.
+ //
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.x era):
+-//   "ctx.sessions.list is the same store object as before — the type just
+-//    moved packages; skip the ISessions annotation to keep the bundle lean."
+-// ────────────────────────────────────────────────────────────
++// Type surface on alpha.2 (type-only, erased at build time):
++//   import type { Context } from '@deepseek-ai/cordis'
++//   import type {} from '@deepseek-ai/dsh-api-session-controller/client' // ctx.sessions, SessionListState
++//   import type {} from '@deepseek-ai/dsh-client-locale/client'          // ctx.locale
++//   import type {} from '@deepseek-ai/dsh-client-ui-layout/client'       // the 'shell.overlay' SlotMap key
++//   import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'     // ctx.slots
++//   import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
++
++import { createPortal } from 'react-dom'
+ 
+ export const name = 'bench-d399-overlay-client'
+ 
+-// Required services: sessions (drives the model-generating flag) + locale.
+-export const inject = ['sessions', 'locale']
++// Required services: sessions (drives the model-generating flag), slots (the
++// shell.overlay seat) + locale.
++export const inject = ['sessions', 'slots', 'locale']
+ 
+-/** Slice of the sessions list store the overlay reads. */
+-const SessionListSlice = undefined // { current?: string, byId: Record<string, { running?: boolean }> }
++/** Own copy namespace (declaration-merged into LocaleNamespaceMap in the TS source). */
++const NS = 'dsh-d399'
+ 
+-/** Cached snapshot: same reference until `running` actually flips. */
+-const RunningCache = undefined // { id: string | undefined, running: boolean }
++/**
++ * Parametric game registry, provided to other client plugins as the
++ * `d399Games` Cordis service (game bodies elided in this fixture).
++ * @returns {{ register: (game: unknown) => void, games: () => unknown[] }}
++ */
++function createGameRegistry() {
++  return { register() {}, games: () => [] }
++}
+ 
+ /**
+- * Distilled from useSessionRunning: reads the current session's `running`
+- * flag off the sessions list snapshot store (useSyncExternalStore in the
+- * real hook; the subscription shape below is the same store contract).
+- *
+- * Type surface as it stands (type-only, erased at build time — this is
+- * where the client-plane break lives):
+- *   import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
++ * The teaser + game-menu chrome: the fixed, full-viewport, click-through layer
++ * that holds the bottom-right teaser and the menu/game surface. Elided in this
++ * fixture (`null` keeps the portaled tree renderable); the real build renders
++ * the D399Overlay React tree here.
++ */
++const OverlayChrome = null
++
++/**
++ * Teaser + game menu entry. Root-scope `shell.overlay` entries receive the
++ * global `useSessions` standard hook; the selector reads the current
++ * session's `running` flag off the same sessions-list feed as before. The
++ * chrome renders through a document-level portal (see the file header).
+  *
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
+- * @returns {boolean} whether the current session's model is generating.
++ * @param {{ useSessions: (select: (state: import('@deepseek-ai/dsh-api-session-controller/client').SessionListState) => boolean) => boolean }} props
++ * @returns {unknown} the document-level portal hosting the teaser/menu tree.
+  */
+-function readSessionRunning(ctx) {
+-  const list = ctx.sessions.list
+-  const snap = list.getSnapshot()
+-  const id = snap.current
+-  const running = id !== undefined ? (snap.byId[id]?.running ?? false) : false
+-  const unsubscribe = list.subscribe(() => {})
+-  unsubscribe()
+-  return running
++function TeaserOverlay({ useSessions }) {
++  const running = useSessions(state =>
++    state.current === undefined ? false : state.byId[state.current]?.running === true)
++  console.error(`[bench-d399-overlay-client] overlay teaser ${running ? 'shown' : 'hidden'} (React tree + game menu elided in fixture)`)
++  return createPortal(OverlayChrome, document.body)
+ }
+ 
+ /**
+- * Client plugin body: register the locale namespace and mount the overlay.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
+- * @param {unknown} config - cordis row config (loosely typed).
++ * Client plugin body: register the locale namespace, provide the game
++ * registry, and contribute the teaser to the shell overlay seat.
++ * @param {import('@deepseek-ai/cordis').Context} ctx
++ * @param {unknown} config - cordis row config (enabled/message/buttonText; loosely typed, consumed by the elided chrome).
+  */
+ export function apply(ctx, config) {
+-  console.error('[bench-d399-overlay-client] apply() on the 0.1.1-era cohort: ClientContext from the client-runtime package')
++  console.error('[bench-d399-overlay-client] apply() on the alpha.2 cohort: cordis Context + owning-package augmentations')
+ 
+   ctx.effect(() => {
+-    ctx.locale.register('dsh-d399', { zh: {}, en: {} })
++    ctx.locale.register(NS, { zh: {}, en: {} })
+   }, 'bench-d399-overlay-client: own copy namespace')
+ 
+-  ctx.effect(() => {
+-    const running = readSessionRunning(ctx)
+-    console.error(`[bench-d399-overlay-client] overlay teaser ${running ? 'shown' : 'hidden'} (React root + portal mount elided in fixture)`)
+-  }, 'bench-d399-overlay-client: overlay mount')
++  ctx.effect(() => ctx.provide('d399Games', createGameRegistry()), 'bench-d399-overlay-client: game registry')
++
++  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
++    name: 'shell.overlay',
++    id: 'd399-teaser',
++    order: 100,
++    locale: NS,
++  }, TeaserOverlay))
+ }
+diff --git a/fixture/index.js b/fixture/index.js
+index 3c0f6b0..9d0467d 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,9 +1,11 @@
+ // Host half (minimal): the d399 overlay is a client-only UI contribution —
+ // the host half has no runtime work (mirrors the real plugin's src/index.ts).
+ //
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the browser half pulled its client
+-// context type from the client-runtime package, and the sessions list store
+-// had no typed home of its own.
++// dsh 0.1.2-alpha.2 cohort: the browser half takes its context type from
++// `@deepseek-ai/cordis` plus the owning packages' type augmentations,
++// contributes the teaser as an additive `shell.overlay` entry, and reads the
++// model-generating signal through the framework `useSessions` hook.
++// `@deepseek-ai/dsh-client-runtime` no longer exists.
+ 
+ export const name = 'bench-d399-overlay'
+ 
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..299cb35
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,48 @@
++{
++  "name": "@bench/dsh-bench-d399-overlay",
++  "version": "0.1.3",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-d399-overlay",
++      "version": "0.1.3",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-layout": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++        "react": "^18.2.0",
++        "react-dom": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-api-session-controller": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-layout": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-renderer": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-invariants": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        },
++        "react-dom": {
++          "optional": true
++        }
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 8dd4dc1..11ad1e1 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-d399-overlay",
+   "version": "0.1.3",
+-  "description": "Browser game overlay: a bottom-right teaser pops up while the model generates (0.1.1-era cohort; exam material only)",
++  "description": "Browser game overlay: a bottom-right teaser pops up while the model generates (alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -15,20 +15,29 @@
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime"
++        "@deepseek-ai/dsh-api-session-controller",
++        "@deepseek-ai/dsh-client-locale",
++        "@deepseek-ai/dsh-client-ui-layout",
++        "@deepseek-ai/dsh-client-ui-renderer"
+       ],
+       "platform": "web"
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-invariants": "^0.0.1-rc.1",
+-    "@deepseek-ai/cordis": "^4.0.1-rc.1",
++    "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-layout": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++    "@deepseek-ai/cordis": "^4.0.2",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
++    "@deepseek-ai/dsh-api-session-controller": { "optional": true },
++    "@deepseek-ai/dsh-client-locale": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-layout": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
+     "@deepseek-ai/dsh-invariants": { "optional": true },
+     "@deepseek-ai/cordis": { "optional": true },
+     "react": { "optional": true },

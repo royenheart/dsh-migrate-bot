@@ -1,0 +1,233 @@
+{
+  "schema": 3,
+  "id": "e5684e1a4a06__461067b898e6__oracle__20261012T082154Z",
+  "createdAt": "2026-10-12T08:21:54Z",
+  "producer": {
+    "commit": "e5684e1a4a0622aa207e2e8e2c0a85c77fccf261",
+    "version": "0.3.4",
+    "dirty": false,
+    "message": "fix(checks): let an optional peer the release stopped publishing through",
+    "snapshot": "751160ba7db8a224"
+  },
+  "subject": {
+    "id": "oracle",
+    "agentRuntime": "none",
+    "attempts": 1,
+    "agentTimeoutMultiplier": 1
+  },
+  "suite": {
+    "repository": "royenheart/dsh-migrate-bot",
+    "commit": "461067b898e643d50567d3e6b0709a30b5b18997",
+    "tasks": [
+      {
+        "id": "R1-router-0.1.5-to-0.2.0",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R2-skill-hub-0.1.6-to-0.1.7",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R3-better-display-0.1.7-rc1-to-rc2",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R4-skill-hub-0.2.0-to-0.2.1-control",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      }
+    ]
+  },
+  "model": {
+    "provider": "none",
+    "model": "none"
+  },
+  "environment": {
+    "harbor": "0.24.0",
+    "docker": "29.6.1",
+    "os": "Linux 6.12.101+deb13-cloud-amd64",
+    "concurrency": 2
+  },
+  "attempts": [
+    {
+      "task": "R1-router-0.1.5-to-0.2.0",
+      "attempt": 1,
+      "trial": "R1-router-0.1.5-to-0.2.0__TF2Q4KK",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 61.4,
+        "totalSec": 250.7
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__TF2Q4KK/verifier/judge.log",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__TF2Q4KK/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__TF2Q4KK/verifier/test-stdout.txt",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        }
+      }
+    },
+    {
+      "task": "R2-skill-hub-0.1.6-to-0.1.7",
+      "attempt": 1,
+      "trial": "R2-skill-hub-0.1.6-to-0.1.7__kKkrR6J",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 24,
+        "totalSec": 251
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__kKkrR6J/verifier/judge.log",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__kKkrR6J/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__kKkrR6J/verifier/test-stdout.txt",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        }
+      }
+    },
+    {
+      "task": "R3-better-display-0.1.7-rc1-to-rc2",
+      "attempt": 1,
+      "trial": "R3-better-display-0.1.7-rc1-to-r__wbvriBB",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.7,
+        "verifierSec": 41.2,
+        "totalSec": 218.5
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__wbvriBB/verifier/judge.log",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__wbvriBB/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__wbvriBB/verifier/test-stdout.txt",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        }
+      }
+    },
+    {
+      "task": "R4-skill-hub-0.2.0-to-0.2.1-control",
+      "attempt": 1,
+      "trial": "R4-skill-hub-0.2.0-to-0.2.1-cont__eNAUbcU",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.2,
+        "verifierSec": 20.7,
+        "totalSec": 216.5
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__eNAUbcU/verifier/judge.log",
+          "sha256": "c534b506ea8cd587d8254d55e092c285eaa2a6ed5fe62bafdef4b5cff12c9534",
+          "bytes": 179
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__eNAUbcU/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__eNAUbcU/verifier/test-stdout.txt",
+          "sha256": "c534b506ea8cd587d8254d55e092c285eaa2a6ed5fe62bafdef4b5cff12c9534",
+          "bytes": 179
+        }
+      }
+    }
+  ],
+  "metrics": {
+    "formula": "v1",
+    "values": {
+      "meanReward": 1,
+      "passRate@1.0": 1,
+      "passRate@0.7": 1,
+      "passAtK": 1,
+      "meanReward.S": null,
+      "meanReward.M": null,
+      "meanReward.H": null,
+      "passHatK": 1,
+      "fragility": 0,
+      "dispersion": null,
+      "unstableTaskShare": 0,
+      "inputTokens": null,
+      "outputTokens": null,
+      "cacheHitRatio": null,
+      "costPerAttempt": null,
+      "costPerSuccess": null,
+      "agentSecP50": 0.3,
+      "agentSecP90": 0.58,
+      "timeoutRate": 0,
+      "infrastructureRate": 0,
+      "eligibleTasks": 4,
+      "infeasibleTasks": 0
+    },
+    "intervals": {
+      "meanReward": [
+        1,
+        1
+      ],
+      "passRate@1.0": [
+        1,
+        1
+      ]
+    }
+  }
+}

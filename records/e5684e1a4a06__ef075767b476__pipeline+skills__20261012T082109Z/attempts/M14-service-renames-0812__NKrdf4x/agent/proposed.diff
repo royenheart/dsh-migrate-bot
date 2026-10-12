@@ -1,0 +1,147 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 6ab0842..8cd54b6 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,11 +1,43 @@
+ # @demo/dsh-bench-status (exam material only, do not publish)
+ 
+-A small npm **bundle plugin** sample whose Node half (the packed `lib/index.mjs`,
+-the `main` entry) is written against the pre-0812 host service names: `inject` is
+-`['tasks', 'httpServer']`, the task registry is read through `ctx.tasks`, the
+-`/bench-status/status` route is registered through `ctx.httpServer.register`, and
+-job completion is subscribed through the `onTaskDone` listener.
++A small npm **bundle plugin** sample. Its Node half (the packed `lib/index.mjs`,
++the `main` entry) owns one HTTP entry point and one job-observation listener; the
++bundle patch (`cordis.patch.yml`, declared by `dsh.bundle.patch`) mounts the row
++into the applying profile.
+ 
+-The host in this container is dsh **0.1.2-alpha.2**.
++Documented surface on dsh **0.1.2-alpha.2**:
+ 
+-This fixture is exam material only — never publish it to npm.
+\ No newline at end of file
++- `inject` is `['jobs']`. The background-job registry is read through `ctx.jobs`.
++- `webServer` is consumed through a scoped
++  `ctx.inject(['webServer'], (webCtx) => …)`. The carrier is mounted only by a
++  web composition (the web-app bundle), so the plugin must activate without it
++  (for example in a headless composition) instead of holding its row
++  `pending (waiting for service: webServer)`.
++- When a web carrier is present, the `/bench-status/status` route is registered
++  through `ctx.webServer.register` (`kind: 'exact'`) and answers
++  `{"ok":true,"open":<n>}` with `ctx.jobs.list().length` as seen by a non-agent
++  caller: the unowned job records the registry reports. The registry keeps
++  settled records listed until their owner (or the registry itself) is torn
++  down, so `open` is a registry record count, not strictly a count of running
++  jobs.
++- Job completion is subscribed through the `onJobDone` listener and logged to
++  stderr as `[bench-status] task done: <id>`.
++
++Migration note: the Node half previously used the pre-0812 service names
++(`inject` `['tasks','httpServer']`, `ctx.tasks`, `ctx.httpServer.register`,
++`onTaskDone`). Those services do not exist on the current host, so the row stayed
++`pending (waiting for services: tasks, httpServer)` and the profile failed to
++boot. The identifiers were renamed per the harness rename ledger
++(`ctx.httpServer`→`ctx.webServer`, `ctx.tasks`→`ctx.jobs`,
++`TaskDoneListener`→`JobDoneListener`); no entry point or behaviour was removed.
++The stderr label is the plugin's own output text rather than a harness
++coordinate, so it keeps its pre-migration wording.
++
++`webServer` is deliberately not a hard `inject` entry: a hard entry made the row
++`pending (waiting for service: webServer)` and aborted the boot of every
++composition that provides `jobs` without a web carrier (the base + headless
++composition the boot probe mounts). The scoped `ctx.inject` is the official
++optional-dependency idiom, so the route still appears in a web composition and
++the plugin still activates elsewhere.
++
++This fixture is exam material only — never publish it to npm.
+diff --git a/fixture/lib/index.mjs b/fixture/lib/index.mjs
+index 5ef102c..f0050c8 100644
+--- a/fixture/lib/index.mjs
++++ b/fixture/lib/index.mjs
+@@ -1,22 +1,41 @@
+ // Node half (bundle plugin, packed artifact — package.json `main` points here).
+-// Contract on the current host: `httpServer` is the official web carrier service
+-// and `tasks` is the official task-registry service — keep those names exactly as
+-// they are; the "webServer"/"jobs" spellings that some newer docs mention are not
+-// real service names on this host, so do not rename anything (renaming would make
+-// the plugin fail to activate).
++// Contract on the current host (dsh 0.1.2-alpha.2): `jobs` is the official
++// background-job registry and `webServer` is the official browser web carrier.
++// The pre-0812 service spellings this file used to consume (see the README
++// migration note) no longer exist on this host: an `inject` naming them leaves
++// the whole row `pending (waiting for services: …)` and the boot fails, so do
++// not restore them.
+ //
+-// Route endpoints are a single source of truth here: the /bench-status/status
+-// route below is served over the official httpServer registration interface.
++// `jobs` is a hard dependency, because the registry read and the completion
++// listener are this plugin's core entry points and every composition this
++// bundle can join (base, headless, web) provides it.
++//
++// `webServer` is not: only a web composition (for example the web-app bundle)
++// mounts the carrier, while a headless composition has none. It is therefore
++// consumed through a scoped `ctx.inject(['webServer'], …)` instead of a hard
++// `inject` entry: the HTTP entry point still appears as soon as a web carrier is
++// present, but a carrier-less profile no longer leaves the row pending and
++// aborts the boot.
++//
++// The stderr label below is the plugin's own output text, not a harness
++// coordinate: the migration renamed the service identifiers only, so the label
++// keeps its pre-migration wording.
+ export const name = 'bench-status'
+-export const inject = ['tasks', 'httpServer']
++export const inject = ['jobs']
+ 
+ export function apply(ctx) {
+-  const { tasks, httpServer } = ctx
+-  const collect = () => tasks.list().length
++  const { jobs } = ctx
++  const collect = () => jobs.list().length
+ 
+-  ctx.effect(() => {
+-    const disposers = [
+-      httpServer.register({
++  ctx.effect(() =>
++    jobs.onJobDone((snapshot) => {
++      console.error('[bench-status] task done:', snapshot.id)
++    }),
++  )
++
++  ctx.inject(['webServer'], (webCtx) => {
++    webCtx.effect(() =>
++      webCtx.webServer.register({
+         kind: 'exact',
+         path: '/bench-status/status',
+         handler: async (req, res) => {
+@@ -24,10 +43,6 @@ export function apply(ctx) {
+           res.end(`{"ok":true,"open":${collect()}}`)
+         },
+       }),
+-      tasks.onTaskDone((snapshot) => {
+-        console.error('[bench-status] task done:', snapshot.id)
+-      }),
+-    ]
+-    return () => disposers.forEach((dispose) => dispose?.())
++    )
+   })
+-}
+\ No newline at end of file
++}
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..73f4d3c
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-status",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-status",
++      "version": "0.1.0"
++    }
++  }
++}

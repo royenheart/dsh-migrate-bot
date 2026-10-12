@@ -1,0 +1,60 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index b3d7cdd..5f0559f 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,4 +1,17 @@
+-# H10 fixture · browser activation trap
++# H10 fixture · browser activation
+ 
+-This renamed Web plugin is valid on the host side but its browser bundle still
+-registers a legacy identity. Exam material only — do not publish (`"private": true`).
++A renamed Web plugin. The host half is an ordinary cordis plugin (`apply` in
++`index.js`), mounted as a profile row by `cordis.patch.yml` through the
++`dsh.bundle.patch` manifest field. The browser half is declared by `dsh.client`
++(`platform: web`, `./client` export) and registers one web-client module; when
++the web composition activates it, it sets
++`document.documentElement.dataset.benchBrowserActivation = 'active'`.
++
++The harness keys each client graph row by package name, and the module system
++rejects a bundle that does not register that id (`client-modules: bundle …
++loaded without registering …`). The registration id in `client.js` therefore
++follows the package name through a rename; the pre-rename
++`@demo/dsh-bench-browser-activation-legacy` registration is retired, because a
++boot row can only request the package name.
++
++Exam material only — do not publish (`"private": true`).
+diff --git a/fixture/client.js b/fixture/client.js
+index d6f2218..c2b76e3 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,7 +1,9 @@
+-// This plugin was renamed. Keep the legacy registration id so older profiles
+-// can still find it. The host already serves this bundle under the new name.
++// Registration key = the package name: the harness boot graph composes one row
++// per `dsh.client` package (row id == package name), and ClientModuleSystem
++// rejects a bundle that registers any other id. A rename therefore updates this
++// id together with package.json and the profile patch row.
+ window.__ModuleLoader__.load({
+-  id: '@demo/dsh-bench-browser-activation-legacy',
++  id: '@demo/dsh-bench-browser-activation',
+   factory: () => ({
+     apply() {
+       document.documentElement.dataset.benchBrowserActivation = 'active'
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..707c017
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-browser-activation",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-browser-activation",
++      "version": "0.1.0"
++    }
++  }
++}

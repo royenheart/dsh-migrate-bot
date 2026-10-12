@@ -1,0 +1,231 @@
+{
+  "score": 66,
+  "max": 100,
+  "reasons": [
+    "fixture was modified by the agent",
+    "pristine baseline: install ok, boot failed (the documented trap), smoke unmeasurable",
+    "patched runtime: install ok, boot green, smoke 401/200",
+    "checkpoint names-drill-host (report): 0/5 — patched fail, pristine unavailable",
+    "checkpoint names-drill-web (report): 0/5 — patched fail, pristine unavailable",
+    "checkpoint names-drill-tools (report): 0/5 — patched fail, pristine unavailable",
+    "checkpoint cites-cards (report): 0/5 — patched fail, pristine unavailable",
+    "checkpoint host-apiproxy-removed (fail-to-pass): 4/4 — patched pass, pristine fail",
+    "checkpoint host-inject-llm (fail-to-pass): 3/3 — patched pass, pristine fail",
+    "checkpoint host-no-remote (pass-to-pass): 3/3 — patched pass, pristine pass",
+    "checkpoint web-raw-removed (fail-to-pass): 4/4 — patched pass, pristine fail",
+    "checkpoint web-inject-connection (fail-to-pass): 0/3 — patched fail, pristine fail",
+    "checkpoint web-rpc-handle (fail-to-pass): 0/3 — patched fail, pristine fail",
+    "checkpoint tools-cohort-gone (fail-to-pass): 5/5 — patched pass, pristine fail",
+    "checkpoint tools-cohort-pinned (fail-to-pass): 5/5 — patched pass, pristine fail",
+    "checkpoint install-ok (pass): 10/10 — patched pass, pristine pass",
+    "checkpoint boot-green (fail-to-pass): 10/10 — patched pass, pristine fail",
+    "checkpoint smoke-401 (fail-to-pass): 5/5 — patched pass, pristine unavailable",
+    "checkpoint smoke-200 (pass-to-pass): 5/5 — patched pass, pristine unavailable",
+    "checkpoint version-host (fail-to-pass): 3/3 — patched pass, pristine fail",
+    "checkpoint version-web (fail-to-pass): 3/3 — patched pass, pristine fail",
+    "checkpoint version-tools (fail-to-pass): 3/3 — patched pass, pristine fail",
+    "checkpoint report-verify-release (report): 0/4 — patched fail, pristine unavailable",
+    "checkpoint report-dist-tag (report): 0/4 — patched fail, pristine unavailable",
+    "checkpoint report-no-force (report): 3/3 — patched pass, pristine unavailable"
+  ],
+  "checkpoints": [
+    {
+      "id": "names-drill-host",
+      "label": "diagnosis names drill-host",
+      "type": "report",
+      "points": 5,
+      "awarded": 0,
+      "patched": "fail",
+      "pristine": "unavailable"
+    },
+    {
+      "id": "names-drill-web",
+      "label": "diagnosis names drill-web",
+      "type": "report",
+      "points": 5,
+      "awarded": 0,
+      "patched": "fail",
+      "pristine": "unavailable"
+    },
+    {
+      "id": "names-drill-tools",
+      "label": "diagnosis names drill-tools",
+      "type": "report",
+      "points": 5,
+      "awarded": 0,
+      "patched": "fail",
+      "pristine": "unavailable"
+    },
+    {
+      "id": "cites-cards",
+      "label": "diagnosis cites DSH-0.1.2-A1-01, DSH-0.1.2-A1-08 and R-01",
+      "type": "report",
+      "points": 5,
+      "awarded": 0,
+      "patched": "fail",
+      "pristine": "unavailable"
+    },
+    {
+      "id": "host-apiproxy-removed",
+      "label": "drill-host drops the apiproxy dependency",
+      "type": "fail-to-pass",
+      "points": 4,
+      "awarded": 4,
+      "patched": "pass",
+      "pristine": "fail"
+    },
+    {
+      "id": "host-inject-llm",
+      "label": "drill-host injects llm",
+      "type": "fail-to-pass",
+      "points": 3,
+      "awarded": 3,
+      "patched": "pass",
+      "pristine": "fail"
+    },
+    {
+      "id": "host-no-remote",
+      "label": "drill-host does not inject remote",
+      "type": "pass-to-pass",
+      "points": 3,
+      "awarded": 3,
+      "patched": "pass",
+      "pristine": "pass"
+    },
+    {
+      "id": "web-raw-removed",
+      "label": "drill-web drops the raw webServer.register",
+      "type": "fail-to-pass",
+      "points": 4,
+      "awarded": 4,
+      "patched": "pass",
+      "pristine": "fail"
+    },
+    {
+      "id": "web-inject-connection",
+      "label": "drill-web injects connection",
+      "type": "fail-to-pass",
+      "points": 3,
+      "awarded": 0,
+      "patched": "fail",
+      "pristine": "fail"
+    },
+    {
+      "id": "web-rpc-handle",
+      "label": "drill-web registers rpc.handle('/ping')",
+      "type": "fail-to-pass",
+      "points": 3,
+      "awarded": 0,
+      "patched": "fail",
+      "pristine": "fail"
+    },
+    {
+      "id": "tools-cohort-gone",
+      "label": "drill-tools drops the unpublished 0.1.2-alpha.1 cohort",
+      "type": "fail-to-pass",
+      "points": 5,
+      "awarded": 5,
+      "patched": "pass",
+      "pristine": "fail"
+    },
+    {
+      "id": "tools-cohort-pinned",
+      "label": "drill-tools pins a published 0.1.2-alpha cohort",
+      "type": "fail-to-pass",
+      "points": 5,
+      "awarded": 5,
+      "patched": "pass",
+      "pristine": "fail"
+    },
+    {
+      "id": "install-ok",
+      "label": "all three plugins install into the isolated profile",
+      "type": "pass",
+      "points": 10,
+      "awarded": 10,
+      "patched": "pass",
+      "pristine": "pass"
+    },
+    {
+      "id": "boot-green",
+      "label": "web cold boot reaches the app layer with a boot URL",
+      "type": "fail-to-pass",
+      "points": 10,
+      "awarded": 10,
+      "patched": "pass",
+      "pristine": "fail"
+    },
+    {
+      "id": "smoke-401",
+      "label": "no-auth POST /ping/ping is rejected with 401",
+      "type": "fail-to-pass",
+      "points": 5,
+      "awarded": 5,
+      "patched": "pass",
+      "pristine": "unavailable"
+    },
+    {
+      "id": "smoke-200",
+      "label": "token-exchanged POST /ping/ping answers 200",
+      "type": "pass-to-pass",
+      "points": 5,
+      "awarded": 5,
+      "patched": "pass",
+      "pristine": "unavailable"
+    },
+    {
+      "id": "version-host",
+      "label": "drill-host version bumped vs baseline",
+      "type": "fail-to-pass",
+      "points": 3,
+      "awarded": 3,
+      "patched": "pass",
+      "pristine": "fail"
+    },
+    {
+      "id": "version-web",
+      "label": "drill-web version bumped vs baseline",
+      "type": "fail-to-pass",
+      "points": 3,
+      "awarded": 3,
+      "patched": "pass",
+      "pristine": "fail"
+    },
+    {
+      "id": "version-tools",
+      "label": "drill-tools version bumped vs baseline",
+      "type": "fail-to-pass",
+      "points": 3,
+      "awarded": 3,
+      "patched": "pass",
+      "pristine": "fail"
+    },
+    {
+      "id": "report-verify-release",
+      "label": "release checklist carries the verify-release semantic gate",
+      "type": "report",
+      "points": 4,
+      "awarded": 0,
+      "patched": "fail",
+      "pristine": "unavailable"
+    },
+    {
+      "id": "report-dist-tag",
+      "label": "release checklist covers prerelease dist-tag routing",
+      "type": "report",
+      "points": 4,
+      "awarded": 0,
+      "patched": "fail",
+      "pristine": "unavailable"
+    },
+    {
+      "id": "report-no-force",
+      "label": "release checklist has no forced/skipped publish markers",
+      "type": "report",
+      "points": 3,
+      "awarded": 3,
+      "patched": "pass",
+      "pristine": "unavailable"
+    }
+  ]
+}

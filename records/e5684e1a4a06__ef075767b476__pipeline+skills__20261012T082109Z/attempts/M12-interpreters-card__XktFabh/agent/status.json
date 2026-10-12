@@ -1,0 +1,152 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "failed",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.8",
+              "version": "0.1.0-rc.8"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [
+          "e2e"
+        ],
+        "reviewed": true,
+        "attempts": 2,
+        "lastFingerprint": "e2e: interpreters-gateway.spec.ts \u203a the interpreters gateway offers the write path its card saves through | interpreters-gateway.spec.ts \u203a the interpreters gateway serves the composed interpreter config | plugin-inventory.spec.ts \u203a Settings > Plugins > Plugin list reports bench-interpreters-card as mount",
+        "failure": {
+          "check": "e2e",
+          "outcome": "fail",
+          "fingerprint": "e2e: interpreters-gateway.spec.ts \u203a the interpreters gateway offers the write path its card saves through | interpreters-gateway.spec.ts \u203a the interpreters gateway serves the composed interpreter config | plugin-inventory.spec.ts \u203a Settings > Plugins > Plugin list reports bench-interpreters-card as mount",
+          "detail": "These tests passed on the source release and do not pass now:\n- interpreters-gateway.spec.ts \u203a the interpreters gateway serves the composed interpreter config: Error: \"the dsh web shell at http://127.0.0.1:35915/\" never became ready\n- interpreters-gateway.spec.ts \u203a the interpreters gateway offers the write path its card saves through: Error: \"the dsh web shell at http://127.0.0.1:35915/\" never became ready\n- plugin-inventory.spec.ts \u203a Settings > Plugins > Plugin list reports bench-interpreters-card as mounted and enabled: Error: \"the dsh web shell at http://127.0.0.1:35915/\" never became ready\n- plugin-inventory.spec.ts \u203a expanding the bench-interpreters-card row shows its entry id, configuration and cordis status: Error: \"the dsh web shell at http://127.0.0.1:35915/\" never became ready\n\n"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [
+          "interpreters-gateway.spec.ts \u203a the interpreters gateway serves the composed interpreter config",
+          "interpreters-gateway.spec.ts \u203a the interpreters gateway offers the write path its card saves through",
+          "plugin-inventory.spec.ts \u203a Settings > Plugins > Plugin list reports bench-interpreters-card as mounted and enabled",
+          "plugin-inventory.spec.ts \u203a expanding the bench-interpreters-card row shows its entry id, configuration and cordis status"
+        ],
+        "stoppedBy": "upstream-blocker",
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "comments": []
+      },
+      "run": "local-2026-10-12T12-12-59-023Z",
+      "startedAt": "2026-10-12T12:13:00.496Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "failed",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.8",
+            "version": "0.1.0-rc.8"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [
+        "e2e"
+      ],
+      "reviewed": true,
+      "attempts": 2,
+      "lastFingerprint": "e2e: interpreters-gateway.spec.ts \u203a the interpreters gateway offers the write path its card saves through | interpreters-gateway.spec.ts \u203a the interpreters gateway serves the composed interpreter config | plugin-inventory.spec.ts \u203a Settings > Plugins > Plugin list reports bench-interpreters-card as mount",
+      "failure": {
+        "check": "e2e",
+        "outcome": "fail",
+        "fingerprint": "e2e: interpreters-gateway.spec.ts \u203a the interpreters gateway offers the write path its card saves through | interpreters-gateway.spec.ts \u203a the interpreters gateway serves the composed interpreter config | plugin-inventory.spec.ts \u203a Settings > Plugins > Plugin list reports bench-interpreters-card as mount",
+        "detail": "These tests passed on the source release and do not pass now:\n- interpreters-gateway.spec.ts \u203a the interpreters gateway serves the composed interpreter config: Error: \"the dsh web shell at http://127.0.0.1:35915/\" never became ready\n- interpreters-gateway.spec.ts \u203a the interpreters gateway offers the write path its card saves through: Error: \"the dsh web shell at http://127.0.0.1:35915/\" never became ready\n- plugin-inventory.spec.ts \u203a Settings > Plugins > Plugin list reports bench-interpreters-card as mounted and enabled: Error: \"the dsh web shell at http://127.0.0.1:35915/\" never became ready\n- plugin-inventory.spec.ts \u203a expanding the bench-interpreters-card row shows its entry id, configuration and cordis status: Error: \"the dsh web shell at http://127.0.0.1:35915/\" never became ready\n\n"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [
+        "interpreters-gateway.spec.ts \u203a the interpreters gateway serves the composed interpreter config",
+        "interpreters-gateway.spec.ts \u203a the interpreters gateway offers the write path its card saves through",
+        "plugin-inventory.spec.ts \u203a Settings > Plugins > Plugin list reports bench-interpreters-card as mounted and enabled",
+        "plugin-inventory.spec.ts \u203a expanding the bench-interpreters-card row shows its entry id, configuration and cordis status"
+      ],
+      "stoppedBy": "upstream-blocker",
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "comments": []
+    },
+    "run": "local-2026-10-12T12-12-59-023Z",
+    "startedAt": "2026-10-12T12:13:00.496Z"
+  }
+}

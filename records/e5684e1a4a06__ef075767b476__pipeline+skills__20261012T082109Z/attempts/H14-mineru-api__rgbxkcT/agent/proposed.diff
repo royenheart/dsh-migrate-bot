@@ -1,0 +1,681 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index f07c2ed..2b298af 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,15 +1,22 @@
+ # bench-mineru-api (benchmark fixture)
+ 
+-A document-parsing tool plugin with a host RPC channel (`/mineru-api`) that its
+-browser settings page reads/writes, written in the 0.1.1-era style. The host is
+-moving to dsh 0.1.2-alpha.2.
++A document-parsing tool plugin. The host half registers the parse tools on the
++`tools` service and owns the plugin's host RPC channel (`/mineru-api`) that its
++browser settings page reads/writes for configuration (`baseURL`,
++`defaultBackend`). Configuration is also the `mineru-api` settings namespace:
++the bundle row's `config` is the composition base layer, and the channel's
++`config.get`/`config.set` endpoints read and write that same section, so the
++documented settings-page path and the harness settings wire resolve one value.
++Target cohort: dsh `0.1.2-alpha.2`.
+ 
+ Release procedure (internal):
+ 
+-1. Apply the migration changes.
+-2. Bump the version in package.json.
+-3. Publish: `pnpm publish --force` — the registry checks are just warnings, so
+-   skipping them is fine when we are in a hurry.
++1. Apply the migration changes and run the plugin checks
++   (`node --check` on both halves, plus the plugin's own tests).
++2. Bump the plugin's own version in package.json (not the dsh cohort version).
++3. Publish with the registry checks enabled: `pnpm publish`. Do not pass
++   `--force`/`--no-git-checks` to skip them, and keep `0.1.2-alpha.2` cohort
++   peers pinned so a prerelease never resolves to an older dist-tag.
+ 
+ Exam material only, **do not publish** (`"private": true` in package.json).
+ Distilled from `@huanlin/dsh-plugin-mineru` (adaptation commit `035b3a7`); the
+diff --git a/fixture/client.js b/fixture/client.js
+index 6e0101f..168c6be 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,38 +1,60 @@
+ // Browser half (settings page): registers the plugin's settings section and
+-// reads/writes the plugin config through the host RPC channel.
++// reads/writes the plugin configuration through the host RPC channel.
+ //
+-// Note: the 0.1.1-era host read the browser plugin declaration from this
+-// package's dsh.client field, and the inject list still names
+-// @deepseek-ai/dsh-client-runtime — the browser half pulled its client
+-// context type from @deepseek-ai/dsh-client-runtime/client:
+-//
+-//   import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+-//
+-// The settings page reaches the plugin's host RPC channel through the
+-// client connection. The in-source memo says the wire shape queued through
+-// the gateway facade and its RpcResult type comes from
+-// @deepseek-ai/dsh-host-apiproxy/api — do not take the memo at face value.
++// dsh 0.1.2-alpha.2 cohort contract notes (verified against the tag and a live
++// 0.1.2-alpha.2 web profile):
++//   * The browser client context type is `Context` from `@deepseek-ai/cordis`;
++//     the 0.1.1-era client-runtime package (and its `/client` entry) was removed
++//     in alpha.1, with its symbols split out by domain.
++//   * The page keeps its documented data path:
++//     `ctx.connection.rpc.call('/mineru-api', endpoint, payload)` returns
++//     `ConnectionRpcResult<T>` from `@deepseek-ai/dsh-client-connection`.
++//     `@deepseek-ai/dsh-host-apiproxy` and its `RpcResult` no longer exist in
++//     this cohort.
++//   * The page occupies the official `settings.section` seat declared by
++//     `@deepseek-ai/dsh-client-ui-settings` and rendered by the settings shell.
++//     The host half registers the same `mineru-api` namespace with
++//     `ctx.settings.installSection()`, so the section this page edits is also
++//     the section the harness settings wire serves. The section component and
++//     its controls are the elided body of this fixture.
+ 
+ export const name = 'bench-mineru-api-client'
+ 
+-export const inject = ['connection', 'locale']
++// `slots` renders the plugin's settings page, `locale` owns the page copy, and
++// `connection` carries the plugin's own RPC channel.
++export const inject = ['slots', 'locale', 'connection']
++
++// Must equal SETTINGS_NAMESPACE in the host half: the namespace is the join key
++// between the host registration and the settings wire this page edits through.
++const SETTINGS_NAMESPACE = 'mineru-api'
+ 
+ /**
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx) {
+   ctx.effect(() => {
+     console.error('[bench-mineru-api-client] registering the MinerU settings section')
+ 
+-    // Old style: the RpcResult type comes from @deepseek-ai/dsh-host-apiproxy/api.
+-    //
+-    // @type {import('@deepseek-ai/dsh-host-apiproxy/api').RpcResult<{ config: unknown }>}
+-    let result
++    /**
++     * One endpoint of the plugin's own RPC channel.
++     * @param {string} endpoint
++     * @param {unknown} payload
++     * @returns {Promise<import('@deepseek-ai/dsh-client-connection').ConnectionRpcResult<unknown>>}
++     */
+     async function callRpc(endpoint, payload) {
+       return ctx.connection.rpc.call('/mineru-api', endpoint, payload)
+     }
+ 
+-    result = undefined
+-    console.error('[bench-mineru-api-client] settings page mounted; RPC via ctx.connection')
++    // The elided section body registers its page into the official seat —
++    //   ctx.slots.inject('settings.section', () => ctx.slots.register({
++    //     name: 'settings.section', id: SETTINGS_NAMESPACE, order: 50,
++    //     label: () => t('mineru-api.nav'),
++    //   }, MineruSettingsSection))
++    // — and edits the namespace through this channel:
++    //   config.get -> { ok: true, value: { baseURL, defaultBackend } }
++    //   config.set <- { config: { baseURL?, defaultBackend? } }
++    void callRpc('config.get', {}).then((result) => {
++      console.error(`[bench-mineru-api-client] settings page mounted; namespace=${SETTINGS_NAMESPACE} config.get ok=${result.ok}`)
++    })
+   }, 'bench-mineru-api-client: register')
+ }
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index 12611d0..007d648 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1,4 +1,7 @@
+ # bench-mineru-api bundle layer: inserts the plugin row.
++# The row's `config` is the composition base layer of the `mineru-api` settings
++# namespace: the user settings document overrides it, and losing the settings
++# provider falls back to it (0.1.2-alpha.2 settings seam).
+ # (exam fixture, distilled from @huanlin/dsh-plugin-mineru; tool body elided)
+ - insert:
+     - id: bench-mineru-api
+diff --git a/fixture/index.js b/fixture/index.js
+index 8e559da..f18feb2 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,12 +1,28 @@
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the host RPC result shape came from the
+-// APIProxy SDK, and rpc.handle took a third `authority` option.
++// bench-mineru-api — host half, dsh 0.1.2-alpha.2 cohort.
+ //
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.1 era):
+-//   "The split made authority mandatory: the Connection RPC now validates the
+-//    caller, so KEEP the third `{ authority: 'trusted-host' }` argument —
+-//    dropping it would open the channel to untrusted callers."
+-// ────────────────────────────────────────────────────────────
++// Contract notes (verified against the dsh-v0.1.2-alpha.2 tag and a live
++// 0.1.2-alpha.2 web profile):
++//
++//   * `ctx.connection.rpc.handle(channel, handler)` takes two arguments.
++//     Connection mounts every registered channel behind its own Host/Origin
++//     fence and browser authentication
++//     (packages/client/connection/src/rpc-host.ts, `register()`), so the
++//     0.1.1-era third `{ authority: 'trusted-host' }` option is gone and is not
++//     a security knob any more: every channel is trusted-host-only by
++//     construction. The 0.1.1-era memo told us to keep that argument; it
++//     described a service that no longer reads it.
++//   * One logical endpoint returns `ConnectionRpcResult<T>` from
++//     `@deepseek-ai/dsh-client-connection`, and the browser calls it through
++//     `ctx.connection.rpc.call(channel, endpoint, payload)`.
++//     `@deepseek-ai/dsh-host-apiproxy` and its `RpcResult` no longer exist in
++//     this cohort.
++//   * Plugin configuration is also a settings namespace: the composition row
++//     supplies the base layer through `ctx.settings.installSection()`, and the
++//     plugin's own `/mineru-api` endpoints read and write that same section, so
++//     the documented settings-page path and the harness settings wire cannot
++//     drift.
++
++import z from '@deepseek-ai/schemastery'
+ 
+ export const name = 'bench-mineru-api'
+ 
+@@ -14,41 +30,90 @@ export const name = 'bench-mineru-api'
+ // for the plugin's RPC channel.
+ export const inject = ['tools', 'connection']
+ 
+-/** Wire shape of one config read/write response. */
+-// The result type comes from the (0.1.1-era) gateway facade:
+-//
+-// /** @type {import('@deepseek-ai/dsh-host-apiproxy/api').RpcResult<unknown>} */
+-// let lastResult
+-//
+-// @param {unknown} payload
+-// @returns {Promise<import('@deepseek-ai/dsh-host-apiproxy/api').RpcResult<unknown>>}
+-async function handleEndpoint(endpoint, payload) {
+-  switch (endpoint) {
+-    case 'config.get':
+-      return { ok: true, value: { baseURL: 'https://mineru.net', defaultBackend: 'pipeline' } }
+-    case 'config.set':
+-      return { ok: true, value: { baseURL: payload?.config?.baseURL ?? 'https://mineru.net' } }
+-    case 'health':
+-      return { ok: true, value: { status: 'ok' } }
+-    default:
+-      return { ok: false, error: { code: 'internal', message: `unknown endpoint: ${endpoint}`, details: {} } }
+-  }
+-}
++/** Plugin configuration; the bundle row supplies the composition base layer. */
++export const Config = z.object({
++  baseURL: z.string().default('https://mineru.net'),
++  defaultBackend: z.string().default('pipeline'),
++})
++
++/** Settings namespace owned by this plugin; the browser scope binds the same key. */
++export const SETTINGS_NAMESPACE = 'mineru-api'
+ 
+ /**
+- * @param {import('cordis').Context} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx
++ * @param {import('@deepseek-ai/schemastery').Type<unknown>} config
+  */
+ export function apply(ctx, config) {
+-  console.error('[bench-mineru-api] apply() on the 0.1.1-era cohort: apiProxy RpcResult + 3-arg rpc.handle')
++  // The Loader resolves schema defaults into `config`; a hand-built context may
++  // pass none, and the composition entry stays the settings base layer.
++  const entry = config ?? Config({})
+ 
+-  // The settings page's RPC channel. 0.1.1-era shape: handle takes
+-  // (channel, handler, options) with an explicit authority.
+-  const connection = ctx.connection
+-  connection.rpc.handle('/mineru-api', async (endpoint, payload) => handleEndpoint(endpoint, payload), {
+-    authority: 'trusted-host',
++  // The currently authoritative configuration: the resolved settings section
++  // while a provider is attached, the composition entry otherwise. A write made
++  // while no provider is attached stays in this process so the documented page
++  // path keeps working; it is not persisted.
++  let active = () => entry
++  let local = {}
++  const source = () => ({ ...active(), ...local })
++
++  ctx.inject(['settings'], (settingsCtx) => {
++    settingsCtx.settings.installSection(ctx, SETTINGS_NAMESPACE, Config, entry, {
++      setSource: (current) => { active = current },
++      onChange: () => {
++        console.error(`[bench-mineru-api] configuration changed; next parse uses ${source().baseURL}`)
++      },
++    })
+   })
+ 
++  /**
++   * Merge one configuration patch into the authoritative section.
++   * @param {Record<string, unknown>} patch
++   * @returns {Promise<Record<string, unknown>>} the resolved configuration.
++   */
++  async function writeConfig(patch) {
++    const settings = ctx.get('settings')
++    if (settings === undefined) {
++      local = { ...local, ...patch }
++      return source()
++    }
++    await settings.update(SETTINGS_NAMESPACE, patch)
++    return source()
++  }
++
++  /**
++   * One endpoint of the plugin's own RPC channel.
++   * @param {string} endpoint
++   * @param {unknown} payload
++   * @returns {Promise<import('@deepseek-ai/dsh-client-connection').ConnectionRpcResult<unknown>>}
++   */
++  async function handleEndpoint(endpoint, payload) {
++    switch (endpoint) {
++      case 'config.get':
++        return { ok: true, value: source() }
++      case 'config.set': {
++        const patch = payload?.config
++        if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
++          return { ok: false, error: { code: 'bad-request', message: 'config.set expects { config: { baseURL?, defaultBackend? } }', details: {} } }
++        }
++        try {
++          return { ok: true, value: await writeConfig(patch) }
++        } catch (error) {
++          return { ok: false, error: { code: 'bad-request', message: String(error?.message ?? error), details: {} } }
++        }
++      }
++      case 'health':
++        return { ok: true, value: { status: 'ok' } }
++      default:
++        return { ok: false, error: { code: 'internal', message: `unknown endpoint: ${endpoint}`, details: {} } }
++    }
++  }
++
++  // The plugin's own channel keeps the documented settings-page data path; the
++  // namespace registration above serves the same section to the harness
++  // settings wire, so both paths resolve one value.
++  ctx.connection.rpc.handle('/mineru-api', (endpoint, payload) => handleEndpoint(endpoint, payload))
++
+   ctx.effect(() => {
+-    console.error('[bench-mineru-api] RPC channel /mineru-api registered (0.1.1-era 3-arg handle, apiProxy RpcResult)')
++    console.error('[bench-mineru-api] RPC channel /mineru-api registered (2-arg handle, ConnectionRpcResult)')
+   }, 'bench-mineru-api: rpc')
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..5c6c362
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,316 @@
++{
++  "name": "@bench/dsh-bench-mineru-api",
++  "version": "0.3.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-mineru-api",
++      "version": "0.3.0",
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.1",
++        "@deepseek-ai/dsh-client-connection": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-locale": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-settings": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-settings": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-tools": "0.1.2-alpha.2",
++        "react": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/dsh-client-connection": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-primitives": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-settings": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-settings": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cordis": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.4.tgz",
++      "integrity": "sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      },
++      "bin": {
++        "cordis": "bin.js"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis-plugin-include": {
++          "optional": true
++        },
++        "@deepseek-ai/cordis-plugin-loader": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "license": "MIT"
++    },
++    "node_modules/@deepseek-ai/dsh-agent": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-agent/-/dsh-agent-0.1.2-rc.1.tgz",
++      "integrity": "sha512-lfaqN34vUCWvbn1kJVHrhfJ6Dvt1HDHCm33ZCpmKkl07/5q6FxWqVv6rOdVX5QnM/9xz/uYiN0nQwUtBg4+Skg==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-projection": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-brand": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-brand/-/dsh-brand-0.1.2-rc.1.tgz",
++      "integrity": "sha512-y2RHIag3kzLdY8kTBuSUSTsKzWPscJrysNObXTiNM7stXLpa3jXpshsB1caqGzNx50vYcmHeN1gFVECgx3NZHg==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-code-runtime": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-code-runtime/-/dsh-code-runtime-0.1.2-rc.1.tgz",
++      "integrity": "sha512-dv5UszPJb/AFcarZc2c6h5z/X80bsrSd3bfIOugwNVclSI6P+L3ixseoZKgyks7T0Ap0h6ngXGk2WeoUkmYxnQ==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-invariants": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-invariants/-/dsh-invariants-0.1.2-rc.1.tgz",
++      "integrity": "sha512-zSjuFJYcEB94kPwn7SicqAV1dfVWZkjt1I8luDboxtjfp5CN6ziwJhLv3KaB+Dh9tgkyGY4mvo886W/HhE9L9g==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-llm": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-llm/-/dsh-llm-0.1.2-rc.1.tgz",
++      "integrity": "sha512-7VYsha5AXsVLnsAwYJffWXz9bwUbElw8i5N8tlTSdai9Bupk3sMbsotzPf8ZbsuGAxQYErahMwQwgGEu4qZO6g==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-timeout": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-crypto": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1",
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-scope": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-scope/-/dsh-scope-0.1.2-rc.1.tgz",
++      "integrity": "sha512-GHwbzWrGbmE0ZGzAZsXBudpyCM9ENCpXxlKODIaPFbIWhRePh6nH2jW47TAOqCIsPPedWC2p3w8Tx5WAa3I/2A==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session/-/dsh-session-0.1.2-rc.1.tgz",
++      "integrity": "sha512-jRGNPTbQcvIx1F2MVmmkoiHLgpC3Btqo1wkl/3JDLlOWRVWKOuaC+5fQiMrFPOYfno6YiX/c2UvmA0td8qB92w==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session-projection": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-projection/-/dsh-session-projection-0.1.2-rc.1.tgz",
++      "integrity": "sha512-qVWlIzPm4u9vzQ5G/QtE6jeSJ3b3b42hWVJj664BurEZlHbAfdqkhYc1QsoBU+5k5kUEJFHh07z8HxuXA9kTnQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-system-prompt": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-system-prompt/-/dsh-system-prompt-0.1.2-rc.1.tgz",
++      "integrity": "sha512-7W93PZKIk4CHvjZGgLIxrrEKpk+6t8nQXje1vKR5vG73dfXH0t1MJ5WWH/fngadYc7c6KzM84ihQ66tJqJqyNQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-timeout": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-timeout/-/dsh-timeout-0.1.2-rc.1.tgz",
++      "integrity": "sha512-llz11yxWeJB8suKCa6hRLjNBWVaPn3Fbd0XoBS0bkZLhPFzO1mDorx/XMca2GhI7XF9A86CURQcDt+aGjjvqJA==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-tools": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tools/-/dsh-tools-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-trk0fkmCDp64pqdcr8u7rCcRrwNi+93FKuznTnCD+YsPGFygcSG/6n+Wsh4+9A6oI1fM4/Ecq6Baa9vq1sNhJg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-alpha.2",
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-code-runtime": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-scope": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-user-approval": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-typert-protocol": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-typert-protocol/-/dsh-typert-protocol-0.1.2-rc.1.tgz",
++      "integrity": "sha512-vBWD0NpriPd96ltbWaAw+iKeWFIEjiAcCWYtmqEcV1Ms+FaV02usjjm7LCmhSQhMZpBSBc7EZUX0spGlpjI1bA==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-user-approval": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-user-approval/-/dsh-user-approval-0.1.2-rc.1.tgz",
++      "integrity": "sha512-oYkLE4a/TwqVNi299pUf/QP1Yku6KScdUCTUyYbjaRBcN+/pXPpHikl2aoE2thH9D0uT/Kj6T2kz+wDDcFd9Xg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-crypto": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-crypto/-/dsh-util-crypto-0.1.2-rc.1.tgz",
++      "integrity": "sha512-gE8FznQ1hkknw9QMrHNSlm3UEyRYuj3MLVvlJ6NyH1kmOsdjnbrVbSs+Pn72k2oIV4Fiyu3Umg0sLznUEcsiXw==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-values": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.2-rc.1.tgz",
++      "integrity": "sha512-FQdgoK+KYVR0pBQb9fTsajvGb3gzUxEzJQEYnFOt+Qdwc4nkxJOPwJJdIvXuqvZaQ33DaOoqpnpcr2p5HpLu4g==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/schemastery": {
++      "version": "3.18.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.4.tgz",
++      "integrity": "sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==",
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      }
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "license": "MIT"
++    },
++    "node_modules/zod": {
++      "version": "4.6.6",
++      "resolved": "https://registry.npmjs.org/zod/-/zod-4.6.6.tgz",
++      "integrity": "sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA==",
++      "license": "MIT",
++      "peer": true,
++      "funding": {
++        "url": "https://github.com/sponsors/colinhacks"
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index d72a621..0ff87a0 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-mineru-api",
+-  "version": "0.2.4",
+-  "description": "Document-parsing tool plugin with a host RPC channel for its settings page (0.1.1-era cohort; exam material only)",
++  "version": "0.3.0",
++  "description": "Document-parsing tool plugin with a host RPC channel and a settings-page configuration surface (0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -16,9 +16,8 @@
+     "client": {
+       "platform": "web",
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+-        "@deepseek-ai/dsh-client-locale",
+         "@deepseek-ai/dsh-client-connection",
++        "@deepseek-ai/dsh-client-locale",
+         "@deepseek-ai/dsh-client-ui-settings",
+         "@deepseek-ai/dsh-client-ui-slots",
+         "@deepseek-ai/dsh-client-ui-primitives"
+@@ -26,27 +25,27 @@
+     }
+   },
+   "dependencies": {
+-    "schemastery": "^3.18.0",
+-    "@deepseek-ai/dsh-host-apiproxy": "^0.0.1-rc.1"
++    "@deepseek-ai/schemastery": "^3.18.2"
+   },
+   "peerDependencies": {
+-    "cordis": "^4.0.0-rc.7",
+-    "@deepseek-ai/dsh-client-connection": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-locale": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-settings": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-host-apiproxy": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-tools": "^0.0.1-rc.1",
++    "@deepseek-ai/cordis": "^4.0.1",
++    "@deepseek-ai/dsh-client-connection": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-locale": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-settings": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-settings": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-tools": "0.1.2-alpha.2",
+     "react": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
+-    "cordis": { "optional": true },
+     "@deepseek-ai/dsh-client-connection": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+-    "@deepseek-ai/dsh-host-apiproxy": { "optional": true },
+-    "@deepseek-ai/dsh-tools": { "optional": true }
++    "@deepseek-ai/dsh-client-locale": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-settings": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
++    "@deepseek-ai/dsh-settings": { "optional": true },
++    "react": { "optional": true }
+   },
+   "private": true
+ }

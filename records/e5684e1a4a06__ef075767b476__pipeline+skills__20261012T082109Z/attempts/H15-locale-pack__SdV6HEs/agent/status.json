@@ -1,0 +1,148 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "failed",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.8",
+              "version": "0.1.0-rc.8"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [
+          "e2e"
+        ],
+        "reviewed": true,
+        "attempts": 1,
+        "lastFingerprint": "e2e: plugin-mount.spec.ts \u203a the locale pack plugin is mounted and enabled in the deployment",
+        "failure": {
+          "check": "e2e",
+          "outcome": "fail",
+          "fingerprint": "e2e: plugin-mount.spec.ts \u203a the locale pack plugin is mounted and enabled in the deployment",
+          "detail": "These tests passed on the source release and do not pass now:\n- plugin-mount.spec.ts \u203a the locale pack plugin is mounted and enabled in the deployment: Error: expect(locator).toBeVisible() failed Locator: getByRole('dialog').filter({ has: getByRole('navigation') }).getByRole('tabpanel', { name: 'Plugin list' }).getByRole('button', { name: /bench-locale-pack/ }).getByRole('img', { name: 'Mounted' }) Expected: visible Timeout: 15000ms Error: element(s) not found Call log: - Expect \"toBeVisible\" with timeout 15000ms - waiting for getByRole('dialog')\n\n"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [
+          "native-language.spec.ts \u203a DSH native language switching still works while the plugin is mounted",
+          "plugin-mount.spec.ts \u203a the locale pack plugin is mounted and enabled in the deployment"
+        ],
+        "stoppedBy": "upstream-blocker",
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "comments": []
+      },
+      "run": "local-2026-10-12T08-58-09-734Z",
+      "startedAt": "2026-10-12T08:58:11.648Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "failed",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.8",
+            "version": "0.1.0-rc.8"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [
+        "e2e"
+      ],
+      "reviewed": true,
+      "attempts": 1,
+      "lastFingerprint": "e2e: plugin-mount.spec.ts \u203a the locale pack plugin is mounted and enabled in the deployment",
+      "failure": {
+        "check": "e2e",
+        "outcome": "fail",
+        "fingerprint": "e2e: plugin-mount.spec.ts \u203a the locale pack plugin is mounted and enabled in the deployment",
+        "detail": "These tests passed on the source release and do not pass now:\n- plugin-mount.spec.ts \u203a the locale pack plugin is mounted and enabled in the deployment: Error: expect(locator).toBeVisible() failed Locator: getByRole('dialog').filter({ has: getByRole('navigation') }).getByRole('tabpanel', { name: 'Plugin list' }).getByRole('button', { name: /bench-locale-pack/ }).getByRole('img', { name: 'Mounted' }) Expected: visible Timeout: 15000ms Error: element(s) not found Call log: - Expect \"toBeVisible\" with timeout 15000ms - waiting for getByRole('dialog')\n\n"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [
+        "native-language.spec.ts \u203a DSH native language switching still works while the plugin is mounted",
+        "plugin-mount.spec.ts \u203a the locale pack plugin is mounted and enabled in the deployment"
+      ],
+      "stoppedBy": "upstream-blocker",
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "comments": []
+    },
+    "run": "local-2026-10-12T08-58-09-734Z",
+    "startedAt": "2026-10-12T08:58:11.648Z"
+  }
+}

@@ -1,0 +1,1666 @@
+{
+  "schema": 3,
+  "id": "801cb1792060__ef075767b476__oracle__20261012T072832Z",
+  "createdAt": "2026-10-12T07:28:32Z",
+  "producer": {
+    "commit": "801cb1792060f44123ff827e1c39d0a3e90d8b91",
+    "version": "0.3.4",
+    "dirty": false,
+    "message": "fix(bench): run only the tasks whose verifier the run can serve",
+    "snapshot": "990c32e622ba0577"
+  },
+  "subject": {
+    "id": "oracle",
+    "agentRuntime": "none",
+    "attempts": 1,
+    "agentTimeoutMultiplier": 1
+  },
+  "suite": {
+    "repository": "oh-my-dsh/dsh-plugin-upgrade-skill",
+    "commit": "ef075767b476e8000c716a18f848028eebcd5aef",
+    "tasks": [
+      {
+        "id": "H1-plane-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H10-browser-activation-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H11-dual-cohort-rpc",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H12-remote-result-boundary-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "H13-ghost-host-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H14-mineru-api",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H15-locale-pack",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H16-history-dock",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H17-merge-calls",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H18-blame-bubbles",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H19-workspace-ya",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H2-baseline-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H20-session-events-ledger",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H21-question-answerer-waterfall",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H22-dsh-data-agent-alpha2",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 18000,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H23-storage-domain-version-compat-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H24-invalid-record-salvage-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H25-session-seed-boundary-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H26-notlisted-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H27-undeclared-import-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H3-client-plane",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H4-tsbuildinfo-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "H5-runtime-export-drift",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H6-remote-error-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 600,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "H7-locale-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H8-fire-drill",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H9-dsh-web-alpha2",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 18000,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M1-host-migration",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M10-tools-tree",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M11-sidebar-spur",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M12-interpreters-card",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M13-repository-plugins-removal",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M14-service-renames-0812",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M2-optional-dep-trap",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M3-session-projection",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M4-peer-prerelease-range",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M5-token-auth-smoke",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M6-sleep-tool",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M7-d399-overlay",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M8-brand-text",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M9-mcpanel",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "S1-static-scan",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S10-paste-rename-and-version-chip",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S11-mermaid-lazyload-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S12-global-upgrade-ebusy-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S13-peer-range-vs-runtime",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S14-link-install-lock-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S15-slot-error-boundary-crash",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S16-self-host-upgrade-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S17-external-ui-plugin-onboarding-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S18-terminal-sprite-render-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S19-phantom-update-stale-host",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S2-negative-scan",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S20-msvc-flock-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S21-resource-service-unavailable-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S22-duplicate-insert-boot-crash-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S23-passing-compat-guard-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S24-dock-cotenant-crash-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S3-snapshot-migration",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S4-legacy-client-imports",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 600,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S5-negative-naming",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 600,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S6-corridor-net-state",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 600,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S7-unpublished-cohort",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 600,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S8-release-routing-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      },
+      {
+        "id": "S9-composer-coordinate-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": true,
+        "note": "The verifier needs REPORT_JUDGE_BASE_URL, REPORT_JUDGE_MODEL, REPORT_JUDGE_API_KEY, which this run does not set."
+      }
+    ]
+  },
+  "model": {
+    "provider": "none",
+    "model": "none"
+  },
+  "environment": {
+    "harbor": "0.24.0",
+    "docker": "29.6.1",
+    "os": "Linux 6.12.101+deb13-cloud-amd64",
+    "concurrency": 4
+  },
+  "attempts": [
+    {
+      "task": "H1-plane-trap",
+      "attempt": 1,
+      "trial": "H1-plane-trap__spmh8R8",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 6.5,
+        "totalSec": 61.1
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H1-plane-trap__spmh8R8/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H1-plane-trap__spmh8R8/verifier/test-stdout.txt",
+          "sha256": "6f2628ab630ba580ae3926bc16c3e726e1350d83e9586d2fe62613f879006aa7",
+          "bytes": 249
+        }
+      }
+    },
+    {
+      "task": "H10-browser-activation-trap",
+      "attempt": 1,
+      "trial": "H10-browser-activation-trap__vgsrA53",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 9.5,
+        "totalSec": 84.7
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H10-browser-activation-trap__vgsrA53/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H10-browser-activation-trap__vgsrA53/verifier/test-stdout.txt",
+          "sha256": "a3e3bbcdca1de7a8bc13742975a4dc028114dc77f95bde93d514c8beae43730c",
+          "bytes": 274
+        }
+      }
+    },
+    {
+      "task": "H11-dual-cohort-rpc",
+      "attempt": 1,
+      "trial": "H11-dual-cohort-rpc__Gc5mwJS",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 2.6,
+        "verifierSec": 0.8,
+        "totalSec": 168.6
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H11-dual-cohort-rpc__Gc5mwJS/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H11-dual-cohort-rpc__Gc5mwJS/verifier/test-stdout.txt",
+          "sha256": "3f0a1cf6364aba6b03344a86f233e0046202bfb9425a1b473e6f55436e8ee730",
+          "bytes": 818
+        }
+      }
+    },
+    {
+      "task": "H13-ghost-host-trap",
+      "attempt": 1,
+      "trial": "H13-ghost-host-trap__yesfsa6",
+      "outcome": "scored",
+      "reward": 0,
+      "rewards": {
+        "reward": 0
+      },
+      "durations": {
+        "agentSec": 72.4,
+        "verifierSec": 0.4,
+        "totalSec": 166.6
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H13-ghost-host-trap__yesfsa6/verifier/reward.txt",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H13-ghost-host-trap__yesfsa6/verifier/test-stdout.txt",
+          "sha256": "50d3b541cdb7353cf44835c0388ffb4f641790c2363296d0d6e378cf748aacf7",
+          "bytes": 112
+        }
+      }
+    },
+    {
+      "task": "H14-mineru-api",
+      "attempt": 1,
+      "trial": "H14-mineru-api__f6J92S7",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 3.6,
+        "totalSec": 25.8
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H14-mineru-api__f6J92S7/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H14-mineru-api__f6J92S7/verifier/test-stdout.txt",
+          "sha256": "5f83fdd40b886a6db4d9c393e4ed5d17e7fc3df6afcd04cafe80741a2c0cb031",
+          "bytes": 1000
+        }
+      }
+    },
+    {
+      "task": "H15-locale-pack",
+      "attempt": 1,
+      "trial": "H15-locale-pack__AGwTtNy",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 5.9,
+        "totalSec": 84.8
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H15-locale-pack__AGwTtNy/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H15-locale-pack__AGwTtNy/verifier/test-stdout.txt",
+          "sha256": "52ae9dc30b2eb7da15ff04973d1bd9be11dc2d6c4286e5978e986495e5a0420b",
+          "bytes": 1140
+        }
+      }
+    },
+    {
+      "task": "H16-history-dock",
+      "attempt": 1,
+      "trial": "H16-history-dock__gksou5K",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.5,
+        "verifierSec": 6.4,
+        "totalSec": 81.5
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H16-history-dock__gksou5K/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H16-history-dock__gksou5K/verifier/test-stdout.txt",
+          "sha256": "8ba7e222048b2eb95fa05b668dcf7440960cc1274d6774dfc958659e379a9231",
+          "bytes": 1222
+        }
+      }
+    },
+    {
+      "task": "H17-merge-calls",
+      "attempt": 1,
+      "trial": "H17-merge-calls__KhAuDQz",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 4.6,
+        "totalSec": 53.1
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H17-merge-calls__KhAuDQz/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H17-merge-calls__KhAuDQz/verifier/test-stdout.txt",
+          "sha256": "c3dea26aebcc109ec33aea37812072f495be7fbd116f7f13184ec943cd2a6cd9",
+          "bytes": 1105
+        }
+      }
+    },
+    {
+      "task": "H18-blame-bubbles",
+      "attempt": 1,
+      "trial": "H18-blame-bubbles__74wLpSJ",
+      "outcome": "scored",
+      "reward": 0.83,
+      "rewards": {
+        "reward": 0.83
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 3.6,
+        "totalSec": 51.9
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H18-blame-bubbles__74wLpSJ/verifier/reward.txt",
+          "sha256": "6a9ab77d0b66eac3e6c6cfd543ca358354bd82f939c809181db9298e13dc9623",
+          "bytes": 5
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H18-blame-bubbles__74wLpSJ/verifier/test-stdout.txt",
+          "sha256": "5cff2ac69efa6ebe49a44166d63752b8e8eb51334fe9e984b5397c3721ad122f",
+          "bytes": 875
+        }
+      }
+    },
+    {
+      "task": "H19-workspace-ya",
+      "attempt": 1,
+      "trial": "H19-workspace-ya__feEnTKD",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 1.3,
+        "verifierSec": 3.6,
+        "totalSec": 50.4
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H19-workspace-ya__feEnTKD/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H19-workspace-ya__feEnTKD/verifier/test-stdout.txt",
+          "sha256": "e6018805d78e4e170117841cfcd88506a051fff7f9aace5bbdd84f7ffbe08a88",
+          "bytes": 1146
+        }
+      }
+    },
+    {
+      "task": "H2-baseline-trap",
+      "attempt": 1,
+      "trial": "H2-baseline-trap__iowXSAv",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.2,
+        "verifierSec": 2.6,
+        "totalSec": 50.1
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H2-baseline-trap__iowXSAv/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H2-baseline-trap__iowXSAv/verifier/test-stdout.txt",
+          "sha256": "af0382693430f09ac597264bebe069448e86caa96aaabea49e719d39c8c2bbf7",
+          "bytes": 239
+        }
+      }
+    },
+    {
+      "task": "H20-session-events-ledger",
+      "attempt": 1,
+      "trial": "H20-session-events-ledger__BLFr2aV",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 0.4,
+        "totalSec": 35.9
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H20-session-events-ledger__BLFr2aV/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H20-session-events-ledger__BLFr2aV/verifier/test-stdout.txt",
+          "sha256": "e65d090a5b76fcffc45576add052026cc30e7eb89d71da7d37ae6e98cc8b4c72",
+          "bytes": 640
+        }
+      }
+    },
+    {
+      "task": "H21-question-answerer-waterfall",
+      "attempt": 1,
+      "trial": "H21-question-answerer-waterfall__ehG2e9N",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 3,
+        "verifierSec": 0.6,
+        "totalSec": 51.9
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H21-question-answerer-waterfall__ehG2e9N/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H21-question-answerer-waterfall__ehG2e9N/verifier/test-stdout.txt",
+          "sha256": "56609768097fe659814f33b2bf80a88169fdb346719f234d3f10b2c16550d44b",
+          "bytes": 859
+        }
+      }
+    },
+    {
+      "task": "H22-dsh-data-agent-alpha2",
+      "attempt": 1,
+      "trial": "H22-dsh-data-agent-alpha2__K7vmyMg",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 3.2,
+        "verifierSec": 175.1,
+        "totalSec": 210
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H22-dsh-data-agent-alpha2__K7vmyMg/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H22-dsh-data-agent-alpha2__K7vmyMg/verifier/test-stdout.txt",
+          "sha256": "b8f4e90f344cf1b316a604228ac084ec4e57264bfe389f09167ffaf4f1235a44",
+          "bytes": 907
+        }
+      }
+    },
+    {
+      "task": "H23-storage-domain-version-compat-trap",
+      "attempt": 1,
+      "trial": "H23-storage-domain-version-compa__4xtQm3X",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 0.4,
+        "totalSec": 35.7
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H23-storage-domain-version-compa__4xtQm3X/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H23-storage-domain-version-compa__4xtQm3X/verifier/test-stdout.txt",
+          "sha256": "dde6f6d1deb11edf299acb65bcaf167c57197b44b5b973fbeba272b4753aaf52",
+          "bytes": 402
+        }
+      }
+    },
+    {
+      "task": "H24-invalid-record-salvage-trap",
+      "attempt": 1,
+      "trial": "H24-invalid-record-salvage-trap__nGgHWH8",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 1.6,
+        "totalSec": 37.8
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H24-invalid-record-salvage-trap__nGgHWH8/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H24-invalid-record-salvage-trap__nGgHWH8/verifier/test-stdout.txt",
+          "sha256": "043b04b02fde9543fe003d519bcdb6c664e2758985070ae649f7b6b5edfb2f31",
+          "bytes": 393
+        }
+      }
+    },
+    {
+      "task": "H25-session-seed-boundary-trap",
+      "attempt": 1,
+      "trial": "H25-session-seed-boundary-trap__EJ9pLNA",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.6,
+        "verifierSec": 0.5,
+        "totalSec": 37.2
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H25-session-seed-boundary-trap__EJ9pLNA/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H25-session-seed-boundary-trap__EJ9pLNA/verifier/test-stdout.txt",
+          "sha256": "53a84e99f278719bbedc82c5d3e1d05668b8b74739bc3043591a144fe15d18de",
+          "bytes": 500
+        }
+      }
+    },
+    {
+      "task": "H26-notlisted-trap",
+      "attempt": 1,
+      "trial": "H26-notlisted-trap__WrabRnx",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.4,
+        "verifierSec": 4.3,
+        "totalSec": 37.8
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H26-notlisted-trap__WrabRnx/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H26-notlisted-trap__WrabRnx/verifier/test-stdout.txt",
+          "sha256": "a33092b6edd53273ac998fbfcea2c1e11103d2f86f0cab2c5cb520ae876c6adb",
+          "bytes": 497
+        }
+      }
+    },
+    {
+      "task": "H27-undeclared-import-trap",
+      "attempt": 1,
+      "trial": "H27-undeclared-import-trap__KAoCSAu",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.2,
+        "verifierSec": 3.1,
+        "totalSec": 26.9
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H27-undeclared-import-trap__KAoCSAu/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H27-undeclared-import-trap__KAoCSAu/verifier/test-stdout.txt",
+          "sha256": "d2a034499f539a25b9fdc510bfe6b61d2815d1713b52601cd66d2b34861bd7d1",
+          "bytes": 472
+        }
+      }
+    },
+    {
+      "task": "H3-client-plane",
+      "attempt": 1,
+      "trial": "H3-client-plane__wbwUFMw",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.2,
+        "verifierSec": 3.5,
+        "totalSec": 28.4
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H3-client-plane__wbwUFMw/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H3-client-plane__wbwUFMw/verifier/test-stdout.txt",
+          "sha256": "81f3dd58687f3b20eda57d8a4d031ae7e3e01216831c1f17f209dfdbef2ec3ec",
+          "bytes": 366
+        }
+      }
+    },
+    {
+      "task": "H5-runtime-export-drift",
+      "attempt": 1,
+      "trial": "H5-runtime-export-drift__obdGnvq",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 8.5,
+        "verifierSec": 3.3,
+        "totalSec": 121.7
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H5-runtime-export-drift__obdGnvq/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H5-runtime-export-drift__obdGnvq/verifier/test-stdout.txt",
+          "sha256": "b4a7f5661426fed4e3b9a8825257a5520134e7b5ffcd88fac1ed384034aaea36",
+          "bytes": 579
+        }
+      }
+    },
+    {
+      "task": "H7-locale-trap",
+      "attempt": 1,
+      "trial": "H7-locale-trap__vLy2qSu",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 4.5,
+        "totalSec": 108.8
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H7-locale-trap__vLy2qSu/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H7-locale-trap__vLy2qSu/verifier/test-stdout.txt",
+          "sha256": "01dcbb29183b09d87f0b8057bfb0e894af0e17839918613b6878d56a4e69748d",
+          "bytes": 361
+        }
+      }
+    },
+    {
+      "task": "H8-fire-drill",
+      "attempt": 1,
+      "trial": "H8-fire-drill__ffwHAbA",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.2,
+        "verifierSec": 10.4,
+        "totalSec": 109.6
+      },
+      "artifacts": {
+        "verifier/grading.json": {
+          "path": "attempts/H8-fire-drill__ffwHAbA/verifier/grading.json",
+          "sha256": "a912636fb2ba6bb89969d14ab77eb0a5b54f02a20fb4c8456a00081b4abe9524",
+          "bytes": 7085
+        },
+        "verifier/reward.json": {
+          "path": "attempts/H8-fire-drill__ffwHAbA/verifier/reward.json",
+          "sha256": "b13160d0762a5612ee98d66ba60e7b86d7eebdfa7416738577057e2b03c66e35",
+          "bytes": 13
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H8-fire-drill__ffwHAbA/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H8-fire-drill__ffwHAbA/verifier/test-stdout.txt",
+          "sha256": "8b1baf84b8ee43d1e8b7d377cef2ab50e67c2ed241c63b4ba19cc68133168626",
+          "bytes": 5495
+        }
+      }
+    },
+    {
+      "task": "H9-dsh-web-alpha2",
+      "attempt": 1,
+      "trial": "H9-dsh-web-alpha2__s4pCtMd",
+      "outcome": "scored",
+      "reward": 0.8,
+      "rewards": {
+        "reward": 0.8
+      },
+      "durations": {
+        "agentSec": 2.5,
+        "verifierSec": 116.6,
+        "totalSec": 215.8
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/H9-dsh-web-alpha2__s4pCtMd/verifier/reward.txt",
+          "sha256": "fdf276f0183c71742823b061f7342d581e56de0af10648339b525249e26ee94f",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H9-dsh-web-alpha2__s4pCtMd/verifier/test-stdout.txt",
+          "sha256": "eca39ef347586817ed36298fcce80e9db2d2700fa27e0cd3652f9f21df21b4c6",
+          "bytes": 930
+        }
+      }
+    },
+    {
+      "task": "M1-host-migration",
+      "attempt": 1,
+      "trial": "M1-host-migration__DSypHuQ",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.6,
+        "verifierSec": 4.7,
+        "totalSec": 50.9
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/M1-host-migration__DSypHuQ/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M1-host-migration__DSypHuQ/verifier/test-stdout.txt",
+          "sha256": "47f32c21a4eac9ee67612e69c7e39970bfabcb824305ac7bd334aa8674108455",
+          "bytes": 378
+        }
+      }
+    },
+    {
+      "task": "M10-tools-tree",
+      "attempt": 1,
+      "trial": "M10-tools-tree__nZNzgcf",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 1.2,
+        "verifierSec": 4.1,
+        "totalSec": 49.6
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/M10-tools-tree__nZNzgcf/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M10-tools-tree__nZNzgcf/verifier/test-stdout.txt",
+          "sha256": "9e5cd9a6d594942ebf6ad7d5b483b2f57b763d5196cf22f9d08097e2b678a803",
+          "bytes": 1049
+        }
+      }
+    },
+    {
+      "task": "M11-sidebar-spur",
+      "attempt": 1,
+      "trial": "M11-sidebar-spur__WDfYK4s",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 1.6,
+        "verifierSec": 3.8,
+        "totalSec": 49.2
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/M11-sidebar-spur__WDfYK4s/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M11-sidebar-spur__WDfYK4s/verifier/test-stdout.txt",
+          "sha256": "6bc6e006eea6989343a1aea97487fde7f9be9c4be2daa0e97d5a9256147e054e",
+          "bytes": 1111
+        }
+      }
+    },
+    {
+      "task": "M12-interpreters-card",
+      "attempt": 1,
+      "trial": "M12-interpreters-card__2heGgXz",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 4.5,
+        "totalSec": 46.5
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/M12-interpreters-card__2heGgXz/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M12-interpreters-card__2heGgXz/verifier/test-stdout.txt",
+          "sha256": "6e38cbda685c17e2009edc02c672f78133716805c9f77e8c8f3a12b459d28854",
+          "bytes": 969
+        }
+      }
+    },
+    {
+      "task": "M13-repository-plugins-removal",
+      "attempt": 1,
+      "trial": "M13-repository-plugins-removal__vJDwgXE",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 4.5,
+        "totalSec": 46.4
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/M13-repository-plugins-removal__vJDwgXE/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M13-repository-plugins-removal__vJDwgXE/verifier/test-stdout.txt",
+          "sha256": "a82a7a853d24f24fb5e5f18222949993383873126a4bc0a11aae52ee8f2f4105",
+          "bytes": 663
+        }
+      }
+    },
+    {
+      "task": "M14-service-renames-0812",
+      "attempt": 1,
+      "trial": "M14-service-renames-0812__3JKfBFk",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 4.4,
+        "totalSec": 45
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/M14-service-renames-0812__3JKfBFk/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M14-service-renames-0812__3JKfBFk/verifier/test-stdout.txt",
+          "sha256": "cbbbbdf5507b48eadf43fb02ff05b3bde5dd0aba92b1d8600b3571a3181af8b3",
+          "bytes": 685
+        }
+      }
+    },
+    {
+      "task": "M2-optional-dep-trap",
+      "attempt": 1,
+      "trial": "M2-optional-dep-trap__CGkWBrU",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 2.1,
+        "verifierSec": 8.3,
+        "totalSec": 88.8
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/M2-optional-dep-trap__CGkWBrU/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M2-optional-dep-trap__CGkWBrU/verifier/test-stdout.txt",
+          "sha256": "b1300537bc15a2d6e0b0645c40478f83d2f640a3944c1f740425a800ddb1502a",
+          "bytes": 362
+        }
+      }
+    },
+    {
+      "task": "M3-session-projection",
+      "attempt": 1,
+      "trial": "M3-session-projection__JSYRxn2",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 1.4,
+        "totalSec": 89.3
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/M3-session-projection__JSYRxn2/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M3-session-projection__JSYRxn2/verifier/test-stdout.txt",
+          "sha256": "1822b3fe1f33ec23c0aa6eb7fe9b714c952b7881552025d33d38c87e7c4b1c57",
+          "bytes": 552
+        }
+      }
+    },
+    {
+      "task": "M4-peer-prerelease-range",
+      "attempt": 1,
+      "trial": "M4-peer-prerelease-range__Sj92Wmh",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 2.6,
+        "totalSec": 88.7
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/M4-peer-prerelease-range__Sj92Wmh/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M4-peer-prerelease-range__Sj92Wmh/verifier/test-stdout.txt",
+          "sha256": "a5ee3ec7f3bde89e5464f8c5fc8d36e39869e2623ec89e20f83293c09f133482",
+          "bytes": 293
+        }
+      }
+    },
+    {
+      "task": "M5-token-auth-smoke",
+      "attempt": 1,
+      "trial": "M5-token-auth-smoke__e6Z7wPY",
+      "outcome": "scored",
+      "reward": 0,
+      "rewards": {
+        "reward": 0
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 3.4,
+        "totalSec": 22.7
+      },
+      "artifacts": {
+        "verifier/grading.json": {
+          "path": "attempts/M5-token-auth-smoke__e6Z7wPY/verifier/grading.json",
+          "sha256": "e2b912e91e2fb129c8edf0aaf854c0ddffcec761474906ec48d9a2cb4d84cff5",
+          "bytes": 216
+        },
+        "verifier/reward.json": {
+          "path": "attempts/M5-token-auth-smoke__e6Z7wPY/verifier/reward.json",
+          "sha256": "659793fa2b3aa457042a9c92dd5049d79d13aecc98d1f2a0e73d08607e3fd786",
+          "bytes": 13
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M5-token-auth-smoke__e6Z7wPY/verifier/reward.txt",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M5-token-auth-smoke__e6Z7wPY/verifier/test-stdout.txt",
+          "sha256": "f244446f833741d4385f8723cb01ae3aa31ec30ecaff0dc05170dd2330d6b237",
+          "bytes": 200
+        }
+      }
+    },
+    {
+      "task": "M6-sleep-tool",
+      "attempt": 1,
+      "trial": "M6-sleep-tool__yPcufLf",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 2.9,
+        "totalSec": 22.5
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/M6-sleep-tool__yPcufLf/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M6-sleep-tool__yPcufLf/verifier/test-stdout.txt",
+          "sha256": "7f7475f71d21fa2d69174e05054dcef5917fbb32e6d5c2ee8964656bae3b2888",
+          "bytes": 734
+        }
+      }
+    },
+    {
+      "task": "M7-d399-overlay",
+      "attempt": 1,
+      "trial": "M7-d399-overlay__tgzPTvm",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 3.6,
+        "totalSec": 23.5
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/M7-d399-overlay__tgzPTvm/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M7-d399-overlay__tgzPTvm/verifier/test-stdout.txt",
+          "sha256": "4e59613ba187dbd517c4af0b067e8183cb6d1398b53c5296fa0ddfb32739b0e3",
+          "bytes": 1068
+        }
+      }
+    },
+    {
+      "task": "M8-brand-text",
+      "attempt": 1,
+      "trial": "M8-brand-text__5SaaWTi",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 3.6,
+        "totalSec": 21.2
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/M8-brand-text__5SaaWTi/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M8-brand-text__5SaaWTi/verifier/test-stdout.txt",
+          "sha256": "a6ab89998aff7be8201c8d132895ac337b7c3a29eca2d32aa33a1f4102cc5a53",
+          "bytes": 1071
+        }
+      }
+    },
+    {
+      "task": "M9-mcpanel",
+      "attempt": 1,
+      "trial": "M9-mcpanel__zF8cU22",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 3.5,
+        "totalSec": 21
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/M9-mcpanel__zF8cU22/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M9-mcpanel__zF8cU22/verifier/test-stdout.txt",
+          "sha256": "a3ce9e04d8c5f49d53280174e456cbda907ec238e5a829d73b16e329e55dc09c",
+          "bytes": 1109
+        }
+      }
+    }
+  ],
+  "metrics": {
+    "formula": "v1",
+    "values": {
+      "meanReward": 0.921842,
+      "passRate@1.0": 0.868421,
+      "passRate@0.7": 0.921053,
+      "passAtK": 0.868421,
+      "meanReward.S": null,
+      "meanReward.M": 0.885714,
+      "meanReward.H": 0.942917,
+      "passHatK": 0.868421,
+      "fragility": 0,
+      "dispersion": null,
+      "unstableTaskShare": 0,
+      "inputTokens": null,
+      "outputTokens": null,
+      "cacheHitRatio": null,
+      "costPerAttempt": null,
+      "costPerSuccess": null,
+      "agentSecP50": 0.3,
+      "agentSecP90": 2.72,
+      "timeoutRate": 0,
+      "infrastructureRate": 0,
+      "eligibleTasks": 38,
+      "infeasibleTasks": 0
+    },
+    "intervals": {
+      "meanReward": [
+        0.836842,
+        0.989474
+      ],
+      "passRate@1.0": [
+        0.763158,
+        0.973684
+      ]
+    }
+  }
+}

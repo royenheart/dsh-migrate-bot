@@ -1,0 +1,142 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.7-rc.2",
+      "target": {
+        "tag": "dsh-v0.1.7-rc.2",
+        "version": "0.1.7-rc.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.7-rc.2",
+            "version": "0.1.7-rc.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.7-rc.1",
+              "version": "0.1.7-rc.1"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 0,
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [
+          "better-display-settings.spec.ts \u203a Better Display is offered as a settings section with its three display switches",
+          "better-display-settings.spec.ts \u203a every display switch flips and the choice survives a reload",
+          "better-display-settings.spec.ts \u203a the generative-mcpapps skill status is reported and Re-check round-trips",
+          "better-display-settings.spec.ts \u203a the settings section stays reachable after closing and reopening Settings",
+          "reader-entry.spec.ts \u203a a brand new session opens on the reading tab with the native composer intact",
+          "reader-entry.spec.ts \u203a switching to another conversation view and back keeps the reading tab usable",
+          "reader-turn.spec.ts \u203a a turn shows its transcript, retry record, process folds and the auto-fold switch",
+          "reader-turn.spec.ts \u203a the reading tab is forced by ?reader=1 and the turn rail navigates between turns"
+        ],
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-12T09-47-30-464Z",
+      "startedAt": "2026-10-12T09:47:31.274Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.7-rc.2",
+    "target": {
+      "tag": "dsh-v0.1.7-rc.2",
+      "version": "0.1.7-rc.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.7-rc.2",
+          "version": "0.1.7-rc.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.7-rc.1",
+            "version": "0.1.7-rc.1"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 0,
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [
+        "better-display-settings.spec.ts \u203a Better Display is offered as a settings section with its three display switches",
+        "better-display-settings.spec.ts \u203a every display switch flips and the choice survives a reload",
+        "better-display-settings.spec.ts \u203a the generative-mcpapps skill status is reported and Re-check round-trips",
+        "better-display-settings.spec.ts \u203a the settings section stays reachable after closing and reopening Settings",
+        "reader-entry.spec.ts \u203a a brand new session opens on the reading tab with the native composer intact",
+        "reader-entry.spec.ts \u203a switching to another conversation view and back keeps the reading tab usable",
+        "reader-turn.spec.ts \u203a a turn shows its transcript, retry record, process folds and the auto-fold switch",
+        "reader-turn.spec.ts \u203a the reading tab is forced by ?reader=1 and the turn rail navigates between turns"
+      ],
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-12T09-47-30-464Z",
+    "startedAt": "2026-10-12T09:47:31.274Z"
+  }
+}

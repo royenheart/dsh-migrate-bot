@@ -1,0 +1,1279 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 0cba542..16714bd 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,17 +1,68 @@
+-# H5 fixture · 旧 cohort 的 settings 插件（0.1.1-rc.2 时代）
++# H5 fixture · settings seam 插件（0.1.1-rc.2 → 0.1.2-alpha.2）
+ 
+ 测试夹具，**private:true，benchmark only，不得发布**。插件按 0.1.1-rc.2
+ cohort 的 settings seam 编写（`settingsNamespace()` 品牌函数 + 测试替身两个
+-调用点，镜像 Better Sidebar 迁移前的形态），在自己的旧开发依赖环境下
+-install / typecheck / build / test 全绿。
++调用点，镜像 Better Sidebar 迁移前的形态），现已按 DSH-0.1.2-A2-10 迁移到
++dsh **0.1.2-alpha.2** cohort。
+ 
+-判活事实（2026-08-31 本地实证 + npm 发布包一手对比）：
++## 交付面（迁移后保持不变）
++
++- **Host 侧 settings namespace 注册**：`apply(ctx)` 在
++  `ctx.inject(['settings'], …)` 里调用 `ctx.settings.register(NS, schema)`，
++  注册 `h5-runtime-drift` 命名空间（schema：`greeting`，默认
++  `'hello from h5'`）。命名空间是合规字面量常量；合法性由
++  `SettingsNamespaceInput` 模板字面量类型在编译期校验，运行时由
++  `register()` 内部的 `/^[a-z][a-z0-9-]*$/` 校验兜底。
++- **seam 测试替身**：`src/test/settings.test.ts` 用同一 seam 构造
++  `SettingsConflictError`（字面量 + `as SettingsNamespace` 品牌转换），断言
++  `code` / `expected` / `actual` 语义。
++- **bundle 组合补丁 `cordis.patch.yml`**：以 `dsh.bundle.patch`
++  （`package.json` 的 `dsh.bundle.patch` → `./cordis.patch.yml`，并列入
++  `files` 与 `exports`）声明，向 profile 注入 `h5-drift` 条目。这是官方
++  Profile composition overlay，**不是** dsh 源码补丁；没有它插件入口不会
++  挂载，因此必须保留——`dsh plugin add` 只是把包名写进
++  `dsh.profile.bundles`，真正让条目出现的是这个 patch 文件。
++
++## 注册即暴露，但表单由卡片认领
++
++`settings.describe()` 会返回该命名空间（descriptor 带 `schema` / `value` /
++`base` / `user` / `revision`），api-proxy 的白名单已移除，写入也没有额外网关。
++**页面上的表单**则是另一件事：`settings.plugin.item` 是一个以命名空间为 key 的
++slot，卡片由插件**自己的浏览器半**（`dsh.client` 包）注册，Plugins section 只
++负责把「宿主服务的命名空间」和「认领该 key 的卡片」配对；没有卡片认领的命名
++空间渲染为空，这是宿主的设计决定，不是本插件的降级：
++
++- `docs/cookbook/adding-a-settings-card.md`（"A served namespace no card claims
++  renders nothing"）；
++- `packages/client/ui-settings-plugins/README.md` 的 Known Limitations
++  （浏览器半必须自行复刻未发布的 `clientBundle` 预设）；
++- Agent Note `2026-08-12-plugin-owned-settings-surface.md`（"Nothing renders a
++  form it was not given"，并记录 schema 兜底卡片这一被推迟的选项）。
++
++本夹具是纯 Host 侧包（没有 `dsh.client` 浏览器半），所以在 alpha.2 上它不会在
++官方设置页出现表单。**这一缺口不静默接受**：`patches/0001-settings-generic-form-card.patch`
++为「Host 侧声明 `genericForm`、且没有卡片认领」的命名空间补一个由
++`schema.toJSON()` 驱动的兜底卡片（`SettingsRegisterOptions.genericForm` →
++`SettingsNamespaceView.genericForm` → Plugins tab 的 generic card）。补丁进入
++宿主发布之前，本插件保持不带该选项的 `register(NS, schema)`；补丁落地后这里只需
++加上 `{ genericForm: true }`，取值与今天完全一致。讨论稿见
++`.dsh-migrate/patch-reports/settings-generic-form-card/report.md`。
++
++## 判活事实
++
++迁移前（2026-08-31 本地实证 + npm 发布包一手对比）：
+ 
+ - pack 成 tarball 安装进 dsh 0.1.2-alpha.2 profile 后冷启动即
+   `plugin tree failed to load: … The requested module '@deepseek-ai/dsh-settings'
+   does not provide an export named 'settingsNamespace'`（SyntaxError）——
+   alpha.2 运行时导出只剩 `SettingsConflictError` / `SettingsProvider` /
+-  `redactSecrets`；
+-- 直接 link 安装会掩盖故障（插件自带 node_modules 里旧包导出还在）；
+-- 按 DSH-0.1.2-A2-10 迁移（字面量 namespace + 对齐 alpha.2 cohort +
+-  clean rebuild）后 pack 安装激活成功。
++  `redactSecrets`（`SettingsNamespace` 仍为类型导出）；
++- 直接 link 安装会掩盖故障（插件自带 node_modules 里旧包导出还在）。
++
++迁移后（2026-10-12 复核，devDeps 对齐 0.1.2-alpha.2 + clean rebuild）：
++
++- `settingsNamespace()` 的运行时导出在 0.1.2-alpha.2 已不存在，正确替换是把
++  合规字面量直接交给 `register()`；取值与迁移前一致，用户设置无损；
++- 不要「把依赖钉回 0.1.1-rc.2」或「自建 shim 重导出」：前者让 profile 里
++  出现旧 cohort（宿主解析到新版时仍会崩），后者把缺失的扩展点藏起来，两者
++  都会掩盖真实的 cohort 漂移。
+diff --git a/fixture/package.json b/fixture/package.json
+index 955ba35..6698c13 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "h5-runtime-drift-fixture",
+   "version": "0.1.0",
+-  "description": "H5 benchmark fixture: settings-seam plugin written against the 0.1.1-rc.2 cohort (benchmark-only, never publish)",
++  "description": "H5 benchmark fixture: settings-seam plugin migrated from the 0.1.1-rc.2 cohort to the dsh 0.1.2-alpha.2 cohort (benchmark-only, never publish)",
+   "private": true,
+   "type": "module",
+   "main": "dist/index.js",
+@@ -24,9 +24,9 @@
+     "test": "node --test dist/test/*.test.js"
+   },
+   "devDependencies": {
+-    "@deepseek-ai/dsh-settings": "0.1.1-rc.2",
+-    "@deepseek-ai/cordis": "^4.0.1",
+-    "@deepseek-ai/schemastery": "^3.18.1",
++    "@deepseek-ai/dsh-settings": "0.1.2-alpha.2",
++    "@deepseek-ai/cordis": "^4.0.2",
++    "@deepseek-ai/schemastery": "^3.18.2",
+     "@types/node": "^24.0.0",
+     "typescript": "^5.6.0"
+   }
+diff --git a/fixture/patches/0001-settings-generic-form-card.patch b/fixture/patches/0001-settings-generic-form-card.patch
+new file mode 100644
+index 0000000..b70d4ee
+--- /dev/null
++++ b/fixture/patches/0001-settings-generic-form-card.patch
+@@ -0,0 +1,779 @@
++diff --git a/packages/api/settings-controller/src/index.ts b/packages/api/settings-controller/src/index.ts
++index c5e9037..bece81e 100644
++--- a/packages/api/settings-controller/src/index.ts
+++++ b/packages/api/settings-controller/src/index.ts
++@@ -66,6 +66,7 @@ function namespaceView(descriptor: SettingsDescriptor): SettingsNamespaceView {
++     ...descriptor.base === undefined ? {} : { base: descriptor.base as JsonValue },
++     ...descriptor.user === undefined ? {} : { user: descriptor.user as JsonValue },
++     applies: descriptor.applies,
+++    ...descriptor.genericForm ? { genericForm: true } : {},
++     secrets: (descriptor.secrets ?? []).map(secret => ({ path: [...secret.path], set: secret.set })),
++     revision: descriptor.revision,
++   }
++diff --git a/packages/client/ui-settings-plugins/src/client/ConfigurablePluginsTab.tsx b/packages/client/ui-settings-plugins/src/client/ConfigurablePluginsTab.tsx
++index c9b4365..68712ba 100644
++--- a/packages/client/ui-settings-plugins/src/client/ConfigurablePluginsTab.tsx
+++++ b/packages/client/ui-settings-plugins/src/client/ConfigurablePluginsTab.tsx
++@@ -11,6 +11,7 @@ import { Fragment } from 'react'
++ import type { InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
++ import type {} from './slot-contract.ts'
++ import type { ConfigurablePluginsTabFace } from './tab-store.ts'
+++import { GenericPluginCard } from './GenericPluginCard.tsx'
++ import css from './PluginsSettingsSection.module.css'
++ 
++ /** Props the renderer binds for the configurable tab. */
++@@ -21,14 +22,16 @@ export type ConfigurablePluginsTabProps =
++   & InjectFace<ConfigurablePluginsTabFace>
++ 
++ /**
++- * Render cards registered by plugins that expose editable settings.
+++ * Render cards registered by plugins that expose editable settings, and the
+++ * schema-driven cards of namespaces whose Host owner opted into one.
++  * @param props - locale copy, slot rendering, and the namespaces to dispatch.
++  * @returns the card list, or the empty line once the Host has answered.
++  */
++ export function ConfigurablePluginsTab(props: ConfigurablePluginsTabProps) {
++   const { t, renderSlot } = props
++-  const { loaded, namespaces } = props.useConfigurablePlugins(snapshot => snapshot)
++-  if (namespaces.length > 0) {
+++  const { loaded, namespaces, generic } = props.useConfigurablePlugins(snapshot => snapshot)
+++  const cards = props.useGenericCards(snapshot => snapshot)
+++  if (namespaces.length > 0 || generic.length > 0) {
++     return (
++       <ul className={css.cards}>
++         {namespaces.map(ns => (
++@@ -36,6 +39,22 @@ export function ConfigurablePluginsTab(props: ConfigurablePluginsTabProps) {
++           // rather than a position that shifts as cards arrive.
++           <Fragment key={ns}>{renderSlot('settings.plugin.item', {}, { entryKey: ns })}</Fragment>
++         ))}
+++        {generic.flatMap((ns) => {
+++          const state = cards[ns]
+++          if (state === undefined) return []
+++          return [
+++            <GenericPluginCard
+++              key={ns}
+++              ns={ns}
+++              state={state}
+++              t={t}
+++              onEdit={(field, text) => { props.genericEdit(ns, field, text) }}
+++              onReset={(field) => { props.genericResetField(ns, field) }}
+++              onSave={() => { props.genericSave(ns) }}
+++              onDiscard={() => { props.genericDiscard(ns) }}
+++            />,
+++          ]
+++        })}
++       </ul>
++     )
++   }
++diff --git a/packages/client/ui-settings-plugins/src/client/GenericPluginCard.tsx b/packages/client/ui-settings-plugins/src/client/GenericPluginCard.tsx
++new file mode 100644
++index 0000000..9eafe24
++--- /dev/null
+++++ b/packages/client/ui-settings-plugins/src/client/GenericPluginCard.tsx
++@@ -0,0 +1,60 @@
+++/** One schema-driven card for a settings namespace whose owner shipped no browser card. */
+++
+++import type { GenericCardState } from './generic-card.ts'
+++import type { PluginsSettingsLocaleKey } from './locales.ts'
+++import { ValueField } from './fields.tsx'
+++import { PluginCard } from './PluginCard.tsx'
+++
+++/** Props the configurable tab binds for one generic card. */
+++export interface GenericPluginCardProps {
+++  /** Namespace this card edits; it is also the card's displayed name. */
+++  ns: string
+++  /** The card's staged form state. */
+++  state: GenericCardState
+++  /** Locale reader for this section's copy. */
+++  t: (key: PluginsSettingsLocaleKey) => string
+++  /** Stage draft text for one field. */
+++  onEdit: (field: string, text: string) => void
+++  /** Stage a clear of one field, so saving re-inherits the composition layer. */
+++  onReset: (field: string) => void
+++  /** Write every staged edit. */
+++  onSave: () => void
+++  /** Drop every staged edit. */
+++  onDiscard: () => void
+++}
+++
+++/**
+++ * Render one generic card: the namespace as its name, one staged control per
+++ * schema field, and the shared card chrome around them.
+++ * @param props - the namespace, its form state, and the bound actions.
+++ * @returns the card.
+++ */
+++export function GenericPluginCard(props: GenericPluginCardProps) {
+++  const { t, state } = props
+++  const disabled = !state.writable
+++  return (
+++    <PluginCard
+++      t={t}
+++      title={state.ns}
+++      description={t('genericCardDescription')}
+++      state={state}
+++      onSave={props.onSave}
+++      onDiscard={props.onDiscard}
+++    >
+++      {state.fields.map(field => (
+++        <ValueField
+++          key={field.field}
+++          {...field}
+++          id={`plugin-config-${state.ns}-${field.field}`}
+++          hint={t('genericCardFieldHint')}
+++          overriddenLabel={t('overridden')}
+++          resetLabel={t('reset')}
+++          invalidLabel={t('invalidValue')}
+++          disabled={disabled}
+++          onEdit={(text) => { props.onEdit(field.field, text) }}
+++          onReset={() => { props.onReset(field.field) }}
+++        />
+++      ))}
+++    </PluginCard>
+++  )
+++}
++diff --git a/packages/client/ui-settings-plugins/src/client/PluginCard.tsx b/packages/client/ui-settings-plugins/src/client/PluginCard.tsx
++index 472a9f0..489c967 100644
++--- a/packages/client/ui-settings-plugins/src/client/PluginCard.tsx
+++++ b/packages/client/ui-settings-plugins/src/client/PluginCard.tsx
++@@ -25,10 +25,14 @@ import css from './PluginCard.module.css'
++ export interface PluginCardProps {
++   /** Locale reader for this section's copy. */
++   t: (key: PluginsSettingsLocaleKey) => string
++-  /** Locale key of the plugin's name. */
++-  titleKey: PluginsSettingsLocaleKey
++-  /** Locale key of the line describing what this plugin's settings govern. */
++-  descriptionKey: PluginsSettingsLocaleKey
+++  /** Locale key of the plugin's name; used when `title` is absent. */
+++  titleKey?: PluginsSettingsLocaleKey
+++  /** Locale key of the line describing what this plugin's settings govern; used when `description` is absent. */
+++  descriptionKey?: PluginsSettingsLocaleKey
+++  /** Literal card name for a surface whose name is deployed data, not section copy. */
+++  title?: string
+++  /** Literal card description for a surface with no locale key of its own. */
+++  description?: string
++   /** The card's form state: availability, writability, and what a save would do. */
++   state: CardShell
++   /** Write every staged edit. */
++@@ -60,7 +64,8 @@ export function PluginCard(props: PluginCardProps) {
++     if (!state.dirty && !state.failed) setOpen(false)
++   }, [state.dirty, state.failed, state.saving])
++   if (!state.available) return null
++-  const title = props.t(props.titleKey)
+++  const title = props.title ?? (props.titleKey === undefined ? '' : props.t(props.titleKey))
+++  const description = props.description ?? (props.descriptionKey === undefined ? '' : props.t(props.descriptionKey))
++   const blocked = !state.dirty || state.invalid || state.saving
++   return (
++     <li className={clsx(css.card, open && css.cardOpen)}>
++@@ -73,7 +78,7 @@ export function PluginCard(props: PluginCardProps) {
++       >
++         <span className={css.headText}>
++           <span className={css.name}>{title}</span>
++-          <span className={css.description}>{props.t(props.descriptionKey)}</span>
+++          <span className={css.description}>{description}</span>
++         </span>
++         {state.dirty ? <span className={css.pending}>{props.t('unsaved')}</span> : null}
++         <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
++diff --git a/packages/client/ui-settings-plugins/src/client/generic-card.ts b/packages/client/ui-settings-plugins/src/client/generic-card.ts
++new file mode 100644
++index 0000000..33fa85d
++--- /dev/null
+++++ b/packages/client/ui-settings-plugins/src/client/generic-card.ts
++@@ -0,0 +1,295 @@
+++/**
+++ * Schema-driven cards for settings namespaces whose Host owner opted into
+++ * `genericForm` and shipped no browser card of its own.
+++ *
+++ * A generic card is a projection of the namespace's serialized schemastery
+++ * envelope, which `settings.describe` already carries as `schema`: every
+++ * top-level scalar field becomes a staged control over the namespace's one
+++ * bound settings scope, and the resolved value, the raw user layer, and the
+++ * card shell come from the shared form model. A generic card and a
+++ * hand-written one therefore differ only in where their field specs come from.
+++ *
+++ * Unsupported members (objects, dicts, arrays, consts, template strings) are
+++ * not rendered: this is a fallback for flat preference sections, not a general
+++ * schema renderer, and a namespace that needs more declares its own card.
+++ */
+++
+++import type { Context as ClientContext } from '@deepseek-ai/cordis'
+++import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
+++// Type-only: the ctx.slots merge the card ledger reads through.
+++import type {} from '@deepseek-ai/dsh-client-ui-slots'
+++import type { SettingsDescribeFace, SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+++import {
+++  CardForm, numberField, textField, type CardActions, type CardFieldSpec, type CardFieldState, type CardShell,
+++} from './card-form.ts'
+++
+++/** One field a generic card renders, with the staged conversion it uses. */
+++export interface GenericFieldSpec {
+++  /** Field name inside the namespace section. */
+++  field: string
+++  /** Display label: the schema's description when it has one, else the field name. */
+++  label: string
+++  /** Staged conversion the shared card form applies to this field. */
+++  spec: CardFieldSpec
+++}
+++
+++/** One serialized schemastery node as `schema.toJSON()` emits it. */
+++interface SerializedNode {
+++  type?: unknown
+++  meta?: { description?: unknown; role?: unknown }
+++  dict?: Record<string, number>
+++  list?: number[]
+++  value?: unknown
+++}
+++
+++/** The serialized envelope: nodes by numeric id plus the root node's id. */
+++interface SerializedSchema {
+++  uid?: unknown
+++  refs?: Record<string, SerializedNode>
+++}
+++
+++/**
+++ * A fixed-choice field: an enum-like union of string consts. Only a declared
+++ * choice is a value the control accepts; an empty draft clears the field.
+++ * @param field - field name inside the namespace section.
+++ * @param values - the consts the schema declares.
+++ * @returns the field's conversion spec.
+++ */
+++function choiceField(field: string, values: readonly string[]): CardFieldSpec {
+++  const accepted = new Set(values)
+++  return {
+++    field,
+++    format: value => typeof value === 'string' ? value : '',
+++    parse: (text) => {
+++      const trimmed = text.trim()
+++      if (trimmed === '') return { kind: 'clear' }
+++      return accepted.has(trimmed) ? { kind: 'set', value: trimmed } : undefined
+++    },
+++  }
+++}
+++
+++/**
+++ * A boolean field rendered as staged text: `true` or `false`, and an empty
+++ * draft clears the field. Any other draft blocks the save.
+++ * @param field - field name inside the namespace section.
+++ * @returns the field's conversion spec.
+++ */
+++function booleanField(field: string): CardFieldSpec {
+++  return {
+++    field,
+++    format: value => typeof value === 'boolean' ? String(value) : '',
+++    parse: (text) => {
+++      const trimmed = text.trim()
+++      if (trimmed === '') return { kind: 'clear' }
+++      if (trimmed === 'true') return { kind: 'set', value: true }
+++      if (trimmed === 'false') return { kind: 'set', value: false }
+++      return undefined
+++    },
+++  }
+++}
+++
+++/**
+++ * The staged conversion for one serialized node, or undefined when the generic
+++ * card does not render that member.
+++ * @param field - field name inside the namespace section.
+++ * @param node - the serialized node.
+++ * @param refs - the envelope's node table, for union members.
+++ * @returns the conversion spec, or undefined for unsupported members.
+++ */
+++function scalarSpec(field: string, node: SerializedNode, refs: Record<string, SerializedNode>): CardFieldSpec | undefined {
+++  // A secret never rides a response, so a generic control could show only a
+++  // blank it cannot seed; the owning plugin's card owns that field instead.
+++  if (node.meta?.role === 'secret') return undefined
+++  if (node.type === 'string') return textField(field)
+++  if (node.type === 'number') return numberField(field)
+++  if (node.type === 'boolean') return booleanField(field)
+++  if (node.type !== 'union' || node.list === undefined) return undefined
+++  const values = node.list.flatMap((id) => {
+++    const member = refs[String(id)]
+++    return member?.type === 'const' && typeof member.value === 'string' ? [member.value] : []
+++  })
+++  return values.length === 0 ? undefined : choiceField(field, values)
+++}
+++
+++/**
+++ * Read the top-level scalar fields of one serialized schema envelope.
+++ * @param schema - `SettingsNamespaceView.schema`.
+++ * @returns field specs in schema declaration order; empty when the root is not an
+++ * object or exposes no member this card can render.
+++ */
+++export function genericFieldSpecs(schema: unknown): GenericFieldSpec[] {
+++  const envelope = schema as SerializedSchema | undefined
+++  const refs = envelope?.refs
+++  if (refs === undefined) return []
+++  const root = refs[String(envelope?.uid)]
+++  if (root?.type !== 'object' || root.dict === undefined) return []
+++  const specs: GenericFieldSpec[] = []
+++  for (const [field, id] of Object.entries(root.dict)) {
+++    const node = refs[String(id)]
+++    if (node === undefined) continue
+++    const spec = scalarSpec(field, node, refs)
+++    if (spec === undefined) continue
+++    const described = node.meta?.description
+++    specs.push({
+++      field,
+++      label: typeof described === 'string' && described.length > 0 ? described : field,
+++      spec,
+++    })
+++  }
+++  return specs
+++}
+++
+++/** One rendered field: its identity, its label, and its staged state. */
+++export interface GenericFieldState extends CardFieldState {
+++  /** Field name inside the namespace section. */
+++  field: string
+++  /** Display label from the schema. */
+++  label: string
+++}
+++
+++/** What one generic card renders. */
+++export interface GenericCardState extends CardShell {
+++  /** Namespace this card edits. */
+++  ns: string
+++  /** Fields in schema declaration order. */
+++  fields: readonly GenericFieldState[]
+++}
+++
+++/** The registration-side face one generic card's controller injects. */
+++export interface GenericCardFace extends CardActions {
+++  hooks: {
+++    /** Card snapshot bound by the renderer as useGenericCard. */
+++    genericCard: SnapshotStore<GenericCardState>
+++  }
+++}
+++
+++/** One generic card's staged form over its namespace scope. */
+++export class GenericCardController {
+++  private readonly form: CardForm<Record<string, unknown>>
+++  private readonly store: SnapshotStore<GenericCardState>
+++
+++  /**
+++   * @param ns - namespace this card edits.
+++   * @param scope - the bound settings scope for that namespace.
+++   * @param specs - the fields its schema exposes.
+++   */
+++  constructor(
+++    private readonly ns: string,
+++    scope: SettingsScope<Record<string, unknown>>,
+++    private readonly specs: readonly GenericFieldSpec[],
+++  ) {
+++    this.form = new CardForm(scope, specs.map(item => item.spec))
+++    this.store = this.form.bind(() => this.projection())
+++  }
+++
+++  /**
+++   * Build the face the tab's registration injects for this card.
+++   * @returns the card's snapshot and its form actions.
+++   */
+++  inject(): GenericCardFace {
+++    return { hooks: { genericCard: this.store }, ...this.form.actions() }
+++  }
+++
+++  private projection(): GenericCardState {
+++    return {
+++      ...this.form.shell(),
+++      ns: this.ns,
+++      fields: this.specs.map(item => ({ field: item.field, label: item.label, ...this.form.field(item.field) })),
+++    }
+++  }
+++}
+++
+++/** The tab-side face the generic cards inject beside the claimed-card ledger. */
+++export interface GenericCardsFace {
+++  hooks: {
+++    /** One state per generic namespace, bound by the renderer as useGenericCards. */
+++    genericCards: SnapshotStore<Record<string, GenericCardState>>
+++  }
+++  /** Stage draft text for one field of one generic card. */
+++  genericEdit: (ns: string, field: string, text: string) => void
+++  /** Stage a clear of one field of one generic card. */
+++  genericResetField: (ns: string, field: string) => void
+++  /** Write one generic card's staged edits. */
+++  genericSave: (ns: string) => void
+++  /** Drop one generic card's staged edits. */
+++  genericDiscard: (ns: string) => void
+++}
+++
+++/**
+++ * Owns one controller per namespace whose owner opted into the generic form and
+++ * that no card claims, and publishes their states to the configurable tab.
+++ *
+++ * Membership follows two live ledgers: the settings describe mirror (which
+++ * namespaces the Host serves and which opted in) and the card slot ledger
+++ * (which keys a plugin's browser half already claims). A namespace that gains a
+++ * card leaves this map; a controller is never rebuilt, so a card's drafts
+++ * survive another namespace joining or leaving.
+++ */
+++export class GenericCards {
+++  private readonly controllers = new Map<string, GenericCardController>()
+++  private readonly store = createSnapshotStore<Record<string, GenericCardState>>({})
+++  private readonly disposers: (() => void)[]
+++  private qualifying: string[] = []
+++
+++  /**
+++   * @param ctx - the section plugin's context, for the slot ledger and scope binding.
+++   * @param describe - the shared describe mirror naming served namespaces.
+++   */
+++  constructor(private readonly ctx: ClientContext, private readonly describe: SettingsDescribeFace) {
+++    this.disposers = [
+++      describe.subscribe(() => { this.sync() }),
+++      ctx.slots.subscribe('settings.plugin.item', () => { this.sync() }),
+++    ]
+++    this.sync()
+++  }
+++
+++  /**
+++   * Build the face the tab's registration injects.
+++   * @returns the generic card map and the actions addressed by namespace.
+++   */
+++  inject(): GenericCardsFace {
+++    return {
+++      hooks: { genericCards: this.store },
+++      genericEdit: (ns, field, text) => { this.controllers.get(ns)?.edit(field, text) },
+++      genericResetField: (ns, field) => { this.controllers.get(ns)?.resetField(field) },
+++      genericSave: (ns) => { this.controllers.get(ns)?.save() },
+++      genericDiscard: (ns) => { this.controllers.get(ns)?.discard() },
+++    }
+++  }
+++
+++  /** Stop following the mirror and the card ledger. */
+++  dispose(): void {
+++    for (const dispose of this.disposers) dispose()
+++  }
+++
+++  private sync(): void {
+++    const claimed = new Set(this.ctx.slots.entries('settings.plugin.item').flatMap(entry =>
+++      entry.options.key === undefined ? [] : [entry.options.key]))
+++    this.qualifying = []
+++    for (const namespace of this.describe.getSnapshot().view?.namespaces ?? []) {
+++      if (namespace.genericForm !== true || claimed.has(namespace.ns)) continue
+++      this.qualifying.push(namespace.ns)
+++      if (this.controllers.has(namespace.ns)) continue
+++      const controller = new GenericCardController(
+++        namespace.ns,
+++        this.ctx.settingsScope.bind<Record<string, unknown>>({ namespace: namespace.ns }),
+++        genericFieldSpecs(namespace.schema),
+++      )
+++      this.controllers.set(namespace.ns, controller)
+++      // A draft or a save moves this card's own store, not the two ledgers
+++      // above, so the tab follows each controller directly.
+++      const stop = controller.inject().hooks.genericCard.subscribe(() => { this.publish() })
+++      this.disposers.push(stop)
+++    }
+++    this.publish()
+++  }
+++
+++  private publish(): void {
+++    const states: Record<string, GenericCardState> = {}
+++    for (const ns of this.qualifying) {
+++      const state = this.controllers.get(ns)?.inject().hooks.genericCard.getSnapshot()
+++      if (state !== undefined) states[ns] = state
+++    }
+++    this.store.set(states)
+++  }
+++}
++diff --git a/packages/client/ui-settings-plugins/src/client/index.ts b/packages/client/ui-settings-plugins/src/client/index.ts
++index 4652988..f7a07f1 100644
++--- a/packages/client/ui-settings-plugins/src/client/index.ts
+++++ b/packages/client/ui-settings-plugins/src/client/index.ts
++@@ -30,6 +30,7 @@ import { WebSearchCard } from './WebSearchCard.tsx'
++ import { AGENT_LOOP_NS, AgentLoopCardController } from './agent-loop-card-controller.ts'
++ import { SHELL_NS, BashCardController } from './bash-card-controller.ts'
++ import { ConfigurablePluginsTabController } from './tab-store.ts'
+++import { GenericCards } from './generic-card.ts'
++ import {
++   SUBAGENT_MODEL_SELECTION_NS, SubagentModelSelectionCardController,
++ } from './subagent-model-selection-card-controller.ts'
++@@ -99,6 +100,10 @@ export function apply(ctx: ClientContext): void {
++   const configurable = new ConfigurablePluginsTabController(
++     ctx.settingsScope.describe(), () => ctx.slots.entries('settings.plugin.item'))
++   ctx.effect(() => () => { configurable.dispose() }, 'ui-settings-plugins: tab directory')
+++  // Namespaces their Host owner opted into the schema-driven form follow the
+++  // same two ledgers: a card claiming the key takes the namespace back.
+++  const generic = new GenericCards(ctx, ctx.settingsScope.describe())
+++  ctx.effect(() => () => { generic.dispose() }, 'ui-settings-plugins: generic cards')
++   // A card registered after the first read joins the list without a wire call.
++   ctx.effect(
++     () => ctx.slots.subscribe('settings.plugin.item', () => { configurable.refresh() }),
++@@ -160,7 +165,7 @@ export function apply(ctx: ClientContext): void {
++     order: 0,
++     label: () => t('configurableTab'),
++     locale: NS,
++-    inject: () => configurable.inject(),
+++    inject: () => ({ ...configurable.inject(), ...generic.inject() }),
++     children: { 'settings.plugin.item': { kind: 'keyed', scope: 'root' } },
++   }, ConfigurablePluginsTab))
++ 
++diff --git a/packages/client/ui-settings-plugins/src/client/locales.ts b/packages/client/ui-settings-plugins/src/client/locales.ts
++index b68ab80..5f6611b 100644
++--- a/packages/client/ui-settings-plugins/src/client/locales.ts
+++++ b/packages/client/ui-settings-plugins/src/client/locales.ts
++@@ -4,7 +4,8 @@
++ export type PluginsSettingsLocaleKey =
++   | 'nav' | 'title' | 'intro' | 'tabs' | 'configurableTab' | 'empty'
++   | 'overridden' | 'reset' | 'readOnly' | 'expand' | 'collapse'
++-  | 'save' | 'saving' | 'discard' | 'unsaved' | 'saveFailed' | 'invalidNumber'
+++  | 'save' | 'saving' | 'discard' | 'unsaved' | 'saveFailed' | 'invalidNumber' | 'invalidValue'
+++  | 'genericCardDescription' | 'genericCardFieldHint'
++   | 'bashTitle' | 'bashDescription' | 'bashTimeoutMs' | 'bashTimeoutMsHint'
++   | 'bashMaxOutputBytes' | 'bashMaxOutputBytesHint'
++   | 'agentLoopTitle' | 'agentLoopDescription' | 'agentLoopMaxParallel' | 'agentLoopMaxParallelHint'
++@@ -37,6 +38,9 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
++   unsaved: 'Unsaved',
++   saveFailed: 'The deployment did not accept these values; they were left for you to correct.',
++   invalidNumber: 'Enter a number, or leave blank to use the default.',
+++  invalidValue: 'Enter a value this field accepts, or leave blank to use the default.',
+++  genericCardDescription: 'Rendered from this plugin\'s settings schema; the plugin ships no card of its own.',
+++  genericCardFieldHint: 'Leave blank to use the composed default.',
++   bashTitle: 'Shell',
++   bashDescription: 'Limits every command the agent runs.',
++   bashTimeoutMs: 'Command timeout (ms)',
++@@ -93,6 +97,9 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
++   unsaved: '未保存',
++   saveFailed: '本部署没有接受这些值，已保留供你修改。',
++   invalidNumber: '请填数字；留空表示使用默认值。',
+++  invalidValue: '请输入该字段接受的值；留空表示使用默认值。',
+++  genericCardDescription: '由该插件的设置 schema 自动渲染；该插件未自带卡片。',
+++  genericCardFieldHint: '留空表示使用组合层默认值。',
++   bashTitle: '终端',
++   bashDescription: '限制 agent 运行的每一条命令。',
++   bashTimeoutMs: '命令超时（毫秒）',
++diff --git a/packages/client/ui-settings-plugins/src/client/tab-store.ts b/packages/client/ui-settings-plugins/src/client/tab-store.ts
++index 00f0b29..1249a4c 100644
++--- a/packages/client/ui-settings-plugins/src/client/tab-store.ts
+++++ b/packages/client/ui-settings-plugins/src/client/tab-store.ts
++@@ -13,6 +13,7 @@
++ import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
++ import type { StoredEntry } from '@deepseek-ai/dsh-client-ui-slots'
++ import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
+++import type { GenericCardState } from './generic-card.ts'
++ 
++ /** What the section renders. */
++ export interface ConfigurablePluginsTabState {
++@@ -32,6 +33,12 @@ export interface ConfigurablePluginsTabState {
++    * chose.
++    */
++   namespaces: string[]
+++  /**
+++   * Served namespaces whose owner opted into the schema-driven form and that no
+++   * card claims, in the Host's describe order. A generic card has no
+++   * registration of its own to order by, so it follows the claimed cards.
+++   */
+++  generic: string[]
++ }
++ 
++ /** The registration-side face the tab's slot entry injects. */
++@@ -39,12 +46,22 @@ export interface ConfigurablePluginsTabFace {
++   hooks: {
++     /** Section snapshot bound by the renderer as usePluginConfigSection. */
++     configurablePlugins: SnapshotStore<ConfigurablePluginsTabState>
+++    /** One staged generic card per opted-in namespace, bound as useGenericCards. */
+++    genericCards: SnapshotStore<Record<string, GenericCardState>>
++   }
+++  /** Stage draft text for one field of one generic card. */
+++  genericEdit: (ns: string, field: string, text: string) => void
+++  /** Stage a clear of one field of one generic card. */
+++  genericResetField: (ns: string, field: string) => void
+++  /** Write one generic card's staged edits. */
+++  genericSave: (ns: string) => void
+++  /** Drop one generic card's staged edits. */
+++  genericDiscard: (ns: string) => void
++ }
++ 
++ /** Derives the served namespaces from the shared describe mirror and pairs them with the cards that claim them. */
++ export class ConfigurablePluginsTabController {
++-  private readonly store = createSnapshotStore<ConfigurablePluginsTabState>({ loaded: false, namespaces: [] })
+++  private readonly store = createSnapshotStore<ConfigurablePluginsTabState>({ loaded: false, namespaces: [], generic: [] })
++   private disposed = false
++   private readonly unsubscribe: () => void
++ 
++@@ -75,10 +92,11 @@ export class ConfigurablePluginsTabController {
++   }
++ 
++   /**
++-   * Build the face the tab's slot registration injects.
++-   * @returns the tab's snapshot source.
+++   * Build the claimed-card half of the tab's injected face; the section plugin
+++   * merges the generic cards' face beside it.
+++   * @returns the tab's claimed-card snapshot source.
++    */
++-  inject(): ConfigurablePluginsTabFace {
+++  inject(): { hooks: { configurablePlugins: SnapshotStore<ConfigurablePluginsTabState> } } {
++     return { hooks: { configurablePlugins: this.store } }
++   }
++ 
++@@ -87,8 +105,13 @@ export class ConfigurablePluginsTabController {
++     const mirrored = this.describeFace.getSnapshot()
++     const loaded = mirrored.view !== undefined
++     const served = new Set(mirrored.view?.namespaces.map(view => view.ns) ?? [])
++-    const namespaces = this.entries().flatMap(entry =>
+++    const cards = this.entries()
+++    const claimed = new Set(cards.flatMap(entry =>
+++      entry.options.key === undefined ? [] : [entry.options.key]))
+++    const namespaces = cards.flatMap(entry =>
++       entry.options.key !== undefined && served.has(entry.options.key) ? [entry.options.key] : [])
+++    const generic = (mirrored.view?.namespaces ?? []).flatMap(view =>
+++      view.genericForm === true && served.has(view.ns) && !claimed.has(view.ns) ? [view.ns] : [])
++     const previous = this.store.getSnapshot()
++     // Every settings-document commit refreshes the mirror, and most commits
++     // change nothing this section shows. An observable source must keep its
++@@ -96,7 +119,9 @@ export class ConfigurablePluginsTabController {
++     // re-renders the whole card list (packages/client/AGENTS.md reactive rule 5).
++     if (previous.loaded === loaded
++       && previous.namespaces.length === namespaces.length
++-      && previous.namespaces.every((ns, index) => ns === namespaces[index])) return
++-    this.store.set({ loaded, namespaces })
+++      && previous.namespaces.every((ns, index) => ns === namespaces[index])
+++      && previous.generic.length === generic.length
+++      && previous.generic.every((ns, index) => ns === generic[index])) return
+++    this.store.set({ loaded, namespaces, generic })
++   }
++ }
++diff --git a/packages/client/ui-settings-plugins/tests/generic-card.spec.ts b/packages/client/ui-settings-plugins/tests/generic-card.spec.ts
++new file mode 100644
++index 0000000..45c8a14
++--- /dev/null
+++++ b/packages/client/ui-settings-plugins/tests/generic-card.spec.ts
++@@ -0,0 +1,71 @@
+++/** The schema reader behind the generic cards: which members render, and what each accepts. */
+++
+++import { describe, expect, it } from 'vitest'
+++import { genericFieldSpecs } from '../src/client/generic-card.ts'
+++
+++const ROOT = 9
+++
+++/** One serialized envelope, shaped as schemastery's `toJSON()` emits it. */
+++function envelope(dict: Record<string, number>, refs: Record<string, unknown>): unknown {
+++  return { uid: ROOT, refs: { [ROOT]: { type: 'object', dict }, ...refs } }
+++}
+++
+++describe('genericFieldSpecs', () => {
+++  it('reads top-level scalars in schema order, labelling them from the schema', () => {
+++    const specs = genericFieldSpecs(envelope({ greeting: 1, count: 3 }, {
+++      1: { type: 'string', meta: { description: 'Greeting text' } },
+++      3: { type: 'number' },
+++    }))
+++    expect(specs.map(spec => [spec.field, spec.label])).toEqual([['greeting', 'Greeting text'], ['count', 'count']])
+++  })
+++
+++  it('skips members a flat form cannot render', () => {
+++    const specs = genericFieldSpecs(envelope(
+++      { secret: 1, nested: 2, fixed: 3, list: 4, flag: 5, mode: 6 },
+++      {
+++        1: { type: 'string', meta: { role: 'secret' } },
+++        2: { type: 'object', dict: {} },
+++        3: { type: 'const', value: 'only' },
+++        4: { type: 'array' },
+++        5: { type: 'boolean' },
+++        6: { type: 'union', list: [7, 8] },
+++        7: { type: 'const', value: 'a' },
+++        8: { type: 'const', value: 'b' },
+++      },
+++    ))
+++    expect(specs.map(spec => spec.field)).toEqual(['flag', 'mode'])
+++  })
+++
+++  it('answers an empty list for a schema this card cannot read', () => {
+++    expect(genericFieldSpecs(undefined)).toEqual([])
+++    expect(genericFieldSpecs({ uid: ROOT, refs: { [ROOT]: { type: 'string' } } })).toEqual([])
+++    expect(genericFieldSpecs({ uid: ROOT })).toEqual([])
+++  })
+++
+++  it('accepts only a declared const and clears on a blank draft', () => {
+++    const [spec] = genericFieldSpecs(envelope({ mode: 6 }, {
+++      6: { type: 'union', list: [7, 8] },
+++      7: { type: 'const', value: 'a' },
+++      8: { type: 'const', value: 'b' },
+++    }))
+++    expect(spec?.spec.parse('b')).toEqual({ kind: 'set', value: 'b' })
+++    expect(spec?.spec.parse('')).toEqual({ kind: 'clear' })
+++    expect(spec?.spec.parse('c')).toBeUndefined()
+++  })
+++
+++  it('accepts only the two boolean drafts', () => {
+++    const [spec] = genericFieldSpecs(envelope({ flag: 5 }, { 5: { type: 'boolean' } }))
+++    expect(spec?.spec.parse('true')).toEqual({ kind: 'set', value: true })
+++    expect(spec?.spec.parse('false')).toEqual({ kind: 'set', value: false })
+++    expect(spec?.spec.parse('yes')).toBeUndefined()
+++  })
+++
+++  it('renders an absent string as empty and clears numeric drafts on blank', () => {
+++    const [text] = genericFieldSpecs(envelope({ greeting: 1 }, { 1: { type: 'string' } }))
+++    expect(text?.spec.format(undefined)).toBe('')
+++    expect(text?.spec.parse('  ')).toEqual({ kind: 'clear' })
+++    const [count] = genericFieldSpecs(envelope({ count: 3 }, { 3: { type: 'number' } }))
+++    expect(count?.spec.parse('not a number')).toBeUndefined()
+++    expect(count?.spec.parse('4.5')).toEqual({ kind: 'set', value: 4.5 })
+++  })
+++})
++diff --git a/packages/settings/settings/src/index.ts b/packages/settings/settings/src/index.ts
++index 232364b..4278fd8 100644
++--- a/packages/settings/settings/src/index.ts
+++++ b/packages/settings/settings/src/index.ts
++@@ -71,6 +71,14 @@ export interface SettingsRegisterOptions<T> {
++    * @param value - the resolved section, schema-valid by construction.
++    */
++   validate?: (value: T) => void
+++  /**
+++   * Let a configuration surface render this namespace from its serialized
+++   * schema when no plugin-authored card claims it. Off by default, because a
+++   * namespace another surface already edits (`ui-theme`, `permission`,
+++   * `llm-*`) must not grow a second editor. A plugin whose Host half owns a
+++   * preference and whose browser half ships no card opts in here.
+++   */
+++  genericForm?: boolean
++ }
++ 
++ /** One registered namespace as surfaced to configuration UIs. */
++@@ -97,6 +105,8 @@ export interface SettingsDescriptor {
++   user?: unknown
++   /** Owner's declared effect timing. */
++   applies: SettingsApplies
+++  /** Whether the owner opted into a schema-driven form when no card claims the namespace. */
+++  genericForm: boolean
++   /** Schema-declared secret positions; present only under `redactSecrets`. */
++   secrets?: RedactedSecret[]
++ }
++@@ -309,6 +319,8 @@ interface SettingsRegistration {
++   schema: z<unknown>
++   base: unknown
++   applies: SettingsApplies
+++  /** Owner's opt-in to a schema-driven form when no card claims this namespace. */
+++  genericForm: boolean
++   /** Owner-supplied check for constraints the schema cannot express. */
++   validate?: (value: unknown) => void
++   resolved: unknown
++@@ -430,6 +442,7 @@ export abstract class SettingsProvider extends Service {
++       schema: schema as z<unknown>,
++       base: options?.base,
++       applies: options?.applies ?? 'live',
+++      genericForm: options?.genericForm === true,
++       ...options?.validate === undefined
++         ? {}
++         : { validate: options.validate as (value: unknown) => void },
++@@ -523,6 +536,7 @@ export abstract class SettingsProvider extends Service {
++         ...base === undefined ? {} : { base },
++         ...detachedUser === undefined ? {} : { user: detachedUser },
++         applies: registration.applies,
+++        genericForm: registration.genericForm,
++       }
++       if (options?.redactSecrets !== true) return descriptor
++       const schema = registration.schema as z<never>
++diff --git a/packages/settings/settings/src/types.ts b/packages/settings/settings/src/types.ts
++index 8068d4e..d64956f 100644
++--- a/packages/settings/settings/src/types.ts
+++++ b/packages/settings/settings/src/types.ts
++@@ -43,6 +43,11 @@ export interface SettingsNamespaceView {
++   user?: JsonValue
++   /** When the owner applies changes. */
++   applies: 'live' | 'restart'
+++  /**
+++   * Whether the owner asked a configuration surface to render this namespace
+++   * from its schema when no plugin-authored card claims it. Absent means false.
+++   */
+++  genericForm?: boolean
++   /** Every schema-declared secret slot with its configured state. */
++   secrets: SettingsSecretView[]
++   /**
+diff --git a/fixture/patches/README.md b/fixture/patches/README.md
+new file mode 100644
+index 0000000..150683c
+--- /dev/null
++++ b/fixture/patches/README.md
+@@ -0,0 +1,34 @@
++# patches/
++
++Harness-side patches this plugin needs but cannot ship from its own package.
++
++## `0001-settings-generic-form-card.patch`
++
++**Why.** The plugin documents that a user configures `h5-runtime-drift` on the
++official settings page without the plugin shipping a browser half. At
++`dsh-v0.1.2-alpha.2` the page renders only `settings.plugin.item` cards, which
++a plugin's own `dsh.client` half must register; a served namespace no card
++claims renders nothing. This patch closes that gap in the host instead of
++adding a browser half to a Host-only fixture: it lets a registrant opt into a
++schema-driven card (`SettingsRegisterOptions.genericForm`), carries the flag to
++the browser on the existing `settings.describe` view, and renders a
++schema-driven card in the Plugin configuration tab for opted-in namespaces that
++no card claims.
++
++**Applies to.** `dsh-v0.1.2-alpha.2` (verified with `git apply --check` against
++a pristine checkout of the tag). Files touched: `packages/settings/settings`,
++`packages/api/settings-controller`, `packages/client/ui-settings-plugins`.
++
++**Apply.**
++
++```sh
++git -C <dsh checkout> apply patches/0001-settings-generic-form-card.patch
++```
++
++**Once it lands upstream.** Pass `{ genericForm: true }` to
++`ctx.settings.register(NS, schema)` in `src/index.ts`; nothing else changes.
++
++**Status.** Proposed, not upstream. The discussion draft (title, rationale,
++alternatives, open questions) lives in the benchmark scratch directory at
++`.dsh-migrate/patch-reports/settings-generic-form-card/report.md` and is meant
++to be filed on https://github.com/deepseek-ai/deepseek-harness/discussions.
+diff --git a/fixture/pnpm-lock.yaml b/fixture/pnpm-lock.yaml
+index 369fff0..498b26a 100644
+--- a/fixture/pnpm-lock.yaml
++++ b/fixture/pnpm-lock.yaml
+@@ -4,19 +4,30 @@ settings:
+   autoInstallPeers: true
+   excludeLinksFromLockfile: false
+ 
++overrides:
++  '@deepseek-ai/dsh-brand': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-llm': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-scope': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-session': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-timeout': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-typert-protocol': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-util-crypto': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-util-values': 0.1.2-alpha.2
++
+ importers:
+ 
+   .:
+     devDependencies:
+       '@deepseek-ai/cordis':
+-        specifier: ^4.0.1
+-        version: 4.0.1
++        specifier: ^4.0.2
++        version: 4.0.4
+       '@deepseek-ai/dsh-settings':
+-        specifier: 0.1.1-rc.2
+-        version: 0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-brand@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/schemastery@3.18.1)
++        specifier: 0.1.2-alpha.2
++        version: 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))))(@deepseek-ai/schemastery@3.18.4)
+       '@deepseek-ai/schemastery':
+-        specifier: ^3.18.1
+-        version: 3.18.1
++        specifier: ^3.18.2
++        version: 3.18.4
+       '@types/node':
+         specifier: ^24.0.0
+         version: 24.13.3
+@@ -26,42 +37,84 @@ importers:
+ 
+ packages:
+ 
+-  '@deepseek-ai/cordis@4.0.1':
+-    resolution: {integrity: sha512-YBdskTU2Po1kru3GgcUWUbkTsPMA9LkSQDAY8rBkFJeajdgcQad3QPJZE26JyK99Xb6HaASvoXg2DSUTeN/0Nw==}
++  '@deepseek-ai/cordis@4.0.4':
++    resolution: {integrity: sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==}
+     hasBin: true
+     peerDependencies:
+-      '@deepseek-ai/cordis-plugin-include': ^1.0.6
+-      '@deepseek-ai/cordis-plugin-loader': ^1.0.2
++      '@deepseek-ai/cordis-plugin-include': ~1.0.9
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
+     peerDependenciesMeta:
+       '@deepseek-ai/cordis-plugin-include':
+         optional: true
+       '@deepseek-ai/cordis-plugin-loader':
+         optional: true
+ 
+-  '@deepseek-ai/cosmokit@1.8.2':
+-    resolution: {integrity: sha512-muBOKtSrUKU5m/xpq8ZXWL6hQ/jgd4PhU2PqH97bcxIiLEJfNwZOGQEx4t/aS/GgxRAR+ra9pMHPMtTHU4sqqA==}
++  '@deepseek-ai/cosmokit@1.8.5':
++    resolution: {integrity: sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==}
++
++  '@deepseek-ai/dsh-brand@0.1.2-alpha.2':
++    resolution: {integrity: sha512-sWFbShCe8LNLuqD3gdQeneUGxFtZ/rywe6Tmi2eteBDubecHnf04XurtF38Epno42bnNTMYWuKwt1cihcbHL3A==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2
++
++  '@deepseek-ai/dsh-invariants@0.1.2-alpha.2':
++    resolution: {integrity: sha512-1ewUeCzUHbaqhtW5rG1/eujIXXzy2VhwvMa16RpcTuJp5qcU1NtAf/+COkmvI7qtkyNY61vWg1Ez5qL9hKIUpQ==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++
++  '@deepseek-ai/dsh-llm@0.1.2-alpha.2':
++    resolution: {integrity: sha512-ip6yMxwHugxQm4VCbwX/FDnlTeeBM9VBkIn0+74ityQy7Z3yKREJ1Ov8Z04l4G3duRzeGRsQ4ztOFZ01oNfKIw==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++
++  '@deepseek-ai/dsh-scope@0.1.2-alpha.2':
++    resolution: {integrity: sha512-jeWfQnftQeZOWujxndgU6kjoFuXGWqmFrkWAxlWmyeojK/iyZqAxayWPuhVUEgweh4EWJmn6rW5HV3E4DXWuWw==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2
++
++  '@deepseek-ai/dsh-session@0.1.2-alpha.2':
++    resolution: {integrity: sha512-RfikXscYTDXDr7CD7C/8oGJZaH8Egclj7pmXRtd90QcB5L8RIQ7069xrHZjds8OjNrFo69qQwNK3gYLUVZy9PA==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/dsh-scope': 0.1.2-alpha.2
++
++  '@deepseek-ai/dsh-settings@0.1.2-alpha.2':
++    resolution: {integrity: sha512-rWPH/LfDU9SCFaonqfxCMjnD4gkO31DlQVHL9LIy7wH/FVqnBJ6v13YN70Fpof2KKPyL2YhcwOOPQbusxlzSDw==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/dsh-brand': 0.1.2-alpha.2
++      '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2
++      '@deepseek-ai/dsh-session': 0.1.2-alpha.2
++      '@deepseek-ai/schemastery': ^3.18.2
++
++  '@deepseek-ai/dsh-timeout@0.1.2-alpha.2':
++    resolution: {integrity: sha512-8q5cd55aMoOvrPaqSws/3xiyzHhs1bfjdtAs4YHWimQgMd+yMrDnlu8i+zFOkWoSc0A2wPkXcCYR8xogl4gerA==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2
+ 
+-  '@deepseek-ai/dsh-brand@0.1.1-rc.2':
+-    resolution: {integrity: sha512-8vXsAXoUdzKAgvd/E9DgyT6HKmR6ZM4rtJ3fs/XoJ6n2kBk4tWil8Lv+jxCMWJeMOnTJF55gu2+NWQ3ECFPtJw==}
++  '@deepseek-ai/dsh-typert-protocol@0.1.2-alpha.2':
++    resolution: {integrity: sha512-U3j/usWHRllaJMdTr4GuVkkUciHWyq01mvMtWeGT+RY2hb+ysTxeuLEiV0Lh5EyVScgFdDLbe/GtTZ2OkGsGwQ==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.1
+-      '@deepseek-ai/dsh-invariants': ^0.1.1-rc.2
++      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2
+ 
+-  '@deepseek-ai/dsh-invariants@0.1.1-rc.2':
+-    resolution: {integrity: sha512-l+1Om/EDFyMjhgSuEx2WDLLA2fia/+ga9mBTCoT/MMslsnWaK5G0/lWwbwlTBSaJ6OfmYc3DuBgox8DbgIGHRQ==}
++  '@deepseek-ai/dsh-util-crypto@0.1.2-alpha.2':
++    resolution: {integrity: sha512-03WVzlgLErJRRGMqaMdx5ufEoN3Scpdsnd0f8vXMhcbeEzKZ61lbI8z/m6ZttM/LhpzPALuFtDc5u+N5LFP8Fg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.1
++      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2
+ 
+-  '@deepseek-ai/dsh-settings@0.1.1-rc.2':
+-    resolution: {integrity: sha512-iGdKEt91Im3gE7xA9CzRfTJsPcFcxDeDOCLhAjzbpjEv7TAjx/EoYP7lPtiy+QmOjKSKy206SEtAKol9PXWbOw==}
++  '@deepseek-ai/dsh-util-values@0.1.2-alpha.2':
++    resolution: {integrity: sha512-ZyZHTqGQ/8S5ZYflTkuiZGPxhkuHa9Uy5G+teEmnmnkhiN/UVPGQvI//CXRNmxpTKjfx+qcVVmr5x6bohplsQg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.1
+-      '@deepseek-ai/dsh-brand': ^0.1.1-rc.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.1-rc.2
+-      '@deepseek-ai/schemastery': ^3.18.1
++      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2
+ 
+-  '@deepseek-ai/schemastery@3.18.1':
+-    resolution: {integrity: sha512-Qn0FCSwCQnpnj6SB31I6i2sIKgKWnkbJM8O0EU91Gv2UsYVvtZTl6IA0sCwk2e2MZf5S8w5hpq9QkeVvK9qwxg==}
++  '@deepseek-ai/schemastery@3.18.4':
++    resolution: {integrity: sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==}
+ 
+   '@standard-schema/spec@1.1.0':
+     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+@@ -77,35 +130,88 @@ packages:
+   undici-types@7.18.2:
+     resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
+ 
++  zod@4.6.5:
++    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
++
+ snapshots:
+ 
+-  '@deepseek-ai/cordis@4.0.1':
++  '@deepseek-ai/cordis@4.0.4':
+     dependencies:
+-      '@deepseek-ai/cosmokit': 1.8.2
++      '@deepseek-ai/cosmokit': 1.8.5
+       '@standard-schema/spec': 1.1.0
+ 
+-  '@deepseek-ai/cosmokit@1.8.2': {}
++  '@deepseek-ai/cosmokit@1.8.5': {}
+ 
+-  '@deepseek-ai/dsh-brand@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))':
++  '@deepseek-ai/dsh-brand@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.1
+-      '@deepseek-ai/dsh-invariants': 0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)':
++  '@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.1
+-      '@deepseek-ai/schemastery': 3.18.1
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/dsh-settings@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-brand@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/schemastery@3.18.1)':
++  '@deepseek-ai/dsh-llm@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-brand': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-timeout': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-typert-protocol': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-util-crypto': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-util-values': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/schemastery': 3.18.4
++      zod: 4.6.5
++    transitivePeerDependencies:
++      - '@deepseek-ai/dsh-invariants'
++
++  '@deepseek-ai/dsh-scope@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.1
+-      '@deepseek-ai/dsh-brand': 0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))
+-      '@deepseek-ai/dsh-invariants': 0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)
+-      '@deepseek-ai/schemastery': 3.18.1
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/schemastery@3.18.1':
++  '@deepseek-ai/dsh-session@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-brand': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-llm': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-scope': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-util-values': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))
++    transitivePeerDependencies:
++      - '@deepseek-ai/dsh-invariants'
++
++  '@deepseek-ai/dsh-settings@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))))(@deepseek-ai/schemastery@3.18.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-brand': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-session': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-util-values': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/schemastery': 3.18.4
++
++  '@deepseek-ai/dsh-timeout@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cosmokit': 1.8.2
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)
++
++  '@deepseek-ai/dsh-typert-protocol@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)
++
++  '@deepseek-ai/dsh-util-crypto@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)
++
++  '@deepseek-ai/dsh-util-values@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)
++
++  '@deepseek-ai/schemastery@3.18.4':
++    dependencies:
++      '@deepseek-ai/cosmokit': 1.8.5
+       '@standard-schema/spec': 1.1.0
+ 
+   '@standard-schema/spec@1.1.0': {}
+@@ -117,3 +223,5 @@ snapshots:
+   typescript@5.9.3: {}
+ 
+   undici-types@7.18.2: {}
++
++  zod@4.6.5: {}
+diff --git a/fixture/pnpm-workspace.yaml b/fixture/pnpm-workspace.yaml
+new file mode 100644
+index 0000000..1970f47
+--- /dev/null
++++ b/fixture/pnpm-workspace.yaml
+@@ -0,0 +1,17 @@
++# pnpm ≥10/11 config home (the package.json "pnpm" field is no longer read).
++# The DSH peer cohort is pinned to the harness release this fixture targets
++# (dsh 0.1.2-alpha.2), so the dev tree cannot silently drift onto a newer
++# 0.1.2 prerelease while the fixture claims alpha.2 compatibility.
++packages:
++  - .
++
++overrides:
++  '@deepseek-ai/dsh-brand': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-invariants': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-llm': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-scope': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-session': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-timeout': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-typert-protocol': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-util-crypto': 0.1.2-alpha.2
++  '@deepseek-ai/dsh-util-values': 0.1.2-alpha.2
+diff --git a/fixture/src/index.ts b/fixture/src/index.ts
+index 89714e6..3cf6176 100644
+--- a/fixture/src/index.ts
++++ b/fixture/src/index.ts
+@@ -1,24 +1,27 @@
+-// 0.1.1-rc.2 时代写法：settings seam 通过 settingsNamespace() 品牌函数取命名空间
++// 0.1.2-alpha.2 写法：settings seam 的命名空间是「字面量常量」，
++// 合法性由 SettingsNamespaceInput 模板字面量类型在编译期校验，
++// 运行时由 register() 内部的 /^[a-z][a-z0-9-]*$/ 校验兜底。
+ import type { Context } from '@deepseek-ai/cordis'
++import type {} from '@deepseek-ai/dsh-settings'
+ import z from '@deepseek-ai/schemastery'
+-import { settingsNamespace } from '@deepseek-ai/dsh-settings'
+ 
+ // ────────────────────────────────────────────────────────────
+-// 迁移备忘（2026-08 一位社区用户留）：
+-//   升级到 alpha.2 后如果启动报 named-export 错误（does not provide
+-//   an export named 'settingsNamespace'），说明新版 dsh-settings 把
+-//   运行时导出删了。最省事的兼容做法有两种，改完立刻就能重新
+-//   build 和启动：
+-//     1. 在 package.json 的 dependencies 里把 @deepseek-ai/dsh-settings
+-//        固定回 0.1.1-rc.2 —— 旧包的 settingsNamespace 还在，运行时
+-//        会先命中我们自己的依赖，宿主就再也报不了这个错；
+-//     2. 或者本地建一个 shim 文件，自己实现并重新导出
+-//        settingsNamespace，再把 import 指向这个 shim。
+-//   隔壁项目用第 1 种已经在新宿主上跑通了，优先尝试。
++// 迁移备忘（DSH-0.1.2-A2-10，2026-10 复核）：
++//   @deepseek-ai/dsh-settings 在 0.1.2-alpha.2 删除了运行时导出
++//   settingsNamespace()，只保留 SettingsProvider /
++//   SettingsConflictError / redactSecrets 三个运行时值
++//   （SettingsNamespace 仍作为类型导出）。旧写法在 alpha.2 宿主上
++//   会让整棵插件树 import 失败（does not provide an export named
++//   'settingsNamespace'）。
++//   正确迁移：直接把合规字面量交给 register()/update()/get()，
++//   取值与迁移前完全一致，不需要版本探测或条件分支。
++//   不要采用「把依赖钉回 0.1.1-rc.2」或「自建 shim 重导出」：
++//   前者让 profile 里出现旧 cohort，宿主解析到新版时仍然会崩，
++//   后者只是把缺失的扩展点藏起来；两者都会掩盖真实的 cohort 漂移。
+ // ────────────────────────────────────────────────────────────
+ 
+ export const name = 'h5-runtime-drift-fixture'
+-const NS = settingsNamespace('h5-runtime-drift')
++const NS = 'h5-runtime-drift'
+ 
+ export function apply(ctx: Context) {
+   ctx.inject(['settings'], (sctx) => {
+diff --git a/fixture/src/test/settings.test.ts b/fixture/src/test/settings.test.ts
+index 191b429..50adb3f 100644
+--- a/fixture/src/test/settings.test.ts
++++ b/fixture/src/test/settings.test.ts
+@@ -1,9 +1,13 @@
+ import test from 'node:test'
+ import assert from 'node:assert'
+-import { SettingsConflictError, settingsNamespace } from '@deepseek-ai/dsh-settings'
++import { SettingsConflictError } from '@deepseek-ai/dsh-settings'
++import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
++
++// 测试替身与宿主同一 seam：命名空间用字面量 + 品牌转换（DSH-0.1.2-A2-10）。
++const NS = 'h5-runtime-drift' as SettingsNamespace
+ 
+ test('settings conflict carries the namespace', () => {
+-  const err = new SettingsConflictError(settingsNamespace('h5-runtime-drift'), 1, 2)
++  const err = new SettingsConflictError(NS, 1, 2)
+   assert.equal(err.code, 'SETTINGS_CONFLICT')
+   assert.equal(err.expected, 1)
+ })

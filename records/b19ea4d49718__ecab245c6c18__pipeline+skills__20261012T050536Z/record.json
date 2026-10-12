@@ -1,0 +1,152 @@
+{
+  "schema": 3,
+  "id": "b19ea4d49718__ecab245c6c18__pipeline+skills__20261012T050536Z",
+  "createdAt": "2026-10-12T05:05:36Z",
+  "producer": {
+    "commit": "b19ea4d49718707cd673ea3c1ff01eb2708e0619",
+    "version": "0.3.4",
+    "dirty": false,
+    "message": "feat(workflow): migrate every plugin of a repository together",
+    "snapshot": "51cf68fd47a8bb2a"
+  },
+  "subject": {
+    "id": "pipeline+skills",
+    "agentRuntime": "0.2.0-rc.2",
+    "skills": {
+      "commit": "ecab245c6c1831c51b0240aca13573b94a6e525e",
+      "names": [
+        "plugin-upgrade"
+      ]
+    },
+    "attempts": 1,
+    "agentTimeoutMultiplier": 3
+  },
+  "suite": {
+    "repository": "oh-my-dsh/dsh-plugin-upgrade-skill",
+    "commit": "ecab245c6c1831c51b0240aca13573b94a6e525e",
+    "tasks": [
+      {
+        "id": "H8-fire-drill",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      }
+    ]
+  },
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-v4-flash",
+    "before": {
+      "at": "2026-10-12T05:05:38.011Z",
+      "servedModel": "deepseek-flash",
+      "fingerprint": "aeb56401ca74e127821c4f9126dcb669"
+    },
+    "after": {
+      "at": "2026-10-12T05:36:08.367Z",
+      "servedModel": "deepseek-flash",
+      "fingerprint": "aeb56401ca74e127821c4f9126dcb669"
+    }
+  },
+  "environment": {
+    "harbor": "0.24.0",
+    "docker": "29.6.1",
+    "os": "Linux 6.12.101+deb13-cloud-amd64",
+    "concurrency": 1
+  },
+  "attempts": [
+    {
+      "task": "H8-fire-drill",
+      "attempt": 1,
+      "trial": "H8-fire-drill__amFUkWV",
+      "outcome": "scored",
+      "reward": 0.66,
+      "rewards": {
+        "reward": 0.66
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1770.1,
+        "verifierSec": 8.7,
+        "totalSec": 1826.6
+      },
+      "usage": {
+        "inputTokens": 330382,
+        "cacheHitTokens": 24741888,
+        "outputTokens": 194955,
+        "usd": 0.2407559640000001
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H8-fire-drill__amFUkWV/agent/proposed.diff",
+          "sha256": "8d8a414f37c77f5d7ea835b64ae9391606b39dcd7d544bfd89985d6f87aa2beb",
+          "bytes": 35554
+        },
+        "agent/agent.log": {
+          "path": "attempts/H8-fire-drill__amFUkWV/agent/agent.log",
+          "sha256": "600a5f373b7936b896f92d36d6d08a4bc80fbe00020b117683141ad33c0c5acc",
+          "bytes": 16859
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H8-fire-drill__amFUkWV/agent/events.jsonl",
+          "sha256": "4af9eb3e52cc19bca2d6c8b415758c6972a197f49bd0074f4d920ccc8438319d",
+          "bytes": 7162
+        },
+        "agent/status.json": {
+          "path": "attempts/H8-fire-drill__amFUkWV/agent/status.json",
+          "sha256": "efc7e27c488df5703708b7ae5657fdce60726214560995816f737f2b6cf6c6fc",
+          "bytes": 12019
+        },
+        "verifier/grading.json": {
+          "path": "attempts/H8-fire-drill__amFUkWV/verifier/grading.json",
+          "sha256": "9fea46abad44257f7d67c0a63305a995578ba89e8a8a4dac55f9ed6911729cb3",
+          "bytes": 7084
+        },
+        "verifier/reward.json": {
+          "path": "attempts/H8-fire-drill__amFUkWV/verifier/reward.json",
+          "sha256": "b15d0c04e193c7b9baf94fb8aaea2f667398b4c93f812528eb256253b2e732d9",
+          "bytes": 16
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H8-fire-drill__amFUkWV/verifier/reward.txt",
+          "sha256": "14e913c04b0cd01c8ea1f98536719d37077730c3727f3999a11dc201d08c9420",
+          "bytes": 5
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H8-fire-drill__amFUkWV/verifier/test-stdout.txt",
+          "sha256": "3e46ef8bb5989b45ed2e62068b9cc5ee531b047df691e5cba377def4ed031e36",
+          "bytes": 5497
+        }
+      }
+    }
+  ],
+  "metrics": {
+    "formula": "v1",
+    "values": {
+      "meanReward": 0.66,
+      "passRate@1.0": 0,
+      "passRate@0.7": 0,
+      "passAtK": 0,
+      "meanReward.S": null,
+      "meanReward.M": null,
+      "meanReward.H": 0.66,
+      "passHatK": 0,
+      "fragility": 0,
+      "dispersion": null,
+      "unstableTaskShare": 0,
+      "inputTokens": 330382,
+      "outputTokens": 194955,
+      "cacheHitRatio": 0.986823,
+      "costPerAttempt": 0.240756,
+      "costPerSuccess": null,
+      "agentSecP50": 1770.1,
+      "agentSecP90": 1770.1,
+      "timeoutRate": 0,
+      "infrastructureRate": 0,
+      "eligibleTasks": 1,
+      "infeasibleTasks": 0
+    },
+    "intervals": {}
+  }
+}

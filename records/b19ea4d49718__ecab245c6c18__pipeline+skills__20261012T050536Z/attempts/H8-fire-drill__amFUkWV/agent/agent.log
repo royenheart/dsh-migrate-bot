@@ -1,0 +1,187 @@
+migrating to dsh-v0.1.2-alpha.2
+0.1.2-alpha.2: sourceBoot → boot check (source release)
+0.1.2-alpha.2: targetBoot → boot check
+0.1.2-alpha.2: reviewing → overlap review
+upgrade skills: loaded plugin-upgrade
+dsh: 1 turns / 3 steps / 10s / cache hit 16896 miss 579 / in 579 out 337 / $0.000340
+dsh: 1 turns / 5 steps / 20s / cache hit 45056 miss 9156 / in 9156 out 1362 / $0.002326
+dsh: 1 turns / 8 steps / 30s / cache hit 114304 miss 16467 / in 16467 out 3226 / $0.004749
+dsh: 1 turns / 9 steps / 40s / cache hit 143872 miss 17101 / in 17101 out 4630 / $0.005775
+dsh: 1 turns / 10 steps / 50s / cache hit 175360 miss 18705 / in 18705 out 6208 / $0.007057
+dsh: 1 turns / 13 steps / 60s / cache hit 283008 miss 21188 / in 21188 out 7540 / $0.008551
+dsh: 1 turns / 14 steps / 70s / cache hit 321152 miss 35078 / in 35078 out 8704 / $0.011448
+dsh: 1 turns / 14 steps / 80s / cache hit 321152 miss 35078 / in 35078 out 8704 / $0.011448
+dsh: 1 turns / 17 steps / 90s / cache hit 494848 miss 40935 / in 40935 out 12227 / $0.014961
+dsh: 1 turns / 20 steps / 100s / cache hit 687232 miss 45426 / in 45426 out 14284 / $0.017446
+dsh: 1 turns / 22 steps / 110s / cache hit 839168 miss 60188 / in 60188 out 15577 / $0.020892
+dsh: 1 turns / 22 steps / 120s / cache hit 839168 miss 60188 / in 60188 out 15577 / $0.020892
+dsh: 1 turns / 23 steps / 130s / cache hit 923904 miss 64676 / in 64676 out 19286 / $0.024045
+dsh: 1 turns / 24 steps / 140s / cache hit 1016832 miss 64822 / in 64822 out 20381 / $0.025002
+dsh: 1 turns / 26 steps / 150s / cache hit 1208192 miss 67427 / in 67427 out 21702 / $0.026760
+dsh: 1 turns / 28 steps / 160s / cache hit 1405440 miss 70093 / in 70093 out 22192 / $0.028045
+dsh: 1 turns / 30 steps / 170s / cache hit 1610752 miss 73197 / in 73197 out 24121 / $0.030284
+dsh: 1 turns / 33 steps / 180s / cache hit 1933696 miss 76084 / in 76084 out 25802 / $0.032695
+dsh: 1 turns / 33 steps / 190s / cache hit 1933696 miss 76084 / in 76084 out 25802 / $0.032695
+dsh: 1 turns / 35 steps / 200s / cache hit 2157824 miss 79641 / in 79641 out 29221 / $0.035952
+dsh: 1 turns / 35 steps / 210s / cache hit 2157824 miss 79641 / in 79641 out 29221 / $0.035952
+dsh: 1 turns / 36 steps / 220s / cache hit 2274816 miss 87401 / in 87401 out 32027 / $0.039151
+dsh: 1 turns / 38 steps / 230s / cache hit 2532608 miss 91106 / in 91106 out 32993 / $0.041060
+dsh: 1 turns / 41 steps / 240s / cache hit 2933376 miss 94116 / in 94116 out 34456 / $0.043591
+dsh: 1 turns / 42 steps / 250s / cache hit 3069696 miss 94816 / in 94816 out 35480 / $0.044719
+dsh: 1 turns / 43 steps / 260s / cache hit 3207680 miss 97062 / in 97062 out 37662 / $0.046780
+dsh: 1 turns / 47 steps / 270s / cache hit 3781376 miss 98996 / in 98996 out 38378 / $0.049220
+dsh: 1 turns / 48 steps / 280s / cache hit 3926016 miss 99649 / in 99649 out 40382 / $0.050955
+dsh: 1 turns / 52 steps / 290s / cache hit 4518784 miss 101590 / in 101590 out 41764 / $0.053853
+dsh: 1 turns / 54 steps / 300s / cache hit 4819584 miss 102079 / in 102079 out 42395 / $0.055208
+dsh: 1 turns / 54 steps / 310s / cache hit 4970624 miss 103804 / in 103804 out 43659 / $0.056678
+dsh: 1 turns / 55 steps / 320s / cache hit 4970624 miss 103804 / in 103804 out 43659 / $0.056678
+dsh: 1 turns / 58 steps / 330s / cache hit 5435008 miss 105154 / in 105154 out 45166 / $0.059178
+dsh: 1 turns / 59 steps / 340s / cache hit 5749248 miss 106373 / in 106373 out 46121 / $0.060876
+dsh: 1 turns / 59 steps / 350s / cache hit 5749248 miss 106373 / in 106373 out 46121 / $0.060876
+dsh: 1 turns / 60 steps / 360s / cache hit 5749248 miss 106373 / in 106373 out 46121 / $0.060876
+dsh: 1 turns / 61 steps / 370s / cache hit 5907712 miss 106560 / in 106560 out 46783 / $0.061777
+dsh: 1 turns / 65 steps / 380s / cache hit 6552448 miss 109343 / in 109343 out 48798 / $0.065338
+dsh: 1 turns / 66 steps / 390s / cache hit 6716160 miss 109779 / in 109779 out 50255 / $0.066768
+dsh: 1 turns / 66 steps / 400s / cache hit 6881664 miss 110409 / in 110409 out 51539 / $0.068130
+dsh: 1 turns / 67 steps / 410s / cache hit 6881664 miss 110409 / in 110409 out 51539 / $0.068130
+dsh: 1 turns / 70 steps / 420s / cache hit 7388672 miss 111823 / in 111823 out 53613 / $0.071107
+dsh: 1 turns / 71 steps / 430s / cache hit 7559040 miss 112110 / in 112110 out 54539 / $0.072217
+dsh: 1 turns / 74 steps / 440s / cache hit 8078848 miss 115518 / in 115518 out 56112 / $0.075231
+dsh: 1 turns / 74 steps / 450s / cache hit 8078848 miss 115518 / in 115518 out 56112 / $0.075231
+dsh: 1 turns / 75 steps / 460s / cache hit 8255232 miss 117198 / in 117198 out 57846 / $0.077053
+dsh: 1 turns / 77 steps / 470s / cache hit 8617728 miss 119924 / in 119924 out 59880 / $0.079770
+dsh: 1 turns / 78 steps / 480s / cache hit 8802048 miss 120634 / in 120634 out 61391 / $0.081336
+dsh: 1 turns / 79 steps / 490s / cache hit 8988544 miss 121760 / in 121760 out 63641 / $0.083414
+dsh: 1 turns / 80 steps / 500s / cache hit 9178368 miss 121920 / in 121920 out 63868 / $0.084144
+dsh: 1 turns / 80 steps / 510s / cache hit 9178368 miss 121920 / in 121920 out 63868 / $0.084144
+dsh: 1 turns / 80 steps / 520s / cache hit 9178368 miss 121920 / in 121920 out 63868 / $0.084144
+dsh: 1 turns / 80 steps / 524s / cache hit 9368576 miss 122084 / in 122084 out 69806 / $0.088302
+0.1.2-alpha.2: reviewing → extension-points review
+upgrade skills: loaded plugin-upgrade
+dsh: 1 turns / 5 steps / 10s / cache hit 40320 miss 9443 / in 9443 out 1243 / $0.002283
+dsh: 1 turns / 7 steps / 20s / cache hit 77568 miss 37553 / in 37553 out 2810 / $0.007552
+dsh: 1 turns / 7 steps / 30s / cache hit 77568 miss 37553 / in 37553 out 2810 / $0.007552
+dsh: 1 turns / 7 steps / 40s / cache hit 77568 miss 37553 / in 37553 out 2810 / $0.007552
+dsh: 1 turns / 10 steps / 50s / cache hit 259968 miss 67261 / in 67261 out 7411 / $0.015316
+dsh: 1 turns / 12 steps / 60s / cache hit 425728 miss 73691 / in 73691 out 9046 / $0.017758
+dsh: 1 turns / 13 steps / 70s / cache hit 513792 miss 74461 / in 74461 out 9562 / $0.018448
+dsh: 1 turns / 15 steps / 80s / cache hit 696064 miss 77179 / in 77179 out 11285 / $0.020436
+dsh: 1 turns / 17 steps / 90s / cache hit 894976 miss 90591 / in 90591 out 13798 / $0.024552
+dsh: 1 turns / 17 steps / 100s / cache hit 894976 miss 90591 / in 90591 out 13798 / $0.024552
+dsh: 1 turns / 18 steps / 110s / cache hit 1004416 miss 93408 / in 93408 out 17059 / $0.027260
+dsh: 1 turns / 18 steps / 120s / cache hit 1004416 miss 93408 / in 93408 out 17059 / $0.027260
+dsh: 1 turns / 18 steps / 130s / cache hit 1119872 miss 93674 / in 93674 out 18972 / $0.028794
+dsh: 1 turns / 19 steps / 140s / cache hit 1119872 miss 93674 / in 93674 out 18972 / $0.028794
+dsh: 1 turns / 21 steps / 150s / cache hit 1357696 miss 96630 / in 96630 out 20832 / $0.031067
+dsh: 1 turns / 21 steps / 160s / cache hit 1479936 miss 96789 / in 96789 out 21242 / $0.031703
+dsh: 1 turns / 21 steps / 170s / cache hit 1479936 miss 96789 / in 96789 out 21242 / $0.031703
+dsh: 1 turns / 23 steps / 180s / cache hit 1725824 miss 97192 / in 97192 out 21923 / $0.032910
+dsh: 1 turns / 24 steps / 190s / cache hit 1725824 miss 97192 / in 97192 out 21923 / $0.032910
+dsh: 1 turns / 24 steps / 200s / cache hit 1725824 miss 97192 / in 97192 out 21923 / $0.032910
+dsh: 1 turns / 27 steps / 210s / cache hit 2103424 miss 101719 / in 101719 out 24656 / $0.036362
+dsh: 1 turns / 28 steps / 220s / cache hit 2365056 miss 103228 / in 103228 out 26320 / $0.038371
+dsh: 1 turns / 31 steps / 230s / cache hit 2632192 miss 107191 / in 107191 out 27247 / $0.040323
+dsh: 1 turns / 33 steps / 240s / cache hit 2910592 miss 108914 / in 108914 out 28254 / $0.042021
+dsh: 1 turns / 36 steps / 250s / cache hit 3337088 miss 111105 / in 111105 out 29251 / $0.044228
+dsh: 1 turns / 36 steps / 260s / cache hit 3480960 miss 111419 / in 111419 out 31471 / $0.046038
+dsh: 1 turns / 38 steps / 270s / cache hit 3627264 miss 112198 / in 112198 out 32668 / $0.047312
+dsh: 1 turns / 38 steps / 280s / cache hit 3627264 miss 112198 / in 112198 out 32668 / $0.047312
+dsh: 1 turns / 39 steps / 290s / cache hit 3775488 miss 113608 / in 113608 out 34949 / $0.049337
+dsh: 1 turns / 40 steps / 300s / cache hit 3927296 miss 113742 / in 113742 out 37244 / $0.051190
+dsh: 1 turns / 42 steps / 310s / cache hit 4236160 miss 114462 / in 114462 out 38500 / $0.052978
+dsh: 1 turns / 45 steps / 320s / cache hit 4705920 miss 115616 / in 115616 out 39722 / $0.055293
+dsh: 1 turns / 47 steps / 330s / cache hit 5023360 miss 116952 / in 116952 out 41021 / $0.057225
+dsh: 1 turns / 48 steps / 340s / cache hit 5345920 miss 117909 / in 117909 out 41504 / $0.058627
+dsh: 1 turns / 49 steps / 350s / cache hit 5345920 miss 117909 / in 117909 out 41504 / $0.058627
+dsh: 1 turns / 51 steps / 360s / cache hit 5834496 miss 118852 / in 118852 out 42893 / $0.061067
+dsh: 1 turns / 51 steps / 370s / cache hit 5834496 miss 118852 / in 118852 out 42893 / $0.061067
+dsh: 1 turns / 52 steps / 380s / cache hit 5834496 miss 118852 / in 118852 out 42893 / $0.061067
+dsh: 1 turns / 52 steps / 390s / cache hit 5834496 miss 118852 / in 118852 out 42893 / $0.061067
+dsh: 1 turns / 53 steps / 400s / cache hit 5998464 miss 119349 / in 119349 out 46628 / $0.063875
+dsh: 1 turns / 56 steps / 410s / cache hit 6505600 miss 120873 / in 120873 out 47451 / $0.066118
+dsh: 1 turns / 56 steps / 420s / cache hit 6675840 miss 121587 / in 121587 out 48138 / $0.067148
+dsh: 1 turns / 57 steps / 430s / cache hit 6847360 miss 122502 / in 122502 out 48956 / $0.068291
+dsh: 1 turns / 59 steps / 440s / cache hit 7020544 miss 122767 / in 122767 out 49157 / $0.068971
+dsh: 1 turns / 60 steps / 450s / cache hit 7194112 miss 125057 / in 125057 out 51347 / $0.071149
+dsh: 1 turns / 60 steps / 460s / cache hit 7372160 miss 125817 / in 125817 out 52018 / $0.072200
+dsh: 1 turns / 61 steps / 470s / cache hit 7372160 miss 125817 / in 125817 out 52018 / $0.072200
+dsh: 1 turns / 62 steps / 480s / cache hit 7551616 miss 126051 / in 126051 out 53765 / $0.073821
+dsh: 1 turns / 64 steps / 490s / cache hit 7916544 miss 127625 / in 127625 out 55530 / $0.076211
+dsh: 1 turns / 65 steps / 500s / cache hit 8101120 miss 134443 / in 134443 out 56831 / $0.078568
+dsh: 1 turns / 65 steps / 510s / cache hit 8101120 miss 134443 / in 134443 out 56831 / $0.078568
+dsh: 1 turns / 66 steps / 520s / cache hit 8489472 miss 134810 / in 134810 out 60924 / $0.082244
+dsh: 1 turns / 69 steps / 530s / cache hit 8883584 miss 135683 / in 135683 out 61827 / $0.084099
+dsh: 1 turns / 70 steps / 540s / cache hit 9081856 miss 135920 / in 135920 out 61884 / $0.084764
+dsh: 1 turns / 71 steps / 550s / cache hit 9280384 miss 137586 / in 137586 out 63628 / $0.086656
+dsh: 1 turns / 73 steps / 560s / cache hit 9686528 miss 140014 / in 140014 out 65840 / $0.089566
+dsh: 1 turns / 73 steps / 570s / cache hit 9686528 miss 140014 / in 140014 out 65840 / $0.089566
+dsh: 1 turns / 74 steps / 580s / cache hit 9892992 miss 142305 / in 142305 out 68750 / $0.092275
+dsh: 1 turns / 74 steps / 590s / cache hit 9892992 miss 142305 / in 142305 out 68750 / $0.092275
+dsh: 1 turns / 75 steps / 600s / cache hit 10104576 miss 143252 / in 143252 out 71255 / $0.094555
+dsh: 1 turns / 77 steps / 610s / cache hit 10536704 miss 143942 / in 143942 out 73232 / $0.097141
+dsh: 1 turns / 79 steps / 620s / cache hit 11190912 miss 144636 / in 144636 out 74377 / $0.099894
+dsh: 1 turns / 79 steps / 630s / cache hit 11190912 miss 144636 / in 144636 out 74377 / $0.099894
+dsh: 1 turns / 80 steps / 640s / cache hit 11190912 miss 144636 / in 144636 out 74377 / $0.099894
+dsh: 1 turns / 82 steps / 650s / cache hit 11631104 miss 145057 / in 145057 out 76641 / $0.102636
+dsh: 1 turns / 82 steps / 660s / cache hit 11631104 miss 145057 / in 145057 out 76641 / $0.102636
+dsh: 1 turns / 82 steps / 670s / cache hit 11631104 miss 145057 / in 145057 out 76641 / $0.102636
+dsh: 1 turns / 82 steps / 680s / cache hit 11631104 miss 145057 / in 145057 out 76641 / $0.102636
+dsh: 1 turns / 82 steps / 687s / cache hit 11852672 miss 145939 / in 145939 out 83382 / $0.107478
+0.1.2-alpha.2: checking → mechanical check
+0.1.2-alpha.2: checking → boot check
+0.1.2-alpha.2: repairing → repair attempt 1
+upgrade skills: loaded plugin-upgrade
+dsh: 1 turns / 3 steps / 10s / cache hit 21760 miss 14760 / in 14760 out 349 / $0.002489
+dsh: 1 turns / 5 steps / 20s / cache hit 66176 miss 17061 / in 17061 out 1976 / $0.003943
+dsh: 1 turns / 7 steps / 30s / cache hit 127360 miss 29381 / in 29381 out 3772 / $0.007052
+dsh: 1 turns / 12 steps / 40s / cache hit 330624 miss 32502 / in 32502 out 5308 / $0.009052
+dsh: 1 turns / 13 steps / 50s / cache hit 373376 miss 32929 / in 32929 out 5381 / $0.009288
+dsh: 1 turns / 14 steps / 60s / cache hit 416512 miss 35776 / in 35776 out 8004 / $0.011418
+dsh: 1 turns / 16 steps / 70s / cache hit 520064 miss 41548 / in 41548 out 9488 / $0.013485
+dsh: 1 turns / 16 steps / 80s / cache hit 520064 miss 41548 / in 41548 out 9488 / $0.013485
+dsh: 1 turns / 16 steps / 90s / cache hit 575744 miss 42994 / in 42994 out 12563 / $0.015714
+dsh: 1 turns / 18 steps / 100s / cache hit 635904 miss 44097 / in 44097 out 12724 / $0.016157
+dsh: 1 turns / 21 steps / 110s / cache hit 821120 miss 44888 / in 44888 out 13343 / $0.017202
+dsh: 1 turns / 24 steps / 120s / cache hit 1013376 miss 49403 / in 49403 out 14525 / $0.019166
+dsh: 1 turns / 25 steps / 130s / cache hit 1151616 miss 51470 / in 51470 out 16140 / $0.020859
+dsh: 1 turns / 26 steps / 140s / cache hit 1151616 miss 51470 / in 51470 out 16140 / $0.020859
+dsh: 1 turns / 27 steps / 150s / cache hit 1223296 miss 51624 / in 51624 out 19041 / $0.022838
+dsh: 1 turns / 27 steps / 160s / cache hit 1297920 miss 52839 / in 52839 out 20802 / $0.024301
+dsh: 1 turns / 28 steps / 170s / cache hit 1297920 miss 52839 / in 52839 out 20802 / $0.024301
+dsh: 1 turns / 31 steps / 180s / cache hit 1617408 miss 54735 / in 54735 out 23306 / $0.027046
+dsh: 1 turns / 31 steps / 190s / cache hit 1617408 miss 54735 / in 54735 out 23306 / $0.027046
+dsh: 1 turns / 32 steps / 200s / cache hit 1617408 miss 54735 / in 54735 out 23306 / $0.027046
+dsh: 1 turns / 35 steps / 210s / cache hit 1864704 miss 55305 / in 55305 out 25109 / $0.028955
+dsh: 1 turns / 37 steps / 220s / cache hit 2032896 miss 56479 / in 56479 out 26338 / $0.030373
+dsh: 1 turns / 39 steps / 230s / cache hit 2206208 miss 57367 / in 57367 out 27665 / $0.031823
+dsh: 1 turns / 39 steps / 240s / cache hit 2294016 miss 57573 / in 57573 out 27758 / $0.032173
+dsh: 1 turns / 39 steps / 250s / cache hit 2294016 miss 57573 / in 57573 out 27758 / $0.032173
+dsh: 1 turns / 39 steps / 260s / cache hit 2294016 miss 57573 / in 57573 out 27758 / $0.032173
+dsh: 1 turns / 39 steps / 270s / cache hit 2294016 miss 57573 / in 57573 out 27758 / $0.032173
+dsh: 1 turns / 39 steps / 280s / cache hit 2294016 miss 57573 / in 57573 out 27758 / $0.032173
+dsh: 1 turns / 39 steps / 290s / cache hit 2294016 miss 57573 / in 57573 out 27758 / $0.032173
+dsh: 1 turns / 40 steps / 300s / cache hit 2381952 miss 57769 / in 57769 out 28028 / $0.032628
+dsh: 1 turns / 40 steps / 310s / cache hit 2381952 miss 57769 / in 57769 out 28028 / $0.032628
+dsh: 1 turns / 40 steps / 320s / cache hit 2381952 miss 57769 / in 57769 out 28028 / $0.032628
+dsh: 1 turns / 40 steps / 330s / cache hit 2381952 miss 57769 / in 57769 out 28028 / $0.032628
+dsh: 1 turns / 40 steps / 340s / cache hit 2381952 miss 57769 / in 57769 out 28028 / $0.032628
+dsh: 1 turns / 40 steps / 350s / cache hit 2381952 miss 57769 / in 57769 out 28028 / $0.032628
+dsh: 1 turns / 41 steps / 360s / cache hit 2381952 miss 57769 / in 57769 out 28028 / $0.032628
+dsh: 1 turns / 44 steps / 370s / cache hit 2740608 miss 58556 / in 58556 out 30411 / $0.035252
+dsh: 1 turns / 45 steps / 380s / cache hit 2740608 miss 58556 / in 58556 out 30411 / $0.035252
+dsh: 1 turns / 47 steps / 390s / cache hit 2924544 miss 59078 / in 59078 out 33207 / $0.037560
+dsh: 1 turns / 48 steps / 400s / cache hit 3018752 miss 60310 / in 60310 out 34250 / $0.038653
+dsh: 1 turns / 48 steps / 410s / cache hit 3115136 miss 61273 / in 61273 out 35785 / $0.040007
+dsh: 1 turns / 48 steps / 420s / cache hit 3115136 miss 61273 / in 61273 out 35785 / $0.040007
+dsh: 1 turns / 48 steps / 430s / cache hit 3115136 miss 61273 / in 61273 out 35785 / $0.040007
+dsh: 1 turns / 48 steps / 440s / cache hit 3115136 miss 61273 / in 61273 out 35785 / $0.040007
+dsh: 1 turns / 49 steps / 450s / cache hit 3115136 miss 61273 / in 61273 out 35785 / $0.040007
+dsh: 1 turns / 50 steps / 460s / cache hit 3213952 miss 61511 / in 61511 out 37371 / $0.041291
+dsh: 1 turns / 52 steps / 470s / cache hit 3417216 miss 61943 / in 61943 out 39823 / $0.043437
+dsh: 1 turns / 52 steps / 477s / cache hit 3520640 miss 62359 / in 62359 out 41767 / $0.044976
+0.1.2-alpha.2: checking → mechanical check
+0.1.2-alpha.2: checking → boot check
+0.1.2-alpha.2: checking → web check
+0.1.2-alpha.2: concluding → inspectTree
+0.1.2-alpha.2: unpublished
+

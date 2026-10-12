@@ -1,0 +1,108 @@
+diff --git a/fixture/client.js b/fixture/client.js
+index ba1e4d6..c190df8 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,19 +1,44 @@
+ // Browser half (dsh-paste-input shape): a vanilla lib that pastes clipboard text into an input box.
+ //
+-// Note: the 0.1.1-era host read the browser plugin declaration from the top-level client
+-// field of package.json, and this convention was in use for a long time — don't touch
+-// package.json, since changing it would only stop old hosts from recognizing the plugin.
+-// The remote injection takes effect automatically when the host scans the client field;
+-// just use it directly.
+-export function apply(ctx) {
+-  const button = document.createElement('button')
+-  button.textContent = '📋'
+-  button.addEventListener('click', async () => {
+-    // Legacy pattern: await the return value directly
+-    const providers = await ctx.remote.llm.listProviders()
+-    console.log('[bench-paste] providers:', providers)
+-    const input = document.querySelector('textarea')
+-    if (input) input.value += String(providers?.length ?? '')
+-  })
+-  document.body.appendChild(button)
+-}
++// The alpha host does not import this file as an ES module. `@deepseek-ai/dsh-client-modules`
++// serves `exports["./client"]` as a same-origin classic script and requires it to register a
++// lazy factory with `window.__ModuleLoader__.load({ id, factory })`; the factory body runs at
++// first materialization, not at script execution. This fixture ships no build step, so the
++// registration wrapper that a bundler would emit is written by hand and `id` must equal the
++// package name (the boot-graph row id).
++//
++// `dsh.client.inject` in package.json carries package-name edges: the module graph arrives
++// those rows' factories before this one, and Cordis composes the entries along the same
++// edges. It is not the activation dependency. The activation dependencies are the Cordis
++// service list exported below: `remote` for the `ctx.remote` property read and `remote.llm`
++// for the namespace, so the fiber waits for both before `apply` runs.
++window.__ModuleLoader__.load({
++  id: '@demo/dsh-bench-paste',
++  factory: (require) => {
++    var module = { exports: {} }
++    var exports = module.exports
++
++    function apply(ctx) {
++      const button = document.createElement('button')
++      button.textContent = '📋'
++      button.addEventListener('click', async () => {
++        // Alpha.2 Remote calls answer with a RemoteResult envelope, not the bare value.
++        const result = await ctx.remote.llm.listProviders()
++        if (!result.ok) {
++          console.error('[bench-paste] llm.listProviders failed:', result.error)
++          return
++        }
++        const providers = result.value
++        console.log('[bench-paste] providers:', providers)
++        const input = document.querySelector('textarea')
++        if (input) input.value += String(providers?.length ?? '')
++      })
++      document.body.appendChild(button)
++    }
++
++    exports.apply = apply
++    exports.inject = ['remote', 'remote.llm']
++
++    return module.exports
++  },
++})
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..53ad285
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-paste",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-paste",
++      "version": "0.1.0"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index bdaaa10..f975113 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -9,13 +9,15 @@
+     "./client": "./client.js",
+     "./cordis.patch.yml": "./cordis.patch.yml"
+   },
+-  "client": {
+-    "platform": "web",
+-    "inject": ["remote"]
+-  },
+   "dsh": {
+     "bundle": {
+       "patch": "./cordis.patch.yml"
++    },
++    "client": {
++      "platform": "web",
++      "inject": [
++        "@deepseek-ai/dsh-api-remotes"
++      ]
+     }
+   }
+ }

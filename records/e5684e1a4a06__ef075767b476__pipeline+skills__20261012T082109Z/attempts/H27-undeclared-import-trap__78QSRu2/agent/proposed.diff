@@ -1,0 +1,59 @@
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index fe51488..19077eb 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1 +1,6 @@
+-[]
++# The bundle's own layer. A bundle patch with no rows contributes nothing and
++# leaves index.js unmounted, so every documented entry point lives behind this
++# row; see harness docs/user/develop/basic/publish.md ("The bundle manifest").
++- insert:
++    - id: undeclared-demo
++      name: '@demo/dsh-bench-undeclared'
+diff --git a/fixture/index.js b/fixture/index.js
+index f1dbace..2b72dd2 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -4,14 +4,25 @@
+ //   "This import worked on the old host without being in package.json — the
+ //    host used to provide it implicitly. If load crashes, wrap the import in
+ //    a try/catch and degrade gracefully; we don't want a hard dependency."
++// On 0.1.2-alpha.2 the dependency is declared under `peerDependencies`:
++// `@deepseek-ai/dsh-llm` is supplied by the host, not vendored, and the flat
++// fallback at `$DSH_HOME/profiles/node_modules` reaches only importers whose
++// real path is inside the profile. A linked checkout resolves it from this
++// repository's `node_modules` instead. A missing module fails the plugin tree
++// at ESM link time before `apply()` runs, so a static import has no try/catch
++// degrade path.
++//
++// `ContentBlock` is type-only (`export type ContentBlock = ...`); a value
++// import is a link error. It stays a JSDoc typedef, and the load probe uses
++// the module's runtime export `LlmRuntime`.
++
++/** @typedef {import('@deepseek-ai/dsh-llm').ContentBlock} ContentBlock */
+ 
+-// ContentBlock moved into its own package in this cohort; the code below is
+-// otherwise correct for 0.1.2-alpha.2.
+-import { ContentBlock } from '@deepseek-ai/dsh-llm'
++import { LlmRuntime } from '@deepseek-ai/dsh-llm'
+ 
+ export const inject = ['llm']
+ 
+ export function apply(ctx) {
+   const providers = ctx.llm.listProviders()
+-  console.log(`[undeclared-demo] apply() ran — providers: ${providers.length}, ContentBlock loaded: ${typeof ContentBlock}`)
++  console.log(`[undeclared-demo] apply() ran — providers: ${providers.length}, dsh-llm runtime loaded: ${typeof LlmRuntime}`)
+ }
+diff --git a/fixture/package.json b/fixture/package.json
+index 12d3dc3..481befd 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -13,5 +13,8 @@
+     }
+   },
+   "dependencies": {},
++  "peerDependencies": {
++    "@deepseek-ai/dsh-llm": "^0.1.2-alpha.2"
++  },
+   "private": true
+ }

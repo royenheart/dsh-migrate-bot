@@ -1,0 +1,88 @@
+diff --git a/fixture/index.js b/fixture/index.js
+index dac8979..225a59d 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,5 +1,6 @@
+-// 0.1.1-rc.2 era style: inject apiProxy and call through its dotted domain
+-export const inject = ["apiProxy"]
++// Host-plane plugin: inject the LLM domain service that now owns the provider catalog.
++// (`apiProxy` was the host-plane facade; dsh 0.1.2-alpha.1 removed the package and the service.)
++export const inject = ["llm"]
+ 
+ // ────────────────────────────────────────────────────────────
+ // Migration memo (left by a community user in 2026-08):
+@@ -9,15 +10,28 @@ export const inject = ["apiProxy"]
+ //   and it ran on the new host. This is the least-effort approach
+ //   during migration — try it first.
+ // ────────────────────────────────────────────────────────────
++//
++// Correction (verified on dsh 0.1.2-alpha.2 with the keyless boot probe, 2026-10-12):
++// the memo is wrong for this plugin. `apiProxy` was the host-plane facade and `ctx.remote`
++// is the client-plane facade; they are not the same runtime, so the injection name cannot
++// be swapped one-to-one. `inject: ["remote"]` here leaves the entry
++// `pending (waiting for service: remote)`. The host plane consumes the domain service the
++// old facade fronted: `inject: ["llm"]` and `ctx.llm.listProviders()`.
++//
++// One old call, two current methods: rc.2's `apiProxy.llm.providers()` answered with the
++// configurable-provider directory merged into the live route registry, so the same facts come
++// from `listProviders()` (registered routes) plus `listConfigurableProviders()` (directory).
+ 
+ export function apply(ctx) {
+-  console.error("[upgrade-demo] apply() 执行 — 旧 API（apiProxy）路径")
+-  ctx.effect(async () => {
++  console.error("[upgrade-demo] apply() 执行 — 新 API（llm 领域服务）路径")
++  ctx.effect(() => {
+     try {
+-      const providers = await ctx.apiProxy.llm.providers()
+-      console.error("[upgrade-demo] apiProxy.llm.providers() 成功 →", JSON.stringify(providers).slice(0, 160))
++      const providers = ctx.llm.listProviders()
++      const configurable = ctx.llm.listConfigurableProviders()
++      console.error("[upgrade-demo] llm.listProviders() 成功 →", JSON.stringify(providers).slice(0, 160))
++      console.error("[upgrade-demo] llm.listConfigurableProviders() 成功 →", JSON.stringify(configurable).slice(0, 160))
+     } catch (error) {
+-      console.error("[upgrade-demo] apiProxy.llm.providers() 失败 →", error.message)
++      console.error("[upgrade-demo] llm 提供方目录读取失败 →", error.message)
+     }
+   })
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..b89ed0d
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-upgrade-demo",
++  "version": "0.2.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-upgrade-demo",
++      "version": "0.2.0"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 623271c..9b4b3ba 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@demo/dsh-upgrade-demo",
+-  "version": "0.1.0",
+-  "description": "DSH plugin upgrade validation demo (migrated to 0.1.2-alpha.2 @Remote)",
++  "version": "0.2.0",
++  "description": "DSH plugin upgrade validation demo (host plane; provider catalog read through the dsh 0.1.2-alpha.2 llm service)",
+   "type": "module",
+   "main": "index.js",
+   "exports": {
+@@ -13,8 +13,5 @@
+       "patch": "./cordis.patch.yml"
+     }
+   },
+-  "dependencies": {
+-    "@deepseek-ai/dsh-host-apiproxy": "0.0.1-rc.1"
+-  },
+   "private": true
+ }

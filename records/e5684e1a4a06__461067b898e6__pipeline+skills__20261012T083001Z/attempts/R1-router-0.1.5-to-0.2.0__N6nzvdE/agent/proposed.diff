@@ -1,0 +1,1363 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index b71774f..e1e5698 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -5,8 +5,8 @@
+ <p align="center">
+   <a href="https://www.npmjs.com/package/dsh-router-core"><img src="https://img.shields.io/npm/v/dsh-router-core?style=flat-square&logo=npm&label=npm" alt="npm version"></a>
+   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-10b981?style=flat-square" alt="MIT license"></a>
+-  <a href="https://www.npmjs.com/package/@deepseek-ai/dsh?activeTab=versions"><img alt="DSH 0.1.5" src="https://img.shields.io/badge/DSH-0.1.5-4d6bfe?style=flat-square" /></a>
+-  <a href="https://www.npmjs.com/package/@deepseek-ai/dsh?activeTab=versions"><img alt="DSH 0.1.7-alpha.2 支持" src="https://img.shields.io/badge/DSH-0.1.7--alpha.2-e400dd?style=flat-square" /></a>
++  <a href="https://www.npmjs.com/package/@deepseek-ai/dsh?activeTab=versions"><img alt="DSH ≥ 0.1.5" src="https://img.shields.io/badge/DSH-%E2%89%A5%200.1.5-4d6bfe?style=flat-square" /></a>
++  <a href="https://www.npmjs.com/package/@deepseek-ai/dsh?activeTab=versions"><img alt="DSH 0.2.0-rc.1 支持" src="https://img.shields.io/badge/DSH-0.2.0--rc.1-e400dd?style=flat-square" /></a>
+   <a href="#agent-team-支持"><img alt="Agent Team" src="https://img.shields.io/badge/Agent%20Team-%E2%9C%93-10b981?style=flat-square" /></a>
+ </p>
+ 
+@@ -33,17 +33,21 @@ dsh-router 按**会话身份**亲和选号:同会话固定落同一个连接(前
+ 
+ ## 快速安装
+ 
+-需要 **DSH `0.1.5-rc.1` 及以上**(支持 `dsh plugin` profile 插件机制)、Node.js `>= 20`,以及 `web` profile。
++需要 **DSH `0.1.5-rc.1` 及以上**(支持 `dsh plugin` profile 插件机制;`0.2.0-rc.1` 已验证)、Node.js `>= 20`,以及 `web` profile。
+ 
+ ```bash
+ dsh plugin --profile web add dsh-router-core
+ ```
+ 
+-然后**重启 `dsh web`**。打开设置面板,左侧导航「模型」下面会出现 **路由**。
++然后**重启 `dsh web`**。打开设置面板,左侧导航「模型」下面会出现 **路由**;
++侧栏也会多一行 **路由**(官方 `sidebar.panellist` 座位),点开在中央栏整页显示同一
++个面板,tab 条右侧的「返回会话」回到当前会话。
+ 
+-第二处入口是侧栏的**插件**面板:内置的供应商与扩展在那里各占一行「包含的组件」,
++第二处入口是宿主的**插件管理页**:内置的供应商与扩展在那里各占一行「包含的组件」,
+ **供应商与扩展的开关也在那一面**(见 [面板](#面板设置--路由)与
+-[供应商开关](#供应商开关))。
++[供应商开关](#供应商开关))。这一面在 0.2 起是**侧栏的「插件」面板**(详情页走
++`plugins.detail.section` 座位);0.1.x 的**设置 → 插件**没有这个座位,所以下面
++「路由组件」一节只在 0.2+ 出现(内置行的宿主开关两版都在)。
+ 
+ > 更多供应商:DSH 插件形态的供应商各自发 npm 包,同样
+ > `dsh plugin --profile web add <包名>` 即可;供应商接入与开发见
+@@ -57,7 +61,7 @@ dsh plugin --profile web add dsh-router-core
+ | 能力           | 说明                                                                                                                                                                                                                                                         |
+ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+ | 零额外进程     | 就是 DSH 插件,随 `dsh web` 启停,天然同源(`/router/api/*` 无 CORS、面板嵌在设置里)。                                                                                                                                                                          |
+-| 扩展即插即拔   | 扩展插件(如 [`dsh-router-ext-rtk`](https://github.com/CARVIN94/dsh-router-ext-rtk))经 `router.ext` 注册,在 bash 执行前改写命令(如加 `rtk` 前缀压缩输出)。开关在官方插件页(设置 → 插件 → dsh-router-core),带自检;面板「扩展」页只列已启用的、只读。 |
++| 扩展即插即拔   | 扩展插件(如 [`dsh-router-ext-rtk`](https://github.com/CARVIN94/dsh-router-ext-rtk))经 `router.ext` 注册,在 bash 执行前改写命令(如加 `rtk` 前缀压缩输出)。开关在宿主插件管理页(0.2 起:侧栏「插件」→ dsh-router-core;0.1.x:设置 → 插件),带自检;面板「扩展」页只列已启用的、只读。 |
+ | 供应商即插即拔 | 内置供应商是插件页「包含的组件」里的三行,可单独开关;更多供应商 = 装一个 DSH 插件(`dsh-router-*`)或放一个 js 文件到 `~/.dsh/profiles/web/suppliers/`(同名 js 覆盖内置)。                                                                                                                                       |
+ | 模型不内置     | 供应商只实现差异化能力,模型拉取与缓存由核心统一管,不写死、不过时。                                                                                                                                                                                           |
+ | 策略只写一次   | 组合回退、账号池(选号/冷却/禁用)、响应写入、凭证存储、积分持久化、模型管理都由核心提供。供应商 js 只对**单个账号**调一次上游并报告成败,不自己遍历账号、不维护冷却表、不落盘积分——否则每个插件都会长出一份互相不一致的实现,而核心也就无从判断「该不该换号」。 |
+@@ -99,14 +103,22 @@ team 测试就是多个会话交错发请求。dsh-router 原生适配这个场
+ > [`docs/pool-sticky-block.md`](docs/pool-sticky-block.md) §11。
+ >
+ > 版本适配:「路由」徽章只在 **DSH ≥ 0.1.7** 出现(0.1.5 的对应座位渲染位置
+-> 不同);0.1.5 与 0.1.7 的兼容差异(设置注册、tool 消息形态)统一按宿主版本号
+-> 判定。
++> 不同);0.1.5 与 0.1.7+ 的兼容差异(设置注册方式、底部徽章)按宿主版本号判定,
++> **tool 结果的消息形态按实际块形状分派**(0.1.x 重放历史里的 `tool-result` 块与
++> 0.2 的独立 `role:'tool'` 消息同一份 adapter 都吃,见 `src/llm/adapter.ts`)。
+ 
+ ## 面板(设置 → 路由)
+ 
+ 面板挂在 **设置 → 路由**(官方 `settings.section` 座位,排在「模型」下面):
+ 
+-第二处入口是**设置 → 插件 → dsh-router-core 的详情页**,那里分两层:
++同一份面板还有**侧栏入口**:侧栏的 **路由** 行(官方 `sidebar.panellist` 列表座位,
++行按钮/选中态/折叠成图标栏都由宿主渲染)点开后占满中央栏(官方 `main` 键控座位),
++tab 条右侧的「返回会话」把中央栏还给当前会话。两个入口渲染同一个 `RouterView`,
++数据来自同一份 `/router/api/*` —— 不是两份界面。
++
++第二处入口是**宿主插件管理页上 dsh-router-core 的详情页**(0.2 起在侧栏「插件」
++面板;这一面走官方 `plugins.detail.section` 座位,0.1.x 的设置 → 插件页没有该座位,
++本节因此是 0.2+ 的),那里分两层:
+ 
+ - 宿主的原生**「包含的组件」**列 core 自己 patch 里声明的**行**:core 本体、三个
+   内置供应商、插件自检这个内置扩展。每行一个宿主管的开关,关一行 = loader 不
+@@ -228,8 +240,10 @@ curl -X POST http://localhost:3080/v1/chat/completions \
+   不复用「暂无供应商」,那句说的是一个都没装,用来描述「装了但自己关的」就是说假话。
+ 
+ 但它**仍留在 `/health` 与插件页那一节**(含关掉的),否则关掉之后就再没有可点的开关能
+-把它开回来。开关 UI 在**设置 → 插件 → dsh-router-core 详情页**下面的「路由组件」一节
+-(「供应商」组 + 「扩展」组)。
++把它开回来。开关 UI 在**dsh-router-core 详情页**(0.2 起:侧栏「插件」面板,官方
++`plugins.detail.section` 座位)下面的「路由组件」一节
++(「供应商」组 + 「扩展」组);0.1.x 没有该座位,这一节的开关不在界面上,
++`PATCH /router/api/suppliers/:id/enabled` 与 `/router/api/ext` 仍可直接调用。
+ 
+ ## 插件自检(内置扩展 `dsh-router-ext-test`)
+ 
+@@ -308,7 +322,7 @@ curl -X POST http://localhost:3080/v1/chat/completions \
+ ### 面板与开关
+ 
+ 面板「扩展」页只列**已启用**的扩展(关闭的连卡片都不出现),整页只读,详情页也没有开关
+-—— 启停只有一个入口:插件页 dsh-router-core 详情页的「路由组件」一节
++—— 启停只有一个入口:dsh-router-core 详情页(宿主插件管理页)的「路由组件」一节
+ (`PATCH /router/api/ext`)。开启时会**自检**:`getState().ready === false` 的拒绝开启
+ (API 409),那一面的开关禁用并显示原因。
+ 
+@@ -339,6 +353,8 @@ curl -X POST http://localhost:3080/v1/chat/completions \
+ 
+ ```
+ 浏览器(client 半)
++  ├─ 侧栏「路由」行(官方 sidebar.panellist 座位) → 中央面板(官方 main 键控座位)
++  │    └─ RouterPanelPage → RouterView  与设置页同一个面板;「返回会话」= selectPanel(null)
+   ├─ 设置 → 路由(settings.section 座位, order 10, 排在「模型」下面)
+   │    ├─ RouterSettingsSection  注册入口(settings-section.tsx)
+   │    ├─ RouterView        tab: 概览 / 供应商 / 组合 / 扩展 / 端点与密钥(tab 条:下划线指示器)
+@@ -347,7 +363,7 @@ curl -X POST http://localhost:3080/v1/chat/completions \
+   │    │    ├─ CombosTab / EndpointTab
+   │    │    └─ ExtTab → ExtDetail  扩展列表(只列已启用)与详情(优先渲染扩展自带的面板)
+   │    └─ LastHitDock       「路由」徽章(composer.dock 座位,≥0.1.7;按会话显示最近命中)
+-  ├─ 设置 → 插件(官方 plugins.detail.section 座位)
++  ├─ 宿主插件管理页(0.2 起:侧栏「插件」面板)(官方 plugins.detail.section 座位)
+   │    ├─ (原生「包含的组件」)  core patch 里声明的行:core 本体 + 内置供应商 + 内置扩展
+   │    │                        宿主管的开关,关一行 = loader 不 import 它
+   │    └─ RouterComponentsSection  dsh-router-core 详情页自绘的「路由组件」一节
+@@ -404,8 +420,11 @@ curl -X POST http://localhost:3080/v1/chat/completions \
+ 
+ ## 前提
+ 
+-- **DSH 版本**:`0.1.5-rc.1` 及以上;插件内部按宿主版本号自动适配 0.1.5 / 0.1.7
+-  差异(设置注册方式、tool 消息形态、底部徽章);「路由」徽章需 **≥ 0.1.7**;
++- **DSH 版本**:`0.1.5-rc.1` 及以上(`0.2.0-rc.1` 已实测);peer 范围
++  `^0.1.5-rc.2 || ^0.2.0-rc.1`(裸 `^0.2.0` 连 rc 宿主都不收,见
++  [DSH-0.2.0-RC1-01](https://github.com/deepseek-ai/deepseek-harness/compare/dsh-v0.1.7-rc.2...dsh-v0.2.0-rc.1));
++  插件内部按宿主版本号自动适配 0.1.5 与 0.1.7+ 差异(设置注册方式、底部徽章),
++  tool 结果的消息形态按块形状分派;「路由」徽章需 **≥ 0.1.7**;
+ - 凭证由 dsh-router 核心统一管(SQLite 库 `<dataDir>/auths/credentials.sqlite`);
+ - 供应商接入与开发见 [`docs/suppliers.md`](docs/suppliers.md);
+ - 重启 DSH 后 `/v1/*` 即生效;面板管理账号、模型与密钥。
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index b77a6e3..b7cd1b9 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1,9 +1,9 @@
+ # dsh-router bundle patch
+ #
+ # Mounts dsh-router into the DSH cordis bundle stack. dsh-router adds a
+-# 路由系统 (Routing System) sidebar entry beside dsh-mnemon's 记忆系统; its
+-# host half serves /router/api/* (OpenAI-compatible /v1/* routing).
+-# No dependency on other plugins.
++# 路由 (Routing System) sidebar panel (official `sidebar.panellist` + `main`
++# seats) and a 路由 page under Settings; its host half serves /router/api/*
++# (OpenAI-compatible /v1/* routing). No dependency on other plugins.
+ #
+ # `name` 是**模块说明符**（不是显示名），必须与 package.json 的 name 逐字一致：
+ # 宿主 loader 拿它去 `import(name)`，客户端 client-modules 拿它去
+diff --git a/fixture/docs/ext.md b/fixture/docs/ext.md
+index 6676656..baa04d9 100644
+--- a/fixture/docs/ext.md
++++ b/fixture/docs/ext.md
+@@ -2,8 +2,9 @@
+ 
+ 扩展插件是**独立的 DSH 插件(npm 包)**,只提供**差异化能力** —— 目前是改写一条
+ bash 命令。装好后出现在「设置 → 路由 → 扩展」,**开关不在那里** —— 启停的唯一入口是
+-官方插件页「设置 → 插件 → dsh-router-core」详情页的「路由组件」一节;面板这一页只列
+-已启用的扩展,只读。
++dsh-router-core 详情页(0.2 起在侧栏「插件」面板的 `plugins.detail.section` 座位;
++0.1.x 的设置 → 插件页没有该座位,那种宿主上开关只在 API 层:`PATCH /router/api/ext`)
++的「路由组件」一节;面板这一页只列已启用的扩展,只读。
+ 
+ **dsh-router 核心只做管理面,不做拦截。** 扩展插件自己挂监听、自己裁决、自己短路
+ (2026-09 重构,见下)。
+diff --git a/fixture/package.json b/fixture/package.json
+index b2987f6..8b3ebc9 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "dsh-router-core",
+-  "version": "0.4.2",
+-  "description": "DSH plugin: a simplified 9router (AI routing gateway). Adds a 路由系统 (Routing System) sidebar entry beside 记忆系统; the panel shows suppliers, account pool, combos, and endpoint/API keys.",
++  "version": "0.5.0",
++  "description": "DSH plugin: a simplified 9router (AI routing gateway). Adds a 路由 (Routing System) sidebar panel and a 路由 page under Settings → 模型, plus a 路由组件 section on the plugin's page; the panel shows suppliers, account pool, combos, endpoint/API keys, and the host half serves OpenAI-compatible /v1 endpoints on the DSH web server.",
+   "type": "module",
+   "repository": {
+     "type": "git",
+@@ -100,11 +100,11 @@
+   },
+   "peerDependencies": {
+     "@deepseek-ai/cordis": "^4.0.2",
+-    "@deepseek-ai/dsh-client-locale": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-llm": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-settings": "^0.1.5-rc.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.5-rc.2 || ^0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.5-rc.2 || ^0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.2 || ^0.2.0-rc.1",
++    "@deepseek-ai/dsh-llm": "^0.1.5-rc.2 || ^0.2.0-rc.1",
++    "@deepseek-ai/dsh-settings": "^0.1.5-rc.2 || ^0.2.0-rc.1",
+     "cordis": "^4.0.0-rc.7",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+@@ -124,6 +124,11 @@
+     }
+   },
+   "devDependencies": {
++    "@deepseek-ai/dsh-client-locale": "^0.1.5-rc.2 || 0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.5-rc.2 || 0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.2 || 0.2.0-rc.1",
++    "@deepseek-ai/dsh-llm": "^0.1.5-rc.2 || 0.2.0-rc.1",
++    "@deepseek-ai/dsh-settings": "^0.1.5-rc.2 || 0.2.0-rc.1",
+     "@types/node": "^26.6.2",
+     "@types/react": "~19.3.0",
+     "@types/react-dom": "~19.3.0",
+diff --git a/fixture/pnpm-lock.yaml b/fixture/pnpm-lock.yaml
+index d550c5c..78f3bef 100644
+--- a/fixture/pnpm-lock.yaml
++++ b/fixture/pnpm-lock.yaml
+@@ -11,25 +11,25 @@ importers:
+       '@deepseek-ai/cordis':
+         specifier: ^4.0.2
+         version: 4.0.2
++      '@deepseek-ai/schemastery':
++        specifier: ^3.18.4
++        version: 3.18.4
++    devDependencies:
+       '@deepseek-ai/dsh-client-locale':
+-        specifier: ^0.1.5-rc.2
++        specifier: ^0.1.5-rc.2 || 0.2.0-rc.1
+         version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+       '@deepseek-ai/dsh-client-ui-primitives':
+-        specifier: ^0.1.5-rc.2
++        specifier: ^0.1.5-rc.2 || 0.2.0-rc.1
+         version: 0.1.5-rc.3(@deepseek-ai/cordis@4.0.2)
+       '@deepseek-ai/dsh-client-ui-slots':
+-        specifier: ^0.1.5-rc.2
++        specifier: ^0.1.5-rc.2 || 0.2.0-rc.1
+         version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+       '@deepseek-ai/dsh-llm':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)
++        specifier: ^0.1.5-rc.2 || 0.2.0-rc.1
++        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+       '@deepseek-ai/dsh-settings':
+-        specifier: ^0.1.5-rc.2
++        specifier: ^0.1.5-rc.2 || 0.2.0-rc.1
+         version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/schemastery@3.18.4)
+-      '@deepseek-ai/schemastery':
+-        specifier: ^3.18.4
+-        version: 3.18.4
+-    devDependencies:
+       '@types/node':
+         specifier: ^26.6.2
+         version: 26.6.2
+@@ -103,11 +103,6 @@ packages:
+     peerDependencies:
+       '@deepseek-ai/cordis': ^4.0.2
+ 
+-  '@deepseek-ai/dsh-llm@0.1.5-rc.1':
+-    resolution: {integrity: sha512-KPKJFTNLjURphuF4NlS8DRK94CUYL/dKB8Hzg/22jtxAFO2paX3ifL0vhdPq9xPbcyplaF7LYlf0+3+pXFTnTg==}
+-    peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-
+   '@deepseek-ai/dsh-llm@0.1.5-rc.2':
+     resolution: {integrity: sha512-Z7BVsBkK24SE4EItQeow8PHms/9GP0DSTi337vTAa/RY7tNg2Snz3INcXUj6CPZfvntQr1in9op9wLI+rfNsqA==}
+     peerDependencies:
+@@ -400,133 +395,157 @@ packages:
+     resolution: {integrity: sha512-Oc2KInVkPfUjEB4PeV6X0NvIoyYTzDe/WmqFrTwBqKs6YKnz4A7XwWQvJTb7M0rLz9a6WgpUUiiS5QKaCi4O/g==}
+     cpu: [arm64]
+     os: [android]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-darwin-arm64@0.10.2':
+     resolution: {integrity: sha512-3H7eNPIHJndUJXZ4QUGBPq1zC6RGcUZfm7bymJes+/N7wTVWUn1bxZ9JcozYHpkWQNm9f23G8YWbaHD9aYH72A==}
+     cpu: [arm64]
+     os: [darwin]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-darwin-x64@0.10.2':
+     resolution: {integrity: sha512-AJOUpR2s3LF9AWiiub/Uyc/UoXNTWcq8hK3cVI6fUSXtwh34dG21J6hRuNlO6JVJFTo4o3ScVvZOrh/YFfUEAA==}
+     cpu: [x64]
+     os: [darwin]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-freebsd-x64@0.10.2':
+     resolution: {integrity: sha512-ms7DcZu87u5CiK/wMwvpKAvAmtaqKjCQIXNweMLypG6qbuiaOMQf1jpbB5+j46xBcgCovo8TQMcv0bCQLKIL9w==}
+     cpu: [x64]
+     os: [freebsd]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-linux-arm-gnu@0.10.2':
+     resolution: {integrity: sha512-xJDpYAsKV5+eaiBhTYl05fvT6sst4PsCeuIFMRu9b0/WCSrNQPfCDtAQ5/MS6xNpsdujdZEPR+gmfWk3ZG5i3A==}
+     cpu: [arm]
+     os: [linux]
+     libc: [glibc]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-linux-arm-musl@0.10.2':
+     resolution: {integrity: sha512-qfTkgd7AEx61l4K9VtXWCGTxc/fmXJ4ZheDz3i+/AAJUtg4sa0bPrc0VBxPggB/rayR8Z3+JfrBItuyanBJJ9Q==}
+     cpu: [arm]
+     os: [linux]
+     libc: [musl]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-linux-arm64-gnu@0.10.2':
+     resolution: {integrity: sha512-4e6Mifm/4UdjtU3D8mATIrvgP+xEiH8xtQOjd0zpd72XKWT7ug3sdyhq2utkkZFP6BvYp7SgZrI+aR4VeIOHdw==}
+     cpu: [arm64]
+     os: [linux]
+     libc: [glibc]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-linux-arm64-musl@0.10.2':
+     resolution: {integrity: sha512-RdsJrUfDYFVV3JOmWFUWwSu31fa1APn12xDeIKxgl/YWxrabwtxsDBNjF2561c7tmcbiewdCUvngqRs8AyGVLA==}
+     cpu: [arm64]
+     os: [linux]
+     libc: [musl]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-linux-x64-gnu@0.10.2':
+     resolution: {integrity: sha512-mVzWimEPPreaPyXIUvxsHoJzvO7ckZ5j0LgQFHz04zQIRwt9A9T2hA7K5/jYjJKkMxWG/U2VjhGNwVhtyU+uqg==}
+     cpu: [x64]
+     os: [linux]
+     libc: [glibc]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-linux-x64-musl@0.10.2':
+     resolution: {integrity: sha512-Y77fyISurmr2mvO1yeq3u+x/WJbACgPR4w+lzEVx30ViCxZzIGrZPRN1yEdZ9xUNPNsIO5thBHIdRNG+UGUG+Q==}
+     cpu: [x64]
+     os: [linux]
+     libc: [musl]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-win32-arm64@0.10.2':
+     resolution: {integrity: sha512-1+tGLyG0u5YYy0lev4ck7/0sd8xJ9SZde0dLut7qLDPZV5WVTV8x6OxNXUne/PGuHZyO1vK+txPQzzHOyXHGSw==}
+     cpu: [arm64]
+     os: [win32]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-win32-x64@0.10.2':
+     resolution: {integrity: sha512-8a2SExRohRbwC0MY4VpOF0/RSckrJ2ASZqAor5/RYSJJaeadR93n10gZzcKT6pY9ukiSOIZCRKVRD2tH73T0qA==}
+     cpu: [x64]
+     os: [win32]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-parser/binding-android-arm64@0.10.2':
+     resolution: {integrity: sha512-2VPBU9fRGRAQ2xPAvghnec3oou5Nrxm2Bezhf+13UMspAxQSkF/32r+ySKXSwIPA5/RivumDJDxAxc301Sgicw==}
+     cpu: [arm64]
+     os: [android]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-darwin-arm64@0.10.2':
+     resolution: {integrity: sha512-LD+PMZE51tCYTOss5HBkm3/AE39MvcMDBfWJx7A4yDcjfNbAQDnHZKtzSOuqrswx+TQHY0ws5xn6+fWOwtmfBA==}
+     cpu: [arm64]
+     os: [darwin]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-darwin-x64@0.10.2':
+     resolution: {integrity: sha512-mmZ8cND+AoIIMRERyMinlg5ApHxP23B9jH2B5wT7T+dliPa9rubLxneB/SUjFwyUjGaFnB5G7t4YvpfbO5zbkQ==}
+     cpu: [x64]
+     os: [darwin]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-freebsd-x64@0.10.2':
+     resolution: {integrity: sha512-gVIjaaIddbRfAhHlC8N809wQWml7mxfSVnzaLtzGXObTeFTPAg/YVnQXt1UOhPM1ah5eG/8Y0RUlNpB4GVe7eQ==}
+     cpu: [x64]
+     os: [freebsd]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-linux-arm-gnu@0.10.2':
+     resolution: {integrity: sha512-q/XPPQQAPdlw05aPj30ygBhekmQryGOwxVraBgApjKK8yY1kNQgqq6XCYLF1WHSee+lhxclrTO7W0/bt7dR1GA==}
+     cpu: [arm]
+     os: [linux]
+     libc: [glibc]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-linux-arm-musl@0.10.2':
+     resolution: {integrity: sha512-A+Cb0I1hFF4wilTQpWs79k1aNnj4B2tkrHx3zsuUNF9BtVY2zPZ4yeQEM/zjXrS/qJlNMZVK9NrWJjwdpnTrfg==}
+     cpu: [arm]
+     os: [linux]
+     libc: [musl]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-linux-arm64-gnu@0.10.2':
+     resolution: {integrity: sha512-aGNSzqIqqphFwAdIFwVvKIyXD1Iy3CxrEJVIZAT87Ecyi4vCmmDD2v2l9h+Gd3/wSy3JZlOI792LJbKAjyy9rQ==}
+     cpu: [arm64]
+     os: [linux]
+     libc: [glibc]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-linux-arm64-musl@0.10.2':
+     resolution: {integrity: sha512-Ddl1sF0rtuCXyHGSOV6dcmdx+ETv1iD+IVFqQuOjzkJZWclxJxdBWX6ZJMRtTiGqGUTbqLEKiTXxpR/Bvqk+2A==}
+     cpu: [arm64]
+     os: [linux]
+     libc: [musl]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-linux-x64-gnu@0.10.2':
+     resolution: {integrity: sha512-/nlcpR6IF5U+0m5L9wvAIXeQa2DT+BXuvqKDsTcOTlcc0B4dHNyqE5hTXsS4hAyimpy2ZK8A1zMNF5hTrjg2cg==}
+     cpu: [x64]
+     os: [linux]
+     libc: [glibc]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-linux-x64-musl@0.10.2':
+     resolution: {integrity: sha512-GX80dxTQD/M/OryyuxJcFzFENzry3cDFPvCFTyWogNWQH3fSHfMrNfpwpl1YzMos1eV9NygK5GSDG7VArQlb4w==}
+     cpu: [x64]
+     os: [linux]
+     libc: [musl]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-win32-arm64@0.10.2':
+     resolution: {integrity: sha512-agePQBV4VHewiGU0ACSjscZ/hJd283f9JfAF19Gf1rI5+wy5tTgx4GS36i0b3xim15AQ4RCpDRosEvhLZ4zAOw==}
+     cpu: [arm64]
+     os: [win32]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-win32-x64@0.10.2':
+     resolution: {integrity: sha512-s8//CMpgL5+y1lvDCdyh1rwGI5+ytDJywFJRe1vnhI7n0j+caxshNucurikYLLVeQ2SYFex6aPrzgQxkabBQRA==}
+     cpu: [x64]
+     os: [win32]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-toolchain/types@0.10.2':
+     resolution: {integrity: sha512-sSeo4SSSToiS+sSD+bwn/s94EEcaLJ7tG5LCp8gFYC1G5VzxzX7fqB6m9RU1yMD8KTpu6zdU/I1NlQf8hVBJ9Q==}
+@@ -897,17 +916,6 @@ snapshots:
+       '@deepseek-ai/cordis': 4.0.2
+       '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/dsh-llm@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)':
+-    dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-timeout': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-typert-protocol': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-crypto': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/schemastery': 3.18.4
+-      zod: 4.6.5
+-
+   '@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
+     dependencies:
+       '@deepseek-ai/cordis': 4.0.2
+diff --git a/fixture/src/client/index.tsx b/fixture/src/client/index.tsx
+index 4c9aebb..8335303 100644
+--- a/fixture/src/client/index.tsx
++++ b/fixture/src/client/index.tsx
+@@ -6,9 +6,12 @@
+  * node_modules 里 @deepseek-ai 是空的：这些包不入 node_modules，按
+  * package.json 的 dsh.client.inject 声明即可）。
+  *
+- * 拿不到 slots 时（老宿主）回退到原来的中心栏面板，不至于整个插件失效。
++ * 侧栏「路由」行 + 中央路由面板走官方 `sidebar.panellist` + `main` 座位
++ * （见 panel-entry.tsx），不再 DOM 注入。宿主没有 `slots` 时（早于
++ * 0.1.5-rc.1 的宿主，本插件不支持）客户端面板整块跳过；host 半的 `/v1`
++ * 与 `/router/api/*` 不依赖 slots。
+  */
+-import { mountRouterWorkspace } from './workspace-mount.tsx'
++import { RouterNavIcon, RouterPanelIcon, RouterPanelPage } from './panel-entry.tsx'
+ import { RouterSettingsSection } from './settings-section.tsx'
+ import { RouterComponentsSection } from './RouterComponentsSection.tsx'
+ import { ExtTestPanel } from './ExtTestPanel.tsx'
+@@ -23,9 +26,17 @@ import './router.css'
+ /**
+  * 设置导航里这一页的显示名。同时是注册 label 和「认领图标」时匹配的文案，
+  * 两处必须一致 —— 认领逻辑按可见文案找自己那一行（见 settings-nav-icon.ts）。
++ * 侧栏「路由」行也用同一个词（侧栏行名由宿主按列表元数据渲染）。
+  */
+ const SECTION_LABEL = '路由'
+ 
++/**
++ * 侧栏行 id = `main` 面板 key = 设置页 section id。宿主用同一个 id 把「点哪一行」
++ * 对上「开哪个面板」、把导航图标对上「哪一节」，几处必须逐字一致
++ * （见 panel-entry.tsx）。
++ */
++const ROUTER_ID = 'dsh-router'
++
+ /**
+  * 必须声明：Cordis 的 ctx 是 Proxy，未声明就访问 `ctx.slots` 会直接抛
+  * `cannot get property "slots" without inject`（实测错误，不是理论风险）——
+@@ -41,6 +52,51 @@ interface SlotsFace {
+ interface Ctx {
+   slots?: SlotsFace
+   effect: (fn: () => (() => void) | void, label?: string) => void
++  /** 可选服务读取（cordis 严格注入：不在 `inject` 里的服务只能走 get）。 */
++  get: (name: string) => unknown
++}
++
++/** 宿主 layout 服务里本插件用到的那一部分（`selectPanel(null)` = 回到当前会话）。 */
++interface LayoutFace {
++  selectPanel: (panelId: string | null) => void
++}
++
++/**
++ * 侧栏「路由」行 + 中央路由面板：官方 `sidebar.panellist`（kind: list）+ `main`
++ * （kind: keyed）两个座位，id/key 同名。
++ *
++ * 这两处是宿主 ≥ 0.1.5-rc.1 都有的座位（0.1.5 与 0.2 契约一致），所以本插件
++ * 支持范围内的宿主都能挂上，不需要 DOM 认领、也不需要版本分流。
++ * 面板里的「返回会话」由 `selectPanel(null)` 回到当前会话（清的是宿主的全局面板
++ * 选中，不改会话）。
++ *
++ * @returns 清理函数；宿主无 slots 时为 undefined（客户端面板整块跳过）
++ */
++function mountPanelEntry(ctx: Ctx): (() => void) | undefined {
++  const slots = ctx.slots
++  if (slots === undefined) return undefined
++  const disposeRow = slots.inject('sidebar.panellist', () => slots.register({
++    name: 'sidebar.panellist',
++    id: ROUTER_ID,
++    order: 10,
++    label: SECTION_LABEL,
++  }, RouterPanelIcon))
++  const disposePage = slots.inject('main', () => slots.register({
++    name: 'main',
++    key: ROUTER_ID,
++    inject: () => ({
++      // 面板点「返回会话」= 清掉全局面板选中（宿主据此显示当前会话），
++      // 不改当前会话、也不写会话事件。
++      onBack: () => {
++        const layout = ctx.get('layout') as LayoutFace | undefined
++        layout?.selectPanel(null)
++      },
++    }),
++  }, RouterPanelPage))
++  return () => {
++    disposePage()
++    disposeRow()
++  }
+ }
+ 
+ /**
+@@ -91,12 +147,30 @@ function mountSettingsSection(ctx: Ctx): (() => void) | undefined {
+   //   只能取同值，让注册顺序决定。
+   return slots.inject('settings.section', () => slots.register({
+     name: 'settings.section',
+-    id: 'dsh-router',
++    id: ROUTER_ID,
+     order: 10,
+     label: SECTION_LABEL,
+   }, RouterSettingsSection))
+ }
+ 
++/**
++ * 设置导航里「路由」那一行的图标：注册到官方 `settings.section.icon` 座位
++ * （宿主补丁 `settings-section-nav-icon` 声明；按 section id 派发，行渲染时带
++ * `active`）。
++ *
++ * 座位在未打补丁的宿主上不存在，`inject` 一直挂起、不会触发 —— 那种宿主仍由
++ * `settings-nav-icon.ts` 的 DOM 认领兜底（见该文件头注释）。两条路同时存在时
++ * 认领逻辑会退让：行里已经有座位渲染的 `.dshr-settingsNavIcon` 就不再打标记。
++ */
++function mountNavIconSeat(ctx: Ctx): (() => void) | undefined {
++  const slots = ctx.slots
++  if (slots === undefined) return undefined
++  return slots.inject('settings.section.icon', () => slots.register({
++    name: 'settings.section.icon',
++    id: ROUTER_ID,
++  }, RouterNavIcon))
++}
++
+ /**
+  * 官方插件页（设置 → 插件）里 dsh-router-core 详情页的「路由组件」一节。
+  *
+@@ -139,19 +213,28 @@ export function apply(ctx: Ctx): void {
+   })
+   const disposeSettings = mountSettingsSection(ctx)
+   if (disposeSettings === undefined) {
+-    // 老宿主（无 slots）：回退到侧边栏入口 + 中心栏面板
+-    console.warn('[dsh-router] 宿主未提供 slots，回退到侧边栏面板')
+-    ctx.effect(() => mountRouterWorkspace(), 'dsh-router: routing system workspace')
++    // 老宿主（无 slots）：客户端面板整块跳过。host 半照常提供 /v1 与
++    // /router/api/*，面板只是没有挂载点。
++    console.warn('[dsh-router] 宿主未提供 slots，跳过设置页、插件页与侧栏面板的注册')
+     return
+   }
+   ctx.effect(() => disposeSettings, 'dsh-router: settings section')
++  const disposePanel = mountPanelEntry(ctx)
++  if (disposePanel !== undefined) {
++    ctx.effect(() => disposePanel, 'dsh-router: sidebar panel entry + main panel')
++  }
+   const disposeComponents = mountComponentsSection(ctx)
+   if (disposeComponents !== undefined) {
+     ctx.effect(() => disposeComponents, 'dsh-router: plugin page components')
+   }
+   registerExtTestPanel(ctx)
+-  // 换掉宿主的默认齿轮（契约没有 icon 字段，只能注册后认领自己的行）
+-  ctx.effect(() => registerSettingsNavIcon(SECTION_LABEL), 'dsh-router: settings nav icon')
++  // 设置导航图标：宿主声明了官方座位（补丁 settings-section-nav-icon）就用座位，
++  // 没有则回到 DOM 认领兜底 —— 两条路能同时挂着，座位生效时认领自动让开。
++  const disposeNavSeat = mountNavIconSeat(ctx)
++  if (disposeNavSeat !== undefined) {
++    ctx.effect(() => disposeNavSeat, 'dsh-router: settings nav icon seat')
++  }
++  ctx.effect(() => registerSettingsNavIcon(SECTION_LABEL), 'dsh-router: settings nav icon claim')
+   // 设置-模型 里 Router 卡片的那句死路提示 → 正确说法（同样只能认领后就地改写）
+   ctx.effect(() => rewriteRouterModelHint(), 'dsh-router: models provider hint copy')
+ }
+diff --git a/fixture/src/client/panel-entry.test.ts b/fixture/src/client/panel-entry.test.ts
+new file mode 100644
+index 0000000..c526dc6
+--- /dev/null
++++ b/fixture/src/client/panel-entry.test.ts
+@@ -0,0 +1,48 @@
++/**
++ * 官方座位注册的判据 —— 锁住几条会静默失效的规则。
++ *
++ * 1. 侧栏行与中央面板必须注册**同一个 id**：宿主拿 `sidebar.panellist` 的列表 id
++ *    去 `main` 的键控座位取面板，两边不一致不会报错，只会「点了没反应」。
++ * 2. 设置导航图标座位按 **section id** 派发，id 也得是同一个。
++ * 3. 面板的「返回会话」必须走宿主的 `selectPanel(null)`，不能自己去改会话。
++ * 4. 这条入口不能再退回 DOM 注入（旧 sidebar-entry.ts 的写法）：侧栏行与中央面板
++ *    现在是官方座位，注入是重复实现且随宿主改版就碎。
++ */
++import test from 'node:test'
++import assert from 'node:assert/strict'
++import { readFileSync } from 'node:fs'
++import { fileURLToPath } from 'node:url'
++
++const index = readFileSync(fileURLToPath(new URL('./index.tsx', import.meta.url)), 'utf8')
++const panel = readFileSync(fileURLToPath(new URL('./panel-entry.tsx', import.meta.url)), 'utf8')
++const claim = readFileSync(fileURLToPath(new URL('./settings-nav-icon.ts', import.meta.url)), 'utf8')
++
++test('侧栏行、中央面板、设置页、导航图标座位共用一个 id', () => {
++  const id = index.match(/const ROUTER_ID = '([^']+)'/)?.[1]
++  assert.equal(id, 'dsh-router', 'ROUTER_ID 是所有注册的共同来源，必须是 dsh-router')
++  assert.match(index, /slots\.inject\('sidebar\.panellist'/, '侧栏行走官方 sidebar.panellist 座位')
++  assert.match(index, /slots\.inject\('main'/, '中央面板走官方 main 座位')
++  assert.match(index, /slots\.inject\('settings\.section\.icon'/, '导航图标走官方 settings.section.icon 座位')
++  assert.match(index, /name: 'sidebar\.panellist',\s*\n\s*id: ROUTER_ID/, '侧栏行 id 用 ROUTER_ID')
++  assert.match(index, /name: 'main',\s*\n\s*key: ROUTER_ID/, 'main 的 key 用同一个 ROUTER_ID')
++  assert.match(index, /name: 'settings\.section',\s*\n\s*id: ROUTER_ID/, '设置页 section id 用同一个 ROUTER_ID')
++  assert.match(index, /name: 'settings\.section\.icon',\s*\n\s*id: ROUTER_ID/, '图标座位 id 用同一个 ROUTER_ID')
++})
++
++test('「返回会话」清的是全局面板选中，不是会话', () => {
++  assert.match(index, /selectPanel\(null\)/, '返回会话 = selectPanel(null)')
++  assert.match(panel, /<RouterView onBack=\{onBack\}/, '面板把 onBack 交给 RouterView')
++})
++
++test('侧栏入口不再 DOM 注入', () => {
++  assert.equal(/document\.(querySelector|createElement)|createRoot/.test(panel), false,
++    'panel-entry.tsx 只注册座位，不该碰宿主 DOM')
++  assert.equal(/data-dsh-router-entry|dshr-entry/.test(index), false,
++    'index.tsx 里不该再有旧侧栏入口的认领代码')
++})
++
++test('图标座位生效时 DOM 认领让开（不叠两个图标）', () => {
++  assert.match(panel, /className=\{NAV_ICON_CLASS\}/, '座位图标带上退让类名')
++  assert.match(claim, /querySelector\(`\.\$\{NAV_ICON_CLASS\}`\) === null/,
++    '认领逻辑要检查行里是否已有座位图标')
++})
+diff --git a/fixture/src/client/panel-entry.tsx b/fixture/src/client/panel-entry.tsx
+new file mode 100644
+index 0000000..09f2bcf
+--- /dev/null
++++ b/fixture/src/client/panel-entry.tsx
+@@ -0,0 +1,86 @@
++/**
++ * 侧栏「路由」面板入口 + 中央路由面板 —— 官方 `sidebar.panellist` + `main` 两个座位。
++ *
++ * 旧版是在侧栏里 DOM 注入一行、再把中心栏整个盖掉（`sidebar-entry.ts` /
++ * `workspace-mount.tsx`）。0.1.5-rc.1 起宿主自带同一套座位：
++ *   - 侧栏行由 `sidebar.panellist` 列表渲染（行按钮、选中态、折叠成图标栏、
++ *     无障碍名称全归宿主，注册方只给图标），行 id 与中央面板的 key 同名；
++ *   - 中央面板由 `main` 键控座位渲染，宿主点行走 `ctx.layout.selectPanel(id)`。
++ * 所以这里改成注册，而不是认领宿主 DOM。
++ *
++ * 面板内容复用 `RouterView` —— 它本来就是按中心栏宽度写的（设置页那版才是
++ * 按 564px 收窄的），所以中央面板是它的原生形态：tab 条下方挂「返回会话」。
++ */
++import { RouterView } from './RouterView.tsx'
++
++/** 侧栏行图标的宿主注入 props（`SidebarPanelIconOwnerProps`）。 */
++interface RouterPanelIconProps {
++  /** 宿主按列宽给的方形边长（宽栏 16、折叠图标栏 18）。 */
++  size?: number
++  /** 附加类名（设置导航那一行用它让 DOM 认领退让，见 settings-nav-icon.ts）。 */
++  className?: string
++}
++
++/**
++ * 「路由」字形图标：三节点汇聚。
++ * 颜色走 `currentColor`，跟着宿主的 hover / 选中态走。
++ * @param props - 边长与附加类名
++ * @returns 路由字形
++ */
++export function RouterPanelIcon({ size = 18, className }: RouterPanelIconProps): JSX.Element {
++  return (
++    <svg
++      viewBox="0 0 16 16"
++      width={size}
++      height={size}
++      className={className}
++      fill="none"
++      stroke="currentColor"
++      strokeWidth="1.5"
++      strokeLinecap="round"
++      strokeLinejoin="round"
++      aria-hidden="true"
++    >
++      <circle cx="3.5" cy="3.5" r="1.6" />
++      <circle cx="12.5" cy="3.5" r="1.6" />
++      <circle cx="8" cy="12.5" r="1.6" />
++      <path d="M5.1 3.5h6.8" />
++      <path d="M3.5 5.1v4.3c0 1.7 2 2.2 3 2.4" />
++      <path d="M12.5 5.1v4.3c0 1.7-2 2.2-3 2.4" />
++    </svg>
++  )
++}
++
++/**
++ * 设置导航那一行的图标（官方 `settings.section.icon` 座位）。
++ *
++ * 类名是给 DOM 认领看的：宿主没声明这个座位时本组件根本不渲染，
++ * `settings-nav-icon.ts` 照旧用 CSS mask 顶上；声明了就以本组件为准，
++ * 认领逻辑见到这个类名会主动退让，不叠加第二个图标。
++ * @returns 16px 路由字形
++ */
++export function RouterNavIcon(): JSX.Element {
++  return <RouterPanelIcon size={16} className={NAV_ICON_CLASS} />
++}
++
++/** 座位渲染的导航图标类名（DOM 认领据此退让）。 */
++export const NAV_ICON_CLASS = 'dshr-settingsNavIcon'
++
++/**
++ * 中央面板页：`main` 座位的内容。
++ *
++ * 外面套 `.dshr-shell`（老中心栏那套根节点样式，限高 + 主题变量），让
++ * `RouterView` 的「tab 条固定、内容区自己滚」继续成立。
++ * `.dshr-panelPage` 只补宿主入口页要求的顶部留白（避开 macOS 红绿灯 /
++ * Windows 标题栏，见 ui-layout README）。
++ *
++ * @param props - 注入的 `onBack`：回到当前会话（`ctx.layout.selectPanel(null)`）
++ * @returns 中央路由面板
++ */
++export function RouterPanelPage({ onBack }: { onBack?: () => void }): JSX.Element {
++  return (
++    <div className="dshr-shell dshr-panelPage">
++      <RouterView onBack={onBack} />
++    </div>
++  )
++}
+diff --git a/fixture/src/client/router.css b/fixture/src/client/router.css
+index 3786a2d..de0a9c3 100644
+--- a/fixture/src/client/router.css
++++ b/fixture/src/client/router.css
+@@ -1,70 +1,5 @@
+ /* ============================================================
+-   dsh-router — sidebar entry
+-   ============================================================ */
+-
+-.dshr-entry {
+-    box-sizing: border-box;
+-    display: flex;
+-    width: 100%;
+-    min-height: 36px;
+-    align-items: center;
+-    gap: 10px;
+-    border: none;
+-    border-radius: 8px;
+-    padding: 0 10px;
+-    color: var(--dsw-alias-label-secondary);
+-    background: transparent;
+-    font-size: 13px;
+-    white-space: nowrap;
+-    cursor: pointer;
+-}
+-
+-.dshr-entry:hover {
+-    color: var(--dsw-alias-label-primary);
+-    background: var(--dsw-alias-interactive-bg-hover);
+-}
+-
+-.dshr-entry[data-active] {
+-    color: var(--dsw-alias-label-primary);
+-    background: var(--dsw-alias-interactive-bg-active);
+-    font-weight: 600;
+-}
+-
+-.dshr-entryIcon {
+-    display: inline-flex;
+-    flex: none;
+-    align-items: center;
+-    justify-content: center;
+-    width: 24px;
+-    height: 24px;
+-}
+-
+-.dshr-entryIcon svg {
+-    display: block;
+-    width: 18px;
+-    height: 18px;
+-}
+-
+-.dshr-entryLabel {
+-    overflow: hidden;
+-    text-overflow: ellipsis;
+-}
+-
+-[data-dsh-frame][data-sidebar-collapsed] .dshr-entry {
+-    width: 36px;
+-    min-height: 36px;
+-    justify-content: center;
+-    margin: 0 auto 12px;
+-    padding: 0;
+-    border-radius: 50%;
+-}
+-
+-[data-dsh-frame][data-sidebar-collapsed] .dshr-entryLabel {
+-    display: none;
+-}
+-
+-/* ============================================================
+-   dsh-router — 主题变量（设置页 .dshr-settings / 老中心栏 .dshr-shell 共用）
++   dsh-router — 主题变量（设置页 .dshr-settings 用）
+    ============================================================ */
+ 
+ .dshr-settings,
+@@ -245,57 +180,6 @@
+     background: transparent;
+ }
+ 
+-/* ============================================================
+-   dsh-router — 老的中心栏劫持骨架（settings 不可用时的回退，非主路径）
+-   ============================================================ */
+-
+-[data-pane="conversation"] {
+-    position: relative;
+-}
+-.dshDesktopConversationSurface {
+-    position: relative;
+-}
+-
+-[data-dsh-router-view] {
+-    position: absolute;
+-    z-index: 60;
+-    inset: 0;
+-    display: none;
+-    min-width: 0;
+-    min-height: 0;
+-    overflow: hidden;
+-    background: var(--dsw-alias-bg-overlay, var(--dsw-alias-bg-base));
+-}
+-
+-.dshr-panelView {
+-    isolation: isolate;
+-}
+-
+-html[data-dsh-router-active]:not([data-dsh-taskboard-active]):not(
+-        [data-dsh-ssh-active]
+-    ):not([data-dsh-mnemon-active])
+-    [data-dsh-router-view] {
+-    display: block;
+-}
+-
+-html[data-dsh-router-active]:not([data-dsh-taskboard-active]):not(
+-        [data-dsh-ssh-active]
+-    ):not([data-dsh-mnemon-active])
+-    [data-pane="conversation"]
+-    > :not([data-dsh-router-view]),
+-html[data-dsh-router-active]:not([data-dsh-taskboard-active]):not(
+-        [data-dsh-ssh-active]
+-    ):not([data-dsh-mnemon-active])
+-    [class*="centerCol"]
+-    > :not([data-dsh-router-view]),
+-html[data-dsh-router-active]:not([data-dsh-taskboard-active]):not(
+-        [data-dsh-ssh-active]
+-    ):not([data-dsh-mnemon-active])
+-    .dshDesktopConversationSurface
+-    > :not([data-dsh-router-view]) {
+-    display: none !important;
+-}
+-
+ .dshr-shell {
+     display: flex;
+     height: 100%;
+@@ -305,6 +189,15 @@ html[data-dsh-router-active]:not([data-dsh-taskboard-active]):not(
+     background: var(--rs-bg);
+ }
+ 
++/* 中央面板（`main` 座位）：入口页要自己让开宿主窗口顶栏。
++   macOS 红绿灯 / Windows 标题栏的高度由宿主发布成
++   `--dsh-frame-top-clearance`（普通 Web 下未定义 → 0），
++   与 ui-plugin-manager 的入口页同一个 28px 基准（见宿主 ui-layout README）。 */
++.dshr-panelPage {
++    box-sizing: border-box;
++    padding-top: calc(28px + var(--dsh-frame-top-clearance, 0px));
++}
++
+ .dshr-settings *,
+ .dshr-settings *::before,
+ .dshr-settings *::after,
+@@ -3137,9 +3030,18 @@ html[data-dsh-router-active]:not([data-dsh-taskboard-active]):not(
+ 
+ /* DSH 0.1.x 的 settings.section 注册只认 id / order / label，图标是宿主按
+    「内置 id 白名单」选的，插件传不了 —— 外部 section 一律拿到通用齿轮。
+-   settings-nav-icon.ts 给本插件那一行打上标记，这里用 currentColor mask
+-   渲染路由字形：跟随宿主导航的 hover/active 配色，也保持 16px 图标节奏。
+-   升级路径：等契约长出 icon 字段，删掉 settings-nav-icon.ts 和这一整块。 */
++   两条路：
++   1. 宿主声明了 `settings.section.icon` 座位（dsh 侧补丁 settings-section-nav-icon）
++      → panel-entry.tsx 的 RouterNavIcon 渲染进那一行（下面这条规则让它撑满节奏）；
++   2. 座位不存在 → settings-nav-icon.ts 给本插件那一行打上标记，这里用
++      currentColor mask 渲染同一个字形：跟随宿主导航的 hover/active 配色。
++   认领逻辑见到座位渲染的图标会让开，所以两条路同时挂着也不会出现两个图标。
++   升级路径：等该座位进入正式契约，删掉 settings-nav-icon.ts 和下面这块 mask。 */
++.dshr-settingsNavIcon {
++    display: block;
++    flex: none;
++}
++
+ [data-dsh-router-settings-nav] > svg:first-child {
+     display: none;
+ }
+diff --git a/fixture/src/client/settings-nav-icon.ts b/fixture/src/client/settings-nav-icon.ts
+index 524e8eb..e37201a 100644
+--- a/fixture/src/client/settings-nav-icon.ts
++++ b/fixture/src/client/settings-nav-icon.ts
+@@ -6,6 +6,11 @@
+  * section 一律拿到通用齿轮（跟「通用设置」「远程访问」同一个）。
+  * 在契约长出 icon 字段之前，只能注册后认领自己的那一行。
+  *
++ * **这是兜底，不是主路径**：宿主若声明了 `settings.section.icon` 座位
++ * （dsh 侧补丁 `settings-section-nav-icon`），`panel-entry.tsx` 的 `RouterNavIcon`
++ * 会渲染进那一行 —— 本认领逻辑见到行里已经有 `.dshr-settingsNavIcon` 就让开，
++ * 不叠第二个图标。两条路同时挂着，谁被宿主支持谁生效。
++ *
+  * 做法跟 dsh-better-sidebar 的 settings-nav-icon.ts 一致：给自己的行打一个
+  * 属性标记，再由 CSS 用 mask 渲染图标（见 router.css 的
+  * `[data-dsh-router-settings-nav]`）。用 mask + currentColor 是为了跟随
+@@ -15,6 +20,7 @@
+  * 碰到同名的别人家 section 不会误伤（我们同时校验它确实在设置面板里）。
+  * 卸载时断开观察并摘掉标记，HMR / 插件热卸载安全。
+  */
++import { NAV_ICON_CLASS } from './panel-entry.tsx'
+ 
+ /** 打在设置导航按钮上的标记属性。 */
+ export const SETTINGS_NAV_MARKER = 'data-dsh-router-settings-nav'
+@@ -24,6 +30,7 @@ const NAV_BUTTON_SELECTOR = '[role="dialog"] nav button'
+ 
+ /**
+  * 持续把标记打在文案等于 `label` 的那一行的身上。
++ * 行里已经有座位渲染的图标（`.dshr-settingsNavIcon`）时摘掉标记让位。
+  * @param label 当前本地化的 section 标题（跟注册时的 label 一致）
+  * @returns 清理函数：断开观察 + 摘掉所有本插件打的标记
+  */
+@@ -35,6 +42,8 @@ export function registerSettingsNavIcon(label: string): () => void {
+     if (disposed || wanted === '') return
+     for (const button of document.querySelectorAll<HTMLElement>(NAV_BUTTON_SELECTOR)) {
+       const matches = button.textContent?.trim() === wanted
++        // 官方座位已经画了图标就不认领（否则两个图标叠在一起）
++        && button.querySelector(`.${NAV_ICON_CLASS}`) === null
+       if (matches) button.setAttribute(SETTINGS_NAV_MARKER, '')
+       else button.removeAttribute(SETTINGS_NAV_MARKER)
+     }
+diff --git a/fixture/src/client/sidebar-entry.ts b/fixture/src/client/sidebar-entry.ts
+deleted file mode 100644
+index 3f536f2..0000000
+--- a/fixture/src/client/sidebar-entry.ts
++++ /dev/null
+@@ -1,167 +0,0 @@
+-/**
+- * Mount a self-healing sidebar entry for the 路由系统 (Routing System),
+- * placed directly ABOVE dsh-mnemon's 记忆系统 entry when that is present.
+- *
+- * The DOM pattern mirrors dsh-mnemon's sidebar-entry.ts: an official-style
+- * row under the New Session row, with a MutationObserver keeping it in place
+- * as the shell re-renders. We deliberately order the family selector so the
+- * router entry sits above the memory entry.
+- */
+-import { ROUTER_ENTRY_SELECTOR, ROUTER_TITLE } from '../shared.ts'
+-import type { RouterWorkspaceController } from './workspace-controller.ts'
+-
+-/** Other plugin families that occupy the same sidebar region. */
+-const FAMILY_SELECTOR =
+-  '[data-dsh-taskboard-entry], [data-dsh-ssh-entry], [data-dsh-mnemon-entry], [data-dsh-router-entry]'
+-
+-/** The entry we want to sit above (dsh-mnemon's 记忆系统), when present. */
+-const ABOVE_TARGET_SELECTOR = '[data-dsh-mnemon-entry]'
+-
+-function sidebarRoot(): HTMLElement | undefined {
+-  const column = document.querySelector<HTMLElement>(
+-    '[data-pane="sidebar"], [class*="sidebarCol"], .dshDesktopUpstreamSidebar',
+-  )
+-  if (column === null) return undefined
+-  return column.querySelector<HTMLElement>('[class*="logoRow"]')?.parentElement
+-    ?? (column.firstElementChild as HTMLElement | undefined)
+-}
+-
+-function newSessionButton(root: HTMLElement): HTMLButtonElement | undefined {
+-  const nested = root.querySelector<HTMLButtonElement>('button[class*="newSession"]')
+-  if (nested !== null) return nested
+-  for (const child of root.children) {
+-    if (child.tagName === 'BUTTON') return child as HTMLButtonElement
+-  }
+-  return undefined
+-}
+-
+-function createIcon(): SVGSVGElement {
+-  const namespace = 'http://www.w3.org/2000/svg'
+-  const icon = document.createElementNS(namespace, 'svg')
+-  icon.setAttribute('viewBox', '0 0 16 16')
+-  icon.setAttribute('width', '18')
+-  icon.setAttribute('height', '18')
+-  icon.setAttribute('fill', 'none')
+-  icon.setAttribute('stroke', 'currentColor')
+-  icon.setAttribute('stroke-width', '1.5')
+-  icon.setAttribute('stroke-linecap', 'round')
+-  icon.setAttribute('stroke-linejoin', 'round')
+-  icon.setAttribute('aria-hidden', 'true')
+-  // A simple node-graph "route" glyph: three dots joined by two paths.
+-  const c1 = document.createElementNS(namespace, 'circle')
+-  c1.setAttribute('cx', '3.5'); c1.setAttribute('cy', '3.5'); c1.setAttribute('r', '1.6')
+-  const c2 = document.createElementNS(namespace, 'circle')
+-  c2.setAttribute('cx', '12.5'); c2.setAttribute('cy', '3.5'); c2.setAttribute('r', '1.6')
+-  const c3 = document.createElementNS(namespace, 'circle')
+-  c3.setAttribute('cx', '8'); c3.setAttribute('cy', '12.5'); c3.setAttribute('r', '1.6')
+-  const p1 = document.createElementNS(namespace, 'path')
+-  p1.setAttribute('d', 'M5.1 3.5h6.8')
+-  const p2 = document.createElementNS(namespace, 'path')
+-  p2.setAttribute('d', 'M3.5 5.1v4.3c0 1.7 2 2.2 3 2.4')
+-  const p3 = document.createElementNS(namespace, 'path')
+-  p3.setAttribute('d', 'M12.5 5.1v4.3c0 1.7-2 2.2-3 2.4')
+-  icon.append(c1, c2, c3, p1, p2, p3)
+-  return icon
+-}
+-
+-function createEntry(controller: RouterWorkspaceController): { entry: HTMLButtonElement; label: HTMLSpanElement } {
+-  const entry = document.createElement('button')
+-  entry.type = 'button'
+-  entry.dataset.dshRouterEntry = ''
+-  entry.className = 'dshr-entry'
+-  const icon = document.createElement('span')
+-  icon.className = 'dshr-entryIcon'
+-  icon.append(createIcon())
+-  const label = document.createElement('span')
+-  label.className = 'dshr-entryLabel'
+-  entry.append(icon, label)
+-  entry.addEventListener('click', () => { controller.toggle() })
+-  return { entry, label }
+-}
+-
+-function placeEntry(root: HTMLElement, entry: HTMLButtonElement): boolean {
+-  const button = newSessionButton(root)
+-  if (button === undefined) return false
+-  if (entry.parentElement === root) return true
+-  const row = button.closest('[class*="logoRow"]')
+-  const base = row !== null && row.parentElement === root ? row : button
+-  const family = Array.from(root.children).filter(
+-    (element): element is HTMLElement =>
+-      element instanceof HTMLElement && element.matches(FAMILY_SELECTOR),
+-  )
+-  // Prefer to sit directly above dsh-mnemon's entry; otherwise after the
+-  // last known family entry, else after the New Session row.
+-  const aboveTarget = Array.from(root.children).find(
+-    (element): element is HTMLElement =>
+-      element instanceof HTMLElement && element.matches(ABOVE_TARGET_SELECTOR),
+-  )
+-  let anchor: Element | null
+-  if (aboveTarget !== undefined) {
+-    anchor = aboveTarget
+-  } else {
+-    anchor = family.at(-1)?.nextElementSibling ?? base.nextElementSibling
+-  }
+-  root.insertBefore(entry, anchor)
+-  return true
+-}
+-
+-/** Mount a self-healing 路由系统 entry above the 记忆系统 row. */
+-export function mountRouterSidebarEntry(
+-  controller: RouterWorkspaceController,
+-): () => void {
+-  const { entry, label } = createEntry(controller)
+-  let root: HTMLElement | undefined
+-  let placed = false
+-
+-  const syncLabel = (): void => {
+-    if (entry.getAttribute('aria-label') !== ROUTER_TITLE) entry.setAttribute('aria-label', ROUTER_TITLE)
+-    if (entry.title !== ROUTER_TITLE) entry.title = ROUTER_TITLE
+-    if (label.textContent !== ROUTER_TITLE) label.textContent = ROUTER_TITLE
+-  }
+-
+-  const rootObserver = new MutationObserver(() => {
+-    if (root === undefined || !root.isConnected) {
+-      placed = false
+-      tryPlace()
+-      return
+-    }
+-    if (!root.contains(entry)) placed = placeEntry(root, entry)
+-  })
+-
+-  const tryPlace = (): void => {
+-    syncLabel()
+-    if (root !== undefined && !root.isConnected) {
+-      rootObserver.disconnect()
+-      root = undefined
+-      placed = false
+-    }
+-    if (placed && document.body.contains(entry)) return
+-    if (placed) {
+-      rootObserver.disconnect()
+-      root = undefined
+-      placed = false
+-    }
+-    root ??= sidebarRoot()
+-    if (root === undefined) return
+-    placed = placeEntry(root, entry)
+-    if (placed) rootObserver.observe(root, { childList: true, subtree: true })
+-  }
+-
+-  const waitObserver = new MutationObserver(tryPlace)
+-  waitObserver.observe(document.body, { childList: true, subtree: true })
+-
+-  const syncActive = (): void => {
+-    if (controller.getSnapshot().open) entry.dataset.active = 'true'
+-    else delete entry.dataset.active
+-  }
+-  const unsubscribe = controller.subscribe(syncActive)
+-  syncActive()
+-  tryPlace()
+-
+-  return () => {
+-    waitObserver.disconnect()
+-    rootObserver.disconnect()
+-    unsubscribe()
+-    entry.remove()
+-  }
+-}
+diff --git a/fixture/src/client/workspace-controller.ts b/fixture/src/client/workspace-controller.ts
+deleted file mode 100644
+index 1945e38..0000000
+--- a/fixture/src/client/workspace-controller.ts
++++ /dev/null
+@@ -1,26 +0,0 @@
+-export interface RouterWorkspaceSnapshot {
+-  open: boolean
+-}
+-
+-/** Small framework-neutral state holder shared by the sidebar row and panel. */
+-export class RouterWorkspaceController {
+-  private snapshot: RouterWorkspaceSnapshot = { open: false }
+-  private readonly listeners = new Set<() => void>()
+-
+-  getSnapshot = (): RouterWorkspaceSnapshot => this.snapshot
+-
+-  subscribe = (listener: () => void): (() => void) => {
+-    this.listeners.add(listener)
+-    return () => { this.listeners.delete(listener) }
+-  }
+-
+-  open(): void { this.setOpen(true) }
+-  close(): void { this.setOpen(false) }
+-  toggle(): void { this.setOpen(!this.snapshot.open) }
+-
+-  private setOpen(open: boolean): void {
+-    if (this.snapshot.open === open) return
+-    this.snapshot = { open }
+-    for (const listener of this.listeners) listener()
+-  }
+-}
+diff --git a/fixture/src/client/workspace-mount.tsx b/fixture/src/client/workspace-mount.tsx
+deleted file mode 100644
+index 216123b..0000000
+--- a/fixture/src/client/workspace-mount.tsx
++++ /dev/null
+@@ -1,110 +0,0 @@
+-/**
+- * Mount the 路由系统 center-column takeover panel, mirroring dsh-mnemon's
+- * workspace-mount.tsx: a React root appended to the conversation column,
+- * shown via `data-dsh-router-active` on <html>, and coordinated with the
+- * other sidebar panels (taskboard / ssh / mnemon) through the shared
+- * `dsh-panel-activate` event.
+- */
+-import { createRoot, type Root } from 'react-dom/client'
+-import { ROUTER_ACTIVE_ATTR } from '../shared.ts'
+-import { RouterView } from './RouterView.tsx'
+-import { mountRouterSidebarEntry } from './sidebar-entry.ts'
+-import { RouterWorkspaceController } from './workspace-controller.ts'
+-
+-const CONVERSATION_COLUMN_SELECTOR =
+-  '[data-pane="conversation"], [class*="centerCol"], .dshDesktopConversationSurface'
+-const ACTIVATE_EVENT = 'dsh-panel-activate'
+-const SIDEBAR_CONTEXT_SELECTOR =
+-  '[class*="sessionRow"], [class*="projectRow"], [class*="searchResultRow"], [class*="searchResultWorkspace"], [class*="newSession"]'
+-
+-function conversationColumn(): HTMLElement | undefined {
+-  return document.querySelector<HTMLElement>(CONVERSATION_COLUMN_SELECTOR) ?? undefined
+-}
+-
+-function mountPanel(controller: RouterWorkspaceController): () => void {
+-  function Panel(): JSX.Element {
+-    // 不改 document.title：这是宿主页面（会话）的标题，插件不该动它。
+-    return <RouterView onBack={() => controller.close()} />
+-  }
+-
+-  let root: Root | undefined
+-  let container: HTMLDivElement | undefined
+-
+-  const ensure = (): void => {
+-    if (container !== undefined && container.isConnected) return
+-    if (container !== undefined) {
+-      root?.unmount()
+-      root = undefined
+-      container = undefined
+-    }
+-    const column = conversationColumn()
+-    if (column === undefined) return
+-    container = document.createElement('div')
+-    container.dataset.dshRouterView = ''
+-    container.className = 'dshr-panelView'
+-    column.append(container)
+-    root = createRoot(container)
+-    root.render(<Panel />)
+-  }
+-
+-  const waitObserver = new MutationObserver(ensure)
+-  waitObserver.observe(document.body, { childList: true, subtree: true })
+-
+-  let suppressCompatibilityClose = false
+-  const applyActive = (): void => {
+-    if (!controller.getSnapshot().open) {
+-      document.documentElement.removeAttribute(ROUTER_ACTIVE_ATTR)
+-      return
+-    }
+-    // Announce the other panels so they close; mirror dsh-mnemon's
+-    // compatibility broadcast (taskboard/ssh listen to 'ssh'/'taskboard').
+-    suppressCompatibilityClose = true
+-    document.dispatchEvent(new CustomEvent(ACTIVATE_EVENT, { detail: 'ssh' }))
+-    document.dispatchEvent(new CustomEvent(ACTIVATE_EVENT, { detail: 'taskboard' }))
+-    suppressCompatibilityClose = false
+-    document.documentElement.setAttribute(ROUTER_ACTIVE_ATTR, '')
+-    document.dispatchEvent(new CustomEvent(ACTIVATE_EVENT, { detail: 'router' }))
+-  }
+-
+-  const onOtherPanelActivate = (event: Event): void => {
+-    if (suppressCompatibilityClose || !controller.getSnapshot().open) return
+-    const detail = (event as CustomEvent<unknown>).detail
+-    if (detail === 'taskboard' || detail === 'ssh' || detail === 'mnemon') controller.close()
+-  }
+-
+-  const onSidebarContextClick = (event: MouseEvent): void => {
+-    if (!controller.getSnapshot().open) return
+-    const target = event.target
+-    if (target instanceof Element && target.closest(SIDEBAR_CONTEXT_SELECTOR) !== null) controller.close()
+-  }
+-
+-  document.addEventListener('click', onSidebarContextClick, true)
+-  document.addEventListener(ACTIVATE_EVENT, onOtherPanelActivate)
+-  const unsubscribe = controller.subscribe(applyActive)
+-  applyActive()
+-  ensure()
+-
+-  return () => {
+-    document.removeEventListener('click', onSidebarContextClick, true)
+-    document.removeEventListener(ACTIVATE_EVENT, onOtherPanelActivate)
+-    waitObserver.disconnect()
+-    unsubscribe()
+-    document.documentElement.removeAttribute(ROUTER_ACTIVE_ATTR)
+-    root?.unmount()
+-    root = undefined
+-    container?.remove()
+-    container = undefined
+-  }
+-}
+-
+-/** Mount the sidebar row and its stateful center-column workspace as one unit. */
+-export function mountRouterWorkspace(): () => void {
+-  if (typeof document === 'undefined' || typeof window === 'undefined') return () => {}
+-  const controller = new RouterWorkspaceController()
+-  const disposeEntry = mountRouterSidebarEntry(controller)
+-  const disposePanel = mountPanel(controller)
+-  return () => {
+-    disposePanel()
+-    disposeEntry()
+-  }
+-}
+diff --git a/fixture/src/index.ts b/fixture/src/index.ts
+index f64ea84..0a47a29 100644
+--- a/fixture/src/index.ts
++++ b/fixture/src/index.ts
+@@ -107,6 +107,14 @@ interface LlmConfigurableProvider {
+   displayName: string
+   settingsNs: string
+   settingsPath: readonly string[]
++  /**
++   * 声明**本提供方的配置不在「设置 → 模型」这张卡片上**（0.2 及以后宿主识别该
++   * 字段）。Router 的真配置在「设置 → 路由」面板，卡片只是个入口 —— 不声明的话
++   * 宿主对未知命名空间会渲染那句「其余字段在 cordis.patch.yml 中」并把 Apply
++   * 置灰，把用户指向一个与本插件字段毫无关系的文件。宿主补丁尚未合并时该字段
++   * 被忽略，客户端仍靠 model-hint-copy.ts 就地改写兜底。
++   */
++  configSurface?: 'models-page' | 'elsewhere'
+ }
+ interface LlmModelDiscoveryRequest {
+   provider?: string
+@@ -710,6 +718,9 @@ export function apply(rawContext: unknown): void {
+           displayName: 'Router',
+           settingsNs,
+           settingsPath: [],
++          // 配置在「设置 → 路由」面板，不在模型卡片上（宿主识别该字段时不再渲染
++          // 那句 cordis.patch.yml 提示；不识别时被忽略，见接口注释）。
++          configSurface: 'elsewhere',
+         },
+       ])
+       disposers.push(providerReg)
+diff --git a/fixture/src/llm/adapter.ts b/fixture/src/llm/adapter.ts
+index 166c6a4..197861a 100644
+--- a/fixture/src/llm/adapter.ts
++++ b/fixture/src/llm/adapter.ts
+@@ -94,6 +94,20 @@ interface RouterImgLike {
+   height: number
+ }
+ 
++/**
++ * 0.1.x 的 tool 结果形态：user 消息里的 'tool-result' 块、`toolCallId` 挂块上。
++ *
++ * 0.2 的 `ContentBlockMap` 已删掉这个类型（工具结果是一等 `role:'tool'` 消息，
++ * `toolCallId` 挂消息级，见 `ToolResultMessage`），直接写 `b.type === 'tool-result'`
++ * 在新契约下是「两个类型没有交集」的编译错误。但重放历史仍可能带老形态，所以按
++ * **块形状**识别，在本地保留这一份声明 —— 判据仍是形状，不是宿主版本号。
++ */
++interface LegacyToolResult {
++  type: 'tool-result'
++  toolCallId: ToolCallId
++  content: ReadonlyArray<{ type: string }>
++}
++
+ /** 模型目录来源：组合。 */
+ export interface RouterAdapterSource {
+   /**
+@@ -215,10 +229,14 @@ async function wireMessages(options: GenerateOptions, system: string | undefined
+       continue
+     }
+     // user / tool-result
+-    const toolResults = message.content.filter((b) => b.type === 'tool-result')
++    //
++    // 走块形状的**宽松视图**：0.2 的 ContentBlock 联合里已无 'tool-result'，
++    // 只有重放历史会带老形态；`role:'tool'` 的新形态在上面那条分支已经处理。
++    const blocks: ReadonlyArray<{ type: string }> = message.content
++    const toolResults = blocks.filter((block): block is LegacyToolResult => block.type === 'tool-result')
+     // 这条消息自己的（非 tool-result 的）user 部分：文本 + 图片。
+     const ownParts = await contentParts(
+-      message.content.filter((b) => b.type !== 'tool-result'),
++      blocks.filter((block) => block.type !== 'tool-result'),
+       attachments,
+       options.signal,
+       log,
+diff --git a/fixture/src/shared.ts b/fixture/src/shared.ts
+index 33055b1..7168cd8 100644
+--- a/fixture/src/shared.ts
++++ b/fixture/src/shared.ts
+@@ -5,18 +5,6 @@
+  * client (vite CJS browser bundle) can both inline them safely.
+  */
+ 
+-/** The sidebar entry / panel dataset attribute family name. */
+-export const ROUTER_ENTRY_SELECTOR = '[data-dsh-router-entry]'
+-
+-/** The center-column takeover panel attribute. */
+-export const ROUTER_VIEW_SELECTOR = '[data-dsh-router-view]'
+-
+-/** Active-state attribute on <html> that shows the panel. */
+-export const ROUTER_ACTIVE_ATTR = 'data-dsh-router-active'
+-
+-/** The panel's visible title (also the sidebar entry label). */
+-export const ROUTER_TITLE = '路由'
+-
+ /** Same-origin API base the client panel fetches (host half serves it). */
+ export const ROUTER_API_BASE = '/router/api'
+ 
