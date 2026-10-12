@@ -32,10 +32,11 @@ The Action is scored on the community migration suite [`oh-my-dsh/dsh-plugin-upg
 
 Every subject but `oracle` runs in the agent runtime of `container/agent-runtime`, installed from its lockfile into the task container apart from the task's own dsh, and its setup ends with `dsh-migrate self-test`, so a runtime that cannot start a session fails the setup rather than scoring 0. The migrate profile goes into `/root/.dsh`, the home the task's dsh and its verifier read: a different home would hide the agent's changes from the verifier.
 
-A pipeline does not read the task statement. It takes its target from the dsh release the task installs globally and its source from the fixture's declared dependencies, exactly as it would in a consumer repository. Two consequences follow, recorded per task as `applicable`:
+A pipeline does not read the task statement. It takes its target from the dsh release the task installs globally and its source from the fixture's declared dependencies, exactly as it would in a consumer repository. Three consequences follow, recorded per task as `applicable`:
 
 - The static tasks (`S`) ask for a written analysis, which a pipeline does not produce, so they are not applicable to a pipeline.
 - A task that installs no dsh release gives a pipeline no target, so it is not applicable either.
+- A task whose agent runs without network gives a pipeline no way to install the releases its checks run on, so it is not applicable.
 
 For every subject, a task whose verifier reads a variable the run does not set (the suite's report judge reads `REPORT_JUDGE_BASE_URL`, `REPORT_JUDGE_MODEL` and `REPORT_JUDGE_API_KEY`) is not applicable, because Harbor refuses a job in which any task lacks one; the record names the missing variables. No record is written when Harbor ran no trial.
 

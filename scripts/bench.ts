@@ -53,10 +53,10 @@ function readRecord(path: string): BenchmarkRecord {
 }
 
 /** The tasks of the suite, read with Python's own TOML parser, as Harbor reads them. */
-function suiteTasks(python: string, tasksDir: string): Array<{ id: string; name: string; networkMode: string; agentTimeoutSec: number; shipsDsh: boolean; verifierEnv: string[] }> {
+function suiteTasks(python: string, tasksDir: string): Array<{ id: string; name: string; networkMode: string; agentNetwork: boolean; agentTimeoutSec: number; shipsDsh: boolean; verifierEnv: string[] }> {
   const read = 'import json, sys, tomllib\nprint(json.dumps([tomllib.load(open(path, "rb")) for path in sys.argv[1:]]))'
   const ids = readdirSync(tasksDir).filter(id => existsSync(join(tasksDir, id, 'task.toml'))).sort()
-  const configs = JSON.parse(execFileSync(python, ['-c', read, ...ids.map(id => join(tasksDir, id, 'task.toml'))], { encoding: 'utf8' })) as Array<{ task?: { name?: string }; agent?: { timeout_sec?: number }; environment?: { network_mode?: string }; verifier?: { env?: Record<string, string> } }>
+  const configs = JSON.parse(execFileSync(python, ['-c', read, ...ids.map(id => join(tasksDir, id, 'task.toml'))], { encoding: 'utf8' })) as Array<{ task?: { name?: string }; agent?: { timeout_sec?: number; network_mode?: string }; environment?: { network_mode?: string }; verifier?: { env?: Record<string, string> } }>
   return ids.map((id, index) => {
     const config = configs[index] ?? {}
     const dockerfile = join(tasksDir, id, 'environment', 'Dockerfile')
@@ -64,6 +64,7 @@ function suiteTasks(python: string, tasksDir: string): Array<{ id: string; name:
       id,
       name: config.task?.name ?? id,
       networkMode: config.environment?.network_mode ?? 'public',
+      agentNetwork: (config.agent?.network_mode ?? config.environment?.network_mode ?? 'public') !== 'no-network',
       agentTimeoutSec: config.agent?.timeout_sec ?? 0,
       shipsDsh: existsSync(dockerfile) && readFileSync(dockerfile, 'utf8').includes('@deepseek-ai/dsh@'),
       // Harbor fills `${NAME}` in the verifier's environment from the shell, and refuses the whole job when one is unset.
@@ -190,15 +191,17 @@ async function run(argv: string[]): Promise<number> {
     .filter(task => selected === undefined || selected.includes(task.id))
     .map(task => {
       const unset = task.verifierEnv.filter(name => (process.env[name] ?? '') === '')
-      const note = subject.startsWith('pipeline') && !task.shipsDsh
+      const pipeline = subject.startsWith('pipeline')
+      const note = pipeline && !task.shipsDsh
         ? 'The task installs no dsh release for the pipeline to target.'
+        : pipeline && !task.agentNetwork ? 'The agent runs without network, and a pipeline installs the releases it checks.'
         : unset.length > 0 ? `The verifier needs ${unset.join(', ')}, which this run does not set.` : undefined
       return {
         id: task.id,
         family: task.id[0] ?? '',
         networkMode: task.networkMode,
         agentTimeoutSec: task.agentTimeoutSec,
-        applicable: (!subject.startsWith('pipeline') || (task.id[0] !== 'S' && task.shipsDsh)) && unset.length === 0,
+        applicable: (!pipeline || (task.id[0] !== 'S' && task.shipsDsh && task.agentNetwork)) && unset.length === 0,
         feasible: feasible === undefined || feasible.has(task.id),
         ...(note === undefined ? {} : { note }),
       }
