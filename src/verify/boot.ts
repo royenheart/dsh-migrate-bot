@@ -63,6 +63,18 @@ const REACHED_MODEL = [
 
 /** Markers that mean a plugin broke the boot. */
 const PLUGIN_LOAD = /plugin\(s\) failed to load:\s*(.+)/i
+/**
+ * A bundle dsh refused and left out, booting without it: from 0.1.7 a plugin
+ * whose peer ranges do not admit the release, or whose patch is malformed.
+ * dsh goes on and may reach the model call or serve, so this is checked first.
+ */
+const SKIPPED_BUNDLE = /skipping profile bundle "([^"]+)":\s*(.+)/i
+
+/** The first bundle dsh skipped, as `name: reason`, or `undefined`. */
+export function skippedBundle(output: string): string | undefined {
+  const skipped = output.match(SKIPPED_BUNDLE)
+  return skipped === null ? undefined : `${skipped[1] ?? ''}: ${skipped[2] ?? ''}`
+}
 const DID_NOT_ACTIVATE = /did not activate/i
 const PENDING = /pending \(waiting for services?:\s*([^)]*)\)/i
 const FIBER_FAILED = /FAILED fiber|ClientPackageCompositionError/i
@@ -105,6 +117,11 @@ export function classifyBoot(input: {
 
   if (input.timedOut) {
     return { outcome: 'timeout', signature: 'timeout: boot did not finish', detail }
+  }
+
+  const skipped = skippedBundle(combined)
+  if (skipped !== undefined) {
+    return { outcome: 'fail', signature: `load: ${normalizeSignature(skipped)}`, detail }
   }
 
   const load = combined.match(PLUGIN_LOAD)

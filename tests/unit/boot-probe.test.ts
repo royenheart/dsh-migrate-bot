@@ -48,6 +48,18 @@ test('a plugin that fails to load is named in the signature', () => {
   assert.match(result.signature, /@acme\/dsh-plugin-foo/)
 })
 
+test('a bundle dsh skipped fails the boot, though dsh went on to the model call', () => {
+  // Verbatim shape from dsh 0.2.0-rc.1, which refuses a plugin whose peer ranges do not admit it and boots without it.
+  const result = classifyBoot({
+    code: 1,
+    stdout: '',
+    stderr: 'dsh: skipping profile bundle "dsh-router-core": Error: Plugin dsh-router-core@0.4.2 is incompatible with dsh 0.2.0-rc.1: peerDependencies {"@deepseek-ai/dsh-llm":"^0.1.5-rc.2"}\ndsh: TRANSPORT: DeepSeek API request to http://127.0.0.1:9/v1 failed',
+    timedOut: false,
+  })
+  assert.equal(result.outcome, 'fail')
+  assert.match(result.signature, /^load: dsh-router-core: Error: Plugin dsh-router-core@/)
+})
+
 test('a plugin waiting on a missing service fails', () => {
   const result = classifyBoot({
     code: 1,

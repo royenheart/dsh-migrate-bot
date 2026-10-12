@@ -2,7 +2,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { classifyBoot, linkPlugins, writeProbeProfile, type BootProbeResult } from './boot.ts'
+import { classifyBoot, linkPlugins, skippedBundle, writeProbeProfile, type BootProbeResult } from './boot.ts'
 import { declaresClient, findPlugins } from '../plugins.ts'
 
 /**
@@ -70,12 +70,13 @@ export interface WebSmokeOptions {
 }
 
 /**
- * The arguments that serve the web UI without opening a browser. Releases
- * before `--no-open` existed do not open one, so the flag is passed only when
- * the release's own help lists it.
+ * The arguments that serve `profile` without opening a browser. `dsh web` is
+ * `dsh --profile web`, a profile of its own, so the profile under test is named.
+ * Releases before `--no-open` existed do not open one, so the flag is passed
+ * only when the release's own help lists it.
  */
-export function webArgs(help: string): string[] {
-  return ['web', '--port', '0', ...(help.includes('--no-open') ? ['--no-open'] : [])]
+export function webArgs(help: string, profile: string): string[] {
+  return ['--profile', profile, '--port', '0', ...(help.includes('--no-open') ? ['--no-open'] : [])]
 }
 
 function webHelp(bin: string): string {
@@ -171,7 +172,7 @@ async function serveWeb(options: WebSmokeOptions, keep: boolean): Promise<Served
       DEEPSEEK_BASE_URL: process.env.DSH_MIGRATE_PROBE_BASE_URL ?? 'http://127.0.0.1:9/v1',
       DSH_TELEMETRY_DISABLED: '1',
     }
-    const result = await spawnImpl(webArgs(options.webHelp ?? webHelp(options.bin)), {
+    const result = await spawnImpl(webArgs(options.webHelp ?? webHelp(options.bin), profile), {
       cwd: options.workdir,
       env,
       bin: options.bin,
@@ -216,7 +217,8 @@ export async function webSmoke(options: WebSmokeOptions): Promise<WebSmokeResult
   }
   const served = await serveWeb(options, false)
   try {
-    if (served.result.ready) return { ok: true, signature: 'web: server ready', detail: scrubWebOutput(served.result.output).slice(-2000) }
+    const skipped = skippedBundle(served.result.output)
+    if (served.result.ready && skipped === undefined) return { ok: true, signature: 'web: server ready', detail: scrubWebOutput(served.result.output).slice(-2000) }
     return notReady(served.result)
   } finally {
     served.stop()
@@ -238,9 +240,9 @@ export async function startWebHost(options: WebSmokeOptions): Promise<{ ok: true
   const served = await serveWeb(options, true)
   const line = served.result.output.split('\n').find(text => (options.readyPattern ?? WEB_READY_PATTERN).test(text))
   const url = line?.match(/https?:\/\/\S+/)?.[0]
-  if (!served.result.ready || url === undefined) {
+  if (!served.result.ready || url === undefined || skippedBundle(served.result.output) !== undefined) {
     served.stop()
-    return { ok: false, failure: served.result.ready ? { ok: false, signature: 'web: no launch URL', detail: '' } : notReady(served.result) }
+    return { ok: false, failure: served.result.ready && url === undefined ? { ok: false, signature: 'web: no launch URL', detail: '' } : notReady(served.result) }
   }
   return { ok: true, host: { url, stop: served.stop } }
 }

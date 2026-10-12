@@ -61,7 +61,7 @@ test('a server that reports ready passes, and the profile mounts the web bundle'
     })
     assert.equal(result.ok, true)
     assert.equal(result.signature, 'web: server ready')
-    assert.deepEqual(seen?.args, ['web', '--port', '0', '--no-open'])
+    assert.deepEqual(seen?.args, ['--profile', 'probe-web', '--port', '0', '--no-open'])
     assert.deepEqual(seen?.bundles, ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@acme/plugin'])
     assert.equal(seen?.env.DEEPSEEK_BASE_URL, 'http://127.0.0.1:9/v1')
   } finally {
@@ -131,8 +131,22 @@ test('the ready pattern matches what dsh web actually prints', () => {
   assert.equal(WEB_READY_PATTERN.test('dsh: plugin(s) failed to load: x'), false)
 })
 
-test('the browser is kept closed with --no-open only where the release has the flag', () => {
-  assert.deepEqual(webArgs('Options:\n  --no-open  do not open the Web UI\n'), ['web', '--port', '0', '--no-open'])
+test('the profile under test is served, and the browser kept closed with --no-open only where the release has the flag', () => {
+  // `dsh web` is `dsh --profile web`: it would serve a fresh default profile without the plugins.
+  assert.deepEqual(webArgs('Options:\n  --no-open  do not open the Web UI\n', 'probe-web'), ['--profile', 'probe-web', '--port', '0', '--no-open'])
   // 0.1.0-rc.6 has no --no-open and opens no browser.
-  assert.deepEqual(webArgs('Options:\n  --host <host>\n  --port <port>\n'), ['web', '--port', '0'])
+  assert.deepEqual(webArgs('Options:\n  --host <host>\n  --port <port>\n', 'probe-web'), ['--profile', 'probe-web', '--port', '0'])
+})
+
+test('a server that left a plugin out is not ready for it', async () => {
+  const dir = plugin({ dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web' } } })
+  try {
+    // Verbatim shape from dsh 0.2.0-rc.1, which skips the bundle and serves anyway.
+    const output = 'dsh: skipping profile bundle "@acme/plugin": Error: Plugin @acme/plugin@1.0.0 is incompatible with dsh 0.2.0-rc.1: peerDependencies {"@deepseek-ai/dsh-llm":"^0.1.5-rc.2"}\ndsh web: http://127.0.0.1:44323/?token=abc\n'
+    const result = await webSmoke({ workdir: dir, bin: '/bin/dsh', timeoutMs: 5_000, webHelp: '', spawnImpl: async () => ({ code: null, output, timedOut: false, ready: true }) })
+    assert.equal(result.ok, false)
+    assert.match(result.signature, /^web load: @acme\/plugin: Error: Plugin @acme\/plugin@/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
