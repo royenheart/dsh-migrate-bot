@@ -1,0 +1,46 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index b3d7cdd..6c97f9a 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,4 +1,5 @@
+ # H10 fixture · browser activation trap
+ 
+-This renamed Web plugin is valid on the host side but its browser bundle still
+-registers a legacy identity. Exam material only — do not publish (`"private": true`).
++This renamed Web plugin is valid on the host side and its browser bundle
++registers under the manifest package name — the identity the host's
++client-modules boot row uses. Exam material only — do not publish (`"private": true`).
+diff --git a/fixture/client.js b/fixture/client.js
+index d6f2218..758d1fa 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,7 +1,8 @@
+-// This plugin was renamed. Keep the legacy registration id so older profiles
+-// can still find it. The host already serves this bundle under the new name.
++// A client bundle's registration id is the module-table identity of its
++// package: the host keys the boot graph row by package.json#name and rejects a
++// bundle that does not register that id, so the pre-rename legacy id is retired.
+ window.__ModuleLoader__.load({
+-  id: '@demo/dsh-bench-browser-activation-legacy',
++  id: '@demo/dsh-bench-browser-activation',
+   factory: () => ({
+     apply() {
+       document.documentElement.dataset.benchBrowserActivation = 'active'
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..707c017
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-browser-activation",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-browser-activation",
++      "version": "0.1.0"
++    }
++  }
++}

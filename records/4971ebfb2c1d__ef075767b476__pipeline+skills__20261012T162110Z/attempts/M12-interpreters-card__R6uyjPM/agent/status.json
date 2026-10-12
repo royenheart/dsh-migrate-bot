@@ -1,0 +1,130 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.8",
+              "version": "0.1.0-rc.8"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 0,
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [
+          "interpreters-read.spec.ts \u203a the interpreters config gateway serves the config the card reads",
+          "interpreters-write.spec.ts \u203a the interpreters config gateway accepts the write the card saves"
+        ],
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-12T19-30-21-907Z",
+      "startedAt": "2026-10-12T19:30:23.941Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.8",
+            "version": "0.1.0-rc.8"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 0,
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [
+        "interpreters-read.spec.ts \u203a the interpreters config gateway serves the config the card reads",
+        "interpreters-write.spec.ts \u203a the interpreters config gateway accepts the write the card saves"
+      ],
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-12T19-30-21-907Z",
+    "startedAt": "2026-10-12T19:30:23.941Z"
+  }
+}

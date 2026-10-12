@@ -1,0 +1,124 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.0.1-rc.1",
+              "version": "0.0.1-rc.1"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 0,
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "\u2026ce@0.0.1-rc.1\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-session-reference\nnpm warn   @deepseek-ai/dsh-session-reference@\"^0.0.1-rc.1\" from @deepseek-ai/dsh@0.0.1-rc.1\nnpm warn   node_modules/@deepseek-ai/dsh\nnpm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn Found: @deepseek-ai/dsh-bash-env@undefined\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-bash-env\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-bash-env@\"^0.0.1-rc.1\" from @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-tool-bash\nnpm warn   @deepseek-ai/dsh-tool-bash@\"^0.0.1-rc.1\" from @deepseek-ai/dsh@0.0.1-rc.1\nnpm warn   node_modules/@deepseek-ai/dsh\nnpm warn   1 more (@deepseek-ai/dsh-base)\nnpm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn Found: @deepseek-ai/dsh-tasks@undefined\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-tasks\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-tasks@\"^0.0.1-rc.1\" from @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-tool-bash\nnpm warn   @deepseek-ai/dsh-tool-bash@\"^0.0.1-rc.1\" from @deepseek-ai/dsh@0.0.1-rc.1\nnpm warn   node_modules/@deepseek-ai/dsh\nnpm warn   1 more (@deepseek-ai/dsh-base)\nnpm error code E404\nnpm error 404 Not Found - GET https://registry.npmjs.org/@deepseek-ai%2fdsh-agent-tool-mode - Not found\nnpm error 404\nnpm error 404  The requested resource '@deepseek-ai/dsh-agent-tool-mode@^0.0.1-rc.1' could not be found or you do not have permission to access it.\nnpm error 404\nnpm error 404 Note that you can also install from a\nnpm error 404 tarball, folder, http url, or git url.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-12T16_24_22_071Z-debug-0.log"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [],
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-12T16-24-19-198Z",
+      "startedAt": "2026-10-12T16:24:21.711Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.0.1-rc.1",
+            "version": "0.0.1-rc.1"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 0,
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "\u2026ce@0.0.1-rc.1\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-session-reference\nnpm warn   @deepseek-ai/dsh-session-reference@\"^0.0.1-rc.1\" from @deepseek-ai/dsh@0.0.1-rc.1\nnpm warn   node_modules/@deepseek-ai/dsh\nnpm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn Found: @deepseek-ai/dsh-bash-env@undefined\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-bash-env\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-bash-env@\"^0.0.1-rc.1\" from @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-tool-bash\nnpm warn   @deepseek-ai/dsh-tool-bash@\"^0.0.1-rc.1\" from @deepseek-ai/dsh@0.0.1-rc.1\nnpm warn   node_modules/@deepseek-ai/dsh\nnpm warn   1 more (@deepseek-ai/dsh-base)\nnpm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn Found: @deepseek-ai/dsh-tasks@undefined\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-tasks\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-tasks@\"^0.0.1-rc.1\" from @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-tool-bash\nnpm warn   @deepseek-ai/dsh-tool-bash@\"^0.0.1-rc.1\" from @deepseek-ai/dsh@0.0.1-rc.1\nnpm warn   node_modules/@deepseek-ai/dsh\nnpm warn   1 more (@deepseek-ai/dsh-base)\nnpm error code E404\nnpm error 404 Not Found - GET https://registry.npmjs.org/@deepseek-ai%2fdsh-agent-tool-mode - Not found\nnpm error 404\nnpm error 404  The requested resource '@deepseek-ai/dsh-agent-tool-mode@^0.0.1-rc.1' could not be found or you do not have permission to access it.\nnpm error 404\nnpm error 404 Note that you can also install from a\nnpm error 404 tarball, folder, http url, or git url.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-12T16_24_22_071Z-debug-0.log"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [],
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-12T16-24-19-198Z",
+    "startedAt": "2026-10-12T16:24:21.711Z"
+  }
+}

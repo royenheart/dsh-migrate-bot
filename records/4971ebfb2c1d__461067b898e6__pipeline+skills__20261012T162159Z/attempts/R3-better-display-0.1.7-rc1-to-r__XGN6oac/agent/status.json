@@ -1,0 +1,152 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.7-rc.2",
+      "target": {
+        "tag": "dsh-v0.1.7-rc.2",
+        "version": "0.1.7-rc.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.7-rc.2",
+            "version": "0.1.7-rc.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.7-rc.1",
+              "version": "0.1.7-rc.1"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 0,
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [
+          "00-session.setup.ts \u203a a reading session with one sent turn exists",
+          "10-reader-view.spec.ts \u203a the reading view is offered as a tab and is the session default",
+          "10-reader-view.spec.ts \u203a switching to the native chat view and back keeps the reading view",
+          "10-reader-view.spec.ts \u203a the reading column offers a jump back to the newest message",
+          "20-turn-process.spec.ts \u203a a sent message renders in the reading column with its clock and copy action",
+          "20-turn-process.spec.ts \u203a a failed turn keeps its process, retry record and error visible",
+          "20-turn-process.spec.ts \u203a the turn navigation rail marks every turn of the session",
+          "30-settings.spec.ts \u203a the Better Display section shows its three switches and the skill status",
+          "30-settings.spec.ts \u203a the deliverable open mode and the frosted glass switches flip and hold",
+          "30-settings.spec.ts \u203a the auto-fold switch in settings and the reading lane control are one setting",
+          "30-settings.spec.ts \u203a the skill status can be re-checked from the section",
+          "40-skill-status.spec.ts \u203a the skill-status route reports the generative-mcpapps state",
+          "50-live-turn.spec.ts \u203a a running turn shows the busy clock, the overtime badge and the retry notice"
+        ],
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-12T17-51-23-814Z",
+      "startedAt": "2026-10-12T17:51:26.335Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.7-rc.2",
+    "target": {
+      "tag": "dsh-v0.1.7-rc.2",
+      "version": "0.1.7-rc.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.7-rc.2",
+          "version": "0.1.7-rc.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.7-rc.1",
+            "version": "0.1.7-rc.1"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 0,
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [
+        "00-session.setup.ts \u203a a reading session with one sent turn exists",
+        "10-reader-view.spec.ts \u203a the reading view is offered as a tab and is the session default",
+        "10-reader-view.spec.ts \u203a switching to the native chat view and back keeps the reading view",
+        "10-reader-view.spec.ts \u203a the reading column offers a jump back to the newest message",
+        "20-turn-process.spec.ts \u203a a sent message renders in the reading column with its clock and copy action",
+        "20-turn-process.spec.ts \u203a a failed turn keeps its process, retry record and error visible",
+        "20-turn-process.spec.ts \u203a the turn navigation rail marks every turn of the session",
+        "30-settings.spec.ts \u203a the Better Display section shows its three switches and the skill status",
+        "30-settings.spec.ts \u203a the deliverable open mode and the frosted glass switches flip and hold",
+        "30-settings.spec.ts \u203a the auto-fold switch in settings and the reading lane control are one setting",
+        "30-settings.spec.ts \u203a the skill status can be re-checked from the section",
+        "40-skill-status.spec.ts \u203a the skill-status route reports the generative-mcpapps state",
+        "50-live-turn.spec.ts \u203a a running turn shows the busy clock, the overtime badge and the retry notice"
+      ],
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-12T17-51-23-814Z",
+    "startedAt": "2026-10-12T17:51:26.335Z"
+  }
+}

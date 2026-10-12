@@ -1,0 +1,148 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.8",
+              "version": "0.1.0-rc.8"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [
+          "e2e"
+        ],
+        "reviewed": true,
+        "attempts": 0,
+        "failure": {
+          "check": "e2e",
+          "outcome": "fail",
+          "fingerprint": "e2e: plugin-deployment.spec.ts \u203a the served deployment \u203a lists bench-brand-text as a mounted, enabled plugin",
+          "detail": "These tests passed on the source release and do not pass now:\n- plugin-deployment.spec.ts \u203a the served deployment \u203a lists bench-brand-text as a mounted, enabled plugin: Error: expect(locator).toBeVisible() failed Locator: getByRole('button', { name: 'Settings', exact: true }) Expected: visible Timeout: 20000ms Error: element(s) not found Call log: - Expect \"toBeVisible\" with timeout 20000ms - waiting for getByRole('button', { name: 'Settings', exact: true })\n\n"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [
+          "plugin-deployment.spec.ts \u203a the served deployment \u203a lists bench-brand-text as a mounted, enabled plugin"
+        ],
+        "warnings": [
+          "end-to-end tests that passed before the migration fail now (advisory, see the checks): e2e: plugin-deployment.spec.ts \u203a the served deployment \u203a lists bench-brand-text as a mounted, enabled plugin"
+        ],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-12T20-44-45-133Z",
+      "startedAt": "2026-10-12T20:44:46.376Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.8",
+            "version": "0.1.0-rc.8"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [
+        "e2e"
+      ],
+      "reviewed": true,
+      "attempts": 0,
+      "failure": {
+        "check": "e2e",
+        "outcome": "fail",
+        "fingerprint": "e2e: plugin-deployment.spec.ts \u203a the served deployment \u203a lists bench-brand-text as a mounted, enabled plugin",
+        "detail": "These tests passed on the source release and do not pass now:\n- plugin-deployment.spec.ts \u203a the served deployment \u203a lists bench-brand-text as a mounted, enabled plugin: Error: expect(locator).toBeVisible() failed Locator: getByRole('button', { name: 'Settings', exact: true }) Expected: visible Timeout: 20000ms Error: element(s) not found Call log: - Expect \"toBeVisible\" with timeout 20000ms - waiting for getByRole('button', { name: 'Settings', exact: true })\n\n"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [
+        "plugin-deployment.spec.ts \u203a the served deployment \u203a lists bench-brand-text as a mounted, enabled plugin"
+      ],
+      "warnings": [
+        "end-to-end tests that passed before the migration fail now (advisory, see the checks): e2e: plugin-deployment.spec.ts \u203a the served deployment \u203a lists bench-brand-text as a mounted, enabled plugin"
+      ],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-12T20-44-45-133Z",
+    "startedAt": "2026-10-12T20:44:46.376Z"
+  }
+}

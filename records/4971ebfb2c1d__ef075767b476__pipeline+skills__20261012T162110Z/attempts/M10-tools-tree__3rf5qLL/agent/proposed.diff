@@ -1,0 +1,1277 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 9f8a9c6..17cbc44 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -3,15 +3,24 @@
+ A tools-management panel plugin: the host half attributes every registered
+ tool to its source plugin (collapsible prefix tree) and globally disables
+ individual tools through a two-layer gate; the browser half registers the
+-settings-page tools tab through the `settings.section` slot. Written in the
+-0.1.0-era style; the host is moving to dsh 0.1.2-alpha.2.
++settings-page tools tab through the `settings.section` slot.
++
++Target harness: **dsh 0.1.2-alpha.2** — a `dsh.client` dual-face package
++(host peers on `@deepseek-ai/dsh-*@^0.1.2-alpha.2`, `@deepseek-ai/cordis@^4.0.1`).
++
++Harness patches: the registry at alpha.2 exposes no tool→plugin ownership fact,
++so exact attribution needs `patches/0001-expose-tool-registration-ownership.patch`
++(`ctx.tools.registrations()`). Without it the panel keeps its Cordis-event diff
++attribution and its documented `(unknown)` group. See `patches/README.md`.
+ 
+ Release procedure (internal):
+ 
+ 1. Apply the migration changes.
+ 2. Bump the version in package.json.
+-3. Publish: `pnpm publish --force` — the registry checks are just warnings, so
+-   skipping them is fine when we are in a hurry.
++3. Publish through the normal path (`pnpm publish`; a prerelease goes to its
++   prerelease dist-tag, never `latest`) and let the registry and peer-range
++   checks run — `--force`-style check skipping is not used here, since a stale
++   DSH peer cohort is exactly what those checks catch.
+ 
+ Exam material only, **do not publish** (`"private": true` in package.json).
+ Distilled from `@huanlin/dsh-plugin-tools-manager` (adaptation commit
+diff --git a/fixture/client.d.ts b/fixture/client.d.ts
+new file mode 100644
+index 0000000..9615edf
+--- /dev/null
++++ b/fixture/client.d.ts
+@@ -0,0 +1,34 @@
++/**
++ * Type surface of the browser half (./client.js): the Context merges this
++ * plugin consumes, the locale namespace it owns, and its public exports.
++ * A .js file cannot carry `import type` / `declare module`, so the whole type
++ * half of the module lives here and package.json points the `./client` export
++ * at it.
++ */
++import type { Context } from '@deepseek-ai/cordis'
++// Type-only: the renderer-owned Context merge (ctx.slots). ui-slots below is
++// the pure SlotMap core; the SERVICE implementation lives in ui-renderer.
++import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
++// Type-only: the settings shell's SlotMap merge (the 'settings.section' entry).
++import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
++// Type-only: the locale plugin's Context merge (ctx.locale).
++import type {} from '@deepseek-ai/dsh-client-locale/client'
++// Type-only: the SlotMap/LocaleNamespaceMap declaration home being augmented.
++import type {} from '@deepseek-ai/dsh-client-ui-slots'
++
++declare module '@deepseek-ai/dsh-client-ui-slots' {
++  interface LocaleNamespaceMap {
++    /** Tools-panel copy. `nav` is the settings-tab label; the elided panel body joins this namespace. */
++    'bench.toolsTree': 'nav'
++  }
++}
++
++/** Plugin name registered with the client Loader. */
++export declare const name: 'bench-tools-tree-client'
++/** Client services required before the panel registers. */
++export declare const inject: readonly string[]
++/**
++ * Register the tools-manager panel as a top-level settings tab.
++ * @param ctx - the browser plugin context.
++ */
++export declare function apply(ctx: Context): void
+diff --git a/fixture/client.js b/fixture/client.js
+index f3ee370..6e6306f 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,25 +1,42 @@
+ // Browser half: registers the tools-management panel as a top-level settings
+-// tab through the settings.section slot; the panel reads/writes the tool tree
++// tab through the `settings.section` slot; the panel reads/writes the tool tree
+ // through the host gateway /tools-manager/api/list|set.
+ //
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.0 era):
+-//   "ctx.slots is provided by @deepseek-ai/dsh-client-ui-slots — the
+-//    ui-renderer import is only cosmetic. Skip the ui-renderer type import,
+-//    and skip any ui-renderer entry in the client inject: the slots service
+-//    arrives with ui-slots anyway."
+-// ────────────────────────────────────────────────────────────
++// alpha.2 client plane. The 0.1.0-era memo that used to sit here ("ctx.slots is
++// provided by @deepseek-ai/dsh-client-ui-slots — skip the ui-renderer import")
++// is stale and wrong on this cohort: ui-slots is the pure SlotMap/registry
++// core and provides no service; the `slots` service is provided by
++// @deepseek-ai/dsh-client-ui-renderer, and the `settings.section` contract is
++// declared by @deepseek-ai/dsh-client-ui-settings. Both Context merges arrive
++// through the type-only imports in ./client.d.ts (a .js file cannot carry
++// `declare module`/`import type`), and the removed 0.1.x client-runtime
++// aggregation package — the old home of ClientContext — has no successor
++// entry point on this cohort.
+ //
+-// 0.1.0-era type surface: the client context type comes from
+-// @deepseek-ai/dsh-client-runtime/client, and the ctx.slots Context merge is
+-// pulled type-only from @deepseek-ai/dsh-client-ui-slots — the client-runtime
+-// split had not happened yet.
++// The slot DECLARATION is owned by the settings shell (ui-settings-general,
++// which registers the `settings.section` list into the sidebar's settings
++// panel). ctx.slots.inject() waits for that declaration, so this file needs no
++// ordering beyond the service inject below.
++//
++// Copy is owned by a locale namespace: the type-level LocaleNamespaceMap
++// augmentation in ./client.d.ts and the runtime ctx.locale.register call here
++// are the two halves of the cohort's pairing rule. The zh dictionary keeps the
++// label the 0.1.0-era hardcoded panel shipped.
+ 
+ export const name = 'bench-tools-tree-client'
+ 
+-// Only slots — the settings.section slot is declared by the shell; no
+-// locale/connection needed (inline styles + hardcoded labels).
+-export const inject = ['slots']
++// slots: register the panel into `settings.section`.
++// locale: the tab label (and the panel's own copy) is a registered namespace.
++export const inject = ['slots', 'locale']
++
++/** Dictionary namespace owned by this plugin. Must match ./client.d.ts. */
++const NS = 'bench.toolsTree'
++
++/** English dictionary (the UI opens in English when the browser names no registered locale). */
++const en = { nav: 'Tool manager' }
++
++/** Chinese dictionary; keeps the historical '工具管理' tab label. */
++const zh = { nav: '工具管理' }
+ 
+ // The panel component (collapsible prefix tree + batch toggle) is elided; the
+ // slot renderer mounts it as a function component.
+@@ -29,15 +46,19 @@ function toolsTreeStub() {
+ 
+ /**
+  * Register the tools-manager panel as a top-level settings tab.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx - the browser plugin context.
+  */
+ export function apply(ctx) {
++  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'bench-tools-tree: panel dictionaries')
++
+   ctx.slots.inject('settings.section', () =>
+     ctx.slots.register({
+       name: 'settings.section',
+       id: 'bench-tools-tree',
+-      order: 62, // after MCP (61)
+-      label: () => '工具管理',
++      // After the shipped sections: general 0, models 10, plugins 15, agent-presets 20.
++      order: 62,
++      label: () => ctx.locale.bind(NS)('nav'),
++      locale: NS,
+       inject: () => ({}),
+     }, toolsTreeStub))
+ }
+diff --git a/fixture/index.js b/fixture/index.js
+index e7d374b..d8a1fad 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,29 +1,62 @@
+-// 0.1.0-era cohort (pre v0.1.2-alpha.1): the host half was already written
+-// against the scoped @deepseek-ai/cordis Context — the migration is entirely
+-// on the client plane.
++// Host half of bench-tools-tree, kept in the fixture as a reference shape (the
++// real body is elided). The host half was already written against the scoped
++// @deepseek-ai/cordis Context; the dsh 0.1.2-alpha.2 move leaves its seams
++// intact and adds one required security hook on the HTTP gateway.
+ //
+-// The real host body is elided in this fixture; its shape, for reference:
++// Shape, for reference:
+ //   - ToolRegistry: attributes each registered tool to its source plugin by
+ //     snapshot-diffing ctx.tools.schemas() on every tools/change;
+-//   - two-layer enable/disable gate: system-prompt/assemble hides disabled
+-//     tools from the model, ctx.tools.guard() denies their execution;
+-//   - /tools-manager/api/list|set HTTP gateway for the browser panel;
+-//   - the disabled set persists through the `tools-manager` settings
+-//     namespace in $DSH_HOME/settings.yaml (no restart needed).
++//   - exact attribution when the host carries patches/0001: read
++//     ctx.tools.registrations() ({ name, owner }) instead of diffing; the
++//     diff path stays as the fallback for unpatched hosts, with (unknown) for
++//     tools no pending plugin claim explains. Feature-detect it
++//     (`typeof ctx.tools.registrations === 'function'`); the alpha.2 registry
++//     has no other ownership fact, and schemas() keeps its model-facing
++//     allowlist (name/description/parameters), so ownership never reaches a
++//     model request.
++//   - two-layer enable/disable gate (both seams unchanged on alpha.2):
++//       * system-prompt/assemble filters the disabled tools out of
++//         assembly.tools, so the model never sees them;
++//       * ctx.tools.guard() on this plain context denies their execution
++//         globally, including run_code SDK sub-dispatch.
++//     ctx.tools.restrict() is still scoped by construction (it throws on a
++//     plain context), which is why the global filter is guard + assemble.
++//   - /tools-manager/api/list|set HTTP gateway for the browser panel, through
++//     ctx.webServer.register({ kind: 'prefix', path: '/tools-manager/api' }).
++//     alpha.2 (DSH-0.1.2-A1-08): a raw ctx.webServer route does NOT inherit
++//     Connection authentication, the Host/Origin fence, or CORS. The handler
++//     must call ctx.connection.requestRejection(req) before reading protected
++//     data or mutating state, honor the returned 401/403 and stop, and keep
++//     webServer in `inject` — that is why `connection` joins the service list
++//     below. (`connection` is mounted by the same web-app bundle as webServer.)
++//     The route shape is unchanged: same path, method, JSON envelope
++//     { ok, value } / { ok: false, error: { code, message } }.
++//   - the disabled set persists through the `tools-manager` settings namespace
++//     in $DSH_HOME/settings.yaml with no restart needed. alpha.2 removed the
++//     settingsNamespace() helper: pass the grammar-conforming literal
++//     'tools-manager' and register inside ctx.inject(['settings'], ...) —
++//     settingsCtx.settings.installSection(ctx, 'tools-manager', Config, config,
++//     hooks) for the optional provider, or ctx.settings.register(...) when the
++//     service is required. Registering the namespace is what exposes it to the
++//     settings page (implemented Agent Note 2026-08-12); watch()/update() drive
++//     the live gate.
+ 
+ export const name = 'bench-tools-tree'
+ 
+-// Host half: tools (registry + guard), webServer (the HTTP gateway), and
+-// systemPrompt (the assemble hook that hides disabled tools from the model).
+-export const inject = ['tools', 'webServer', 'systemPrompt']
++// Host half: tools (registry + guard), webServer (the HTTP gateway), connection
++// (the alpha.2 trust/authentication gate on that gateway), and systemPrompt
++// (the assemble hook that hides disabled tools from the model).
++export const inject = ['tools', 'webServer', 'connection', 'systemPrompt']
+ 
+ /**
+  * @param {import('@deepseek-ai/cordis').Context} ctx
++ * @param {{ disabled?: string[] }} [config] - the `bench-tools-tree` composition entry.
+  */
+ export function apply(ctx, config) {
+-  console.error('[bench-tools-tree] apply() on the 0.1.0-era cohort: client plane still typed against the client-runtime ClientContext')
++  console.error('[bench-tools-tree] apply() on the dsh 0.1.2-alpha.2 cohort: host seams unchanged, gateway gated by ctx.connection.requestRejection')
+ 
+   ctx.effect(() => {
+     console.error('[bench-tools-tree] host half active: tool registry + enable/disable policy + /tools-manager/api gateway (real body elided)')
++    return () => {}
+   }, 'bench-tools-tree: host')
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..c710eef
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,601 @@
++{
++  "name": "@bench/dsh-bench-tools-tree",
++  "version": "0.2.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-tools-tree",
++      "version": "0.2.0",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.1",
++        "@deepseek-ai/dsh-client-connection": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-host-webserver": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-settings": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2",
++        "@deepseek-ai/schemastery": "^3.18.0",
++        "react": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/dsh-settings": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cordis": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.4.tgz",
++      "integrity": "sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      },
++      "bin": {
++        "cordis": "bin.js"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis-plugin-include": {
++          "optional": true
++        },
++        "@deepseek-ai/cordis-plugin-loader": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/@deepseek-ai/dsh-agent": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-agent/-/dsh-agent-0.1.2-rc.1.tgz",
++      "integrity": "sha512-lfaqN34vUCWvbn1kJVHrhfJ6Dvt1HDHCm33ZCpmKkl07/5q6FxWqVv6rOdVX5QnM/9xz/uYiN0nQwUtBg4+Skg==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-projection": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-brand": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-brand/-/dsh-brand-0.1.2-rc.1.tgz",
++      "integrity": "sha512-y2RHIag3kzLdY8kTBuSUSTsKzWPscJrysNObXTiNM7stXLpa3jXpshsB1caqGzNx50vYcmHeN1gFVECgx3NZHg==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-connection": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-connection/-/dsh-client-connection-0.1.2-rc.1.tgz",
++      "integrity": "sha512-30g7JG+Z8bDj+ux+KsDfMSXPI6zXotMAFNCxI8O8mJiutJNlZxIL5LXQeDrJpVOW9MWWQkoMp+R+Dxzp5DNDSQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-credentials": "^0.1.2-rc.1",
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-locale": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-locale/-/dsh-client-locale-0.1.2-rc.1.tgz",
++      "integrity": "sha512-p34i5WcZ0+b77RKEatGLc6Rh4OgJJmc15kWbBqtCtSI1BxpwZxjDzoNIMTTS3jDGUQqfEd9X7Js9D4uNJDUewg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-renderer": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-renderer/-/dsh-client-ui-renderer-0.1.2-rc.1.tgz",
++      "integrity": "sha512-mG4aNL7dL57i6I6FLol3AWWp3g2C+EV3jYt2MZHzbfMcS0gQnEd/BSGH3T5DfNCQcOEIGqu0TQ0B3bxnJatmTA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "use-sync-external-store": "1.2.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-settings": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings/-/dsh-client-ui-settings-0.1.2-rc.1.tgz",
++      "integrity": "sha512-/S16tlS84fggURMqO94HjYbE0xIH82aRJ2E4UupgM9acD3yJ6SCVam17tMcWKnqA6UWJK9llEHhl+KN9JyI/0Q==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-slots": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-slots/-/dsh-client-ui-slots-0.1.2-rc.1.tgz",
++      "integrity": "sha512-wcqn8xwb87RjurSQ0zPoI4K9eYhDyoBjQqg4bByDq8CNynvayHoBPnNWfiAQ8ngyOPE20teL3DMS0gbcfCTqbA==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-code-runtime": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-code-runtime/-/dsh-code-runtime-0.1.2-rc.1.tgz",
++      "integrity": "sha512-dv5UszPJb/AFcarZc2c6h5z/X80bsrSd3bfIOugwNVclSI6P+L3ixseoZKgyks7T0Ap0h6ngXGk2WeoUkmYxnQ==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-credentials": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-credentials/-/dsh-credentials-0.1.2-rc.1.tgz",
++      "integrity": "sha512-e7DGpuYQqiD4dOWGQeY/XAWPTjbax/MkrXBwsB8wBtNpoPiAKiLYgd+iFiQc66BGOlutSRFz31IKdbduqPbTxA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-host-webserver": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-host-webserver/-/dsh-host-webserver-0.1.2-rc.1.tgz",
++      "integrity": "sha512-QVcaf4qnIa1t215Y8TRiRhqkEz4Lu5/F+KqvWT+4sHOiyWmZr8g1JndqlwP6MBnMQEPmp0I/EKYJ7PWMV32gkA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "compression": "^1.8.1",
++        "negotiator": "^1.0.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-invariants": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-invariants/-/dsh-invariants-0.1.2-rc.1.tgz",
++      "integrity": "sha512-zSjuFJYcEB94kPwn7SicqAV1dfVWZkjt1I8luDboxtjfp5CN6ziwJhLv3KaB+Dh9tgkyGY4mvo886W/HhE9L9g==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-llm": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-llm/-/dsh-llm-0.1.2-rc.1.tgz",
++      "integrity": "sha512-7VYsha5AXsVLnsAwYJffWXz9bwUbElw8i5N8tlTSdai9Bupk3sMbsotzPf8ZbsuGAxQYErahMwQwgGEu4qZO6g==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-timeout": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-crypto": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1",
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-scope": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-scope/-/dsh-scope-0.1.2-rc.1.tgz",
++      "integrity": "sha512-GHwbzWrGbmE0ZGzAZsXBudpyCM9ENCpXxlKODIaPFbIWhRePh6nH2jW47TAOqCIsPPedWC2p3w8Tx5WAa3I/2A==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session/-/dsh-session-0.1.2-rc.1.tgz",
++      "integrity": "sha512-jRGNPTbQcvIx1F2MVmmkoiHLgpC3Btqo1wkl/3JDLlOWRVWKOuaC+5fQiMrFPOYfno6YiX/c2UvmA0td8qB92w==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session-projection": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-projection/-/dsh-session-projection-0.1.2-rc.1.tgz",
++      "integrity": "sha512-qVWlIzPm4u9vzQ5G/QtE6jeSJ3b3b42hWVJj664BurEZlHbAfdqkhYc1QsoBU+5k5kUEJFHh07z8HxuXA9kTnQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-system-prompt": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-system-prompt/-/dsh-system-prompt-0.1.2-rc.1.tgz",
++      "integrity": "sha512-7W93PZKIk4CHvjZGgLIxrrEKpk+6t8nQXje1vKR5vG73dfXH0t1MJ5WWH/fngadYc7c6KzM84ihQ66tJqJqyNQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-timeout": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-timeout/-/dsh-timeout-0.1.2-rc.1.tgz",
++      "integrity": "sha512-llz11yxWeJB8suKCa6hRLjNBWVaPn3Fbd0XoBS0bkZLhPFzO1mDorx/XMca2GhI7XF9A86CURQcDt+aGjjvqJA==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-tools": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tools/-/dsh-tools-0.1.2-rc.1.tgz",
++      "integrity": "sha512-W9kUio00s7WbM8kEwniyd4hfb3CeUxVczsjXbOcKtakfiTywNLeyRWkpx2fvwRAH2rBfg3qCgczVfS0DOw1csg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1",
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-code-runtime": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-user-approval": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-typert-protocol": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-typert-protocol/-/dsh-typert-protocol-0.1.2-rc.1.tgz",
++      "integrity": "sha512-vBWD0NpriPd96ltbWaAw+iKeWFIEjiAcCWYtmqEcV1Ms+FaV02usjjm7LCmhSQhMZpBSBc7EZUX0spGlpjI1bA==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-user-approval": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-user-approval/-/dsh-user-approval-0.1.2-rc.1.tgz",
++      "integrity": "sha512-oYkLE4a/TwqVNi299pUf/QP1Yku6KScdUCTUyYbjaRBcN+/pXPpHikl2aoE2thH9D0uT/Kj6T2kz+wDDcFd9Xg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-crypto": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-crypto/-/dsh-util-crypto-0.1.2-rc.1.tgz",
++      "integrity": "sha512-gE8FznQ1hkknw9QMrHNSlm3UEyRYuj3MLVvlJ6NyH1kmOsdjnbrVbSs+Pn72k2oIV4Fiyu3Umg0sLznUEcsiXw==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-values": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.2-rc.1.tgz",
++      "integrity": "sha512-FQdgoK+KYVR0pBQb9fTsajvGb3gzUxEzJQEYnFOt+Qdwc4nkxJOPwJJdIvXuqvZaQ33DaOoqpnpcr2p5HpLu4g==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/schemastery": {
++      "version": "3.18.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.4.tgz",
++      "integrity": "sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      }
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/bytes": {
++      "version": "3.1.2",
++      "resolved": "https://registry.npmjs.org/bytes/-/bytes-3.1.2.tgz",
++      "integrity": "sha512-/Nf7TyzTx6S3yRJObOAV7956r8cr2+Oj8AC5dt8wSP3BQAoeX58NoHyCU8P8zGkNXStjTSi6fzO6F0pBdcYbEg==",
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">= 0.8"
++      }
++    },
++    "node_modules/compressible": {
++      "version": "2.0.18",
++      "resolved": "https://registry.npmjs.org/compressible/-/compressible-2.0.18.tgz",
++      "integrity": "sha512-AF3r7P5dWxL8MxyITRMlORQNaOA2IkAFaTr4k7BUumjPtRpGDTZpl0Pb1XCO6JeDCBdp126Cgs9sMxqSjgYyRg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "mime-db": ">= 1.43.0 < 2"
++      },
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/compression": {
++      "version": "1.8.2",
++      "resolved": "https://registry.npmjs.org/compression/-/compression-1.8.2.tgz",
++      "integrity": "sha512-o8vI5RE5A6EVVOd9o41jKp41aJom+QTEO/Bx8MYNjexMo/Bv2WOjUfZr+aL0WnYSgymUy6zeguqLTsIhV0gMvQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "bytes": "3.1.2",
++        "compressible": "~2.0.18",
++        "debug": "2.6.9",
++        "destroy": "1.2.0",
++        "negotiator": "~0.6.4",
++        "on-headers": "~1.1.0",
++        "safe-buffer": "5.2.1",
++        "vary": "~1.1.2"
++      },
++      "engines": {
++        "node": ">= 0.8.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/express"
++      }
++    },
++    "node_modules/compression/node_modules/negotiator": {
++      "version": "0.6.4",
++      "resolved": "https://registry.npmjs.org/negotiator/-/negotiator-0.6.4.tgz",
++      "integrity": "sha512-myRT3DiWPHqho5PrJaIRyaMv2kgYf0mUVgBNOYMuCH5Ki1yEiQaf/ZJuQ62nvpc44wL5WDbTX7yGJi1Neevw8w==",
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/content-type": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/content-type/-/content-type-2.1.0.tgz",
++      "integrity": "sha512-mj7UPXE0jaqaOsukNZRUEfEi2AcL7C/vwmwcHV0O97eO1E1pxBZuyjlZrx5seTaNBg1U6+o35wpa35Qfcc+7ag==",
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/express"
++      }
++    },
++    "node_modules/debug": {
++      "version": "2.6.9",
++      "resolved": "https://registry.npmjs.org/debug/-/debug-2.6.9.tgz",
++      "integrity": "sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "ms": "2.0.0"
++      }
++    },
++    "node_modules/destroy": {
++      "version": "1.2.0",
++      "resolved": "https://registry.npmjs.org/destroy/-/destroy-1.2.0.tgz",
++      "integrity": "sha512-2sJGJTaXIIaR1w4iJSNoN0hnMY7Gpc/n8D4qSCJw8QqFWXf7cuAgnEHxBpweaVcPevC2l3KpjYCx3NypQQgaJg==",
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">= 0.8",
++        "npm": "1.2.8000 || >= 1.4.16"
++      }
++    },
++    "node_modules/js-tokens": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/js-tokens/-/js-tokens-4.0.0.tgz",
++      "integrity": "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==",
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/loose-envify": {
++      "version": "1.4.0",
++      "resolved": "https://registry.npmjs.org/loose-envify/-/loose-envify-1.4.0.tgz",
++      "integrity": "sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "js-tokens": "^3.0.0 || ^4.0.0"
++      },
++      "bin": {
++        "loose-envify": "cli.js"
++      }
++    },
++    "node_modules/mime-db": {
++      "version": "1.54.0",
++      "resolved": "https://registry.npmjs.org/mime-db/-/mime-db-1.54.0.tgz",
++      "integrity": "sha512-aU5EJuIN2WDemCcAp2vFBfp/m4EAhWJnUNSSw0ixs7/kXbd6Pg64EmwJkNdFhB8aWt1sH2CTXrLxo/iAGV3oPQ==",
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/ms": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz",
++      "integrity": "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==",
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/negotiator": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/negotiator/-/negotiator-1.1.0.tgz",
++      "integrity": "sha512-NMPBRMJgiQHjbd8phG3Vebdx4kZ1H121rbl5IkMqeOsahptB9BKo/d7oJ3zTXqTgagn2bWlNSXkh0QUGM31RYg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "content-type": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/express"
++      }
++    },
++    "node_modules/on-headers": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/on-headers/-/on-headers-1.1.0.tgz",
++      "integrity": "sha512-737ZY3yNnXy37FHkQxPzt4UZ2UWPWiCZWLvFZ4fu5cueciegX0zGPnrlY6bwRg4FdQOe9YU8MkmJwGhoMybl8A==",
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">= 0.8"
++      }
++    },
++    "node_modules/react": {
++      "version": "18.3.1",
++      "resolved": "https://registry.npmjs.org/react/-/react-18.3.1.tgz",
++      "integrity": "sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "loose-envify": "^1.1.0"
++      },
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
++    "node_modules/safe-buffer": {
++      "version": "5.2.1",
++      "resolved": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.2.1.tgz",
++      "integrity": "sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==",
++      "funding": [
++        {
++          "type": "github",
++          "url": "https://github.com/sponsors/feross"
++        },
++        {
++          "type": "patreon",
++          "url": "https://www.patreon.com/feross"
++        },
++        {
++          "type": "consulting",
++          "url": "https://feross.org/support"
++        }
++      ],
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/use-sync-external-store": {
++      "version": "1.2.0",
++      "resolved": "https://registry.npmjs.org/use-sync-external-store/-/use-sync-external-store-1.2.0.tgz",
++      "integrity": "sha512-eEgnFxGQ1Ife9bzYs6VLi8/4X6CObHMw9Qr9tPY43iKwsPw8xE8+EFsf/2cFZ5S3esXgpWgtSCtLNS41F+sKPA==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "react": "^16.8.0 || ^17.0.0 || ^18.0.0"
++      }
++    },
++    "node_modules/vary": {
++      "version": "1.1.2",
++      "resolved": "https://registry.npmjs.org/vary/-/vary-1.1.2.tgz",
++      "integrity": "sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==",
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">= 0.8"
++      }
++    },
++    "node_modules/zod": {
++      "version": "4.6.7",
++      "resolved": "https://registry.npmjs.org/zod/-/zod-4.6.7.tgz",
++      "integrity": "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==",
++      "license": "MIT",
++      "peer": true,
++      "funding": {
++        "url": "https://github.com/sponsors/colinhacks"
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 944660c..7988bd9 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,12 +1,15 @@
+ {
+   "name": "@bench/dsh-bench-tools-tree",
+-  "version": "0.1.0",
+-  "description": "Tools-management panel plugin: the host half attributes every registered tool to its source plugin (tree) and gates disabled tools, the browser half registers the settings-page tools tab (0.1.0-era cohort; exam material only)",
++  "version": "0.2.0",
++  "description": "Tools-management panel plugin: the host half attributes every registered tool to its source plugin (tree) and gates disabled tools, the browser half registers the settings-page tools tab (dsh 0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+     ".": "./index.js",
+-    "./client": "./client.js",
++    "./client": {
++      "types": "./client.d.ts",
++      "default": "./client.js"
++    },
+     "./cordis.patch.yml": "./cordis.patch.yml"
+   },
+   "dsh": {
+@@ -15,36 +18,28 @@
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+-        "@deepseek-ai/dsh-client-ui-primitives",
+-        "@deepseek-ai/dsh-client-ui-slots"
++        "@deepseek-ai/dsh-client-locale",
++        "@deepseek-ai/dsh-client-ui-settings"
+       ],
+       "platform": "web"
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-host-webserver": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-settings": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-system-prompt": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-tools": "^0.0.1-rc.1",
+-    "react": "^18.2.0",
+-    "schemastery": "^3.18.0"
++    "@deepseek-ai/cordis": "^4.0.1",
++    "@deepseek-ai/dsh-client-connection": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-host-webserver": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-settings": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-system-prompt": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2",
++    "@deepseek-ai/schemastery": "^3.18.0",
++    "react": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
+-    "@deepseek-ai/cordis": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+-    "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
+-    "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+-    "@deepseek-ai/dsh-host-webserver": { "optional": true },
+-    "@deepseek-ai/dsh-settings": { "optional": true },
+-    "@deepseek-ai/dsh-system-prompt": { "optional": true },
+-    "@deepseek-ai/dsh-tools": { "optional": true },
+-    "react": { "optional": true },
+-    "schemastery": { "optional": true }
++    "@deepseek-ai/dsh-settings": { "optional": true }
+   },
+   "private": true
+ }
+diff --git a/fixture/patches/0001-expose-tool-registration-ownership.patch b/fixture/patches/0001-expose-tool-registration-ownership.patch
+new file mode 100644
+index 0000000..1c948c8
+--- /dev/null
++++ b/fixture/patches/0001-expose-tool-registration-ownership.patch
+@@ -0,0 +1,299 @@
++diff --git a/packages/core/tools/src/index.ts b/packages/core/tools/src/index.ts
++index 1e6d7c3..1d62ff7 100644
++--- a/packages/core/tools/src/index.ts
+++++ b/packages/core/tools/src/index.ts
++@@ -687,12 +687,36 @@ interface CompiledToolRestriction {
++ interface ToolView {
++   /** Visible definitions after restrictions, scoped shadowing, and transport insertion. */
++   readonly visible: ReadonlyMap<string, ToolDefinition>
+++  /**
+++   * Registering plugin per visible name, parallel to {@link visible}; absent
+++   * for the registry-synthesized presentation transport.
+++   */
+++  readonly owners: ReadonlyMap<string, string>
++   /** Pre-restriction capability names used by prompt-order validation. */
++   readonly knownNames: ReadonlySet<string>
++   /** Current global names that a scoped restriction may name. */
++   readonly restrictableNames: ReadonlySet<string>
++ }
++ 
+++/**
+++ * One visible tool's ownership fact: the plugin fiber whose context performed
+++ * the registration. This is a projection for management and inspection
+++ * surfaces, not a model-facing field — {@link ToolRuntime.schemas} keeps its
+++ * own allowlist.
+++ */
+++export interface ToolOwnership {
+++  /** Tool name as registered. */
+++  readonly name: string
+++  /**
+++   * Display name of the fiber whose context called `register()`: the plugin's
+++   * own name, `'root'` for the root context, and the scope shim's name for a
+++   * registration made through `createScope` (the shim is the registering
+++   * fiber there). `undefined` for a registry-synthesized entry such as the
+++   * reserved `run_code` presentation transport, which no plugin registered.
+++   */
+++  readonly owner: string | undefined
+++}
+++
++ /**
++  * A monotonic execution guard evaluated after every `tools/pre-execute`
++  * listener and before the tool body. Returning a reason denies the call;
++@@ -706,6 +730,8 @@ export type ToolGuard = (execution: Readonly<ToolExecution>) => string | undefin
++ /** One scope's complete tool-registry contribution. */
++ class ToolLayer implements ScopeLayer {
++   readonly tools: NamedEntries<ToolDefinition>
+++  /** Registering plugin identity per name, parallel to {@link tools}. */
+++  readonly owners: NamedEntries<string>
++   readonly restrictions = new AnonymousEntries<CompiledToolRestriction>()
++   readonly guards = new AnonymousEntries<ToolGuard>()
++   /**
++@@ -716,14 +742,18 @@ class ToolLayer implements ScopeLayer {
++   mode: ToolPresentationMode | undefined
++ 
++   constructor(scope: ScopeKey | undefined) {
++-    this.tools = new NamedEntries(name => new Error(scope === undefined
+++    const duplicate = (name: string): Error => new Error(scope === undefined
++       ? `tool "${name}" is already registered (for a per-agent variant, register through that agent's \`agent.ctx\` instead)`
++-      : `tool "${name}" is already registered in this scope`))
+++      : `tool "${name}" is already registered in this scope`)
+++    this.tools = new NamedEntries(duplicate)
+++    // Same key domain as `tools`, so a duplicate name fails on the definition
+++    // insert before an owner can be filed.
+++    this.owners = new NamedEntries(duplicate)
++   }
++ 
++   /** Whether every contribution table in this aggregate layer is empty. */
++   isEmpty(): boolean {
++-    return this.tools.isEmpty() && this.restrictions.isEmpty() && this.guards.isEmpty()
+++    return this.tools.isEmpty() && this.owners.isEmpty() && this.restrictions.isEmpty() && this.guards.isEmpty()
++       && this.mode === undefined
++   }
++ 
++@@ -1045,9 +1075,20 @@ export class ToolRuntime extends Service {
++     if (name === RUN_CODE_NAME) {
++       throw new Error(`tool name "${RUN_CODE_NAME}" is reserved for the PTC mode presentation transport and cannot be registered or shadowed`)
++     }
+++    // Read before the effect so the fact belongs to this registration: a
+++    // service method sees `this.ctx` as the CALLER's context, so the nearest
+++    // named fiber is the plugin that called `register()`.
+++    const owner = this.ctx.fiber.name
++     return this.layers.effect(
++       this.ctx,
++-      layer => layer.tools.insert(name, definition),
+++      (layer) => {
+++        const undo = layer.tools.insert(name, definition)
+++        const undoOwner = layer.owners.insert(name, owner)
+++        return () => {
+++          undo()
+++          undoOwner()
+++        }
+++      },
++       { label: 'tools.register()' },
++     )
++   }
++@@ -1150,11 +1191,14 @@ export class ToolRuntime extends Service {
++     // Inherited surface, nearest ancestor last: a nearer scope's same-name
++     // entry shadows a farther one, and the global layer is the farthest.
++     const inherited = new Map<string, ToolDefinition>(this.layers.global.tools.entries())
+++    const inheritedOwners = new Map<string, string>(this.layers.global.owners.entries())
++     for (const layer of layers) {
++       if (layer === own) continue
++       for (const [name, definition] of layer.tools.entries()) inherited.set(name, definition)
+++      for (const [name, owner] of layer.owners.entries()) inheritedOwners.set(name, owner)
++     }
++     const visible = new Map<string, ToolDefinition>()
+++    const owners = new Map<string, string>()
++     const knownNames = new Set<string>()
++     const restrictableNames = new Set<string>()
++     for (const [name, definition] of inherited) {
++@@ -1162,7 +1206,11 @@ export class ToolRuntime extends Service {
++       restrictableNames.add(name)
++       // Restrictions intersect across the whole chain: any scope on it may
++       // mask an inherited name for everything nested inside it.
++-      if (layers.every(layer => layer.admits(name))) visible.set(name, definition)
+++      if (!layers.every(layer => layer.admits(name))) continue
+++      visible.set(name, definition)
+++      const owner = inheritedOwners.get(name)
+++      /* v8 ignore next -- register() files a name and its owner together. */
+++      if (owner !== undefined) owners.set(name, owner)
++     }
++     // The scope's own registrations last, shadowing an inherited name and
++     // outside the filter above.
++@@ -1171,6 +1219,8 @@ export class ToolRuntime extends Service {
++         knownNames.add(name)
++         visible.set(name, definition)
++       }
+++      // An own name shadows the inherited owner it replaced.
+++      for (const [name, owner] of own.owners.entries()) owners.set(name, owner)
++     }
++     // Presentation infrastructure is resolved last and outside capability
++     // filtering. Registration rejects this reserved name, so the insertion is
++@@ -1180,7 +1230,7 @@ export class ToolRuntime extends Service {
++     if (this.modeFor(scope) !== 'native') {
++       visible.set(RUN_CODE_NAME, this.requireCodeTransport())
++     }
++-    return { visible, knownNames, restrictableNames }
+++    return { visible, owners, knownNames, restrictableNames }
++   }
++ 
++   /**
++@@ -1226,6 +1276,21 @@ export class ToolRuntime extends Service {
++     return [...this.view(scope).visible.values()].map(definition => this.schemaOf(definition, true))
++   }
++ 
+++  /**
+++   * Project the registering plugin of every visible tool. Ownership is read
+++   * from the registering context's fiber at `register()` time, so a
+++   * management or inspection surface attributes tools by registry fact
+++   * instead of inferring ownership from composition or registration order.
+++   * The projection stays out of {@link schemas}: no owner reaches a model
+++   * request.
+++   * @param scope - the viewing scope (the agent); omitted = the global view.
+++   * @returns one `{ name, owner }` entry per visible tool, in view order.
+++   */
+++  registrations(scope?: ScopeKey): ToolOwnership[] {
+++    const view = this.view(scope)
+++    return [...view.visible.keys()].map(name => ({ name, owner: view.owners.get(name) }))
+++  }
+++
++   /** Project visible callable tools onto the generated PTC mode SDK contract. */
++   private sdkSchemas(scope?: ScopeKey): ToolSdkSchema[] {
++     return [...this.view(scope).visible.values()]
++diff --git a/packages/core/tools/tests/ownership.spec.ts b/packages/core/tools/tests/ownership.spec.ts
++new file mode 100644
++index 0000000..b2c3c3a
++--- /dev/null
+++++ b/packages/core/tools/tests/ownership.spec.ts
++@@ -0,0 +1,131 @@
+++import { describe, expect, it } from 'vitest'
+++import { Context } from '@deepseek-ai/cordis'
+++import { CodeRuntime } from '@deepseek-ai/dsh-code-runtime'
+++import type { CodeRunResult } from '@deepseek-ai/dsh-code-runtime'
+++import { createScope } from '@deepseek-ai/dsh-scope'
+++import type { Scope } from '@deepseek-ai/dsh-scope'
+++import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+++import ToolRuntime, { RUN_CODE_NAME } from '@deepseek-ai/dsh-tools'
+++import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
+++import type { Agent } from '@deepseek-ai/dsh-agent'
+++import type { SessionId } from '@deepseek-ai/dsh-session'
+++
+++/**
+++ * Mount the registry (with its systemPrompt dependency) on a fresh context.
+++ * @param mode - presentation mode; `ptc` additionally needs a code runtime so
+++ * the reserved `run_code` transport can be synthesized into the view.
+++ */
+++async function mount(mode: 'native' | 'ptc' = 'native'): Promise<Context> {
+++  const ctx = new Context()
+++  await ctx.plugin(SystemPrompt, {})
+++  await ctx.plugin(ToolRuntime, { mode })
+++  if (mode === 'ptc') await ctx.plugin(StubRuntime)
+++  return ctx
+++}
+++
+++/** The transport's presence is the subject here; no program ever runs. */
+++class StubRuntime extends CodeRuntime {
+++  readonly language = 'typescript'
+++  readonly isolation = 'stub'
+++  run(): Promise<CodeRunResult> {
+++    return Promise.resolve({ logs: [] })
+++  }
+++}
+++
+++function tool(name: string): ToolDefinition {
+++  return {
+++    name,
+++    description: `tool ${name}`,
+++    parameters: { type: 'object', properties: {} },
+++    output: {
+++      schema: { type: 'string' },
+++      render: (_args, value) => [{ type: 'text', text: value as string }],
+++    },
+++    execute: (): Promise<string> => Promise.resolve(`ran:${name}`),
+++  }
+++}
+++
+++/** Mount one named plugin whose context registers its tool during apply. */
+++async function registerFrom(ctx: Context, plugin: string, name: string) {
+++  return ctx.plugin({
+++    name: plugin,
+++    inject: ['tools'],
+++    apply(inner: Context) { inner.tools.register(tool(name)) },
+++  })
+++}
+++
+++/** Mint a scope from inside a named plugin: the scope shim is the registering fiber. */
+++async function mintNamedScope(ctx: Context, plugin: string, key: Agent): Promise<Scope> {
+++  let scope!: Scope
+++  await ctx.plugin({
+++    name: plugin,
+++    inject: ['tools', 'systemPrompt'],
+++    apply(inner: Context) { scope = createScope(inner, key) },
+++  })
+++  return scope
+++}
+++
+++describe('registrations() ownership projection', () => {
+++  it('attributes each visible tool to the plugin fiber that registered it', async () => {
+++    const ctx = await mount()
+++    ctx.tools.register(tool('root_tool'))
+++    await registerFrom(ctx, 'alpha', 'tool_a')
+++    await registerFrom(ctx, 'beta', 'tool_b')
+++
+++    expect(ctx.tools.registrations()).toEqual([
+++      { name: 'root_tool', owner: 'root' },
+++      { name: 'tool_a', owner: 'alpha' },
+++      { name: 'tool_b', owner: 'beta' },
+++    ])
+++  })
+++
+++  it('files no owner for a rejected duplicate and drops the fact with its registration', async () => {
+++    const ctx = await mount()
+++    const alpha = await registerFrom(ctx, 'alpha', 'tool_a')
+++    expect(() => ctx.tools.register(tool('tool_a'))).toThrow('already registered')
+++
+++    expect(ctx.tools.registrations()).toEqual([{ name: 'tool_a', owner: 'alpha' }])
+++    await alpha.dispose()
+++    expect(ctx.tools.registrations()).toEqual([])
+++  })
+++
+++  it('reports the scope owner for a shadowed name and omits restricted-away tools', async () => {
+++    const ctx = await mount()
+++    ctx.tools.register(tool('shared'))
+++    await registerFrom(ctx, 'alpha', 'global_tool')
+++    const key = { id: 'a' as SessionId } as Agent
+++    const scope = await mintNamedScope(ctx, 'agent-a', key)
+++    scope.ctx.tools.register(tool('shared'))
+++    scope.ctx.tools.restrict({ deny: ['global_tool'] })
+++
+++    // `createScope` registers through its own shim fiber, so a scoped
+++    // registration carries the shim's name, not the minting plugin's.
+++    expect(ctx.tools.registrations(key)).toEqual([{ name: 'shared', owner: 'scope' }])
+++    expect(ctx.tools.registrations()).toEqual([
+++      { name: 'shared', owner: 'root' },
+++      { name: 'global_tool', owner: 'alpha' },
+++    ])
+++  })
+++
+++  it('leaves the model-facing schema projection allowlisted', async () => {
+++    const ctx = await mount()
+++    ctx.tools.register(tool('root_tool'))
+++    await registerFrom(ctx, 'alpha', 'tool_a')
+++
+++    // Ownership is a management projection: `schemas()` must keep its own
+++    // allowlist, so no owner can leak into a model request.
+++    expect(Object.keys(ctx.tools.schemas()[0]!).sort()).toEqual(['description', 'name', 'parameters'])
+++    expect(ctx.tools.registrations().map(entry => entry.name)).toEqual(['root_tool', 'tool_a'])
+++  })
+++
+++  it('reports no owner for the registry-synthesized run_code transport', async () => {
+++    const ctx = await mount('ptc')
+++    await registerFrom(ctx, 'alpha', 'tool_a')
+++
+++    const view = ctx.tools.registrations()
+++    expect(view.map(entry => entry.name)).toEqual(['tool_a', RUN_CODE_NAME])
+++    // The transport is synthesized during view resolution, not registered by a
+++    // plugin, so no fiber can be its owner.
+++    expect(view.at(-1)).toStrictEqual({ name: RUN_CODE_NAME, owner: undefined })
+++  })
+++})
+diff --git a/fixture/patches/README.md b/fixture/patches/README.md
+new file mode 100644
+index 0000000..9b5b563
+--- /dev/null
++++ b/fixture/patches/README.md
+@@ -0,0 +1,46 @@
++# dsh-side patches — the complete-surface requirement
++
++The tools tree's data basis is **tool → source-plugin attribution**. The harness
++at `dsh-v0.1.2-alpha.2` exposes no ownership fact for a registered tool:
++
++- `ctx.tools.schemas()` projects only `name` / `description` / `parameters`
++  (`packages/core/tools/src/index.ts`, `schemaOf`), and
++- `tools/change` announces *that* the registry changed, not who changed it.
++
++Without a harness change the panel can only infer ownership by diffing
++`ctx.tools.schemas()` against Cordis `internal/plugin` / `internal/status`
++events. That is the shipped best-effort path: dynamically registered tools can
++land in the wrong plugin group, and unattributed ones fall into `(unknown)`.
++
++`0001-expose-tool-registration-ownership.patch` is the general-purpose harness
++change that completes the surface: `ToolRuntime.register()` records the
++registering context's fiber name, and the new read-only
++`ctx.tools.registrations(scope?)` projection returns `{ name, owner }` per
++visible tool. `schemas()` keeps its model-facing allowlist unchanged, so no
++owner can leak into a model request.
++
++## Apply
++
++```sh
++# from a dsh-v0.1.2-alpha.2 checkout
++git apply -p1 patches/0001-expose-tool-registration-ownership.patch
++```
++
++The patch is a plain `git diff -p1` against `dsh-v0.1.2-alpha.2` touching
++`packages/core/tools/src/index.ts` and adding
++`packages/core/tools/tests/ownership.spec.ts`. Refresh it after editing the
++checkout with:
++
++```sh
++git -C <harness> add -N packages/core/tools/tests/ownership.spec.ts
++git -C <harness> diff -- packages/core/tools > patches/0001-expose-tool-registration-ownership.patch
++git -C <harness> reset -q -- packages/core/tools/tests/ownership.spec.ts
++```
++
++## Behaviour without the patch
++
++The host half keeps the Cordis-event diff attribution path and the panel's
++`(unknown)` group. The capability is never dropped — only its exactness
++degrades. `ctx.tools.registrations` is absent on an unpatched host, so the
++host half must feature-detect it (`typeof ctx.tools.registrations === 'function'`)
++and fall back to the diff path.

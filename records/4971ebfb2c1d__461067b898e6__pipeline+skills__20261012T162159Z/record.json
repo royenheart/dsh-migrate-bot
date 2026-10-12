@@ -1,0 +1,357 @@
+{
+  "schema": 3,
+  "id": "4971ebfb2c1d__461067b898e6__pipeline+skills__20261012T162159Z",
+  "createdAt": "2026-10-12T16:21:59Z",
+  "producer": {
+    "commit": "4971ebfb2c1dd1687924904448275eb1d0a8cc54",
+    "version": "0.3.4",
+    "dirty": false,
+    "message": "fix(e2e): report an advisory end-to-end failure without working on it",
+    "snapshot": "af6d2d0432c29819"
+  },
+  "subject": {
+    "id": "pipeline+skills",
+    "agentRuntime": "0.2.0-rc.2",
+    "skills": {
+      "commit": "ef075767b476e8000c716a18f848028eebcd5aef",
+      "names": [
+        "plugin-upgrade"
+      ]
+    },
+    "attempts": 1,
+    "agentTimeoutMultiplier": 5
+  },
+  "suite": {
+    "repository": "royenheart/dsh-migrate-bot",
+    "commit": "461067b898e643d50567d3e6b0709a30b5b18997",
+    "tasks": [
+      {
+        "id": "R1-router-0.1.5-to-0.2.0",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R2-skill-hub-0.1.6-to-0.1.7",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R3-better-display-0.1.7-rc1-to-rc2",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R4-skill-hub-0.2.0-to-0.2.1-control",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      }
+    ]
+  },
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-v4-flash",
+    "before": {
+      "at": "2026-10-12T16:22:01.531Z",
+      "servedModel": "deepseek-flash",
+      "fingerprint": "aeb56401ca74e127821c4f9126dcb669"
+    },
+    "after": {
+      "at": "2026-10-12T19:58:14.111Z",
+      "servedModel": "deepseek-flash",
+      "fingerprint": "aeb56401ca74e127821c4f9126dcb669"
+    }
+  },
+  "environment": {
+    "harbor": "0.24.0",
+    "docker": "29.6.1",
+    "os": "Linux 6.12.101+deb13-cloud-amd64",
+    "concurrency": 2
+  },
+  "attempts": [
+    {
+      "task": "R1-router-0.1.5-to-0.2.0",
+      "attempt": 1,
+      "trial": "R1-router-0.1.5-to-0.2.0__ivrhgEv",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 4867.3,
+        "verifierSec": 53.1,
+        "totalSec": 5217.9
+      },
+      "usage": {
+        "inputTokens": 412285,
+        "cacheHitTokens": 49191168,
+        "outputTokens": 261132,
+        "usd": 0.366095454
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__ivrhgEv/agent/proposed.diff",
+          "sha256": "b7fab3cf861336665d87b6cd2b2ad2498264d350be27fa47c0ff63ad3a402c3e",
+          "bytes": 81811
+        },
+        "agent/agent.log": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__ivrhgEv/agent/agent.log",
+          "sha256": "8957e003245c62eb782ad77542f6310ba656fe28fadd1f15c9d299cfbb7cacc6",
+          "bytes": 46230
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__ivrhgEv/agent/events.jsonl",
+          "sha256": "401ffc714f1c46b18f6b96b940c090e2a9d8fcf8c909c7e4fcd01bafe11ef0d2",
+          "bytes": 8179
+        },
+        "agent/status.json": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__ivrhgEv/agent/status.json",
+          "sha256": "d01cb7e68a72cf02c5419e278583de0708584f536667427cf09c2611441f9b84",
+          "bytes": 5867
+        },
+        "verifier/judge.log": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__ivrhgEv/verifier/judge.log",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__ivrhgEv/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__ivrhgEv/verifier/test-stdout.txt",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        }
+      }
+    },
+    {
+      "task": "R2-skill-hub-0.1.6-to-0.1.7",
+      "attempt": 1,
+      "trial": "R2-skill-hub-0.1.6-to-0.1.7__TEwkHmf",
+      "outcome": "scored",
+      "reward": 0.7,
+      "rewards": {
+        "reward": 0.7
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 5132.9,
+        "verifierSec": 27.7,
+        "totalSec": 5393.4
+      },
+      "usage": {
+        "inputTokens": 437853,
+        "cacheHitTokens": 94357120,
+        "outputTokens": 272454,
+        "usd": 0.5122217099999998
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__TEwkHmf/agent/proposed.diff",
+          "sha256": "d538282657100007fbbb5a3a79eb996ccfb6076a254cff9c1ab7756b98bb86ea",
+          "bytes": 210186
+        },
+        "agent/agent.log": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__TEwkHmf/agent/agent.log",
+          "sha256": "250dfc7b1b23f177a930a47667a08be64b39c940206c7a6b5b57b84e93fc4b37",
+          "bytes": 49936
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__TEwkHmf/agent/events.jsonl",
+          "sha256": "136bf88258bf3e885f25b212e07b93d49caa1e3b1a967e481527ac0a4f688e2c",
+          "bytes": 5638
+        },
+        "agent/status.json": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__TEwkHmf/agent/status.json",
+          "sha256": "cbcb7cdf2276360731423d42fbdb068037efe8aeb167ccfe4c11630c3fe97f04",
+          "bytes": 3367
+        },
+        "verifier/judge.log": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__TEwkHmf/verifier/judge.log",
+          "sha256": "9fa6bdca3ee302ccbf219db3c2dcc7f5f7706df1b550395f84472907844e961b",
+          "bytes": 945
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__TEwkHmf/verifier/reward.txt",
+          "sha256": "3b1add489f8961560bc1562f10cabcf762bce961623cca362f0128522fe1ed29",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__TEwkHmf/verifier/test-stdout.txt",
+          "sha256": "9fa6bdca3ee302ccbf219db3c2dcc7f5f7706df1b550395f84472907844e961b",
+          "bytes": 945
+        }
+      }
+    },
+    {
+      "task": "R3-better-display-0.1.7-rc1-to-rc2",
+      "attempt": 1,
+      "trial": "R3-better-display-0.1.7-rc1-to-r__XGN6oac",
+      "outcome": "scored",
+      "reward": 0.8,
+      "rewards": {
+        "reward": 0.8
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 4160.6,
+        "verifierSec": 52.4,
+        "totalSec": 4373.7
+      },
+      "usage": {
+        "inputTokens": 358090,
+        "cacheHitTokens": 57469824,
+        "outputTokens": 205949,
+        "usd": 0.34969237200000003
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__XGN6oac/agent/proposed.diff",
+          "sha256": "d9e84c9b6be8543b70c3400484f8aac37d0361bc727c0082866948b1070ba2f6",
+          "bytes": 4795383
+        },
+        "agent/agent.log": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__XGN6oac/agent/agent.log",
+          "sha256": "858509fdca700206e881e586bcfebc4e9f806ecb5124176b0de6acc5d1e0a426",
+          "bytes": 38810
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__XGN6oac/agent/events.jsonl",
+          "sha256": "94d1ffc4ba348a53de5cba2a797e6ae19a9008452ff3e4e8f1659314e8f7107b",
+          "bytes": 7609
+        },
+        "agent/status.json": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__XGN6oac/agent/status.json",
+          "sha256": "f25471d64f41548aa09787e7615fe81df159042efcbff84218daf182a626b481",
+          "bytes": 6089
+        },
+        "verifier/judge.log": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__XGN6oac/verifier/judge.log",
+          "sha256": "f7b33bdab490397302328c373f0f5648953d7c2cb52046366223ed7b0b508203",
+          "bytes": 1306
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__XGN6oac/verifier/reward.txt",
+          "sha256": "fdf276f0183c71742823b061f7342d581e56de0af10648339b525249e26ee94f",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__XGN6oac/verifier/test-stdout.txt",
+          "sha256": "f7b33bdab490397302328c373f0f5648953d7c2cb52046366223ed7b0b508203",
+          "bytes": 1306
+        }
+      }
+    },
+    {
+      "task": "R4-skill-hub-0.2.0-to-0.2.1-control",
+      "attempt": 1,
+      "trial": "R4-skill-hub-0.2.0-to-0.2.1-cont__FDstQGA",
+      "outcome": "scored",
+      "reward": 0.77,
+      "rewards": {
+        "reward": 0.77
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 7351.7,
+        "verifierSec": 34,
+        "totalSec": 7575.6
+      },
+      "usage": {
+        "inputTokens": 378322,
+        "cacheHitTokens": 74368256,
+        "outputTokens": 247378,
+        "usd": 0.42827986799999984
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__FDstQGA/agent/proposed.diff",
+          "sha256": "107bfb66037e113be808114c00bfb0d86889e5d60e3e75fbd6427186495f51b4",
+          "bytes": 150500
+        },
+        "agent/agent.log": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__FDstQGA/agent/agent.log",
+          "sha256": "9e2afcbba4651dc17397e24462df0fa71cea2dcbca83ff8240412215db8e16cb",
+          "bytes": 59071
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__FDstQGA/agent/events.jsonl",
+          "sha256": "800f345a90ce2400b53cefabd9fea2059412fd3a9d4ec5fcaa56ff5be4beefb5",
+          "bytes": 7213
+        },
+        "agent/status.json": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__FDstQGA/agent/status.json",
+          "sha256": "3b617fa8c30888bcc2dd5943da66fbccb02aeb5989c4112cc7ffd701142ddff1",
+          "bytes": 8065
+        },
+        "verifier/judge.log": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__FDstQGA/verifier/judge.log",
+          "sha256": "89e4f965003de212cd1f895b60b471b71b21925447b565e7638a3e4d35ef06fd",
+          "bytes": 428
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__FDstQGA/verifier/reward.txt",
+          "sha256": "c7a85b53e01b63d8a4870dacaa8936e7743bae47d3f649f9b94a6bd4628e828a",
+          "bytes": 5
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__FDstQGA/verifier/test-stdout.txt",
+          "sha256": "89e4f965003de212cd1f895b60b471b71b21925447b565e7638a3e4d35ef06fd",
+          "bytes": 428
+        }
+      }
+    }
+  ],
+  "metrics": {
+    "formula": "v1",
+    "values": {
+      "meanReward": 0.8175,
+      "passRate@1.0": 0.25,
+      "passRate@0.7": 1,
+      "passAtK": 0.25,
+      "meanReward.S": null,
+      "meanReward.M": null,
+      "meanReward.H": null,
+      "passHatK": 0.25,
+      "fragility": 0,
+      "dispersion": null,
+      "unstableTaskShare": 0,
+      "inputTokens": 396637.5,
+      "outputTokens": 246728.25,
+      "cacheHitRatio": 0.994272,
+      "costPerAttempt": 0.414072,
+      "costPerSuccess": 1.656289,
+      "agentSecP50": 5000.1,
+      "agentSecP90": 6686.06,
+      "timeoutRate": 0,
+      "infrastructureRate": 0,
+      "eligibleTasks": 4,
+      "infeasibleTasks": 0
+    },
+    "intervals": {
+      "meanReward": [
+        0.725,
+        0.9425
+      ],
+      "passRate@1.0": [
+        0,
+        0.75
+      ]
+    }
+  }
+}

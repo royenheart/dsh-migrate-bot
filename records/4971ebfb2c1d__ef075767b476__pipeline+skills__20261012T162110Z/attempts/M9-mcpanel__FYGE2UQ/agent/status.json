@@ -1,0 +1,138 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.5",
+              "version": "0.1.0-rc.5"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 1,
+        "lastFingerprint": "mechanical: npm warn",
+        "failure": {
+          "check": "mechanical",
+          "outcome": "fail",
+          "fingerprint": "mechanical: npm warn",
+          "detail": "npm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-brand@\"^0.1.2-rc.1\" from @deepseek-ai/dsh-user-approval@0.1.2-rc.1\nnpm warn node_modules/@deepseek-ai/dsh-user-approval\nnpm warn   peer @deepseek-ai/dsh-user-approval@\"^0.1.2-alpha.2\" from @deepseek-ai/dsh-tools@0.1.2-alpha.2\nnpm warn   node_modules/@deepseek-ai/dsh-tools\nnpm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: @deepseek-ai/dsh-user-approval@0.1.2-rc.1\nnpm warn Found: @deepseek-ai/dsh-brand@undefined\nnpm warn node_modules/@deepseek-ai/dsh-brand\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-brand@\"^0.1.2-rc.1\" from @deepseek-ai/dsh-user-approval@0.1.2-rc.1\nnpm warn node_modules/@deepseek-ai/dsh-user-approval\nnpm warn   peer @deepseek-ai/dsh-user-approval@\"^0.1.2-alpha.2\" from @deepseek-ai/dsh-tools@0.1.2-alpha.2\nnpm warn   node_modules/@deepseek-ai/dsh-tools\nnpm error code ETARGET\nnpm error notarget No matching version found for @deepseek-ai/dsh-llm@^0.1.2-rc.1 with a date before 8/30/2026, 3:10:52 PM.\nnpm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-12T21_34_42_140Z-debug-0.log"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "could not install dsh 0.1.0-rc.5 for the checks: the npm registry did not say when @deepseek-ai/dsh@0.1.0-rc.5 was published"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [],
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-12T21-13-41-403Z",
+      "startedAt": "2026-10-12T21:13:42.844Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.5",
+            "version": "0.1.0-rc.5"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 1,
+      "lastFingerprint": "mechanical: npm warn",
+      "failure": {
+        "check": "mechanical",
+        "outcome": "fail",
+        "fingerprint": "mechanical: npm warn",
+        "detail": "npm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-brand@\"^0.1.2-rc.1\" from @deepseek-ai/dsh-user-approval@0.1.2-rc.1\nnpm warn node_modules/@deepseek-ai/dsh-user-approval\nnpm warn   peer @deepseek-ai/dsh-user-approval@\"^0.1.2-alpha.2\" from @deepseek-ai/dsh-tools@0.1.2-alpha.2\nnpm warn   node_modules/@deepseek-ai/dsh-tools\nnpm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: @deepseek-ai/dsh-user-approval@0.1.2-rc.1\nnpm warn Found: @deepseek-ai/dsh-brand@undefined\nnpm warn node_modules/@deepseek-ai/dsh-brand\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-brand@\"^0.1.2-rc.1\" from @deepseek-ai/dsh-user-approval@0.1.2-rc.1\nnpm warn node_modules/@deepseek-ai/dsh-user-approval\nnpm warn   peer @deepseek-ai/dsh-user-approval@\"^0.1.2-alpha.2\" from @deepseek-ai/dsh-tools@0.1.2-alpha.2\nnpm warn   node_modules/@deepseek-ai/dsh-tools\nnpm error code ETARGET\nnpm error notarget No matching version found for @deepseek-ai/dsh-llm@^0.1.2-rc.1 with a date before 8/30/2026, 3:10:52 PM.\nnpm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-12T21_34_42_140Z-debug-0.log"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "could not install dsh 0.1.0-rc.5 for the checks: the npm registry did not say when @deepseek-ai/dsh@0.1.0-rc.5 was published"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [],
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-12T21-13-41-403Z",
+    "startedAt": "2026-10-12T21:13:42.844Z"
+  }
+}

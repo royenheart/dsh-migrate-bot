@@ -1,0 +1,1912 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index bc9bde1..f6dbcf8 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -3,9 +3,22 @@
+ A browser game overlay plugin: while the model generates, a teaser pops up in
+ the bottom-right corner of the web UI and clicking it opens a game menu
+ (wordle / match-3, extensible game registry). Client-only plugin — the host
+-half is a no-op stub. Written in the 0.1.1-era style (the browser half pulls
+-its client context type from the client-runtime package). The host is moving
+-to dsh 0.1.2-alpha.2.
++half is a no-op stub. Migrated to the dsh 0.1.2-alpha.2 cohort: the browser
++half composes its client context from the owning packages (`@deepseek-ai/cordis`
++plus the `sessions` merge of `@deepseek-ai/dsh-api-session-controller/client`
++and the `locale` merge of `@deepseek-ai/dsh-client-locale/client`); the removed
++`@deepseek-ai/dsh-client-runtime` aggregation package is no longer referenced.
++
++Composition config. The bundle row in `cordis.patch.yml` carries the overlay's
++`enabled` / `message` / `buttonText`; `apply(ctx, config)` of the browser half
++reads the same row config the host half receives, and the locale namespace
++stays empty because the visible copy is not plugin-owned. On dsh
++0.1.2-alpha.2 the boot graph does not carry a row config to the browser half
++(`WebBootEntry` has no config member), so that half receives `undefined` and
++renders no copy. The harness patch that adds the channel is
++`patches/0001-client-row-config-channel.patch` (applies to
++`dsh-v0.1.2-alpha.2`); the plugin keeps the documented config entry point
++instead of substituting a built-in default or a settings page.
+ 
+ Release procedure (internal):
+ 
+diff --git a/fixture/client.d.ts b/fixture/client.d.ts
+new file mode 100644
+index 0000000..1fa635d
+--- /dev/null
++++ b/fixture/client.d.ts
+@@ -0,0 +1,26 @@
++/**
++ * Type-level surface of the browser half (`exports["./client"]` resolves
++ * `client.js` to this declaration file).
++ *
++ * A JavaScript plugin cannot declaration-merge, so its locale namespace key
++ * set lives here: TypeScript reads it when the package's `./client` types are
++ * resolved, and it pairs with the runtime `ctx.locale.register` call in
++ * `client.js`. The key union is empty while the client half owns no visible
++ * strings — the teaser line and button text arrive through the bundle row
++ * config (`message` / `buttonText` in `cordis.patch.yml`), which the boot graph
++ * carries to the browser half as `apply(ctx, config)`; a harness without that
++ * channel leaves the browser half without the row config, and the plugin
++ * renders no copy rather than a different one. Add keys here when the overlay
++ * starts shipping its own copy, and fill both dictionaries in the same change.
++ *
++ * `@deepseek-ai/dsh-client-ui-slots` owns `LocaleNamespaceMap`; the type-only
++ * import activates its declaration and creates no runtime module request.
++ */
++import type {} from '@deepseek-ai/dsh-client-locale/client'
++
++declare module '@deepseek-ai/dsh-client-ui-slots' {
++  interface LocaleNamespaceMap {
++    /** Own copy namespace of the d399 overlay (teaser + game menu). */
++    'dsh-d399': never
++  }
++}
+diff --git a/fixture/client.js b/fixture/client.js
+index e9ec395..9dd2eb7 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -5,41 +5,67 @@
+ //
+ // The overlay is NOT a slot registration: it is a `position: fixed` DOM
+ // contribution portaled to document.body, so it subscribes to the sessions
+-// list snapshot store itself instead of receiving session-scoped hooks.
++// list snapshot store itself instead of receiving session-scoped hooks. The
++// 0.1.2-alpha.2 cohort also ships `shell.overlay` (ui-layout's root-scope,
++// additive frame-wide floating layer) as the official seat for a surface like
++// this; the plugin keeps its own portal on purpose — teaser placement, the
++// generating trigger, and the game menu are plugin-owned, and the portal works
++// unchanged on the new cohort.
+ //
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the client context type lived on the
+-// client-runtime package.
++// The teaser line and button text are composition config: the bundle row in
++// `cordis.patch.yml` declares `enabled` / `message` / `buttonText`, and the
++// browser half reads the same row config the host half receives.
+ //
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.x era):
+-//   "ctx.sessions.list is the same store object as before — the type just
+-//    moved packages; skip the ISessions annotation to keep the bundle lean."
+-// ────────────────────────────────────────────────────────────
++// 0.1.2-alpha.2 cohort: the `dsh-client-runtime` aggregation package is gone
++// (`ClientContext` with it). `ctx` is the Cordis `Context`, and each client
++// facet is declaration-merged by its owning package, imported type-only below
++// (sessions: `dsh-api-session-controller/client`, locale:
++// `dsh-client-locale/client`). `ctx.sessions.list` is the same store object as
++// before — `current` plus `byId[id].running` — the store type just moved
++// packages, so it is annotated from the owning package instead of dropped.
+ 
+ export const name = 'bench-d399-overlay-client'
+ 
+ // Required services: sessions (drives the model-generating flag) + locale.
+ export const inject = ['sessions', 'locale']
+ 
++/**
++ * Client root context: the Cordis `Context` plus the client facets merged in
++ * by the packages that own them. The type-only references below are what pull
++ * those merges (`ctx.sessions`, `ctx.locale`) into this program; an untyped
++ * `ctx` would silently turn every store read into `any`.
++ *
++ * @typedef {import('@deepseek-ai/cordis').Context} ClientContext
++ * @typedef {import('@deepseek-ai/dsh-api-session-controller/client').ISessions} ISessions
++ * @typedef {import('@deepseek-ai/dsh-api-session-controller/client').SessionListState} SessionListState
++ * @typedef {import('@deepseek-ai/dsh-client-locale/client').LocaleRuntime} LocaleRuntime
++ */
++
+ /** Slice of the sessions list store the overlay reads. */
+-const SessionListSlice = undefined // { current?: string, byId: Record<string, { running?: boolean }> }
++/** @type {SessionListState | undefined} */
++const SessionListSlice = undefined // { ids, byId, current, phase, … }
+ 
+ /** Cached snapshot: same reference until `running` actually flips. */
+-const RunningCache = undefined // { id: string | undefined, running: boolean }
++/** @type {{ id: string | undefined, running: boolean } | undefined} */
++const RunningCache = undefined
+ 
+ /**
+  * Distilled from useSessionRunning: reads the current session's `running`
+  * flag off the sessions list snapshot store (useSyncExternalStore in the
+  * real hook; the subscription shape below is the same store contract).
+  *
+- * Type surface as it stands (type-only, erased at build time — this is
+- * where the client-plane break lives):
+- *   import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
++ * Type surface on the alpha.2 cohort: `ctx.sessions` is the declaration merge
++ * of `@deepseek-ai/dsh-api-session-controller/client` (`ISessions`), whose
++ * `list` is a snapshot store of `SessionListState` — `current` is the selected
++ * id, `byId[id]` is a `SessionSummary` carrying `running: boolean` — and the
++ * `locale` service is the merge of `@deepseek-ai/dsh-client-locale/client`
++ * (`LocaleRuntime`).
+  *
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * @param {ClientContext} ctx
+  * @returns {boolean} whether the current session's model is generating.
+  */
+ function readSessionRunning(ctx) {
++  /** @type {ISessions['list']} */
+   const list = ctx.sessions.list
+   const snap = list.getSnapshot()
+   const id = snap.current
+@@ -51,18 +77,60 @@ function readSessionRunning(ctx) {
+ 
+ /**
+  * Client plugin body: register the locale namespace and mount the overlay.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
+- * @param {unknown} config - cordis row config (loosely typed).
++ *
++ * The visible copy is composition config, not plugin-internal defaults: the
++ * bundle row (`cordis.patch.yml`) declares `enabled` / `message` / `buttonText`
++ * and the browser half reads the same row config the host half receives. The
++ * harness carries a row's config to the browser half through the boot graph;
++ * on a harness without that channel this half receives no config at all, which
++ * `readOverlayConfig` surfaces instead of substituting different copy.
++ *
++ * @param {ClientContext} ctx
++ * @param {unknown} config - cordis row config (`enabled`, `message`, `buttonText`).
+  */
+ export function apply(ctx, config) {
+-  console.error('[bench-d399-overlay-client] apply() on the 0.1.1-era cohort: ClientContext from the client-runtime package')
++  console.error('[bench-d399-overlay-client] apply() on the 0.1.2-alpha.2 cohort: Context composed from the owning client packages')
+ 
+-  ctx.effect(() => {
+-    ctx.locale.register('dsh-d399', { zh: {}, en: {} })
+-  }, 'bench-d399-overlay-client: own copy namespace')
++  const overlay = readOverlayConfig(config)
++  if (!overlay.enabled) {
++    console.error('[bench-d399-overlay-client] overlay disabled by the bundle row config; registering nothing')
++    return
++  }
++
++  // `dsh-d399` is declared in client.d.ts, so the typed bilingual form is the
++  // declared entry point; its disposer is returned because duplicate
++  // (ns, locale) registration throws and a remounting HMR entry must be able
++  // to register again.
++  ctx.effect(
++    () => ctx.locale.register('dsh-d399', { zh: {}, en: {} }),
++    'bench-d399-overlay-client: own copy namespace',
++  )
+ 
+   ctx.effect(() => {
+     const running = readSessionRunning(ctx)
+-    console.error(`[bench-d399-overlay-client] overlay teaser ${running ? 'shown' : 'hidden'} (React root + portal mount elided in fixture)`)
++    // The mount renders `overlay.message` and `overlay.buttonText` verbatim;
++    // a missing row config leaves them undefined rather than inventing copy.
++    console.error(`[bench-d399-overlay-client] overlay teaser ${running ? 'shown' : 'hidden'} while generating (React root + portal mount elided in fixture)`)
++    // The real mount returns the React root's unmount; the fixture keeps the
++    // disposer so the entry still tears down through the effect.
++    return () => {}
+   }, 'bench-d399-overlay-client: overlay mount')
+ }
++
++/**
++ * Read the overlay's composition config off the cordis row. The values are
++ * part of the plugin's documented surface (`cordis.patch.yml`), so an absent
++ * config means the row declared nothing and the mount renders no copy — it is
++ * not permission to hard-code a different teaser.
++ *
++ * @param {unknown} config - cordis row config.
++ * @returns {{ enabled: boolean, message: string | undefined, buttonText: string | undefined }}
++ */
++function readOverlayConfig(config) {
++  const row = config ?? {}
++  return {
++    enabled: row.enabled !== false,
++    message: typeof row.message === 'string' ? row.message : undefined,
++    buttonText: typeof row.buttonText === 'string' ? row.buttonText : undefined,
++  }
++}
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index 5b6f2b4..db37ad9 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -3,6 +3,11 @@
+ # When the model is generating, a teaser pops up in the bottom-right corner;
+ # clicking the button opens the game menu (wordle / match-3, extensible via
+ # the d399Games client service).
++#
++# The config below is the overlay's documented composition surface: the host
++# half receives it through cordis, and the browser half reads the same row
++# config as `apply(ctx, config)` — `enabled` gates the mount, `message` and
++# `buttonText` are the teaser copy.
+ - insert:
+     - id: bench-d399-overlay
+       name: '@bench/dsh-bench-d399-overlay'
+diff --git a/fixture/index.js b/fixture/index.js
+index 3c0f6b0..0f24bb1 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,23 +1,28 @@
+ // Host half (minimal): the d399 overlay is a client-only UI contribution —
+ // the host half has no runtime work (mirrors the real plugin's src/index.ts).
+ //
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the browser half pulled its client
+-// context type from the client-runtime package, and the sessions list store
+-// had no typed home of its own.
++// 0.1.2-alpha.2 cohort: the browser half composes its client context from the
++// owning packages (`dsh-api-session-controller/client` for the sessions list,
++// `dsh-client-locale/client` for the locale registry); the removed
++// `dsh-client-runtime` aggregation package is no longer referenced.
+ 
+ export const name = 'bench-d399-overlay'
+ 
+ // Client-only plugin: the host half declares no injections.
++/** @type {string[]} */
+ export const inject = []
+ 
+ /**
+  * Host apply — no-op. The overlay is mounted entirely by the browser half.
+  * @param {import('@deepseek-ai/cordis').Context} ctx
++ * @param {unknown} config - cordis row config (unused by the no-op host half).
+  */
+ export function apply(ctx, config) {
+   console.error('[bench-d399-overlay] host apply(): client-only overlay plugin; the browser half mounts the bottom-right teaser while the model generates')
+ 
+   ctx.effect(() => {
+     console.error('[bench-d399-overlay] no host-plane registrations (overlay is client-only)')
++    // `ctx.effect` takes an effect, not a callback: return an empty disposer.
++    return () => {}
+   }, 'bench-d399-overlay: host')
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..d26fd60
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,1038 @@
++{
++  "name": "@bench/dsh-bench-d399-overlay",
++  "version": "0.1.4",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-d399-overlay",
++      "version": "0.1.4",
++      "devDependencies": {
++        "@deepseek-ai/cordis": "^4.0.1",
++        "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-store": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.1",
++        "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++        "react": "^18.2.0",
++        "react-dom": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-api-session-controller": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-invariants": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        },
++        "react-dom": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cordis": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.4.tgz",
++      "integrity": "sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==",
++      "devOptional": true,
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      },
++      "bin": {
++        "cordis": "bin.js"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis-plugin-include": {
++          "optional": true
++        },
++        "@deepseek-ai/cordis-plugin-loader": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cordis-plugin-include": {
++      "version": "1.0.9",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis-plugin-include/-/cordis-plugin-include-1.0.9.tgz",
++      "integrity": "sha512-Xmekm7u5Kpeym6nABL4T1/Mg6aQYFZxsipB0WycmCctvX1DqAv8nCFwRmg2XMx/f7EbZgNEbXQwJfabcMu8zxQ==",
++      "devOptional": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "js-yaml": "^4.1.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      }
++    },
++    "node_modules/@deepseek-ai/cordis-plugin-loader": {
++      "version": "1.0.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis-plugin-loader/-/cordis-plugin-loader-1.0.5.tgz",
++      "integrity": "sha512-200huL2ttWcjyeYllvPYn+qMR7I89qy8MhZasbHltPzB/KMrSfsyoCYKdCGc5KqPGj5iJugcmibQzjINMO9I+Q==",
++      "devOptional": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@deepseek-ai/schemastery": "~3.18.4"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "~4.0.4",
++        "node-addon-require-builtin": "^0.1.6"
++      },
++      "peerDependenciesMeta": {
++        "node-addon-require-builtin": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "devOptional": true,
++      "license": "MIT"
++    },
++    "node_modules/@deepseek-ai/dsh-agent": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-agent/-/dsh-agent-0.1.2-rc.1.tgz",
++      "integrity": "sha512-lfaqN34vUCWvbn1kJVHrhfJ6Dvt1HDHCm33ZCpmKkl07/5q6FxWqVv6rOdVX5QnM/9xz/uYiN0nQwUtBg4+Skg==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-projection": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-agent-default-model": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-agent-default-model/-/dsh-agent-default-model-0.1.2-rc.1.tgz",
++      "integrity": "sha512-feuTXXl6jIAp71O77l8XzeKcpgahlCXQ7YUjM+Cl/VF0EBpctKkdvwbvTalImRzYYzX5qGK74hblsT2HC4xEwQ==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-settings": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-agent-presets": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-agent-presets/-/dsh-agent-presets-0.1.2-rc.1.tgz",
++      "integrity": "sha512-vNvDw8DYtZ8ySublYY6gFPPruNIST3Xq9bf7RlgoAY4xJxc4w3+/+HOhoYrxQRDWk+FQgYkBnSfnT0OTSOY3RQ==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "js-yaml": "^4.1.0",
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/cordis-plugin-include": "^1.0.7",
++        "@deepseek-ai/cordis-plugin-loader": "^1.0.3",
++        "@deepseek-ai/dsh-agent": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-atomic-write": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-home-paths": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-projection": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-settings": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-tools": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-api-gateway": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-api-gateway/-/dsh-api-gateway-0.1.2-rc.1.tgz",
++      "integrity": "sha512-9jYky3tan2ZFAyaNP2+wbOvwGiUwJdvqqBVUJ6370+2d7OeZIfPu4PMLLFvPqGXR28a9TwuhWoT7i9gpHxRmmA==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-deque": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-timeout": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1",
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "ws": "^8.21.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-api-session-controller": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-api-session-controller/-/dsh-api-session-controller-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-X2YSKLSlD8ncitlzSdqzeBV92V4Sa7wEkOB65u32Xy04rovR+vKlqm4TpSGjHUT7Q0U8vOQ6eVlrMmOuJ+nkbw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-deque": "^0.1.2-alpha.2",
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-agent-default-model": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-agent-presets": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-api-gateway": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-attachment": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-connection": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-file-reference": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-jobs": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-native-command": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-scope": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-session-persistence": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-session-projection": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-session-projection-cache": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-session-query": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-session-title": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-skill": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-subagent": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-typert-registry": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-util-time": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-util-workspace-path": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-workspace": "^0.1.2-alpha.2"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/dsh-jobs": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-session-persistence": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-session-projection-cache": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-atomic-write": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-atomic-write/-/dsh-atomic-write-0.1.2-rc.1.tgz",
++      "integrity": "sha512-lwWwdXRZrL/xCluykwh+HSFzNPlSyhLPP3oyXas5Zp0e+bc7blk9u6J7bY2GTNBQBIUC7AN+xwFKd3fnkIXGIw==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-attachment": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-attachment/-/dsh-attachment-0.1.2-rc.1.tgz",
++      "integrity": "sha512-QISKUjEITusLvAkqPLRn70xDUt+GjjY41pISjtPKYcZ4EGmayzhgZ3VJNYEcC+rbaF44hs2o/0VhOwHA7lyxjw==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-brand": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-brand/-/dsh-brand-0.1.2-rc.1.tgz",
++      "integrity": "sha512-y2RHIag3kzLdY8kTBuSUSTsKzWPscJrysNObXTiNM7stXLpa3jXpshsB1caqGzNx50vYcmHeN1gFVECgx3NZHg==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-connection": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-connection/-/dsh-client-connection-0.1.2-rc.1.tgz",
++      "integrity": "sha512-30g7JG+Z8bDj+ux+KsDfMSXPI6zXotMAFNCxI8O8mJiutJNlZxIL5LXQeDrJpVOW9MWWQkoMp+R+Dxzp5DNDSQ==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-credentials": "^0.1.2-rc.1",
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-locale": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-locale/-/dsh-client-locale-0.1.2-rc.1.tgz",
++      "integrity": "sha512-p34i5WcZ0+b77RKEatGLc6Rh4OgJJmc15kWbBqtCtSI1BxpwZxjDzoNIMTTS3jDGUQqfEd9X7Js9D4uNJDUewg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-store": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-store/-/dsh-client-store-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-tz94GO4b8m3PPe/knfNjHa/VeTJTDNgN1eZeQWHjb5kKxCCThlNk91y5z/kEC93oGVd0lphq5pG5aQCQr2364g==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "immer": "^10.1.1",
++        "zustand": "~4.4.7"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-store/node_modules/zustand": {
++      "version": "4.4.7",
++      "resolved": "https://registry.npmjs.org/zustand/-/zustand-4.4.7.tgz",
++      "integrity": "sha512-QFJWJMdlETcI69paJwhSMJz7PPWjVP8Sjhclxmxmxv/RYI7ZOvR5BHX+ktH0we9gTWQMxcne8q1OY8xxz604gw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "use-sync-external-store": "1.2.0"
++      },
++      "engines": {
++        "node": ">=12.7.0"
++      },
++      "peerDependencies": {
++        "@types/react": ">=16.8",
++        "immer": ">=9.0",
++        "react": ">=16.8"
++      },
++      "peerDependenciesMeta": {
++        "@types/react": {
++          "optional": true
++        },
++        "immer": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-slots": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-slots/-/dsh-client-ui-slots-0.1.2-rc.1.tgz",
++      "integrity": "sha512-wcqn8xwb87RjurSQ0zPoI4K9eYhDyoBjQqg4bByDq8CNynvayHoBPnNWfiAQ8ngyOPE20teL3DMS0gbcfCTqbA==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-code-runtime": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-code-runtime/-/dsh-code-runtime-0.1.2-rc.1.tgz",
++      "integrity": "sha512-dv5UszPJb/AFcarZc2c6h5z/X80bsrSd3bfIOugwNVclSI6P+L3ixseoZKgyks7T0Ap0h6ngXGk2WeoUkmYxnQ==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-credentials": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-credentials/-/dsh-credentials-0.1.2-rc.1.tgz",
++      "integrity": "sha512-e7DGpuYQqiD4dOWGQeY/XAWPTjbax/MkrXBwsB8wBtNpoPiAKiLYgd+iFiQc66BGOlutSRFz31IKdbduqPbTxA==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-deque": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-deque/-/dsh-deque-0.1.2-rc.1.tgz",
++      "integrity": "sha512-v2HL9e6NER5Yv8p3+8zls9YvhG3NeRRMVg0GZ/4VgOJcVDgZp14EYVVbheX9HzYlyiic41ciAf1T8Y2pkV41OQ==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-file-reference": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-file-reference/-/dsh-file-reference-0.1.2-rc.1.tgz",
++      "integrity": "sha512-m4Rvk7tpOep62Q1UCceeqFKSM0K4Y6igZopuKn+AZkL2FAM2JISojMefXq5SKtjPiZP0Vg4BpDey3M63Bnl4xw==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-home-paths": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-home-paths/-/dsh-home-paths-0.1.2-rc.1.tgz",
++      "integrity": "sha512-DeDXxvrhAlkS+hxNLSFvWp8LDFhn26pO8gcutptOgSkrObM0yYW5119kyduwD1ExW0v1geToX+uDjBxO/SS/pQ==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-invariants": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-invariants/-/dsh-invariants-0.1.2-rc.1.tgz",
++      "integrity": "sha512-zSjuFJYcEB94kPwn7SicqAV1dfVWZkjt1I8luDboxtjfp5CN6ziwJhLv3KaB+Dh9tgkyGY4mvo886W/HhE9L9g==",
++      "devOptional": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-llm": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-llm/-/dsh-llm-0.1.2-rc.1.tgz",
++      "integrity": "sha512-7VYsha5AXsVLnsAwYJffWXz9bwUbElw8i5N8tlTSdai9Bupk3sMbsotzPf8ZbsuGAxQYErahMwQwgGEu4qZO6g==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-timeout": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-crypto": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1",
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-native-command": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-native-command/-/dsh-native-command-0.1.2-rc.1.tgz",
++      "integrity": "sha512-dBVql+9hXcdnWcfwBiFAfzz9CmAnx6iWYsBFQNdPgVu9m7VcOyiIT8ZQ47BVm7GHmpDXmqiI7pL1iwnI56hrzg==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-scope": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-scope/-/dsh-scope-0.1.2-rc.1.tgz",
++      "integrity": "sha512-GHwbzWrGbmE0ZGzAZsXBudpyCM9ENCpXxlKODIaPFbIWhRePh6nH2jW47TAOqCIsPPedWC2p3w8Tx5WAa3I/2A==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session/-/dsh-session-0.1.2-rc.1.tgz",
++      "integrity": "sha512-jRGNPTbQcvIx1F2MVmmkoiHLgpC3Btqo1wkl/3JDLlOWRVWKOuaC+5fQiMrFPOYfno6YiX/c2UvmA0td8qB92w==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session-persistence": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-persistence/-/dsh-session-persistence-0.1.2-rc.1.tgz",
++      "integrity": "sha512-8dnQGgqA8yK7SIxyC2utRdkHhM7mxw9iidDlPOx4GRO4fgY8+UpjxFvWPshkKsY2WNYY/nYcZQt5NNoE/Br4Dw==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-timeout": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session-projection": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-projection/-/dsh-session-projection-0.1.2-rc.1.tgz",
++      "integrity": "sha512-qVWlIzPm4u9vzQ5G/QtE6jeSJ3b3b42hWVJj664BurEZlHbAfdqkhYc1QsoBU+5k5kUEJFHh07z8HxuXA9kTnQ==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session-query": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-query/-/dsh-session-query-0.1.2-rc.1.tgz",
++      "integrity": "sha512-cubi3flRd66ebzJ/My5t9YIB7ymLdmQonjb07oU5btMHO/ln+gpKnqq2DcnfsdKkktSR+f5VpLMbfTNtoBuRCw==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-persistence": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-projection": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-projection-cache": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-title": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-tool-todo": "^0.1.2-rc.1"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/dsh-session-persistence": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-session-projection": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-session-projection-cache": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session-title": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-title/-/dsh-session-title-0.1.2-rc.1.tgz",
++      "integrity": "sha512-hCffH0uZWEM9p3MPkOQOFUxpPwfV48N8KDc3hYX7zVOFgHBY93ylwkEEVVkWN+sNp2zJmFrZSya23jFVshDtQg==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1",
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-projection": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-settings": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-settings/-/dsh-settings-0.1.2-rc.1.tgz",
++      "integrity": "sha512-wMmJ2w5S6I7hgmgPppuAVemltEcTmAa8gvii7fk4T2KGVCuBYgig8xPwQ8Lp2ukLZSzzE6ZVCQxhdYZyJX/USA==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/schemastery": "^3.18.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-skill": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-skill/-/dsh-skill-0.1.2-rc.1.tgz",
++      "integrity": "sha512-oaHunkTZ9gtlxp66GcqZ3tQmPXEgbu/KNCnc9JipaIwfLHFYiU3CKuFjVAiu82qtSr9w7umRMFKAstkr1R30jw==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1",
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-storage": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-storage/-/dsh-storage-0.1.2-rc.1.tgz",
++      "integrity": "sha512-tMtOe7GkHKZ71QpOzp2Mfisg37aAYjPCRS2MYfDrgM0pmj29Gn7HOxAPCk6gEqxs6rZbPbG1/SB9esWuQNfITg==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-storage-domain": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-storage-domain/-/dsh-storage-domain-0.1.2-rc.1.tgz",
++      "integrity": "sha512-Ee+fI/46ZXgKV4bfLeiNJMhlo9Mx0jT9GXzuJ0DcdGGOsNSZrY/EQAzVXHJJu6EVwIJqBkv1bxEKijVSF2YhZQ==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-storage": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-subagent": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-subagent/-/dsh-subagent-0.1.2-rc.1.tgz",
++      "integrity": "sha512-GhRsymKb1uYbc7OwHh8WTdSXqAcx/KHFJwYX4BYJk90dsOkVx9ccBq6QoJfDYja34s1KCyv2UO/8MUtrzBsITw==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1",
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-agent-presets": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-attachment": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-jobs": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-sandbox": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-sandbox-policy": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-persistence": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-projection": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-projection-cache": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-query": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-tools": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-user-approval": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-time": "^0.1.2-rc.1"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/dsh-agent-presets": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-jobs": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-sandbox": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-sandbox-policy": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-session-persistence": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-session-projection": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-session-projection-cache": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-session-query": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-user-approval": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-system-prompt": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-system-prompt/-/dsh-system-prompt-0.1.2-rc.1.tgz",
++      "integrity": "sha512-7W93PZKIk4CHvjZGgLIxrrEKpk+6t8nQXje1vKR5vG73dfXH0t1MJ5WWH/fngadYc7c6KzM84ihQ66tJqJqyNQ==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-timeout": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-timeout/-/dsh-timeout-0.1.2-rc.1.tgz",
++      "integrity": "sha512-llz11yxWeJB8suKCa6hRLjNBWVaPn3Fbd0XoBS0bkZLhPFzO1mDorx/XMca2GhI7XF9A86CURQcDt+aGjjvqJA==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-tool-todo": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tool-todo/-/dsh-tool-todo-0.1.2-rc.1.tgz",
++      "integrity": "sha512-NFDdJNwryfwrNDsy9XeYYB9NaI/GAfgNMKvMlMxgXXuvmVoeLD71o5r2/S5Cl0unXLRfV+dP91hkj4Z+aVYTzA==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-projection": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-tools": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-tools": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tools/-/dsh-tools-0.1.2-rc.1.tgz",
++      "integrity": "sha512-W9kUio00s7WbM8kEwniyd4hfb3CeUxVczsjXbOcKtakfiTywNLeyRWkpx2fvwRAH2rBfg3qCgczVfS0DOw1csg==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1",
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-code-runtime": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-user-approval": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-typert-protocol": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-typert-protocol/-/dsh-typert-protocol-0.1.2-rc.1.tgz",
++      "integrity": "sha512-vBWD0NpriPd96ltbWaAw+iKeWFIEjiAcCWYtmqEcV1Ms+FaV02usjjm7LCmhSQhMZpBSBc7EZUX0spGlpjI1bA==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-typert-registry": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-typert-registry/-/dsh-typert-registry-0.1.2-rc.1.tgz",
++      "integrity": "sha512-Y6eWVTp3GBDt9DYjYqsLIHG3SJelBZvhDpBipz0Cam1Al85MQyecqdMrmOmvCZZ7nDwelC6xkZfg7vikrtpB/w==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-user-approval": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-user-approval/-/dsh-user-approval-0.1.2-rc.1.tgz",
++      "integrity": "sha512-oYkLE4a/TwqVNi299pUf/QP1Yku6KScdUCTUyYbjaRBcN+/pXPpHikl2aoE2thH9D0uT/Kj6T2kz+wDDcFd9Xg==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-crypto": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-crypto/-/dsh-util-crypto-0.1.2-rc.1.tgz",
++      "integrity": "sha512-gE8FznQ1hkknw9QMrHNSlm3UEyRYuj3MLVvlJ6NyH1kmOsdjnbrVbSs+Pn72k2oIV4Fiyu3Umg0sLznUEcsiXw==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-time": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-time/-/dsh-util-time-0.1.2-rc.1.tgz",
++      "integrity": "sha512-OoudDLoYothbZKDbjO6kFu3NLgAnglIS8NFkg5fjnBtz8LGwplN8w7kRURLIrZtH38HknYhpDsdJh8LZai3U6A==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-values": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.2-rc.1.tgz",
++      "integrity": "sha512-FQdgoK+KYVR0pBQb9fTsajvGb3gzUxEzJQEYnFOt+Qdwc4nkxJOPwJJdIvXuqvZaQ33DaOoqpnpcr2p5HpLu4g==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-workspace-path": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-workspace-path/-/dsh-util-workspace-path-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-pu0NlgVVGN1G2HqJTC/150wd6N6nXmJcqyvzSZgnZ7J5vRXQQXbQkpksP+EK4bwWqViYPzhAc8kgyygtkIS9tw==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-workspace": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-workspace/-/dsh-workspace-0.1.2-rc.1.tgz",
++      "integrity": "sha512-8q1e4a9K8ON4VabR6VfachNnuOHKvfBlQlv07mFT6CwoaCZXB1WwZxjJFOnIcF7R05uRAPJSVAgUMedgWMxVEQ==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-persistence": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-storage": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-storage-domain": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/schemastery": {
++      "version": "3.18.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.4.tgz",
++      "integrity": "sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==",
++      "devOptional": true,
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      }
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "devOptional": true,
++      "license": "MIT"
++    },
++    "node_modules/argparse": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/argparse/-/argparse-2.0.1.tgz",
++      "integrity": "sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==",
++      "devOptional": true,
++      "license": "Python-2.0",
++      "peer": true
++    },
++    "node_modules/immer": {
++      "version": "10.2.0",
++      "resolved": "https://registry.npmjs.org/immer/-/immer-10.2.0.tgz",
++      "integrity": "sha512-d/+XTN3zfODyjr89gM3mPq1WNX2B8pYsu7eORitdwyA2sBubnTl3laYlBk4sXY5FUa5qTZGBDPJICVbvqzjlbw==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/immer"
++      }
++    },
++    "node_modules/js-tokens": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/js-tokens/-/js-tokens-4.0.0.tgz",
++      "integrity": "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==",
++      "devOptional": true,
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/js-yaml": {
++      "version": "4.3.2",
++      "resolved": "https://registry.npmjs.org/js-yaml/-/js-yaml-4.3.2.tgz",
++      "integrity": "sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==",
++      "devOptional": true,
++      "funding": [
++        {
++          "type": "github",
++          "url": "https://github.com/sponsors/puzrin"
++        },
++        {
++          "type": "github",
++          "url": "https://github.com/sponsors/nodeca"
++        }
++      ],
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "argparse": "^2.0.1"
++      },
++      "bin": {
++        "js-yaml": "bin/js-yaml.js"
++      }
++    },
++    "node_modules/loose-envify": {
++      "version": "1.4.0",
++      "resolved": "https://registry.npmjs.org/loose-envify/-/loose-envify-1.4.0.tgz",
++      "integrity": "sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==",
++      "devOptional": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "js-tokens": "^3.0.0 || ^4.0.0"
++      },
++      "bin": {
++        "loose-envify": "cli.js"
++      }
++    },
++    "node_modules/react": {
++      "version": "18.3.1",
++      "resolved": "https://registry.npmjs.org/react/-/react-18.3.1.tgz",
++      "integrity": "sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==",
++      "devOptional": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "loose-envify": "^1.1.0"
++      },
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
++    "node_modules/use-sync-external-store": {
++      "version": "1.2.0",
++      "resolved": "https://registry.npmjs.org/use-sync-external-store/-/use-sync-external-store-1.2.0.tgz",
++      "integrity": "sha512-eEgnFxGQ1Ife9bzYs6VLi8/4X6CObHMw9Qr9tPY43iKwsPw8xE8+EFsf/2cFZ5S3esXgpWgtSCtLNS41F+sKPA==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "react": "^16.8.0 || ^17.0.0 || ^18.0.0"
++      }
++    },
++    "node_modules/ws": {
++      "version": "8.22.0",
++      "resolved": "https://registry.npmjs.org/ws/-/ws-8.22.0.tgz",
++      "integrity": "sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">=10.0.0"
++      },
++      "peerDependencies": {
++        "bufferutil": "^4.0.1",
++        "utf-8-validate": ">=5.0.2"
++      },
++      "peerDependenciesMeta": {
++        "bufferutil": {
++          "optional": true
++        },
++        "utf-8-validate": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/zod": {
++      "version": "4.6.7",
++      "resolved": "https://registry.npmjs.org/zod/-/zod-4.6.7.tgz",
++      "integrity": "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "url": "https://github.com/sponsors/colinhacks"
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 8dd4dc1..4137bca 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-d399-overlay",
+-  "version": "0.1.3",
+-  "description": "Browser game overlay: a bottom-right teaser pops up while the model generates (0.1.1-era cohort; exam material only)",
++  "version": "0.1.4",
++  "description": "Browser game overlay: a bottom-right teaser pops up while the model generates (0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -15,24 +15,34 @@
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime"
++        "@deepseek-ai/dsh-api-session-controller",
++        "@deepseek-ai/dsh-client-locale"
+       ],
+       "platform": "web"
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-invariants": "^0.0.1-rc.1",
+-    "@deepseek-ai/cordis": "^4.0.1-rc.1",
++    "@deepseek-ai/cordis": "^4.0.1",
++    "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+-    "@deepseek-ai/dsh-invariants": { "optional": true },
+     "@deepseek-ai/cordis": { "optional": true },
++    "@deepseek-ai/dsh-api-session-controller": { "optional": true },
++    "@deepseek-ai/dsh-client-locale": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+     "react": { "optional": true },
+     "react-dom": { "optional": true }
+   },
++  "devDependencies": {
++    "@deepseek-ai/cordis": "^4.0.1",
++    "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-store": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2"
++  },
+   "private": true
+ }
+diff --git a/fixture/patches/0001-client-row-config-channel.patch b/fixture/patches/0001-client-row-config-channel.patch
+new file mode 100644
+index 0000000..d26658a
+--- /dev/null
++++ b/fixture/patches/0001-client-row-config-channel.patch
+@@ -0,0 +1,539 @@
++diff --git a/.agents/notes/implemented/architecture/2026-08-30-client-row-config-channel.i18n.yaml b/.agents/notes/implemented/architecture/2026-08-30-client-row-config-channel.i18n.yaml
++new file mode 100644
++index 0000000..9f67e6d
++--- /dev/null
+++++ b/.agents/notes/implemented/architecture/2026-08-30-client-row-config-channel.i18n.yaml
++@@ -0,0 +1,6 @@
+++# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+++# side as of the last confirmed-consistent state. Both languages carry equal authority;
+++# after editing either side, bring the other along and re-record with:
+++#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-30-client-row-config-channel.md
+++2026-08-30-client-row-config-channel.md: e7d9f882b6e33dcf3b385bc099137113f5af71c8
+++2026-08-30-client-row-config-channel.zh.md: 53aae48544671e6d5e067697e585b09d9a2f5284
++diff --git a/.agents/notes/implemented/architecture/2026-08-30-client-row-config-channel.md b/.agents/notes/implemented/architecture/2026-08-30-client-row-config-channel.md
++new file mode 100644
++index 0000000..e7d9f88
++--- /dev/null
+++++ b/.agents/notes/implemented/architecture/2026-08-30-client-row-config-channel.md
++@@ -0,0 +1,33 @@
+++# Agent Note: Client row config crosses the boot wire
+++
+++Status: implemented
+++
+++English | [中文](2026-08-30-client-row-config-channel.zh.md)
+++
+++> Scope: the composition config of a `dsh.client` row between the host Loader and the browser half. The [client plugin loading model](2026-07-23-client-plugin-loading-model.md) owns arrival and lifecycle, and the [client shell layering note](2026-08-15-client-shells-and-dynamic-packages.md) owns package placement and shared-module requests.
+++
+++## Problem
+++
+++A `dsh.client` package is one Loader row read by two halves: the host half receives `entry.options.config`, while the browser half was created from `window.__DSH_BOOT__`, whose `WebBootEntry` carried `id`/`url`/`rev`/`inject`/`immediately`/`external` and nothing else. A composition value a plugin wanted on both sides therefore had to be duplicated: the row config drove the host half, and the browser half read a built-in default or a settings document. A third-party front-door plugin reported the gap as the first of its open questions ([discussion #2648](https://github.com/deepseek-ai/deepseek-harness/discussions/2648)); row-config edits were also the one composition change the browser half could never observe.
+++
+++## Decision
+++
+++The boot graph carries the row config. `WebBootEntry.config` is the source Loader row's `config` as one JSON value, omitted when the row declares none; the client-modules node half projects `entry.options.config` at scan time and re-projects it when a live row's config changes, keeping the row's artifact revision. The browser manifest parser copies the field into `BootPluginRow.config`, and the boot kernel passes it to `loader.create({ name, config })`, so the browser half receives the same value through `apply(ctx, config)` as the host half.
+++
+++`assertJsonValue()` rejects a config that JSON would change or drop — functions, symbols, bigints, non-finite numbers, class instances, `undefined` members — and composition fails with the entry name and the JSON path. Silent divergence between the two halves is the failure this channel removes, so a value that cannot cross the wire is misconfiguration, not a reason to fall back.
+++
+++A config edit on a live row reaches the served graph (the next index render) but not an already-created fiber: refreshing a running entry's config remains an explicit `entry.update()` its owner performs. HMR keeps the row's config because `rebuilt()` rebuilds the row from the value already on it.
+++
+++## Alternatives considered
+++
+++**A settings namespace per plugin.** The [plugin-owned settings surface](2026-08-12-plugin-owned-settings-surface.md) is the sanctioned configuration channel for values a user edits in the browser, and it persists through the host document only on loopback connections. It is a different entry point: it adds a document, a namespace registration, and a settings card, and it cannot express a composition value that must be identical on both halves before the first render.
+++
+++**`dsh.client.external` plus a shared package.** Carrying the value as a module request shares code, not data; the value still needs a wire to the browser half.
+++
+++**Serializing the whole entry (`id`, `name`, `config`, `inject`, `disabled`).** The graph is a browser wire, not a copy of the Loader's config document: `disabled` rows are filtered out at composition, and the remaining fields keep their dedicated wire members.
+++
+++**Best-effort JSON that drops what does not serialize.** Dropping a function or an `undefined` member silently gives the browser half a different value than the host half, which is the defect this change removes.
+++
+++## Consequences
+++
+++Plugin authors declare a browser-half value once, in the composition row, and read it with `apply(ctx, config)`. The row config becomes browser-visible content: a dual-face row's config is served in the page, so a secret belongs in a credential or settings namespace, not in row config. The wire grows by one JSON value per configured row, and the graph's existing `<` escaping already covers plugin-controlled strings.
++diff --git a/.agents/notes/implemented/architecture/2026-08-30-client-row-config-channel.zh.md b/.agents/notes/implemented/architecture/2026-08-30-client-row-config-channel.zh.md
++new file mode 100644
++index 0000000..53aae48
++--- /dev/null
+++++ b/.agents/notes/implemented/architecture/2026-08-30-client-row-config-channel.zh.md
++@@ -0,0 +1,33 @@
+++# Agent Note: Client row config crosses the boot wire
+++
+++Status: implemented
+++
+++English | [中文](2026-08-30-client-row-config-channel.zh.md)
+++
+++> 范围：`dsh.client` 行在宿主 Loader 与浏览器半侧之间的组合配置。到达与生命周期由[客户端插件加载模型](2026-07-23-client-plugin-loading-model.md)负责，包放置与共享模块请求由[客户端 shell 分层说明](2026-08-15-client-shells-and-dynamic-packages.md)负责。
+++
+++## Problem
+++
+++一个 `dsh.client` 包是一行 Loader 条目，由两个半侧共同读取：宿主半侧收到 `entry.options.config`，而浏览器半侧由 `window.__DSH_BOOT__` 创建，其 `WebBootEntry` 只携带 `id`/`url`/`rev`/`inject`/`immediately`/`external`，别无其他。因此插件若想让两侧读到同一个组合值，只能复制一份：行配置驱动宿主半侧，浏览器半侧读取内置默认值或 settings 文档。一个第三方前门插件把这个缺口列为它的首个待解问题（[discussion #2648](https://github.com/deepseek-ai/deepseek-harness/discussions/2648)）；行配置的修改也是浏览器半侧唯一永远观察不到的组合变更。
+++
+++## Decision
+++
+++启动图携带行配置。`WebBootEntry.config` 是源 Loader 行的 `config`，作为一个 JSON 值，行未声明时省略；client-modules 的 Node 半在扫描时投影 `entry.options.config`，并在存活行的配置变化时重新投影，同时保持该行的产物 revision 不变。浏览器 manifest 解析器把该字段复制进 `BootPluginRow.config`，启动内核把它传给 `loader.create({ name, config })`，于是浏览器半侧通过 `apply(ctx, config)` 收到的值与宿主半侧相同。
+++
+++`assertJsonValue()` 拒绝 JSON 会改动或丢弃的配置——函数、symbol、bigint、非有限数、类实例、`undefined` 成员——组合失败时给出条目名与 JSON 路径。两个半侧静默分歧正是这条通道要消除的失败，因此无法跨线的值是配置错误，而不是回退的理由。
+++
+++存活行上的配置修改会进入所服务的图（下一次 index 渲染），但不会进入已创建的 fiber：刷新运行中条目的配置仍是其属主显式执行的 `entry.update()`。HMR 会保留行的配置，因为 `rebuilt()` 用行上已有的值重建该行。
+++
+++## Alternatives considered
+++
+++**每个插件一个 settings 命名空间。** [插件自有设置界面](2026-08-12-plugin-owned-settings-surface.md)是用户在浏览器中编辑的值的既定配置通道，且它只在 loopback 连接上通过宿主文档持久化。它是另一个扩展点：它增加一个文档、一次命名空间注册和一张设置卡片，也无法表达必须在首次渲染前于两个半侧完全一致的组合值。
+++
+++**`dsh.client.external` 加一个共享包。** 用模块请求携带的是代码而不是数据；值仍然需要一条到达浏览器半侧的线路。
+++
+++**序列化整个条目（`id`、`name`、`config`、`inject`、`disabled`）。** 图是浏览器线路，不是 Loader 配置文档的副本：`disabled` 行已在组合时被过滤，其余字段保留各自的专用线路成员。
+++
+++**尽力而为的 JSON，丢弃无法序列化的部分。** 丢弃函数或 `undefined` 成员会让浏览器半侧静默拿到与宿主半侧不同的值，而这正是本变更要消除的缺陷。
+++
+++## Consequences
+++
+++插件作者只需在组合行里声明一次浏览器半侧的值，并以 `apply(ctx, config)` 读取。行配置因此成为浏览器可见内容：双面包的行配置会出现在页面里，所以机密应放在 credential 或 settings 命名空间，而不是行配置中。线路为每个已配置行增加一个 JSON 值；图中既有的 `<` 转义已经覆盖插件可控字符串。
++diff --git a/docs/subsystems/client-modules.md b/docs/subsystems/client-modules.md
++index f58cb65..2eb518a 100644
++--- a/docs/subsystems/client-modules.md
+++++ b/docs/subsystems/client-modules.md
++@@ -8,7 +8,7 @@ Source: [`packages/client/modules/src/client/manifest.ts`](../../packages/client
++ 
++ ## The wire
++ 
++-The graph is the wire single source between the Node and browser halves. The host composes `WebBootEntry` rows and `WebBootBatch` descriptors from scanned packages, then contributes the registration facade, application preloads, bootstrap scripts, and graph global to the structured index-injection table before the Vite entry. The `global` row renders as `globalThis["__DSH_BOOT__"]` with `<` escaped so plugin-controlled strings cannot break out of the script element. A page without a valid manifest cannot boot: the browser parser rejects malformed rows or batches, unknown members, and entries without exactly one initial combo descriptor.
+++The graph is the wire single source between the Node and browser halves. The host composes `WebBootEntry` rows and `WebBootBatch` descriptors from scanned packages, then contributes the registration facade, application preloads, bootstrap scripts, and graph global to the structured index-injection table before the Vite entry. The `global` row renders as `globalThis["__DSH_BOOT__"]` with `<` escaped so plugin-controlled strings cannot break out of the script element. A page without a valid manifest cannot boot: the browser parser rejects malformed rows or batches, unknown members, and entries without exactly one initial combo descriptor. A row also carries its `config` — the same value its host half receives — and the browser half reads it as `apply(ctx, config)`; a config that is not JSON data fails composition instead of reaching one half changed.
++ 
++ ```ts type-equiv
++ /**
++@@ -17,7 +17,9 @@ The graph is the wire single source between the Node and browser halves. The hos
++  * `immediately` marks stage-one prefetch. `inject` names package rows whose
++  * factories must arrive before this row materializes, while Cordis separately
++  * uses the same package edges to compose entries. `external` carries exact
++- * non-inject module requests (see {@link WebBootGraph.entries}).
+++ * non-inject module requests (see {@link WebBootGraph.entries}). `config` is the
+++ * source Loader row's composition config, the same value the row's host half
+++ * receives.
++  */
++ interface WebBootEntry {
++   /** Entry name == package name. */
++@@ -32,6 +34,12 @@ interface WebBootEntry {
++   immediately?: boolean
++   /** Non-baseline module specifiers this row requests; omitted when it requests none. */
++   external?: string[]
+++  /**
+++   * The source Loader row's `config`, as one JSON value; omitted when the row
+++   * declares none. The browser half receives it as `apply(ctx, config)`, so both
+++   * halves of a dual-face package read the same composition values.
+++   */
+++  config?: unknown
++ }
++ ```
++ 
++diff --git a/docs/subsystems/client-modules.zh.md b/docs/subsystems/client-modules.zh.md
++index 18c72df..1b7cfc9 100644
++--- a/docs/subsystems/client-modules.zh.md
+++++ b/docs/subsystems/client-modules.zh.md
++@@ -8,7 +8,7 @@ Web 插件表：[dsh-client-modules](../../packages/client/modules) 中 client 
++ 
++ ## wire
++ 
++-图是 Node 半与浏览器半之间协议层的唯一真源。宿主从扫描到的包组合出 `WebBootEntry` 行与 `WebBootBatch` 描述，随后在 Vite entry 之前向结构化 index 注入表贡献 registration facade、application preload、bootstrap 脚本与图全局量。`global` 行渲染为 `globalThis["__DSH_BOOT__"]`，其中 `<` 已转义，插件可控的字符串因此无法逃出 script 元素。没有有效 manifest 的页面无法启动：浏览器解析器会拒绝畸形 row 或批次、未知成员，以及未恰好归属一个初始 combo 描述的 entry。
+++图是 Node 半与浏览器半之间协议层的唯一真源。宿主从扫描到的包组合出 `WebBootEntry` 行与 `WebBootBatch` 描述，随后在 Vite entry 之前向结构化 index 注入表贡献 registration facade、application preload、bootstrap 脚本与图全局量。`global` 行渲染为 `globalThis["__DSH_BOOT__"]`，其中 `<` 已转义，插件可控的字符串因此无法逃出 script 元素。没有有效 manifest 的页面无法启动：浏览器解析器会拒绝畸形 row 或批次、未知成员，以及未恰好归属一个初始 combo 描述的 entry。row 还携带自己的 `config`——与宿主半侧收到的是同一个值——浏览器半侧以 `apply(ctx, config)` 读取；不是 JSON 数据的 config 会让组合失败，而不是让某一侧拿到被改动的值。
++ 
++ ```ts type-equiv
++ /**
++@@ -17,7 +17,9 @@ Web 插件表：[dsh-client-modules](../../packages/client/modules) 中 client 
++  * `immediately` marks stage-one prefetch. `inject` names package rows whose
++  * factories must arrive before this row materializes, while Cordis separately
++  * uses the same package edges to compose entries. `external` carries exact
++- * non-inject module requests (see {@link WebBootGraph.entries}).
+++ * non-inject module requests (see {@link WebBootGraph.entries}). `config` is the
+++ * source Loader row's composition config, the same value the row's host half
+++ * receives.
++  */
++ interface WebBootEntry {
++   /** Entry name == package name. */
++@@ -32,6 +34,12 @@ interface WebBootEntry {
++   immediately?: boolean
++   /** Non-baseline module specifiers this row requests; omitted when it requests none. */
++   external?: string[]
+++  /**
+++   * The source Loader row's `config`, as one JSON value; omitted when the row
+++   * declares none. The browser half receives it as `apply(ctx, config)`, so both
+++   * halves of a dual-face package read the same composition values.
+++   */
+++  config?: unknown
++ }
++ ```
++ 
++diff --git a/packages/client/modules/src/client/manifest.ts b/packages/client/modules/src/client/manifest.ts
++index e8feb2e..acdf0a9 100644
++--- a/packages/client/modules/src/client/manifest.ts
+++++ b/packages/client/modules/src/client/manifest.ts
++@@ -45,7 +45,9 @@ declare module '@deepseek-ai/cordis' {
++  * `immediately` marks stage-one prefetch. `inject` names package rows whose
++  * factories must arrive before this row materializes, while Cordis separately
++  * uses the same package edges to compose entries. `external` carries exact
++- * non-inject module requests (see {@link WebBootGraph.entries}).
+++ * non-inject module requests (see {@link WebBootGraph.entries}). `config` is the
+++ * source Loader row's composition config, the same value the row's host half
+++ * receives.
++  */
++ export interface WebBootEntry {
++   /** Entry name == package name. */
++@@ -60,6 +62,12 @@ export interface WebBootEntry {
++   immediately?: boolean
++   /** Non-baseline module specifiers this row requests; omitted when it requests none. */
++   external?: string[]
+++  /**
+++   * The source Loader row's `config`, as one JSON value; omitted when the row
+++   * declares none. The browser half receives it as `apply(ctx, config)`, so both
+++   * halves of a dual-face package read the same composition values.
+++   */
+++  config?: unknown
++ }
++ 
++ /** Initial scheduling phase for one content-addressed combo script. */
++@@ -115,6 +123,8 @@ export interface BootPluginRow {
++   inject: string[]
++   /** Stage-one prefetch tier (false when the wire omits it). */
++   immediately: boolean
+++  /** Row config carried by the wire; absent when the row declares none, never a synthesized default. */
+++  config?: unknown
++ }
++ 
++ /** The parsed boot manifest: one wire, two consumer views. */
++@@ -209,6 +219,7 @@ export function parseBootManifest(wire: unknown): BootManifest {
++       id: row.id,
++       inject: inject === undefined ? [] : [...inject],
++       immediately: row.immediately === true,
+++      ...(row.config === undefined ? {} : { config: row.config }),
++     })
++   }
++ 
++diff --git a/packages/client/modules/src/index.ts b/packages/client/modules/src/index.ts
++index 98b6fa5..c7ac050 100644
++--- a/packages/client/modules/src/index.ts
+++++ b/packages/client/modules/src/index.ts
++@@ -100,6 +100,8 @@ interface ClientPackageSource extends ResolvedPkgMeta {
++   baseUrl: string
++   /** Stable cache and contribution key for this source. */
++   sourceKey: string
+++  /** JSON projection of the owning Loader row's config; absent when the row declares none. */
+++  config?: unknown
++ }
++ 
++ /** Recovery instruction shared by grouped startup and steady-state bundle diagnostics. */
++@@ -414,7 +416,7 @@ function buildBatch(phase: WebBootBatchPhase, records: readonly WebPluginRecord[
++ }
++ 
++ /** Graph row for one bundle rev (url carries the rev as its cache-busting query). */
++-function graphRow(id: string, rev: string, fields: WebBootRowFields): WebBootEntry {
+++function graphRow(id: string, rev: string, fields: WebBootRowFields, config?: unknown): WebBootEntry {
++   return {
++     id,
++     url: comboUrl([id], rev),
++@@ -422,9 +424,65 @@ function graphRow(id: string, rev: string, fields: WebBootRowFields): WebBootEnt
++     ...(fields.inject !== undefined ? { inject: fields.inject } : {}),
++     ...(fields.immediately ? { immediately: true } : {}),
++     ...(fields.external.length > 0 ? { external: fields.external } : {}),
+++    ...(config === undefined ? {} : { config }),
++   }
++ }
++ 
+++/**
+++ * Reject every value JSON would change or drop. The graph is embedded in the
+++ * served HTML as JSON, so a value that does not survive the round trip would
+++ * reach the browser half as something other than what the row's host half sees —
+++ * the silent divergence this channel exists to remove.
+++ * @param loaderName - Loader specifier named in the diagnostic.
+++ * @param value - candidate value at `path`.
+++ * @param path - JSON path of the candidate inside the row config.
+++ * @throws {Error} when the value is not a JSON value.
+++ */
+++function assertJsonValue(loaderName: string, value: unknown, path: string): void {
+++  if (value === null || typeof value === 'string' || typeof value === 'boolean') return
+++  if (typeof value === 'number') {
+++    if (Number.isFinite(value)) return
+++  } else if (Array.isArray(value)) {
+++    value.forEach((item, index) => { assertJsonValue(loaderName, item, `${path}[${index}]`) })
+++    return
+++  } else if (typeof value === 'object') {
+++    const prototype = Object.getPrototypeOf(value) as unknown
+++    if (prototype === Object.prototype || prototype === null) {
+++      for (const [key, item] of Object.entries(value)) {
+++        assertJsonValue(loaderName, item, `${path}.${key}`)
+++      }
+++      return
+++    }
+++  }
+++  throw new Error(
+++    `client-modules: loader entry ${loaderName} config${path} is not a JSON value; `
+++    + 'the browser half receives the row config through window.__DSH_BOOT__, so only JSON data crosses',
+++  )
+++}
+++
+++/**
+++ * Project a Loader row's `config` onto the boot wire.
+++ * @param loaderName - Loader specifier named in the diagnostic.
+++ * @param config - raw `entry.options.config`.
+++ * @returns the JSON projection, or undefined when the row declares no config.
+++ * @throws {Error} when the value is not a JSON value (see {@link assertJsonValue}).
+++ */
+++function wireConfig(loaderName: string, config: unknown): unknown {
+++  if (config === undefined) return undefined
+++  assertJsonValue(loaderName, config, '')
+++  return JSON.parse(JSON.stringify(config)) as unknown
+++}
+++
+++/**
+++ * Compare two wire configs in the form the browser receives them.
+++ * @param left - config already carried by a graph row.
+++ * @param right - freshly projected config of the same Loader row.
+++ * @returns whether the two values serialize identically.
+++ */
+++function sameWireConfig(left: unknown, right: unknown): boolean {
+++  return JSON.stringify(left) === JSON.stringify(right)
+++}
+++
++ /**
++  * Order composed rows so every requested dynamic package precedes its
++  * consumers. An `external` specifier is either the package row it names
++@@ -636,7 +694,7 @@ export class ClientModuleRegistry extends Service {
++     const rev = artifactRevision(bundle, sourceMap)
++     record.baseline = baseline
++     if (rev === record.entry.rev) return rev
++-    record.entry = graphRow(id, rev, record.meta)
+++    record.entry = graphRow(id, rev, record.meta, record.entry.config)
++     record.bundle = bundle
++     if (sourceMap === undefined) delete record.sourceMap
++     else record.sourceMap = sourceMap
++@@ -936,7 +994,14 @@ export class ClientModuleRegistry extends Service {
++     }
++     const resolved = this.resolveMeta(loaderName, baseUrl)
++     if (resolved === null) return undefined
++-    return { ...resolved, loaderName, baseUrl, sourceKey: this.sourceKey(loaderName, baseUrl) }
+++    const config = wireConfig(loaderName, entry.options.config)
+++    return {
+++      ...resolved,
+++      loaderName,
+++      baseUrl,
+++      sourceKey: this.sourceKey(loaderName, baseUrl),
+++      ...(config === undefined ? {} : { config }),
+++    }
++   }
++ 
++   private reconcilePackage(packageName: string): boolean {
++@@ -954,13 +1019,21 @@ export class ClientModuleRegistry extends Service {
++     }
++     const source = sources[0]
++     if (source === undefined) return this.table.delete(packageName)
++-    if (this.table.get(packageName)?.sourceKey === source.sourceKey) return false
+++    const existing = this.table.get(packageName)
+++    if (existing?.sourceKey === source.sourceKey) {
+++      // Same source and artifact: a config edit is the one remaining change.
+++      // The row keeps its rev, so the browser refetches no bundle, and the next
+++      // index render serves the new value.
+++      if (sameWireConfig(existing.entry.config, source.config)) return false
+++      existing.entry = graphRow(packageName, existing.entry.rev, existing.meta, source.config)
+++      return true
+++    }
++     // The opaque initial rev rides the row until HMR observes a file change;
++     // a fiber restart from the same source reuses the existing row.
++     const snapshot = this.initialBundleSnapshot(packageName, source.meta.clientPath)
++     const rev = this.allocateInitialRevision()
++     this.table.set(packageName, {
++-      entry: graphRow(packageName, rev, source.meta),
+++      entry: graphRow(packageName, rev, source.meta, source.config),
++       loaderName: source.loaderName,
++       sourceKey: source.sourceKey,
++       meta: source.meta,
++diff --git a/packages/client/modules/tests/loader.client.spec.ts b/packages/client/modules/tests/loader.client.spec.ts
++index 8de76e8..e968dc4 100644
++--- a/packages/client/modules/tests/loader.client.spec.ts
+++++ b/packages/client/modules/tests/loader.client.spec.ts
++@@ -368,6 +368,22 @@ describe('boot manifest wire', () => {
++     ])
++   })
++ 
+++  it('carries the row config into the plugin view and leaves the module view out of it', () => {
+++    const manifest = parseBootManifest({
+++      rev: 'graph',
+++      entries: [
+++        { id: 'a', url: '/plugins/a/client.js', rev: '1', config: { message: 'hi', buttonText: 'play' } },
+++        { id: 'b', url: '/plugins/b/client.js', rev: '2' },
+++      ],
+++      batches: [{ phase: 'application', url: '/batch.js', rev: 'batch', entries: ['a', 'b'] }],
+++    })
+++    expect(manifest.plugins).toEqual([
+++      { id: 'a', inject: [], immediately: false, config: { message: 'hi', buttonText: 'play' } },
+++      { id: 'b', inject: [], immediately: false },
+++    ])
+++    expect(manifest.modules.every(row => !('config' in row))).toBe(true)
+++  })
+++
++   it('rejects a non-array external', () => {
++     expect(() => parseBootManifest({
++       rev: 'graph',
++diff --git a/packages/client/modules/tests/node-half.client.spec.ts b/packages/client/modules/tests/node-half.client.spec.ts
++index 5553c94..5db58f0 100644
++--- a/packages/client/modules/tests/node-half.client.spec.ts
+++++ b/packages/client/modules/tests/node-half.client.spec.ts
++@@ -64,6 +64,7 @@ function constructWithRoute(
++     contextBaseUrl?: string
++     entryBaseUrl?: string
++     internal?: NonNullable<Context['loader']['internal']>
+++    configs?: Record<string, unknown>
++   } = {},
++ ): { context: Context; service: ClientModuleRegistry; route: WebRoute } {
++   const ctx = new Context()
++@@ -72,8 +73,9 @@ function constructWithRoute(
++     internal: options.internal,
++     *entries() {
++       for (const packageName of packageNames) {
+++        const config = options.configs?.[packageName]
++         yield {
++-          options: { name: packageName },
+++          options: { name: packageName, ...(config === undefined ? {} : { config }) },
++           fiber: {},
++           disabled: false,
++           parent: { tree: { ctx: { baseUrl: options.entryBaseUrl ?? ctx.baseUrl } } },
++@@ -775,6 +777,53 @@ describe('shared module declarations', () => {
++   })
++ })
++ 
+++describe('row config channel', () => {
+++  it('carries the Loader row config onto the composed graph row', () => {
+++    const packageName = '@fixture/row-config'
+++    writeBuiltPackage(packageName, {})
+++    const config = { enabled: true, message: 'hi', buttonText: 'play' }
+++    expect(constructWithRoute([packageName], { configs: { [packageName]: config } }).service.graph().entries)
+++      .toEqual([{
+++        id: packageName,
+++        url: expect.stringContaining(`/plugins/??${packageName}/client.js&rev=`) as unknown as string,
+++        rev: expect.any(String) as unknown as string,
+++        config,
+++      }])
+++  })
+++
+++  it('omits config when the row declares none', () => {
+++    const packageName = '@fixture/row-config-absent'
+++    writeBuiltPackage(packageName, {})
+++    const [row] = construct([packageName]).graph().entries
+++    expect(row).not.toHaveProperty('config')
+++  })
+++
+++  it('re-carries a changed config without changing the artifact revision', async () => {
+++    const packageName = '@fixture/row-config-change'
+++    writeBuiltPackage(packageName, {})
+++    const configs: Record<string, unknown> = { [packageName]: { buttonText: 'play' } }
+++    const { context, service } = constructWithRoute([packageName], { configs })
+++    const firstRevision = service.graph().entries[0]!.rev
+++
+++    configs[packageName] = { buttonText: 'stop' }
+++    emitLoaderEntryChange(context, packageName)
+++    await Promise.resolve()
+++
+++    expect(service.graph().entries[0]).toMatchObject({
+++      rev: firstRevision,
+++      config: { buttonText: 'stop' },
+++    })
+++  })
+++
+++  it('fails activation loud when a row config cannot cross the boot wire', () => {
+++    const packageName = '@fixture/row-config-not-json'
+++    writeBuiltPackage(packageName, {})
+++    expect(() => constructWithRoute([packageName], {
+++      configs: { [packageName]: { onClick: () => {} } },
+++    })).toThrow(`client-modules: loader entry ${packageName} config.onClick is not a JSON value`)
+++  })
+++})
+++
++ describe('module graph order', () => {
++   const entry = (id: string, fields: Partial<WebBootEntry> = {}): WebBootEntry =>
++     ({ id, url: comboUrl([id], '0'), rev: '0', ...fields })
++diff --git a/packages/client/web/src/boot.ts b/packages/client/web/src/boot.ts
++index 71ab65c..a4e410e 100644
++--- a/packages/client/web/src/boot.ts
+++++ b/packages/client/web/src/boot.ts
++@@ -121,13 +121,18 @@ export class AppWebEntry {
++       this.page.setState(entry.options.name, STATE_LABELS[entry.fiber.state])
++     })
++ 
++-    const rows = this.manifest.plugins.map(row => row.id)
+++    const rows = this.manifest.plugins
++     this.page.setTotal(rows.length)
++     await prefetching
++-    await Promise.all(rows.map(async (name) => {
++-      this.page.setState(name, 'loading')
++-      const id = await loader.create({ name })
++-      if (loader.resolve(id).fiber === undefined) this.page.setState(name, 'failed')
+++    await Promise.all(rows.map(async (row) => {
+++      this.page.setState(row.id, 'loading')
+++      // The composition row's config reaches the browser half exactly as the
+++      // host half received it; a row without one stays absent, never `{}`.
+++      const id = await loader.create({
+++        name: row.id,
+++        ...(row.config === undefined ? {} : { config: row.config }),
+++      })
+++      if (loader.resolve(id).fiber === undefined) this.page.setState(row.id, 'failed')
++     }))
++ 
++     await loader.await()
++diff --git a/packages/client/web/tests/boot.client.spec.ts b/packages/client/web/tests/boot.client.spec.ts
++index 34b13d4..5de28c4 100644
++--- a/packages/client/web/tests/boot.client.spec.ts
+++++ b/packages/client/web/tests/boot.client.spec.ts
++@@ -217,4 +217,56 @@ describe('plugin activation', () => {
++     expect(container.textContent).toBe('mounted')
++     await entry.dispose()
++   })
+++
+++  it('creates every entry with its composition row config', async () => {
+++    const seen: unknown[] = []
+++    const container = document.createElement('div')
+++    document.body.append(container)
+++    const target = installFacade()
+++    const config = { enabled: true, message: 'hi', buttonText: 'play' }
+++    const entries: WebBootEntry[] = [
+++      { id: 'configured', url: '/configured.js', rev: '1', config },
+++      { id: 'plain', url: '/plain.js', rev: '1' },
+++      { id: 'renderer', url: '/renderer.js', rev: '1' },
+++    ]
+++    win.__DSH_BOOT__ = {
+++      rev: 'graph',
+++      entries,
+++      batches: [{
+++        phase: 'application',
+++        url: '/application.js',
+++        rev: 'batch',
+++        entries: entries.map(row => row.id),
+++      }],
+++    }
+++    const registrations: ClientBundleRegistration[] = [
+++      {
+++        id: 'configured',
+++        factory: () => ({ apply: (_ctx: Context, rowConfig: unknown) => { seen.push(rowConfig) } }),
+++      },
+++      {
+++        id: 'plain',
+++        factory: () => ({ apply: (_ctx: Context, rowConfig: unknown) => { seen.push(rowConfig) } }),
+++      },
+++      {
+++        id: 'renderer',
+++        factory: () => ({
+++          apply: (ctx: Context) => {
+++            ctx.reflect.provide('uiRenderer', { mount: () => () => {} })
+++          },
+++        }),
+++      },
+++    ]
+++    const entry = new AppWebEntry(container, {
+++      loadBundle: async (url) => {
+++        if (url !== '/application.js') throw new Error(`missing fixture batch ${url}`)
+++        for (const registration of registrations) target.load(registration)
+++      },
+++    })
+++
+++    await entry.run()
+++
+++    expect(seen).toEqual([config, undefined])
+++    await entry.dispose()
+++  })
++ })

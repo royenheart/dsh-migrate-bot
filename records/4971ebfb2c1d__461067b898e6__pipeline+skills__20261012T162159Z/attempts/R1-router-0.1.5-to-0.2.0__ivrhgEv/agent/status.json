@@ -1,0 +1,138 @@
+{
+  "migrations": [
+    {
+      "id": "0.2.0-rc.1",
+      "target": {
+        "tag": "dsh-v0.2.0-rc.1",
+        "version": "0.2.0-rc.1"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.2.0-rc.1",
+            "version": "0.2.0-rc.1"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.5-rc.2",
+              "version": "0.1.5-rc.2"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 1,
+        "lastFingerprint": "mechanical: npm warn ERESOLVE overriding peer dependency",
+        "failure": {
+          "check": "mechanical",
+          "outcome": "fail",
+          "fingerprint": "mechanical: npm warn ERESOLVE overriding peer dependency",
+          "detail": "npm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: tsdown@0.23.0\nnpm warn Found: peer vitest@\"^2.0.0 || ^3.0.0 || ^4.0.0\" from @sxzz/test-utils@0.5.19\nnpm warn node_modules/.pnpm/tsdown@0.23.0_typescript@7.0.2/node_modules/tsdown/node_modules/@sxzz/test-utils\nnpm warn   dev @sxzz/test-utils@\"^0.5.18\" from tsdown@0.23.0\nnpm warn   node_modules/.pnpm/tsdown@0.23.0_typescript@7.0.2/node_modules/tsdown\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer vitest@\"^2.0.0 || ^3.0.0 || ^4.0.0\" from @sxzz/test-utils@0.5.19\nnpm warn node_modules/.pnpm/tsdown@0.23.0_typescript@7.0.2/node_modules/tsdown/node_modules/@sxzz/test-utils\nnpm warn   dev @sxzz/test-utils@\"^0.5.18\" from tsdown@0.23.0\nnpm warn   node_modules/.pnpm/tsdown@0.23.0_typescript@7.0.2/node_modules/tsdown\nnpm error Cannot read properties of null (reading 'matches')\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-12T16_52_22_694Z-debug-0.log"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [],
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-12T16-24-50-169Z",
+      "startedAt": "2026-10-12T16:24:50.956Z"
+    }
+  ],
+  "processed": {
+    "id": "0.2.0-rc.1",
+    "target": {
+      "tag": "dsh-v0.2.0-rc.1",
+      "version": "0.2.0-rc.1"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.2.0-rc.1",
+          "version": "0.2.0-rc.1"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.5-rc.2",
+            "version": "0.1.5-rc.2"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 1,
+      "lastFingerprint": "mechanical: npm warn ERESOLVE overriding peer dependency",
+      "failure": {
+        "check": "mechanical",
+        "outcome": "fail",
+        "fingerprint": "mechanical: npm warn ERESOLVE overriding peer dependency",
+        "detail": "npm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: tsdown@0.23.0\nnpm warn Found: peer vitest@\"^2.0.0 || ^3.0.0 || ^4.0.0\" from @sxzz/test-utils@0.5.19\nnpm warn node_modules/.pnpm/tsdown@0.23.0_typescript@7.0.2/node_modules/tsdown/node_modules/@sxzz/test-utils\nnpm warn   dev @sxzz/test-utils@\"^0.5.18\" from tsdown@0.23.0\nnpm warn   node_modules/.pnpm/tsdown@0.23.0_typescript@7.0.2/node_modules/tsdown\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer vitest@\"^2.0.0 || ^3.0.0 || ^4.0.0\" from @sxzz/test-utils@0.5.19\nnpm warn node_modules/.pnpm/tsdown@0.23.0_typescript@7.0.2/node_modules/tsdown/node_modules/@sxzz/test-utils\nnpm warn   dev @sxzz/test-utils@\"^0.5.18\" from tsdown@0.23.0\nnpm warn   node_modules/.pnpm/tsdown@0.23.0_typescript@7.0.2/node_modules/tsdown\nnpm error Cannot read properties of null (reading 'matches')\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-12T16_52_22_694Z-debug-0.log"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [],
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-12T16-24-50-169Z",
+    "startedAt": "2026-10-12T16:24:50.956Z"
+  }
+}

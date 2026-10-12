@@ -1,0 +1,2036 @@
+{
+  "schema": 3,
+  "id": "4971ebfb2c1d__ef075767b476__pipeline+skills__20261012T162110Z",
+  "createdAt": "2026-10-12T16:21:10Z",
+  "producer": {
+    "commit": "4971ebfb2c1dd1687924904448275eb1d0a8cc54",
+    "version": "0.3.4",
+    "dirty": false,
+    "message": "fix(e2e): report an advisory end-to-end failure without working on it",
+    "snapshot": "af6d2d0432c29819"
+  },
+  "subject": {
+    "id": "pipeline+skills",
+    "agentRuntime": "0.2.0-rc.2",
+    "skills": {
+      "commit": "ef075767b476e8000c716a18f848028eebcd5aef",
+      "names": [
+        "plugin-upgrade"
+      ]
+    },
+    "attempts": 1,
+    "agentTimeoutMultiplier": 5
+  },
+  "suite": {
+    "repository": "oh-my-dsh/dsh-plugin-upgrade-skill",
+    "commit": "ef075767b476e8000c716a18f848028eebcd5aef",
+    "tasks": [
+      {
+        "id": "H1-plane-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H10-browser-activation-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H11-dual-cohort-rpc",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": false,
+        "feasible": true,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "H12-remote-result-boundary-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "H13-ghost-host-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": false
+      },
+      {
+        "id": "H14-mineru-api",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H15-locale-pack",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H16-history-dock",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H17-merge-calls",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H18-blame-bubbles",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": false
+      },
+      {
+        "id": "H19-workspace-ya",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H2-baseline-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H20-session-events-ledger",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": false,
+        "feasible": true,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "H21-question-answerer-waterfall",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": false,
+        "feasible": true,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "H22-dsh-data-agent-alpha2",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 18000,
+        "applicable": false,
+        "feasible": true,
+        "note": "The agent runs without network, and a pipeline installs the releases it checks."
+      },
+      {
+        "id": "H23-storage-domain-version-compat-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": false,
+        "feasible": true,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "H24-invalid-record-salvage-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": false,
+        "feasible": true,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "H25-session-seed-boundary-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": false,
+        "feasible": true,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "H26-notlisted-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H27-undeclared-import-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H3-client-plane",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H4-tsbuildinfo-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "H5-runtime-export-drift",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H6-remote-error-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 600,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "H7-locale-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H8-fire-drill",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H9-dsh-web-alpha2",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 18000,
+        "applicable": false,
+        "feasible": false,
+        "note": "The agent runs without network, and a pipeline installs the releases it checks."
+      },
+      {
+        "id": "M1-host-migration",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M10-tools-tree",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M11-sidebar-spur",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M12-interpreters-card",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M13-repository-plugins-removal",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M14-service-renames-0812",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M2-optional-dep-trap",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M3-session-projection",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": false
+      },
+      {
+        "id": "M4-peer-prerelease-range",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M5-token-auth-smoke",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": false
+      },
+      {
+        "id": "M6-sleep-tool",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M7-d399-overlay",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M8-brand-text",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M9-mcpanel",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "S1-static-scan",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S10-paste-rename-and-version-chip",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S11-mermaid-lazyload-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S12-global-upgrade-ebusy-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S13-peer-range-vs-runtime",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S14-link-install-lock-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S15-slot-error-boundary-crash",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S16-self-host-upgrade-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S17-external-ui-plugin-onboarding-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S18-terminal-sprite-render-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S19-phantom-update-stale-host",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S2-negative-scan",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S20-msvc-flock-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S21-resource-service-unavailable-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S22-duplicate-insert-boot-crash-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S23-passing-compat-guard-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S24-dock-cotenant-crash-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S3-snapshot-migration",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S4-legacy-client-imports",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 600,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S5-negative-naming",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 600,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S6-corridor-net-state",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 600,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S7-unpublished-cohort",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 600,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S8-release-routing-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      },
+      {
+        "id": "S9-composer-coordinate-trap",
+        "family": "S",
+        "networkMode": "public",
+        "agentTimeoutSec": 300,
+        "applicable": false,
+        "feasible": false,
+        "note": "The task installs no dsh release for the pipeline to target."
+      }
+    ]
+  },
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-v4-flash",
+    "before": {
+      "at": "2026-10-12T16:21:11.152Z",
+      "servedModel": "deepseek-flash",
+      "fingerprint": "aeb56401ca74e127821c4f9126dcb669"
+    },
+    "after": {
+      "at": "2026-10-12T21:55:44.734Z",
+      "servedModel": "deepseek-flash",
+      "fingerprint": "aeb56401ca74e127821c4f9126dcb669"
+    }
+  },
+  "environment": {
+    "harbor": "0.24.0",
+    "docker": "29.6.1",
+    "os": "Linux 6.12.101+deb13-cloud-amd64",
+    "concurrency": 3
+  },
+  "attempts": [
+    {
+      "task": "H1-plane-trap",
+      "attempt": 1,
+      "trial": "H1-plane-trap__n4V9Voq",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1558.4,
+        "verifierSec": 2.1,
+        "totalSec": 1768
+      },
+      "usage": {
+        "inputTokens": 144761,
+        "cacheHitTokens": 7415808,
+        "outputTokens": 93907,
+        "usd": 0.100305774
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H1-plane-trap__n4V9Voq/agent/proposed.diff",
+          "sha256": "034a1653737bb51c221e3a61bb8daac0cda5460addb802212c43824cec81a2ac",
+          "bytes": 8838
+        },
+        "agent/agent.log": {
+          "path": "attempts/H1-plane-trap__n4V9Voq/agent/agent.log",
+          "sha256": "997017b5372a4061cd5672c619176eb746cce850396ce313a2f58535eed6b079",
+          "bytes": 13697
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H1-plane-trap__n4V9Voq/agent/events.jsonl",
+          "sha256": "50388aa04703772e95b05bcb4a557b0a44047b27d3586c64fccea734937393bb",
+          "bytes": 4814
+        },
+        "agent/status.json": {
+          "path": "attempts/H1-plane-trap__n4V9Voq/agent/status.json",
+          "sha256": "f9573acb24450e91bb0c2010563f186d377040492c338f1194b7f837e0fcab96",
+          "bytes": 7089
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H1-plane-trap__n4V9Voq/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H1-plane-trap__n4V9Voq/verifier/test-stdout.txt",
+          "sha256": "6f2628ab630ba580ae3926bc16c3e726e1350d83e9586d2fe62613f879006aa7",
+          "bytes": 249
+        }
+      }
+    },
+    {
+      "task": "H10-browser-activation-trap",
+      "attempt": 1,
+      "trial": "H10-browser-activation-trap__TFyXdAA",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1011.5,
+        "verifierSec": 6.2,
+        "totalSec": 1217.1
+      },
+      "usage": {
+        "inputTokens": 160789,
+        "cacheHitTokens": 6158208,
+        "outputTokens": 81241,
+        "usd": 0.09133757399999999
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H10-browser-activation-trap__TFyXdAA/agent/proposed.diff",
+          "sha256": "939c7417dcf66b5094d95e921a22ec3fcc428ad6b5a2e791a076664ec77157e5",
+          "bytes": 1790
+        },
+        "agent/agent.log": {
+          "path": "attempts/H10-browser-activation-trap__TFyXdAA/agent/agent.log",
+          "sha256": "1ba2bd7b609f952fd0fbd9cba02b00e32cc6cce258a348890f95aa45ffc16f8a",
+          "bytes": 9788
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H10-browser-activation-trap__TFyXdAA/agent/events.jsonl",
+          "sha256": "89ac0f5f17cfd59ad786e9f5ce4bde747c0085450f07f7cbf3541def9c4630be",
+          "bytes": 2346
+        },
+        "agent/status.json": {
+          "path": "attempts/H10-browser-activation-trap__TFyXdAA/agent/status.json",
+          "sha256": "f505d7d1fad6bf7f14782020edf73c56326265f80916f39898c5c56332cf7e0f",
+          "bytes": 2519
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H10-browser-activation-trap__TFyXdAA/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H10-browser-activation-trap__TFyXdAA/verifier/test-stdout.txt",
+          "sha256": "a3e3bbcdca1de7a8bc13742975a4dc028114dc77f95bde93d514c8beae43730c",
+          "bytes": 274
+        }
+      }
+    },
+    {
+      "task": "H14-mineru-api",
+      "attempt": 1,
+      "trial": "H14-mineru-api__ntwZsPV",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2125.2,
+        "verifierSec": 3.4,
+        "totalSec": 2334
+      },
+      "usage": {
+        "inputTokens": 286313,
+        "cacheHitTokens": 25893376,
+        "outputTokens": 213998,
+        "usd": 0.24902587799999987
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H14-mineru-api__ntwZsPV/agent/proposed.diff",
+          "sha256": "578b515883cd2abdc893cb8f91fbb1a0c93a30611d4fcdf09ed2fbf5e4e86dff",
+          "bytes": 30345
+        },
+        "agent/agent.log": {
+          "path": "attempts/H14-mineru-api__ntwZsPV/agent/agent.log",
+          "sha256": "343392c76e06058473384b347037bdc485ddd2176b72a92d4a35fe15eaab975b",
+          "bytes": 19405
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H14-mineru-api__ntwZsPV/agent/events.jsonl",
+          "sha256": "435f5673874a022f2db8454c90e8b75e5d73583a8f022a82273bc8d68c905a4f",
+          "bytes": 7066
+        },
+        "agent/status.json": {
+          "path": "attempts/H14-mineru-api__ntwZsPV/agent/status.json",
+          "sha256": "5e0809ef584e2b5d4b0060c4722723b2ee1d20eb762130c76926b9b64c5bddb7",
+          "bytes": 7267
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H14-mineru-api__ntwZsPV/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H14-mineru-api__ntwZsPV/verifier/test-stdout.txt",
+          "sha256": "30798aecbce3ea97ff23adf54b7e3a2080da7beb4faf52954bd04380dd389a58",
+          "bytes": 1047
+        }
+      }
+    },
+    {
+      "task": "H15-locale-pack",
+      "attempt": 1,
+      "trial": "H15-locale-pack__KWDv9nm",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2893.5,
+        "verifierSec": 3.4,
+        "totalSec": 2981.5
+      },
+      "usage": {
+        "inputTokens": 252610,
+        "cacheHitTokens": 27649664,
+        "outputTokens": 167691,
+        "usd": 0.221455092
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H15-locale-pack__KWDv9nm/agent/proposed.diff",
+          "sha256": "038e05cb2bdbdd07ba3b63dc8163ddb83becffa1884e47e1adb4d347a1e67ac7",
+          "bytes": 23704
+        },
+        "agent/agent.log": {
+          "path": "attempts/H15-locale-pack__KWDv9nm/agent/agent.log",
+          "sha256": "0986460e3a34a5c7b395523019cd7495edb92d0e74fa542eb656a2d810d5bfd9",
+          "bytes": 27733
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H15-locale-pack__KWDv9nm/agent/events.jsonl",
+          "sha256": "97924b7113c5a776c8eb6d7b756c0d3a94cc8dec492ffa345d4b510592f023f7",
+          "bytes": 3277
+        },
+        "agent/status.json": {
+          "path": "attempts/H15-locale-pack__KWDv9nm/agent/status.json",
+          "sha256": "4212fb5f062fcf6b556bc2144878ee6063e6a419c40babb1ac54702df2bc12a8",
+          "bytes": 3817
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H15-locale-pack__KWDv9nm/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H15-locale-pack__KWDv9nm/verifier/test-stdout.txt",
+          "sha256": "312d8c61a06bb96193d9e30c57108a8311ed536e0e1d447ed9a30f26a4c3cc12",
+          "bytes": 1054
+        }
+      }
+    },
+    {
+      "task": "H16-history-dock",
+      "attempt": 1,
+      "trial": "H16-history-dock__jjE4Shi",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2976.2,
+        "verifierSec": 3.4,
+        "totalSec": 3065.3
+      },
+      "usage": {
+        "inputTokens": 362852,
+        "cacheHitTokens": 37118976,
+        "outputTokens": 223055,
+        "usd": 0.299617728
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H16-history-dock__jjE4Shi/agent/proposed.diff",
+          "sha256": "c7ce4c6941cb342624cabd7e6afed2959e47e803380c8d06b98c32418a437723",
+          "bytes": 30595
+        },
+        "agent/agent.log": {
+          "path": "attempts/H16-history-dock__jjE4Shi/agent/agent.log",
+          "sha256": "957b9ca9270a2c6c404640e6142abc103706f0dc607ec8a4e79d1e73329c260b",
+          "bytes": 28265
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H16-history-dock__jjE4Shi/agent/events.jsonl",
+          "sha256": "b200426878f63ca86f5b8370a916cd46ab6ea826f967bc87d13764da6b8758ba",
+          "bytes": 6975
+        },
+        "agent/status.json": {
+          "path": "attempts/H16-history-dock__jjE4Shi/agent/status.json",
+          "sha256": "406e74b5e724c480413414f4ad79c905166620c6d06383bfb0c971aec5bc332e",
+          "bytes": 7267
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H16-history-dock__jjE4Shi/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H16-history-dock__jjE4Shi/verifier/test-stdout.txt",
+          "sha256": "fe76a77655b127b0be72e7930478c37bc99e0d9b9424f5ccd4a8187f258c31d2",
+          "bytes": 1306
+        }
+      }
+    },
+    {
+      "task": "H17-merge-calls",
+      "attempt": 1,
+      "trial": "H17-merge-calls__s9TdyoL",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2674.8,
+        "verifierSec": 7.1,
+        "totalSec": 2920.8
+      },
+      "usage": {
+        "inputTokens": 315323,
+        "cacheHitTokens": 38978432,
+        "outputTokens": 190600,
+        "usd": 0.278593746
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H17-merge-calls__s9TdyoL/agent/proposed.diff",
+          "sha256": "5d77ac2c7f91da1f856c37c596998eb8412a0471e6091178f9168ea227d19e8d",
+          "bytes": 54279
+        },
+        "agent/agent.log": {
+          "path": "attempts/H17-merge-calls__s9TdyoL/agent/agent.log",
+          "sha256": "e4fddb318d030259d5f857a26796a7c6be6e9eb5a00caaf0b8a5dcd4e1f8dc1b",
+          "bytes": 24716
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H17-merge-calls__s9TdyoL/agent/events.jsonl",
+          "sha256": "ddb356f7e736310249a12414f999d4329e3a60bb06d270a47a94fd46f44e044f",
+          "bytes": 4461
+        },
+        "agent/status.json": {
+          "path": "attempts/H17-merge-calls__s9TdyoL/agent/status.json",
+          "sha256": "927388c62c4d8c4c91b4385e08ccf94ad0d246a1310befe0d2d0c272d949f2c6",
+          "bytes": 7385
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H17-merge-calls__s9TdyoL/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H17-merge-calls__s9TdyoL/verifier/test-stdout.txt",
+          "sha256": "23ac6d13064c9c8a168702a0c45ba910ca78c44b32f97e9a615b9429f18dda88",
+          "bytes": 1089
+        }
+      }
+    },
+    {
+      "task": "H19-workspace-ya",
+      "attempt": 1,
+      "trial": "H19-workspace-ya__vVEjveE",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2391.8,
+        "verifierSec": 3.3,
+        "totalSec": 2513.1
+      },
+      "usage": {
+        "inputTokens": 229809,
+        "cacheHitTokens": 29568512,
+        "outputTokens": 165606,
+        "usd": 0.2225404860000001
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H19-workspace-ya__vVEjveE/agent/proposed.diff",
+          "sha256": "c443f771511d8230f6598b7bcbd39ebe52b6a723c514b171667cacd281becade",
+          "bytes": 30965
+        },
+        "agent/agent.log": {
+          "path": "attempts/H19-workspace-ya__vVEjveE/agent/agent.log",
+          "sha256": "27bd10eed1c1ee1a49e185b30ceaf635fcd0e2c394aa5a53cbe2d09ac6b711a7",
+          "bytes": 22637
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H19-workspace-ya__vVEjveE/agent/events.jsonl",
+          "sha256": "d39cab3d00e2586859f9ab6bda19eec0a915ad0aa0683435636ace730e1a6cce",
+          "bytes": 6844
+        },
+        "agent/status.json": {
+          "path": "attempts/H19-workspace-ya__vVEjveE/agent/status.json",
+          "sha256": "f72b2b04477c65afc3678e51045e829db1eec204bd50992f66accf349220e94b",
+          "bytes": 7267
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H19-workspace-ya__vVEjveE/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H19-workspace-ya__vVEjveE/verifier/test-stdout.txt",
+          "sha256": "43058507c569db999cb3083d3018872d9281df417b8543392d60ab1e7723dffe",
+          "bytes": 1163
+        }
+      }
+    },
+    {
+      "task": "H2-baseline-trap",
+      "attempt": 1,
+      "trial": "H2-baseline-trap__Yww9nTb",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1747,
+        "verifierSec": 2.3,
+        "totalSec": 1831.4
+      },
+      "usage": {
+        "inputTokens": 206924,
+        "cacheHitTokens": 12857600,
+        "outputTokens": 119625,
+        "usd": 0.14138640000000002
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H2-baseline-trap__Yww9nTb/agent/proposed.diff",
+          "sha256": "a50e68a5cee363afa820a28eb943a14d4fa6e21943a1710d6d0ac3d57d47d1fd",
+          "bytes": 9532
+        },
+        "agent/agent.log": {
+          "path": "attempts/H2-baseline-trap__Yww9nTb/agent/agent.log",
+          "sha256": "efa431fb82027ea9b2c58cb28ebc1429f8c70ee3a9ed2a5fe03460d281bb24d1",
+          "bytes": 16014
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H2-baseline-trap__Yww9nTb/agent/events.jsonl",
+          "sha256": "43d1cab14e03239c3d7ab97e95bcaed37227ac102162d97dcdcf1d208b611c61",
+          "bytes": 6544
+        },
+        "agent/status.json": {
+          "path": "attempts/H2-baseline-trap__Yww9nTb/agent/status.json",
+          "sha256": "792af4a24b8a908e8bed25091f6328418d43350f9989b65206287dc7a9c565ab",
+          "bytes": 10525
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H2-baseline-trap__Yww9nTb/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H2-baseline-trap__Yww9nTb/verifier/test-stdout.txt",
+          "sha256": "3ba9446c78f2c26328bc141afb5a3311f6b0739aa14f9643b46be9c2f4f6e224",
+          "bytes": 242
+        }
+      }
+    },
+    {
+      "task": "H26-notlisted-trap",
+      "attempt": 1,
+      "trial": "H26-notlisted-trap__Jphx6F8",
+      "outcome": "scored",
+      "reward": 0,
+      "rewards": {
+        "reward": 0
+      },
+      "agentExitCode": 1,
+      "durations": {
+        "agentSec": 2.9,
+        "verifierSec": 0.3,
+        "totalSec": 187.5
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H26-notlisted-trap__Jphx6F8/agent/proposed.diff",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "agent/agent.log": {
+          "path": "attempts/H26-notlisted-trap__Jphx6F8/agent/agent.log",
+          "sha256": "450e2d75bd00658a8e598a07708a16b383a33c778ed5b04d6ab9797e67539e2f",
+          "bytes": 98
+        },
+        "agent/status.json": {
+          "path": "attempts/H26-notlisted-trap__Jphx6F8/agent/status.json",
+          "sha256": "34c97f88ae8890b3a601632d1d631a91597200595dde3be46b775454a5501a6e",
+          "bytes": 22
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H26-notlisted-trap__Jphx6F8/verifier/reward.txt",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H26-notlisted-trap__Jphx6F8/verifier/test-stdout.txt",
+          "sha256": "9b3842fe3e82f704fbfb6147f93c71b7a959a404d7cea198ccb375eecdafe638",
+          "bytes": 395
+        }
+      }
+    },
+    {
+      "task": "H27-undeclared-import-trap",
+      "attempt": 1,
+      "trial": "H27-undeclared-import-trap__8PLXhMq",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2815.5,
+        "verifierSec": 3.5,
+        "totalSec": 3003.6
+      },
+      "usage": {
+        "inputTokens": 213155,
+        "cacheHitTokens": 14310272,
+        "outputTokens": 145182,
+        "usd": 0.16201326600000004
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H27-undeclared-import-trap__8PLXhMq/agent/proposed.diff",
+          "sha256": "e12521129cc3ceddfbd2928dc282fc985c1eaae96449cd85a07a06db7faf71e2",
+          "bytes": 9309
+        },
+        "agent/agent.log": {
+          "path": "attempts/H27-undeclared-import-trap__8PLXhMq/agent/agent.log",
+          "sha256": "88f3f95774fca79a353f24bc458786b37115b1f19c6267509ce197d84159da83",
+          "bytes": 26556
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H27-undeclared-import-trap__8PLXhMq/agent/events.jsonl",
+          "sha256": "63699120a77b19fd2793ae01507af4fe995cb703fcd16bc0a42afd429032a752",
+          "bytes": 2352
+        },
+        "agent/status.json": {
+          "path": "attempts/H27-undeclared-import-trap__8PLXhMq/agent/status.json",
+          "sha256": "df88d451c08f670bb37fba4e2f94db76b4ceac12ccffb1e3233e5c1fa6def4ad",
+          "bytes": 2463
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H27-undeclared-import-trap__8PLXhMq/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H27-undeclared-import-trap__8PLXhMq/verifier/test-stdout.txt",
+          "sha256": "6aae3be05ef72f9d38f6070a88bd991cd43a0a994f79624214d32805029e00bf",
+          "bytes": 584
+        }
+      }
+    },
+    {
+      "task": "H3-client-plane",
+      "attempt": 1,
+      "trial": "H3-client-plane__zAep4Wc",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1688.9,
+        "verifierSec": 3.5,
+        "totalSec": 1781.4
+      },
+      "usage": {
+        "inputTokens": 215316,
+        "cacheHitTokens": 14012544,
+        "outputTokens": 131362,
+        "usd": 0.153152232
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H3-client-plane__zAep4Wc/agent/proposed.diff",
+          "sha256": "85fa77c150721662d4ba26cb3f3d301875a89b68d6e323f5fe83eb5a4cc22a56",
+          "bytes": 7725
+        },
+        "agent/agent.log": {
+          "path": "attempts/H3-client-plane__zAep4Wc/agent/agent.log",
+          "sha256": "56a82d712212fe01f3486a9936838f78f157b2a0d6d251ed0f4e538060999716",
+          "bytes": 15903
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H3-client-plane__zAep4Wc/agent/events.jsonl",
+          "sha256": "71be8240ec5139394a8c1c9f8b190522422d408ca58311432fabbcaebbbf1310",
+          "bytes": 2409
+        },
+        "agent/status.json": {
+          "path": "attempts/H3-client-plane__zAep4Wc/agent/status.json",
+          "sha256": "331c4773d108ab9908ae75499271f4d0c4d8b24b9ce34235da18d68954a6a4e3",
+          "bytes": 2555
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H3-client-plane__zAep4Wc/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H3-client-plane__zAep4Wc/verifier/test-stdout.txt",
+          "sha256": "81f3dd58687f3b20eda57d8a4d031ae7e3e01216831c1f17f209dfdbef2ec3ec",
+          "bytes": 366
+        }
+      }
+    },
+    {
+      "task": "H5-runtime-export-drift",
+      "attempt": 1,
+      "trial": "H5-runtime-export-drift__DHrEnN5",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2527.9,
+        "verifierSec": 13.3,
+        "totalSec": 2671.3
+      },
+      "usage": {
+        "inputTokens": 257192,
+        "cacheHitTokens": 18282752,
+        "outputTokens": 224493,
+        "usd": 0.22812285599999993
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H5-runtime-export-drift__DHrEnN5/agent/proposed.diff",
+          "sha256": "93b19010ed20d0f1c310ad439a9ddf8f89a4f27715a15974b54b47275ecd2167",
+          "bytes": 18619
+        },
+        "agent/agent.log": {
+          "path": "attempts/H5-runtime-export-drift__DHrEnN5/agent/agent.log",
+          "sha256": "33dce8598595f443e5d33f3b6f6c8c9a994bf18e8fd4460078f81e6f57c20d64",
+          "bytes": 24349
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H5-runtime-export-drift__DHrEnN5/agent/events.jsonl",
+          "sha256": "2db32be60470ed6a8c18b0b2067ac827d56a224728ae93bb709300f9aa01e68e",
+          "bytes": 8335
+        },
+        "agent/status.json": {
+          "path": "attempts/H5-runtime-export-drift__DHrEnN5/agent/status.json",
+          "sha256": "05efb0f014c41862f46cc00e4e17ba8cd1517c8e6e927fb7960b5cc28e82397c",
+          "bytes": 12761
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H5-runtime-export-drift__DHrEnN5/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H5-runtime-export-drift__DHrEnN5/verifier/test-stdout.txt",
+          "sha256": "b4a7f5661426fed4e3b9a8825257a5520134e7b5ffcd88fac1ed384034aaea36",
+          "bytes": 579
+        }
+      }
+    },
+    {
+      "task": "H7-locale-trap",
+      "attempt": 1,
+      "trial": "H7-locale-trap__Gnz4ePi",
+      "outcome": "scored",
+      "reward": 0.6,
+      "rewards": {
+        "reward": 0.6
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2646.6,
+        "verifierSec": 3.5,
+        "totalSec": 2816.6
+      },
+      "usage": {
+        "inputTokens": 230188,
+        "cacheHitTokens": 16696832,
+        "outputTokens": 133519,
+        "usd": 0.164730096
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H7-locale-trap__Gnz4ePi/agent/proposed.diff",
+          "sha256": "4bce05183c1a8d60deba50e85930e6276edb06b3d232cf2de7434d9e772c9e86",
+          "bytes": 5330
+        },
+        "agent/agent.log": {
+          "path": "attempts/H7-locale-trap__Gnz4ePi/agent/agent.log",
+          "sha256": "7f29ab63d0e8091eeeeb6b1a66814b47efdc2e0d85798606ab15295969f93915",
+          "bytes": 25281
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H7-locale-trap__Gnz4ePi/agent/events.jsonl",
+          "sha256": "f94d7de256f427b47c08582b0dab2f0f039db5a16f70c4fb0e359af01a5cee8f",
+          "bytes": 2409
+        },
+        "agent/status.json": {
+          "path": "attempts/H7-locale-trap__Gnz4ePi/agent/status.json",
+          "sha256": "45a36f034501cb7dce91289f210faafd9a236ba3db9d2916dc5f27542cc3c82f",
+          "bytes": 2519
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H7-locale-trap__Gnz4ePi/verifier/reward.txt",
+          "sha256": "aad816ea07062223f75fb606f5c0d42dfaa51388c7f56625c3109025bb90112f",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H7-locale-trap__Gnz4ePi/verifier/test-stdout.txt",
+          "sha256": "4347706883bfcbc383e28ae2918f712f1ec27fda8625582f168478850ab7b0f5",
+          "bytes": 336
+        }
+      }
+    },
+    {
+      "task": "H8-fire-drill",
+      "attempt": 1,
+      "trial": "H8-fire-drill__joM8qhv",
+      "outcome": "scored",
+      "reward": 0.47,
+      "rewards": {
+        "reward": 0.47
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2463.5,
+        "verifierSec": 9.8,
+        "totalSec": 2630.5
+      },
+      "usage": {
+        "inputTokens": 245703,
+        "cacheHitTokens": 18699776,
+        "outputTokens": 157123,
+        "usd": 0.18722857799999995
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H8-fire-drill__joM8qhv/agent/proposed.diff",
+          "sha256": "61a792a5a33505b8e1c7222b394ae6277861d3701c2696ff0d0d461d0fcc5de0",
+          "bytes": 23533
+        },
+        "agent/agent.log": {
+          "path": "attempts/H8-fire-drill__joM8qhv/agent/agent.log",
+          "sha256": "f194befb63a016208f17b9bd528a6a8aa8a52de085245e63aa81a327327c4679",
+          "bytes": 23548
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H8-fire-drill__joM8qhv/agent/events.jsonl",
+          "sha256": "516f541daf9f7def86c41dadcd946b4cde32ed5e9ad4f0bf0ecaba4217113a56",
+          "bytes": 4805
+        },
+        "agent/status.json": {
+          "path": "attempts/H8-fire-drill__joM8qhv/agent/status.json",
+          "sha256": "9696e74f301089aa17dc39753d4548e7f94f239461974ece724dd4873e64c8e9",
+          "bytes": 7003
+        },
+        "verifier/grading.json": {
+          "path": "attempts/H8-fire-drill__joM8qhv/verifier/grading.json",
+          "sha256": "a24d5e546a75f7da3bda7ed563ed1bf4df3b6035cc130c872246f531106a18bd",
+          "bytes": 7057
+        },
+        "verifier/reward.json": {
+          "path": "attempts/H8-fire-drill__joM8qhv/verifier/reward.json",
+          "sha256": "2632ab1ed742daec35eef590097194c570e6de6a40c511e9569c0088f38bb7b6",
+          "bytes": 16
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H8-fire-drill__joM8qhv/verifier/reward.txt",
+          "sha256": "e4a0d328004cb6cf9aa69a4d93d98529a7f4210cc03c41396c83ccfc99c06b04",
+          "bytes": 5
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H8-fire-drill__joM8qhv/verifier/test-stdout.txt",
+          "sha256": "006c9ee335d26e5b3efd975debbb5053e8dd83c6700b0dab57d64758000df824",
+          "bytes": 5470
+        }
+      }
+    },
+    {
+      "task": "M1-host-migration",
+      "attempt": 1,
+      "trial": "M1-host-migration__2nFxecu",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1557,
+        "verifierSec": 3.1,
+        "totalSec": 1645.3
+      },
+      "usage": {
+        "inputTokens": 142947,
+        "cacheHitTokens": 5606912,
+        "outputTokens": 79129,
+        "usd": 0.08574018600000002
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M1-host-migration__2nFxecu/agent/proposed.diff",
+          "sha256": "1d8e945eb89b20d9ae7d2d37c4a4a929ee5f986514d1588439f78fa1a20e5a6c",
+          "bytes": 4280
+        },
+        "agent/agent.log": {
+          "path": "attempts/M1-host-migration__2nFxecu/agent/agent.log",
+          "sha256": "704a0fe7c4774fbef76e25893756f3ea1f4d5a87592dec46cccd975c13dbb300",
+          "bytes": 14352
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M1-host-migration__2nFxecu/agent/events.jsonl",
+          "sha256": "86d071135c43052638697b5e658fd7253b8ab3dac25bd5814668c927a117921a",
+          "bytes": 6534
+        },
+        "agent/status.json": {
+          "path": "attempts/M1-host-migration__2nFxecu/agent/status.json",
+          "sha256": "661514e2df56a0637e4fb19a066f327dbf9b39106f7e9b89b376dd454b2c2f9c",
+          "bytes": 10525
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M1-host-migration__2nFxecu/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M1-host-migration__2nFxecu/verifier/test-stdout.txt",
+          "sha256": "47f32c21a4eac9ee67612e69c7e39970bfabcb824305ac7bd334aa8674108455",
+          "bytes": 378
+        }
+      }
+    },
+    {
+      "task": "M10-tools-tree",
+      "attempt": 1,
+      "trial": "M10-tools-tree__3rf5qLL",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 3121.8,
+        "verifierSec": 3.7,
+        "totalSec": 3209.9
+      },
+      "usage": {
+        "inputTokens": 343211,
+        "cacheHitTokens": 43251072,
+        "outputTokens": 229050,
+        "usd": 0.3186648659999999
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M10-tools-tree__3rf5qLL/agent/proposed.diff",
+          "sha256": "812a57cee2546f453f662e49c5a099d25a804c2ec3387badeacf852273498667",
+          "bytes": 56511
+        },
+        "agent/agent.log": {
+          "path": "attempts/M10-tools-tree__3rf5qLL/agent/agent.log",
+          "sha256": "a90e84ccdfb1f4a0936e90c7595ebe5858e155aee80f7e437eb520746a2aa1f1",
+          "bytes": 29711
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M10-tools-tree__3rf5qLL/agent/events.jsonl",
+          "sha256": "0e55c63e5daebbcc2588c027352098aa668867272d29580b35c434e258809d36",
+          "bytes": 7144
+        },
+        "agent/status.json": {
+          "path": "attempts/M10-tools-tree__3rf5qLL/agent/status.json",
+          "sha256": "bd7a0586a87f49a751ff4f3ef2d6c29f2f65a8fcc4cfca8df17507db830c9f27",
+          "bytes": 7267
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M10-tools-tree__3rf5qLL/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M10-tools-tree__3rf5qLL/verifier/test-stdout.txt",
+          "sha256": "7fbbbd6d0465cc66f65aa920fda415ea9617f16193860d6cfaa692f7bad92f52",
+          "bytes": 1231
+        }
+      }
+    },
+    {
+      "task": "M11-sidebar-spur",
+      "attempt": 1,
+      "trial": "M11-sidebar-spur__BgrHaxG",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2449.9,
+        "verifierSec": 3.5,
+        "totalSec": 2569.8
+      },
+      "usage": {
+        "inputTokens": 218938,
+        "cacheHitTokens": 20041728,
+        "outputTokens": 160231,
+        "usd": 0.18910448400000004
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M11-sidebar-spur__BgrHaxG/agent/proposed.diff",
+          "sha256": "5d3b55801ab3fcf51e63a7be2a6cc3ce5c9cd16e73d6c474a1ef23dd6889eb7e",
+          "bytes": 10989
+        },
+        "agent/agent.log": {
+          "path": "attempts/M11-sidebar-spur__BgrHaxG/agent/agent.log",
+          "sha256": "6c1599439ce8a6f46cc0bb89028a1c84bf5f451a643472a698cd72d168fc6e87",
+          "bytes": 23195
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M11-sidebar-spur__BgrHaxG/agent/events.jsonl",
+          "sha256": "b19ad99004ae658bb83836a7520a8d4f4b6414a60ada000215aa9b9b6e47bb40",
+          "bytes": 6970
+        },
+        "agent/status.json": {
+          "path": "attempts/M11-sidebar-spur__BgrHaxG/agent/status.json",
+          "sha256": "e1aba70dbb1ae9104ac78c003fb4c700e9a054660d4014b56a3b85cabd8a1537",
+          "bytes": 7267
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M11-sidebar-spur__BgrHaxG/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M11-sidebar-spur__BgrHaxG/verifier/test-stdout.txt",
+          "sha256": "705116161257cc190e34e632447f03b42fb5087c103bf9175bfcb758df8c00ae",
+          "bytes": 1168
+        }
+      }
+    },
+    {
+      "task": "M12-interpreters-card",
+      "attempt": 1,
+      "trial": "M12-interpreters-card__R6uyjPM",
+      "outcome": "scored",
+      "reward": 0.85,
+      "rewards": {
+        "reward": 0.85
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2057.4,
+        "verifierSec": 3.5,
+        "totalSec": 2164.3
+      },
+      "usage": {
+        "inputTokens": 268776,
+        "cacheHitTokens": 24013952,
+        "outputTokens": 193445,
+        "usd": 0.2284252559999999
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M12-interpreters-card__R6uyjPM/agent/proposed.diff",
+          "sha256": "92b196e1bc7a1e83d1b5f6cb5088e2e2f666f8363e5c3fee1b6a9fb7e64621e4",
+          "bytes": 17362
+        },
+        "agent/agent.log": {
+          "path": "attempts/M12-interpreters-card__R6uyjPM/agent/agent.log",
+          "sha256": "165648ad3ba461266172937054c813581f1f9445063c217c972d6b354ba59464",
+          "bytes": 19567
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M12-interpreters-card__R6uyjPM/agent/events.jsonl",
+          "sha256": "87f710ec25c320fe797edf3bb50313f03fcc950387ae50b4d45633ca6728c8bd",
+          "bytes": 3181
+        },
+        "agent/status.json": {
+          "path": "attempts/M12-interpreters-card__R6uyjPM/agent/status.json",
+          "sha256": "35b129d110ad80ab540492c17b46bcff22f52b4ff47291a53eb96240dbd18ddb",
+          "bytes": 3811
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M12-interpreters-card__R6uyjPM/verifier/reward.txt",
+          "sha256": "b8713d4438c8855ac1ab83ca3baac5895bdddc9429b49b65d3804f95877e55ea",
+          "bytes": 5
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M12-interpreters-card__R6uyjPM/verifier/test-stdout.txt",
+          "sha256": "c1a7e047bb8c55db8d5bf441fe9d99800746ddeb9ef8989551e4eda6c75bf289",
+          "bytes": 883
+        }
+      }
+    },
+    {
+      "task": "M13-repository-plugins-removal",
+      "attempt": 1,
+      "trial": "M13-repository-plugins-removal__NtnzDaU",
+      "outcome": "scored",
+      "reward": 0,
+      "rewards": {
+        "reward": 0
+      },
+      "agentExitCode": 1,
+      "durations": {
+        "agentSec": 1.5,
+        "verifierSec": 0.3,
+        "totalSec": 81.3
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M13-repository-plugins-removal__NtnzDaU/agent/proposed.diff",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "agent/agent.log": {
+          "path": "attempts/M13-repository-plugins-removal__NtnzDaU/agent/agent.log",
+          "sha256": "450e2d75bd00658a8e598a07708a16b383a33c778ed5b04d6ab9797e67539e2f",
+          "bytes": 98
+        },
+        "agent/status.json": {
+          "path": "attempts/M13-repository-plugins-removal__NtnzDaU/agent/status.json",
+          "sha256": "34c97f88ae8890b3a601632d1d631a91597200595dde3be46b775454a5501a6e",
+          "bytes": 22
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M13-repository-plugins-removal__NtnzDaU/verifier/reward.txt",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M13-repository-plugins-removal__NtnzDaU/verifier/test-stdout.txt",
+          "sha256": "115b68f5ab4c596a1d053ac89dec0e11a2d6357a05755b76d217cc80304b8d15",
+          "bytes": 118
+        }
+      }
+    },
+    {
+      "task": "M14-service-renames-0812",
+      "attempt": 1,
+      "trial": "M14-service-renames-0812__VYMQRdK",
+      "outcome": "scored",
+      "reward": 0.8,
+      "rewards": {
+        "reward": 0.8
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1702.4,
+        "verifierSec": 3.6,
+        "totalSec": 1786.5
+      },
+      "usage": {
+        "inputTokens": 181406,
+        "cacheHitTokens": 11959808,
+        "outputTokens": 112173,
+        "usd": 0.13039412400000003
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M14-service-renames-0812__VYMQRdK/agent/proposed.diff",
+          "sha256": "f994190e38c5623e38318c95aa1854f1a6fd6cedaf34f88807df7eb8b745dee4",
+          "bytes": 7002
+        },
+        "agent/agent.log": {
+          "path": "attempts/M14-service-renames-0812__VYMQRdK/agent/agent.log",
+          "sha256": "01e7017570cb2b93e4c5815e71dd58fd06af58b3c979baa39f3de457fc0190bd",
+          "bytes": 16286
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M14-service-renames-0812__VYMQRdK/agent/events.jsonl",
+          "sha256": "6e51d67a806861fc02b151be4121eacf63539e3174e96d88411f7b1f40597ca5",
+          "bytes": 3970
+        },
+        "agent/status.json": {
+          "path": "attempts/M14-service-renames-0812__VYMQRdK/agent/status.json",
+          "sha256": "ca47e1d0167deb72178edfbc01498df69b4cbd9ccfed57434f9e947c0115368b",
+          "bytes": 5835
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M14-service-renames-0812__VYMQRdK/verifier/reward.txt",
+          "sha256": "fdf276f0183c71742823b061f7342d581e56de0af10648339b525249e26ee94f",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M14-service-renames-0812__VYMQRdK/verifier/test-stdout.txt",
+          "sha256": "0c985e83020be55477c2eb0741a06690cf6c1aa20fd8f2309f36d3892d13bde5",
+          "bytes": 764
+        }
+      }
+    },
+    {
+      "task": "M2-optional-dep-trap",
+      "attempt": 1,
+      "trial": "M2-optional-dep-trap__Gp2hxDT",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1970.6,
+        "verifierSec": 2.5,
+        "totalSec": 2052
+      },
+      "usage": {
+        "inputTokens": 153688,
+        "cacheHitTokens": 15839744,
+        "outputTokens": 161638,
+        "usd": 0.16755523200000003
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M2-optional-dep-trap__Gp2hxDT/agent/proposed.diff",
+          "sha256": "3af51b60e97a250874384fe0c0c79d0c9a46b57200d460dc592d3478ecb3692f",
+          "bytes": 7670
+        },
+        "agent/agent.log": {
+          "path": "attempts/M2-optional-dep-trap__Gp2hxDT/agent/agent.log",
+          "sha256": "d6d99c7ff0a57826ab2dc6a6f33eca5bceeb37f337ed95549d5153892dd0b771",
+          "bytes": 19020
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M2-optional-dep-trap__Gp2hxDT/agent/events.jsonl",
+          "sha256": "349d754571305e808e20782d7b2f9b601da2c4badc6f3fc25520b354e3d8827b",
+          "bytes": 4502
+        },
+        "agent/status.json": {
+          "path": "attempts/M2-optional-dep-trap__Gp2hxDT/agent/status.json",
+          "sha256": "d5b298274ebe24eee587fcfcd7fb72b759de595e1317421ca32f54aa0b2601c8",
+          "bytes": 6793
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M2-optional-dep-trap__Gp2hxDT/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M2-optional-dep-trap__Gp2hxDT/verifier/test-stdout.txt",
+          "sha256": "53fd9e31a4fc7c1fbf3b345f36d7669f2f79017250744e7f1135ca949aade110",
+          "bytes": 411
+        }
+      }
+    },
+    {
+      "task": "M4-peer-prerelease-range",
+      "attempt": 1,
+      "trial": "M4-peer-prerelease-range__ccFoLTs",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1388.3,
+        "verifierSec": 2.4,
+        "totalSec": 1502.5
+      },
+      "usage": {
+        "inputTokens": 143757,
+        "cacheHitTokens": 5831424,
+        "outputTokens": 76220,
+        "usd": 0.08478982199999999
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M4-peer-prerelease-range__ccFoLTs/agent/proposed.diff",
+          "sha256": "99d25555e30ffbb2d755bcd9249fe232b5ebe2a4cf682e2f0d04853a75f7bdca",
+          "bytes": 12436
+        },
+        "agent/agent.log": {
+          "path": "attempts/M4-peer-prerelease-range__ccFoLTs/agent/agent.log",
+          "sha256": "b2a02b6e953602e6e9045043d6d26fc21a0b8d6a6ca85e6163a9e0e630d8f6b6",
+          "bytes": 12649
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M4-peer-prerelease-range__ccFoLTs/agent/events.jsonl",
+          "sha256": "37c4bd5f1114ef13f6f989d0e6dbfd704409ed1c079e6c9b37f27ba661b038f7",
+          "bytes": 2884
+        },
+        "agent/status.json": {
+          "path": "attempts/M4-peer-prerelease-range__ccFoLTs/agent/status.json",
+          "sha256": "71689339ade411604a501797307c1e9843ed2b5018542edfe5d7fa56bb26e5a7",
+          "bytes": 3367
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M4-peer-prerelease-range__ccFoLTs/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M4-peer-prerelease-range__ccFoLTs/verifier/test-stdout.txt",
+          "sha256": "a5ee3ec7f3bde89e5464f8c5fc8d36e39869e2623ec89e20f83293c09f133482",
+          "bytes": 293
+        }
+      }
+    },
+    {
+      "task": "M6-sleep-tool",
+      "attempt": 1,
+      "trial": "M6-sleep-tool__eEdLYT5",
+      "outcome": "scored",
+      "reward": 0.85,
+      "rewards": {
+        "reward": 0.85
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2095.9,
+        "verifierSec": 2.9,
+        "totalSec": 2182
+      },
+      "usage": {
+        "inputTokens": 198019,
+        "cacheHitTokens": 13520128,
+        "outputTokens": 131592,
+        "usd": 0.149218434
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M6-sleep-tool__eEdLYT5/agent/proposed.diff",
+          "sha256": "ec3c691e8e38041d6e9a0f5064a85f0412bc0069a2d800e4a8d20bba9def93de",
+          "bytes": 7201
+        },
+        "agent/agent.log": {
+          "path": "attempts/M6-sleep-tool__eEdLYT5/agent/agent.log",
+          "sha256": "3d74dc7243bc7f1b85500f8342fe3f008d4398d6dfff7750e915a3ef49c3f1cc",
+          "bytes": 19523
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M6-sleep-tool__eEdLYT5/agent/events.jsonl",
+          "sha256": "47b402ef822a21baf05e60975a47fc8cd5a8ba9c099dbecbd20e648e76219862",
+          "bytes": 5339
+        },
+        "agent/status.json": {
+          "path": "attempts/M6-sleep-tool__eEdLYT5/agent/status.json",
+          "sha256": "4e7aee08d40b9bb72ac56752ea0e13e5df03a9156fbbb5d10927e830e7712289",
+          "bytes": 7747
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M6-sleep-tool__eEdLYT5/verifier/reward.txt",
+          "sha256": "b8713d4438c8855ac1ab83ca3baac5895bdddc9429b49b65d3804f95877e55ea",
+          "bytes": 5
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M6-sleep-tool__eEdLYT5/verifier/test-stdout.txt",
+          "sha256": "4e1828b5cb4a41c85d27be04bf41019a53a23ace2225f44960d5ec3f2401ea2d",
+          "bytes": 650
+        }
+      }
+    },
+    {
+      "task": "M7-d399-overlay",
+      "attempt": 1,
+      "trial": "M7-d399-overlay__pExFPDA",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2462.4,
+        "verifierSec": 3.6,
+        "totalSec": 2584.6
+      },
+      "usage": {
+        "inputTokens": 296661,
+        "cacheHitTokens": 34565504,
+        "outputTokens": 241177,
+        "usd": 0.29290186200000007
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M7-d399-overlay__pExFPDA/agent/proposed.diff",
+          "sha256": "75fd581d6b4ad6257a13077d4cb5b98013d175abd216261f4cee1dbfd8f1edf7",
+          "bytes": 90193
+        },
+        "agent/agent.log": {
+          "path": "attempts/M7-d399-overlay__pExFPDA/agent/agent.log",
+          "sha256": "23ac952e52d99492b43f5218ca8cee958a150c831ce25c6731432b12396ec904",
+          "bytes": 23387
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M7-d399-overlay__pExFPDA/agent/events.jsonl",
+          "sha256": "f9a322ac08d7bb5e4055f39e4dac4817524764b894987db208d66ce9ad9f5799",
+          "bytes": 8938
+        },
+        "agent/status.json": {
+          "path": "attempts/M7-d399-overlay__pExFPDA/agent/status.json",
+          "sha256": "ef219112bafafa908c7ff3aecce6fe7322d290dabfedaf2781b3b8f21fdde6ca",
+          "bytes": 10573
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M7-d399-overlay__pExFPDA/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M7-d399-overlay__pExFPDA/verifier/test-stdout.txt",
+          "sha256": "46b31e671488096c45645bda8cedfdb49f8f1ad21bf61c3ba2d2133a85eae610",
+          "bytes": 1020
+        }
+      }
+    },
+    {
+      "task": "M8-brand-text",
+      "attempt": 1,
+      "trial": "M8-brand-text__MFAEsqd",
+      "outcome": "scored",
+      "reward": 0.85,
+      "rewards": {
+        "reward": 0.85
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2678.2,
+        "verifierSec": 3.2,
+        "totalSec": 2777.9
+      },
+      "usage": {
+        "inputTokens": 271469,
+        "cacheHitTokens": 36598528,
+        "outputTokens": 199239,
+        "usd": 0.27005933400000015
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M8-brand-text__MFAEsqd/agent/proposed.diff",
+          "sha256": "59658521ed397aa9ee104df1c8da584f02e841494149135006f76a70ec546d41",
+          "bytes": 68358
+        },
+        "agent/agent.log": {
+          "path": "attempts/M8-brand-text__MFAEsqd/agent/agent.log",
+          "sha256": "f2bc8d5c02503cd0de4f5ae7d35471464aee3b786470728f40040c0948e0156e",
+          "bytes": 25341
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M8-brand-text__MFAEsqd/agent/events.jsonl",
+          "sha256": "376e4cfcc549a6404a43fb5e766a936ff08d009d015f6cdc5fa093b4bd88b8c4",
+          "bytes": 3739
+        },
+        "agent/status.json": {
+          "path": "attempts/M8-brand-text__MFAEsqd/agent/status.json",
+          "sha256": "5f98284036ca9f5e34a8e107573108c299bb30e5860e09dd08c716ac79277095",
+          "bytes": 5577
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M8-brand-text__MFAEsqd/verifier/reward.txt",
+          "sha256": "b8713d4438c8855ac1ab83ca3baac5895bdddc9429b49b65d3804f95877e55ea",
+          "bytes": 5
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M8-brand-text__MFAEsqd/verifier/test-stdout.txt",
+          "sha256": "decebbc34aa0a712cd771c634f817d3275495b8077e202e08c4c49f2ad7cc73c",
+          "bytes": 876
+        }
+      }
+    },
+    {
+      "task": "M9-mcpanel",
+      "attempt": 1,
+      "trial": "M9-mcpanel__FYGE2UQ",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2500.4,
+        "verifierSec": 3.5,
+        "totalSec": 2592.1
+      },
+      "usage": {
+        "inputTokens": 352159,
+        "cacheHitTokens": 36419200,
+        "outputTokens": 221844,
+        "usd": 0.29518785
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M9-mcpanel__FYGE2UQ/agent/proposed.diff",
+          "sha256": "51a11a4ad6ca83810caa09d62f7c4266415bd9f716be7110d73392ef3659cee0",
+          "bytes": 67060
+        },
+        "agent/agent.log": {
+          "path": "attempts/M9-mcpanel__FYGE2UQ/agent/agent.log",
+          "sha256": "c70f53186a0aa580f5c7555fe2257abd822d7a4fa802eb81419940166ec575cc",
+          "bytes": 24324
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M9-mcpanel__FYGE2UQ/agent/events.jsonl",
+          "sha256": "7421e520ef452e455fafdf5cac2411ef1845298ba417d94a280bc0bb7beea320",
+          "bytes": 5035
+        },
+        "agent/status.json": {
+          "path": "attempts/M9-mcpanel__FYGE2UQ/agent/status.json",
+          "sha256": "4789ee9277eca1a76488c85a2d0b30541eb3dab2c778dc7891e5f4b8e8e781ce",
+          "bytes": 6457
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M9-mcpanel__FYGE2UQ/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M9-mcpanel__FYGE2UQ/verifier/test-stdout.txt",
+          "sha256": "62813b466950ff06b915b6703f7e394fc2e82734982513e35e432303623640fc",
+          "bytes": 1181
+        }
+      }
+    }
+  ],
+  "metrics": {
+    "formula": "v1",
+    "values": {
+      "meanReward": 0.585385,
+      "passRate@1.0": 0.230769,
+      "passRate@0.7": 0.384615,
+      "passAtK": 0.230769,
+      "meanReward.S": null,
+      "meanReward.M": 0.6125,
+      "meanReward.H": 0.562143,
+      "passHatK": 0.230769,
+      "fragility": 0,
+      "dispersion": null,
+      "unstableTaskShare": 0,
+      "inputTokens": 237165.25,
+      "outputTokens": 160547.5,
+      "cacheHitRatio": 0.989075,
+      "costPerAttempt": 0.196315,
+      "costPerSuccess": 0.785259,
+      "agentSecP50": 2258.5,
+      "agentSecP90": 2854.5,
+      "timeoutRate": 0,
+      "infrastructureRate": 0,
+      "eligibleTasks": 26,
+      "infeasibleTasks": 4
+    },
+    "intervals": {
+      "meanReward": [
+        0.468846,
+        0.70001
+      ],
+      "passRate@1.0": [
+        0.076923,
+        0.384615
+      ]
+    }
+  }
+}

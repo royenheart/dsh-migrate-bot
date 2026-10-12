@@ -1,0 +1,1300 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index fd30dd7..1497c41 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -4,7 +4,8 @@ An MCP-server management panel plugin: the host half writes the `mcp-client`
+ insert rows into the profile `cordis.patch.yml` (the loader's config HMR
+ mounts/unmounts/hot-swaps the official mcp-client instances), and the browser
+ half registers the settings-page "MCP" panel tab through the `settings.section`
+-slot. Written in the 0.1.2-era style; the host is moving to dsh 0.1.2-alpha.2.
++slot. Migrated to the dsh 0.1.2-alpha.2 cohort (client context types composed
++per owning package; `@deepseek-ai/dsh-client-runtime` is gone).
+ 
+ Release procedure (internal):
+ 
+diff --git a/fixture/client.js b/fixture/client.js
+index 500c522..23a8556 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -2,15 +2,32 @@
+ // settings.section slot, plus the plugin's own locale namespace for the panel
+ // copy (following DSH's native zh/en).
+ //
++// The panel stays where the product documents it: a top-level Settings page
++// owned by this plugin. The official Settings → Plugins section is a different
++// entry point (its `settings.plugin.item` cards edit one settings namespace
++// each); it does not cover, and is not replaced by, this page.
++//
+ // ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.2 era):
+-//   "Keep @deepseek-ai/dsh-client-runtime in the client inject — the browser
+-//    half still imports its ClientContext type, and type imports need the
+-//    package present in the client graph."
+-// ────────────────────────────────────────────────────────────
++// Cohort note (migrated to dsh 0.1.2-alpha.2):
++//   The 0.1.2-era `@deepseek-ai/dsh-client-runtime` aggregation package was
++//   removed in 0.1.2-alpha.1, so this half composes its context types from the
++//   owning packages it actually consumes:
++//     ctx.slots        service from @deepseek-ai/dsh-client-ui-renderer;
++//                      register API/types from @deepseek-ai/dsh-client-ui-slots
++//     ctx.locale       @deepseek-ai/dsh-client-locale/client
++//     settings.section @deepseek-ai/dsh-client-ui-settings/client (the type is
++//                      declared there; the runtime slot is declared by
++//                      ui-settings-general's `sidebar.settings` entry)
++//   Type-only imports are erased by the client build and create no module
++//   request; `react`, `@deepseek-ai/dsh-client-ui-slots`, and
++//   `@deepseek-ai/dsh-client-ui-primitives` come from the shell's frozen
++//   platform module table.
+ //
+-// 0.1.2-era type surface: the client context type comes from the client
+-// runtime package; the ctx.slots merge and the locale runtime arrive with it.
++// Packaging note: the host serves the declared `exports["./client"]` artifact
++// verbatim as a closure-factory bundle (`window.__ModuleLoader__.load({ id,
++// factory })`, emitted by the harness client build preset), so a packed
++// release ships that built artifact; this file is the authoring form.
++// ────────────────────────────────────────────────────────────
+ 
+ export const name = 'bench-mcpanel-client'
+ 
+@@ -25,7 +42,8 @@ function mcpanelStub() {
+ 
+ /**
+  * Register the settings-page "MCP" panel.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx - the browser plugin
++ *   context (`slots` and `locale` are declared injections).
+  */
+ export function apply(ctx) {
+   // Plugin-own copy namespace, following DSH's native zh/en.
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..b4bbe0d
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,550 @@
++{
++  "name": "@bench/dsh-bench-mcpanel",
++  "version": "0.1.3",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-mcpanel",
++      "version": "0.1.3",
++      "dependencies": {
++        "yaml": "^2.4.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-app-boot": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-settings-general": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-host-webserver": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/dsh-app-boot": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-primitives": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cordis": {
++      "version": "4.0.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.2.tgz",
++      "integrity": "sha512-asOnXP1TzFSFQlHb1iegDZp0z/8WD1c7YNrwJR/Tx2bzNuMXfcekE/I67Iv6SQXeLB4csxqCngzQKANP7gdw0g==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "^1.8.3",
++        "@standard-schema/spec": "^1.1.0"
++      },
++      "bin": {
++        "cordis": "bin.js"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis-plugin-include": "^1.0.7",
++        "@deepseek-ai/cordis-plugin-loader": "^1.0.3"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis-plugin-include": {
++          "optional": true
++        },
++        "@deepseek-ai/cordis-plugin-loader": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.3",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.3.tgz",
++      "integrity": "sha512-qBo+ronVM6Eu2WNVJXi8JcMiqZ19T9BRIpV+5qJUFPXjGH/Z0QKcQMC/IZJ7L394YTOtJgcovbk9qP0w2GsBXQ==",
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/@deepseek-ai/dsh-agent": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-agent/-/dsh-agent-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-K7B5XSQ7byB/IoNGj7n+lBgHCpVPJqEPvpGoHKc1dBS8fPo2yYp/ALFag4YOfrXVP3jQ9A8di20BbvIlp79SoA==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-scope": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-session-projection": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-brand": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-brand/-/dsh-brand-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-sWFbShCe8LNLuqD3gdQeneUGxFtZ/rywe6Tmi2eteBDubecHnf04XurtF38Epno42bnNTMYWuKwt1cihcbHL3A==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-locale": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-locale/-/dsh-client-locale-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-YDALYBD+iYU3GAAdL0ce2edcKURGe8jTk452ZSmDTGaUqd4TUBsB304yt2HjSzAyzoL3R7t2f4aKrVtAWbY1Rg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-settings": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings/-/dsh-client-ui-settings-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-06gPdKaUVItJt1liQVYM/I2W0TxNuK7qN682Ja43R4vMahg++mP35ALA5MtZPXQNLnHKe+AllYMzmgrjBf8rnA==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-settings-general": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings-general/-/dsh-client-ui-settings-general-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-uGk1ogimIU8bMGEkIo/4PyDXicm7WLCrdnfrC/FMhzmb0boszT7c36b2VlauoX/Fc8XL3Wk4BhNGsMJc6gX6Kg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "clsx": "^2.0.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-slots": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-slots/-/dsh-client-ui-slots-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-6ihXjJcgQLExj28SkKuPK0Rr7xfOvHhOiAIeO+uD5yywxtz7mSAW4S9JuxAOrpk2I2gNNU0DnFU4MmB229tjww==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-code-runtime": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-code-runtime/-/dsh-code-runtime-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-KGUwcm4sSHjspQYr2Kj1DycaxnPzxg25sk3ychqbFG4cLcUA8W6eqQJEpEUgmnCOkDBx/j9oXvzNxp7XGMsRoQ==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-host-webserver": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-host-webserver/-/dsh-host-webserver-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-cvsfM/cm5hZk/RqdIsardfqBIVpemdmUrP4M6UgdqhJy2nG5VnokLBg7k0bc8Yi11q0vIETfQK4xiDOSOMnu7Q==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "compression": "^1.8.1",
++        "negotiator": "^1.0.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-invariants": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-invariants/-/dsh-invariants-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-1ewUeCzUHbaqhtW5rG1/eujIXXzy2VhwvMa16RpcTuJp5qcU1NtAf/+COkmvI7qtkyNY61vWg1Ez5qL9hKIUpQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-llm": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-llm/-/dsh-llm-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-ip6yMxwHugxQm4VCbwX/FDnlTeeBM9VBkIn0+74ityQy7Z3yKREJ1Ov8Z04l4G3duRzeGRsQ4ztOFZ01oNfKIw==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-timeout": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-util-crypto": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-alpha.2",
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-scope": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-scope/-/dsh-scope-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-jeWfQnftQeZOWujxndgU6kjoFuXGWqmFrkWAxlWmyeojK/iyZqAxayWPuhVUEgweh4EWJmn6rW5HV3E4DXWuWw==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session/-/dsh-session-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-RfikXscYTDXDr7CD7C/8oGJZaH8Egclj7pmXRtd90QcB5L8RIQ7069xrHZjds8OjNrFo69qQwNK3gYLUVZy9PA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-alpha.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-scope": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session-projection": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-projection/-/dsh-session-projection-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-E5NYRAOQwiYYu56WSHTlnI2MkyqznA4ePlOdOQvpF97a7ZG2BkRfflwvQ5NHIPv8FABemoSCGMiI3/0GSfqvBg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-system-prompt": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-system-prompt/-/dsh-system-prompt-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-qT9PZEVMAbszsg1UVUvuovfWFS5unjy08KV0rnOc89TJCgkb2CnlknSyIQs0lXc/UiqT6ZQ59i4ClAFrXhxfxQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-scope": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-timeout": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-timeout/-/dsh-timeout-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-8q5cd55aMoOvrPaqSws/3xiyzHhs1bfjdtAs4YHWimQgMd+yMrDnlu8i+zFOkWoSc0A2wPkXcCYR8xogl4gerA==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-tools": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tools/-/dsh-tools-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-trk0fkmCDp64pqdcr8u7rCcRrwNi+93FKuznTnCD+YsPGFygcSG/6n+Wsh4+9A6oI1fM4/Ecq6Baa9vq1sNhJg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-alpha.2",
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-code-runtime": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-scope": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-user-approval": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-typert-protocol": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-typert-protocol/-/dsh-typert-protocol-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-U3j/usWHRllaJMdTr4GuVkkUciHWyq01mvMtWeGT+RY2hb+ysTxeuLEiV0Lh5EyVScgFdDLbe/GtTZ2OkGsGwQ==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-user-approval": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-user-approval/-/dsh-user-approval-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-CcV3hf2Q0NYxRbnlE+IysaUkq/hvmjlvS9OGiHpARZVY4VlidlZRmsy5g5L17vDoxirX+WBJ9Cc5VcJMcjPrUg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-brand": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-scope": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-crypto": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-crypto/-/dsh-util-crypto-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-03WVzlgLErJRRGMqaMdx5ufEoN3Scpdsnd0f8vXMhcbeEzKZ61lbI8z/m6ZttM/LhpzPALuFtDc5u+N5LFP8Fg==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-values": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-ZyZHTqGQ/8S5ZYflTkuiZGPxhkuHa9Uy5G+teEmnmnkhiN/UVPGQvI//CXRNmxpTKjfx+qcVVmr5x6bohplsQg==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/schemastery": {
++      "version": "3.18.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.2.tgz",
++      "integrity": "sha512-njDtZsznjYxok7KLLlHOPyuv2efdWVbSflAHgztSfbMsg+CVraEoRe2DjOCgClYv3ZCSm7WXoaUkbB/+RY7tWQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "^1.8.3",
++        "@standard-schema/spec": "^1.1.0"
++      }
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/bytes": {
++      "version": "3.1.2",
++      "resolved": "https://registry.npmjs.org/bytes/-/bytes-3.1.2.tgz",
++      "integrity": "sha512-/Nf7TyzTx6S3yRJObOAV7956r8cr2+Oj8AC5dt8wSP3BQAoeX58NoHyCU8P8zGkNXStjTSi6fzO6F0pBdcYbEg==",
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">= 0.8"
++      }
++    },
++    "node_modules/clsx": {
++      "version": "2.1.1",
++      "resolved": "https://registry.npmjs.org/clsx/-/clsx-2.1.1.tgz",
++      "integrity": "sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==",
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">=6"
++      }
++    },
++    "node_modules/compressible": {
++      "version": "2.0.18",
++      "resolved": "https://registry.npmjs.org/compressible/-/compressible-2.0.18.tgz",
++      "integrity": "sha512-AF3r7P5dWxL8MxyITRMlORQNaOA2IkAFaTr4k7BUumjPtRpGDTZpl0Pb1XCO6JeDCBdp126Cgs9sMxqSjgYyRg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "mime-db": ">= 1.43.0 < 2"
++      },
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/compression": {
++      "version": "1.8.1",
++      "resolved": "https://registry.npmjs.org/compression/-/compression-1.8.1.tgz",
++      "integrity": "sha512-9mAqGPHLakhCLeNyxPkK4xVo746zQ/czLH1Ky+vkitMnWfWZps8r0qXuwhwizagCRttsL4lfG4pIOvaWLpAP0w==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "bytes": "3.1.2",
++        "compressible": "~2.0.18",
++        "debug": "2.6.9",
++        "negotiator": "~0.6.4",
++        "on-headers": "~1.1.0",
++        "safe-buffer": "5.2.1",
++        "vary": "~1.1.2"
++      },
++      "engines": {
++        "node": ">= 0.8.0"
++      }
++    },
++    "node_modules/compression/node_modules/negotiator": {
++      "version": "0.6.4",
++      "resolved": "https://registry.npmjs.org/negotiator/-/negotiator-0.6.4.tgz",
++      "integrity": "sha512-myRT3DiWPHqho5PrJaIRyaMv2kgYf0mUVgBNOYMuCH5Ki1yEiQaf/ZJuQ62nvpc44wL5WDbTX7yGJi1Neevw8w==",
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/content-type": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/content-type/-/content-type-2.1.0.tgz",
++      "integrity": "sha512-mj7UPXE0jaqaOsukNZRUEfEi2AcL7C/vwmwcHV0O97eO1E1pxBZuyjlZrx5seTaNBg1U6+o35wpa35Qfcc+7ag==",
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/express"
++      }
++    },
++    "node_modules/debug": {
++      "version": "2.6.9",
++      "resolved": "https://registry.npmjs.org/debug/-/debug-2.6.9.tgz",
++      "integrity": "sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "ms": "2.0.0"
++      }
++    },
++    "node_modules/mime-db": {
++      "version": "1.54.0",
++      "resolved": "https://registry.npmjs.org/mime-db/-/mime-db-1.54.0.tgz",
++      "integrity": "sha512-aU5EJuIN2WDemCcAp2vFBfp/m4EAhWJnUNSSw0ixs7/kXbd6Pg64EmwJkNdFhB8aWt1sH2CTXrLxo/iAGV3oPQ==",
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/ms": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz",
++      "integrity": "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==",
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/negotiator": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/negotiator/-/negotiator-1.1.0.tgz",
++      "integrity": "sha512-NMPBRMJgiQHjbd8phG3Vebdx4kZ1H121rbl5IkMqeOsahptB9BKo/d7oJ3zTXqTgagn2bWlNSXkh0QUGM31RYg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "content-type": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/express"
++      }
++    },
++    "node_modules/on-headers": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/on-headers/-/on-headers-1.1.0.tgz",
++      "integrity": "sha512-737ZY3yNnXy37FHkQxPzt4UZ2UWPWiCZWLvFZ4fu5cueciegX0zGPnrlY6bwRg4FdQOe9YU8MkmJwGhoMybl8A==",
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">= 0.8"
++      }
++    },
++    "node_modules/safe-buffer": {
++      "version": "5.2.1",
++      "resolved": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.2.1.tgz",
++      "integrity": "sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==",
++      "funding": [
++        {
++          "type": "github",
++          "url": "https://github.com/sponsors/feross"
++        },
++        {
++          "type": "patreon",
++          "url": "https://www.patreon.com/feross"
++        },
++        {
++          "type": "consulting",
++          "url": "https://feross.org/support"
++        }
++      ],
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/vary": {
++      "version": "1.1.2",
++      "resolved": "https://registry.npmjs.org/vary/-/vary-1.1.2.tgz",
++      "integrity": "sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==",
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">= 0.8"
++      }
++    },
++    "node_modules/yaml": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/yaml/-/yaml-2.9.0.tgz",
++      "integrity": "sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==",
++      "license": "ISC",
++      "bin": {
++        "yaml": "bin.mjs"
++      },
++      "engines": {
++        "node": ">= 14.6"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/eemeli"
++      }
++    },
++    "node_modules/zod": {
++      "version": "4.5.4",
++      "resolved": "https://registry.npmjs.org/zod/-/zod-4.5.4.tgz",
++      "integrity": "sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==",
++      "license": "MIT",
++      "peer": true,
++      "funding": {
++        "url": "https://github.com/sponsors/colinhacks"
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 8ac2d49..418eaf4 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-mcpanel",
+-  "version": "0.1.2",
+-  "description": "MCP-server management panel plugin: the host half writes the mcp-client insert rows into the profile cordis.patch.yml (config HMR), the browser half registers the settings-page MCP tab (0.1.2-era cohort; exam material only)",
++  "version": "0.1.3",
++  "description": "MCP-server management panel plugin: the host half writes the mcp-client insert rows into the profile cordis.patch.yml (config HMR), the browser half registers the settings-page MCP tab (dsh 0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -15,9 +15,9 @@
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+-        "@deepseek-ai/dsh-client-ui-primitives",
+-        "@deepseek-ai/dsh-client-ui-slots"
++        "@deepseek-ai/dsh-client-locale",
++        "@deepseek-ai/dsh-client-ui-settings",
++        "@deepseek-ai/dsh-client-ui-settings-general"
+       ],
+       "platform": "web"
+     }
+@@ -26,16 +26,22 @@
+     "yaml": "^2.4.0"
+   },
+   "peerDependencies": {
+-    "cordis": "^4.0.0-rc.7",
+-    "react": "^18.2.0",
+-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.5",
+-    "@deepseek-ai/dsh-app-boot": "^0.1.0-rc.5",
+-    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.5",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.0-rc.5"
++    "@deepseek-ai/cordis": "^4.0.2",
++    "@deepseek-ai/dsh-app-boot": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-settings-general": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-host-webserver": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2"
+   },
+   "peerDependenciesMeta": {
+     "@deepseek-ai/dsh-app-boot": {
+       "optional": true
++    },
++    "@deepseek-ai/dsh-client-ui-primitives": {
++      "optional": true
+     }
+   },
+   "private": true
+diff --git a/fixture/patches/profile-patch-layer.patch b/fixture/patches/profile-patch-layer.patch
+new file mode 100644
+index 0000000..18022dc
+--- /dev/null
++++ b/fixture/patches/profile-patch-layer.patch
+@@ -0,0 +1,614 @@
++# dsh-v0.1.2-alpha.2 + profile-patch-layer patch (apply with: git apply)
++
++diff --git a/apps/cli/src/profile-boot.ts b/apps/cli/src/profile-boot.ts
++index ad5c362..05ef007 100644
++--- a/apps/cli/src/profile-boot.ts
+++++ b/apps/cli/src/profile-boot.ts
++@@ -26,8 +26,10 @@ import {
++   loadOverlayPatches,
++   loadProfile,
++   PROFILE_PATCH_FILENAME,
+++  provideProfilePatches,
++   watchUserPatches,
++   type Profile,
+++  type ProfilePatchesHost,
++ } from '@deepseek-ai/dsh-app-boot'
++ import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
++ import { DSH_LAUNCH_ENVIRONMENT_KEY, type LaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
++@@ -248,6 +250,10 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
++   ])
++   // Cloned for the same insert-aliasing reason as composeLive: the boot
++   // application must not mutate the objects later reloads recompose from.
+++  // The profile-patch service publishes its identity and one serialized
+++  // read-modify-write over the profile layer, so a management plugin never
+++  // reimplements `$DSH_HOME/profiles/<name>` discovery.
+++  let profilePatches: ProfilePatchesHost | undefined
++   const ctx = await boot(NAME, rootConfig, structuredClone(allPatches(composed)), (hostCtx) => {
++     app.current = hostCtx
++     // Before any config-tree entry mounts, so plugins resolve all launch-time
++@@ -260,6 +266,14 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
++       exit: code => void shutdown.shutdown(code),
++       ready: appReady.service,
++     })
+++    profilePatches = provideProfilePatches(hostCtx, {
+++      profile: composed.profile,
+++      homePatchPath: homePatchPath(),
+++      higherLayers: () => [
+++        loadOptionalPatches(NAME, homePatchPath()) ?? [],
+++        ...composed.overlays,
+++      ],
+++    })
++   })
++   app.current = ctx
++   // A live-reload profile can dispose the whole tree while post-boot watcher
++@@ -288,11 +302,13 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
++         binName: NAME,
++         filename: composed.profile.patchPath,
++         compose: composeLive,
+++        onApplied: (userPatches, filename) => profilePatches?.applied(userPatches, filename),
++       })
++       await watchUserPatches(ctx, {
++         binName: NAME,
++         filename: homePatchPath(),
++         compose: composeLive,
+++        onApplied: (userPatches, filename) => profilePatches?.applied(userPatches, filename),
++       })
++     } catch (error) {
++       suppressShutdownError(ctx, signalShutdown.signal, error)
++diff --git a/packages/boot/app-boot/src/index.ts b/packages/boot/app-boot/src/index.ts
++index 85e25eb..83fa4e8 100644
++--- a/packages/boot/app-boot/src/index.ts
+++++ b/packages/boot/app-boot/src/index.ts
++@@ -27,6 +27,16 @@ declare module '@deepseek-ai/cordis' {
++   }
++ }
++ 
+++export {
+++  parseProfilePatches,
+++  provideProfilePatches,
+++  type ProfilePatchEdit,
+++  type ProfilePatchMutateOptions,
+++  type ProfilePatches,
+++  type ProfilePatchesHost,
+++  type ProfilePatchesOptions,
+++} from './profile-patches.ts'
+++
++ export {
++   composeEntries,
++   DEFAULT_PROFILE_BUNDLES,
++@@ -223,6 +233,15 @@ export interface UserPatchWatchOptions {
++    * is the whole patch list.
++    */
++   compose?: (userPatches: PatchOptions[]) => PatchOptions[]
+++  /**
+++   * Observe each applied generation after the include update settles, for a
+++   * surface that mirrors the layer it watches (see
+++   * {@link provideProfilePatches}). Listeners run in watcher order; a throw
+++   * does not re-run the refresh that already committed.
+++   * @param userPatches - the layer as parsed from `filename` (relative plugin names anchored).
+++   * @param filename - the watched file, so one hook can route several layers.
+++   */
+++  onApplied?: (userPatches: readonly PatchOptions[], filename: string) => void
++ }
++ 
++ /**
++@@ -236,7 +255,7 @@ export async function watchUserPatches(
++   ctx: Context,
++   options: UserPatchWatchOptions,
++ ): Promise<() => Promise<void>> {
++-  const { binName, filename, compose = (patches: PatchOptions[]) => patches } = options
+++  const { binName, filename, compose = (patches: PatchOptions[]) => patches, onApplied } = options
++   const hmr = ctx.get('hmr')
++   if (hmr === undefined) throw new Error(`${binName}: user patch-layer watching requires the Cordis HMR service`)
++   const entry = bootstrapIncludes.get(ctx)
++@@ -253,6 +272,7 @@ export async function watchUserPatches(
++         patches,
++       },
++     })
+++    onApplied?.(userPatches, filename)
++   })
++   try {
++     return await register
++diff --git a/packages/boot/app-boot/src/profile-patches.ts b/packages/boot/app-boot/src/profile-patches.ts
++new file mode 100644
++index 0000000..60a0a50
++--- /dev/null
+++++ b/packages/boot/app-boot/src/profile-patches.ts
++@@ -0,0 +1,245 @@
+++/**
+++ * Active-profile live configuration: the profile identity, its user patch
+++ * layer, and one serialized read-modify-write entry point that the launcher's
+++ * existing `watchUserPatches` watcher turns into a live composition change.
+++ *
+++ * The launcher already owns every fact a management plugin needs — the profile
+++ * name and directory, its `cordis.patch.yml`, the reload mode — but hands the
+++ * tree only the launch environment and the app command line. Without this
+++ * service a plugin can neither address the active profile's layer nor write it
+++ * without guessing `$DSH_HOME/profiles/<name>`, so row-mutating surfaces (MCP
+++ * server managers, skill managers, plugin managers) reimplement profile
+++ * discovery and race the launcher's watcher.
+++ *
+++ * The service is read-mostly: {@link ProfilePatches.mutate} owns one
+++ * lock-guarded read-modify-write, and the launcher's exact-path HMR watcher
+++ * applies the committed file through the ordinary Loader coordination path.
+++ * @module @deepseek-ai/dsh-app-boot/profile-patches
+++ */
+++
+++import { readFileSync } from 'node:fs'
+++import type { Context } from '@deepseek-ai/cordis'
+++import { type EntryOptions, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
+++import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
+++import { writeFileAtomic, withFileLock } from '@deepseek-ai/dsh-atomic-write'
+++import * as yaml from 'js-yaml'
+++import type { ProfilePatchReload } from './profile.ts'
+++
+++declare module '@deepseek-ai/cordis' {
+++  interface Context {
+++    /** The active profile's user patch layer; provided by a launcher before the tree mounts. */
+++    profilePatches?: ProfilePatches
+++  }
+++}
+++
+++/** Permission bits stamped on the replaced user patch layer. */
+++const PATCH_FILE_MODE = 0o644
+++
+++/** One edit of the profile's user patch layer. */
+++export interface ProfilePatchEdit {
+++  /**
+++   * Produce the layer's next patch list from its current one.
+++   * @param patches - the layer exactly as authored (relative plugin names stay relative).
+++   * @returns the next patch list to persist; the same array is written back unchanged.
+++   */
+++  (patches: PatchOptions[]): PatchOptions[]
+++}
+++
+++/** Commit options for {@link ProfilePatches.mutate}. */
+++export interface ProfilePatchMutateOptions {
+++  /**
+++   * Refuse the candidate before it is committed. Runs under the writer lock
+++   * after the edit and before the atomic replace, so a throw leaves the layer
+++   * exactly as it was; a writer that changes control-plane rows (an inserted
+++   * plugin row, for example) must refuse candidates it cannot prove resolvable,
+++   * because a row that fails at the next boot takes the whole harness with it
+++   * (discussion #3473).
+++   * @param next - the candidate patch list about to be written.
+++   */
+++  validate?: (next: readonly PatchOptions[]) => void | Promise<void>
+++}
+++
+++/** The active profile's user patch layer, as a tree-visible service. */
+++export interface ProfilePatches {
+++  /** The profile name (`dsh --profile <name>`). */
+++  readonly name: string
+++  /** The absolute profile directory. */
+++  readonly dir: string
+++  /** The absolute path of the profile's own `cordis.patch.yml`. */
+++  readonly patchPath: string
+++  /** The absolute path of the home-level `$DSH_HOME/cordis.patch.yml`. */
+++  readonly homePatchPath: string
+++  /** Whether a committed write reaches the running tree without a restart. */
+++  readonly reload: ProfilePatchReload
+++  /**
+++   * Read the profile layer exactly as authored. Relative plugin names stay
+++   * relative — the launcher anchors them at application time, not on disk.
+++   * @returns the parsed patch list; empty when the file does not exist.
+++   * @throws when the file exists but is not a top-level array of patch entries.
+++   */
+++  read(): PatchOptions[]
+++  /**
+++   * Read the layer, apply `edit`, and commit the result atomically under the
+++   * cross-process writer lock. A live-reload profile applies the commit
+++   * through the launcher's watcher; a startup-frozen profile applies it at the
+++   * next launch, which {@link reload} states.
+++   * @param edit - the read-modify-write transform.
+++   * @param options - optional pre-commit validation; a refusal writes nothing.
+++   * @returns the committed patch list.
+++   */
+++  mutate(edit: ProfilePatchEdit, options?: ProfilePatchMutateOptions): Promise<PatchOptions[]>
+++  /**
+++   * Observe committed generations of the profile layer. Fires from the
+++   * launcher's watcher after a live apply, so every writer (this service, a
+++   * hand edit, another process) is observed alike. The watcher may publish the
+++   * same generation more than once for one write, so a listener must be
+++   * idempotent; a startup-frozen profile never fires.
+++   * @param listener - receives each new patch list.
+++   * @returns a disposer removing the listener.
+++   */
+++  subscribe(listener: (patches: readonly PatchOptions[]) => void): () => void
+++  /**
+++   * Row ids the profile layer cannot effectively set because a
+++   * higher-precedence layer already claims them (the home layer and `--patch`
+++   * overlays outrank the profile layer). A configuration surface should refuse
+++   * such an edit rather than persist one the composition will mask.
+++   * @returns the claimed ids, including ids inserted by higher layers.
+++   */
+++  higherPrecedenceIds(): ReadonlySet<string>
+++}
+++
+++/** Launcher-owned inputs for {@link provideProfilePatches}. */
+++export interface ProfilePatchesOptions {
+++  /** The loaded profile whose user layer this service edits. */
+++  profile: {
+++    name: string
+++    dir: string
+++    patchPath: string
+++    patchReload: ProfilePatchReload
+++  }
+++  /** Absolute path of the home-level `$DSH_HOME/cordis.patch.yml`. */
+++  homePatchPath: string
+++  /**
+++   * The patch lists that outrank the profile layer, in application order
+++   * (home layer, then `--patch` overlays). Read per call so an operator edit
+++   * is reflected without re-providing the service.
+++   */
+++  higherLayers?: () => readonly (readonly PatchOptions[])[]
+++}
+++
+++/** The provided service plus the watcher hook that feeds its subscribers. */
+++export interface ProfilePatchesHost {
+++  /** The service provided on the host context. */
+++  readonly service: ProfilePatches
+++  /**
+++   * Publish one watcher-applied generation of the profile layer.
+++   * @param patches - the layer the watcher just parsed.
+++   * @param filename - the watched file; other watched layers are ignored.
+++   */
+++  readonly applied: (patches: readonly PatchOptions[], filename: string) => void
+++}
+++
+++/**
+++ * Parse a patch layer as authored: the same YAML dialect and top-level array
+++ * contract boot enforces, without anchoring relative plugin names (a
+++ * read-modify-write must be able to write back what it read).
+++ * @param binName - the diagnostic prefix.
+++ * @param file - the source path, quoted in errors.
+++ * @param content - the file's text.
+++ * @returns the parsed patch list.
+++ * @throws when the document is not a top-level array of mappings.
+++ */
+++export function parseProfilePatches(binName: string, file: string, content: string): PatchOptions[] {
+++  let parsed: unknown
+++  try {
+++    parsed = yaml.load(content, { schema: entryListSchema })
+++  } catch (error) {
+++    throw new Error(`${binName}: failed to parse patches ${file}: ${String(error)}`)
+++  }
+++  if (!Array.isArray(parsed)) {
+++    throw new Error(`${binName}: patches ${file} must be a top-level YAML array of loader patch entries`)
+++  }
+++  parsed.forEach((entry, index) => {
+++    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+++      throw new Error(`${binName}: patches entry ${index + 1} in ${file} must be a mapping (a loader patch entry)`)
+++    }
+++  })
+++  return parsed as PatchOptions[]
+++}
+++
+++/** Read one layer from disk, treating absence as an empty layer. */
+++function readLayer(binName: string, file: string): PatchOptions[] {
+++  let content: string
+++  try {
+++    content = readFileSync(file, 'utf8')
+++  } catch (error) {
+++    if ((error as NodeJS.ErrnoException | null)?.code === 'ENOENT') return []
+++    throw new Error(`${binName}: failed to read patches ${file}: ${String(error)}`)
+++  }
+++  return parseProfilePatches(binName, file, content)
+++}
+++
+++/** Every row id one patch entry claims. */
+++function claimedIds(entry: EntryOptions): string[] {
+++  const ids: string[] = []
+++  if (typeof entry.id === 'string') ids.push(entry.id)
+++  for (const inserted of entry.insert ?? []) {
+++    if (typeof inserted.id === 'string') ids.push(inserted.id)
+++  }
+++  return ids
+++}
+++
+++/**
+++ * Provide the active profile's user patch layer on a host context before any
+++ * tree entry mounts.
+++ * @param ctx - the host context the tree will mount under.
+++ * @param options - the profile, its home sibling, and the higher-precedence layers.
+++ * @returns the service and the watcher hook that publishes applied generations.
+++ */
+++export function provideProfilePatches(ctx: Context, options: ProfilePatchesOptions): ProfilePatchesHost {
+++  const binName = 'dsh'
+++  const { profile } = options
+++  const listeners = new Set<(patches: readonly PatchOptions[]) => void>()
+++
+++  const service: ProfilePatches = {
+++    name: profile.name,
+++    dir: profile.dir,
+++    patchPath: profile.patchPath,
+++    homePatchPath: options.homePatchPath,
+++    reload: profile.patchReload,
+++    read: () => readLayer(binName, profile.patchPath),
+++    mutate: async (edit, mutateOptions) => {
+++      const next = await withFileLock(profile.patchPath, async () => {
+++        const current = readLayer(binName, profile.patchPath)
+++        const edited = edit(current)
+++        await mutateOptions?.validate?.(edited)
+++        await writeFileAtomic(profile.patchPath, yaml.dump(edited, { schema: entryListSchema, noRefs: true }), {
+++          mode: PATCH_FILE_MODE,
+++        })
+++        return edited
+++      })
+++      return next
+++    },
+++    subscribe: (listener) => {
+++      listeners.add(listener)
+++      return () => { listeners.delete(listener) }
+++    },
+++    higherPrecedenceIds: () => {
+++      const ids = new Set<string>()
+++      for (const layer of options.higherLayers?.() ?? []) {
+++        for (const patch of layer) for (const id of claimedIds(patch)) ids.add(id)
+++      }
+++      return ids
+++    },
+++  }
+++
+++  ctx.provide('profilePatches', service)
+++
+++  return {
+++    service,
+++    applied: (patches, filename) => {
+++      if (filename !== profile.patchPath) return
+++      for (const listener of listeners) listener(patches)
+++    },
+++  }
+++}
++diff --git a/packages/boot/app-boot/tests/profile-patches.spec.ts b/packages/boot/app-boot/tests/profile-patches.spec.ts
++new file mode 100644
++index 0000000..e71529d
++--- /dev/null
+++++ b/packages/boot/app-boot/tests/profile-patches.spec.ts
++@@ -0,0 +1,126 @@
+++/**
+++ * Profile live-configuration behavior of `dsh-app-boot`: the
+++ * `profilePatches` service provided to the tree — identity facts, an
+++ * unanchored authored view, one lock-guarded read-modify-write, and the
+++ * watcher hook that publishes applied generations.
+++ */
+++
+++import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+++import { tmpdir } from 'node:os'
+++import { join } from 'node:path'
+++import { describe, expect, it } from 'vitest'
+++import { Context } from '@deepseek-ai/cordis'
+++import {
+++  parseProfilePatches,
+++  PROFILE_PATCH_FILENAME,
+++  provideProfilePatches,
+++} from '../src/index.ts'
+++
+++const tmp = (): string => mkdtempSync(join(tmpdir(), 'dsh-profile-patches-'))
+++
+++describe('parseProfilePatches', () => {
+++  it('rejects a non-array document and a non-mapping entry', () => {
+++    expect(() => parseProfilePatches('dsh-test-bin', 'x.yml', 'id: row\n'))
+++      .toThrow(/must be a top-level YAML array/)
+++    expect(() => parseProfilePatches('dsh-test-bin', 'x.yml', '- 3\n'))
+++      .toThrow(/entry 1 in x.yml must be a mapping/)
+++  })
+++})
+++
+++describe('provideProfilePatches', () => {
+++  it('provides identity and an authored view without anchoring relative names', () => {
+++    const dir = tmp()
+++    const patchPath = join(dir, PROFILE_PATCH_FILENAME)
+++    writeFileSync(patchPath, [
+++      '- insert:',
+++      '    - id: probe',
+++      '      name: ./probe.mjs',
+++      '      config:',
+++      '        token: !!js process.env.DSH_PROBE_TOKEN',
+++      '',
+++    ].join('\n'))
+++    const ctx = new Context()
+++    const homePatchPath = join(dir, 'cordis.patch.yml')
+++    const host = provideProfilePatches(ctx, {
+++      profile: { name: 'demo', dir, patchPath, patchReload: 'live' },
+++      homePatchPath,
+++    })
+++
+++    expect(ctx.get('profilePatches')).toBe(host.service)
+++    expect(host.service).toMatchObject({ name: 'demo', dir, patchPath, homePatchPath, reload: 'live' })
+++    const authored = host.service.read()
+++    expect(authored[0]?.insert?.[0]).toMatchObject({ id: 'probe', name: './probe.mjs' })
+++  })
+++
+++  it('commits an edit atomically and keeps relative names and !!js expressions', async () => {
+++    const dir = tmp()
+++    const patchPath = join(dir, PROFILE_PATCH_FILENAME)
+++    writeFileSync(patchPath, '- insert:\n    - id: probe\n      name: ./probe.mjs\n')
+++    const ctx = new Context()
+++    const host = provideProfilePatches(ctx, {
+++      profile: { name: 'demo', dir, patchPath, patchReload: 'live' },
+++      homePatchPath: join(dir, 'home.yml'),
+++    })
+++
+++    await host.service.mutate(patches => [...patches, {
+++      insert: [{ id: 'mcp-github', name: '@deepseek-ai/dsh-mcp-client', config: { serverName: 'github' } }],
+++    }])
+++
+++    const written = readFileSync(patchPath, 'utf8')
+++    expect(written).toContain('name: ./probe.mjs')
+++    expect(written).toContain('mcp-github')
+++    expect(host.service.read()).toHaveLength(2)
+++    // The lock is released on both outcomes, so a second write succeeds.
+++    await host.service.mutate(patches => patches.slice(0, 1))
+++    expect(host.service.read()).toHaveLength(1)
+++  })
+++
+++  it('refuses a candidate a validator rejects without touching the layer', async () => {
+++    const dir = tmp()
+++    const patchPath = join(dir, PROFILE_PATCH_FILENAME)
+++    writeFileSync(patchPath, '- insert:\n    - id: probe\n      name: ./probe.mjs\n')
+++    const ctx = new Context()
+++    const host = provideProfilePatches(ctx, {
+++      profile: { name: 'demo', dir, patchPath, patchReload: 'live' },
+++      homePatchPath: join(dir, 'home.yml'),
+++    })
+++    const before = readFileSync(patchPath, 'utf8')
+++
+++    await expect(host.service.mutate(
+++      patches => [...patches, { insert: [{ id: 'missing', name: '@example/not-installed' }] }],
+++      { validate: (next) => {
+++        if (JSON.stringify(next).includes('not-installed')) throw new Error('row does not resolve')
+++      } },
+++    )).rejects.toThrow('row does not resolve')
+++
+++    expect(readFileSync(patchPath, 'utf8')).toBe(before)
+++    expect(host.service.read()).toHaveLength(1)
+++  })
+++
+++  it('publishes only generations of the profile layer and reports higher-precedence ids', () => {
+++    const dir = tmp()
+++    const patchPath = join(dir, PROFILE_PATCH_FILENAME)
+++    writeFileSync(patchPath, '[]\n')
+++    const ctx = new Context()
+++    const host = provideProfilePatches(ctx, {
+++      profile: { name: 'demo', dir, patchPath, patchReload: 'startup' },
+++      homePatchPath: join(dir, 'home.yml'),
+++      higherLayers: () => [[
+++        { insert: [{ id: 'home-row' }] },
+++        { id: 'overridden' },
+++      ]],
+++    })
+++
+++    const seen: string[] = []
+++    const off = host.service.subscribe((patches) => { seen.push(JSON.stringify(patches)) })
+++    host.applied([{ insert: [{ id: 'other-file' }] }], join(dir, 'home.yml'))
+++    expect(seen).toHaveLength(0)
+++    host.applied([{ insert: [{ id: 'probe' }] }], patchPath)
+++    expect(seen).toEqual(['[{"insert":[{"id":"probe"}]}]'])
+++    off()
+++    host.applied([{ insert: [{ id: 'probe' }] }], patchPath)
+++    expect(seen).toHaveLength(1)
+++    expect(host.service.higherPrecedenceIds()).toEqual(new Set(['home-row', 'overridden']))
+++    expect(host.service.reload).toBe('startup')
+++  })
+++})
++diff --git a/.agents/notes/implemented/architecture/2026-10-12-profile-patch-service.md b/.agents/notes/implemented/architecture/2026-10-12-profile-patch-service.md
++new file mode 100644
++index 0000000..06dc41c
++--- /dev/null
+++++ b/.agents/notes/implemented/architecture/2026-10-12-profile-patch-service.md
++@@ -0,0 +1,48 @@
+++# Agent Note: The active profile's user patch layer is provided to the tree
+++
+++Status: implemented
+++
+++English | [中文](2026-10-12-profile-patch-service.zh.md)
+++
+++## Problem
+++
+++The launcher resolves the active profile's identity — name, directory, `cordis.patch.yml`, `patchReload` — in `composeProfile()` and watches that file with `watchUserPatches()`, but the tree sees only the launch environment and the app command line. A management surface that must persist a composition row therefore reconstructs `$DSH_HOME/profiles/<name>` from `DSH_HOME` and writes the launcher's own file: an MCP-server manager inserting `@deepseek-ai/dsh-mcp-client` instances, a skill manager, or a plugin inventory that wants to enable a row. Nothing in the row store carries the profile name, and `@deepseek-ai/dsh-home-paths` resolves only the harness home.
+++
+++Three failures follow from that reconstruction, each observed in the field. A row naming an unresolvable package exits the process during boot, so the check has to happen before the write, not after ([discussion #3473](https://github.com/deepseek-ai/deepseek-harness/discussions/3473)). A write that lands during a reload can activate the replacement fiber while the previous scope is still alive ([discussion #8968](https://github.com/deepseek-ai/deepseek-harness/discussions/8968)); that report is about entry re-activation ordering, and every writer of the file depends on that ordering being correct. Two writers race the launcher's watcher with no shared lock, and a plugin that mirrors the layer cannot learn that a generation landed. The documented user path stays manual: "merge the chosen file's single `insert` patch into a user patch layer — `$DSH_HOME/profiles/<name>/cordis.patch.yml` for one profile, or `$DSH_HOME/cordis.patch.yml` for every profile on the machine" ([mcp-memory guide](../../../docs/user/guide/mcp-memory.md)).
+++
+++## Decision
+++
+++`@deepseek-ai/dsh-app-boot` provides `ProfilePatches` on the host context, and the launcher provides it in `runProfile`'s boot `prepare` hook — before any config-tree entry mounts, beside `DSH_LAUNCH_ENVIRONMENT_KEY` and `provideCmdline`.
+++
+++`provideProfilePatches(ctx, { profile, homePatchPath, higherLayers })` takes the loaded `Profile` the launcher already holds, the home layer path, and a thunk returning the layers that outrank the profile layer (home layer, then `--patch` overlays). It returns the service plus an `applied(patches, filename)` hook.
+++
+++`ctx.profilePatches` carries the profile facts a tree cannot otherwise obtain — `name`, `dir`, `patchPath`, `homePatchPath`, `reload`:
+++
+++- `read()` returns the layer **as authored**. Relative plugin names stay relative, because `loadOptionalPatches()` anchors them to `file:` URLs at parse time and its output cannot be written back. A read-modify-write therefore round-trips `./probe.mjs` and `!!js process.env.…` config expressions unchanged.
+++- `mutate(edit, { validate })` reads the layer, applies `edit`, runs `validate(next)`, and replaces the file with `writeFileAtomic` (mode `0o644`) inside `withFileLock` (`<patchPath>.lock`). A `validate` throw leaves the layer exactly as it was and releases the lock, so a writer that changes control-plane rows can refuse a candidate it cannot prove resolvable before the write that would break the next boot ([discussion #3473](https://github.com/deepseek-ai/deepseek-harness/discussions/3473)). One lock-guarded read-modify-write is the whole write API; package installation, row semantics, and backup policy stay with the caller.
+++- `subscribe(listener)` observes committed generations, and `watchUserPatches` accepts an `onApplied(userPatches, filename)` callback that fires after `entry.update()` settles. The service publishes only its own `patchPath`, so an external hand edit and another process are observed alike, and a `startup`-frozen profile never fires.
+++- `higherPrecedenceIds()` returns the ids claimed by the home layer and the `--patch` overlays — explicit entry `id`s and inserted row `id`s — so a configuration surface refuses an edit the composed order would mask instead of persisting a dead row.
+++
+++`parseProfilePatches(binName, file, content)` is exported beside the service: it parses the same top-level array and loader dialect boot enforces, without anchoring, and fails loud on a non-array document or a non-mapping entry. The service's own reader treats an absent file as an empty layer, so a profile whose user layer was never authored still reads and writes.
+++
+++The watcher hook does not change reload semantics. `--dump-config` never provides the service, so a dump stays a read of the composition, and `reload` reports only whether a commit reaches the running tree without a restart.
+++
+++## Alternatives considered
+++
+++- **A launcher-local script or helper that the plugin runs.** The facts live in `apps/cli`, but a helper still has to reach the tree, and a tree-visible copy would be a second implementation of profile discovery — the duplication this decision removes.
+++- **Carrying the profile path on the launch environment snapshot.** That snapshot is a process-environment projection with a single owner, and identity plus mutation semantics would sit on a value passed to every plugin that never writes a row.
+++- **`loadOptionalPatches()` as the read path.** It is the fail-loud boot parser and anchors relative names at parse time, so writing its output back would persist `file:` URLs over `./probe.mjs`. Reading authored content needs the unanchored parser this change adds.
+++- **Providing the service after boot settles.** Rows activate while the tree mounts; a row that asks for `profilePatches` after settlement would be a second ordering rule beside Cordis injection, and the field report's write-during-reload hazard is about the file, not about who provides the service.
+++- **Making `plugin-inventory` writable** (`packages/host/plugin-inventory/README.md` keeps it read-only by design) or routing the write through `ctx.settings`. The settings document is a separate user file; neither mounts, unmounts, or hot-swaps a composition row.
+++- **Letting the service own row semantics** (insert, enable, remove a named plugin). Row identity, module-name assertions, and `disabled` placement belong to the caller's patch edits; a service that knew them would freeze one row layout into `app-boot`.
+++
+++## Consequences
+++
+++- A management surface addresses the active profile layer without reconstructing `$DSH_HOME/profiles/<name>`, and its writes serialize against other writers and the launcher's watcher.
+++- A live-reload profile applies a commit through the existing `watchUserPatches` path; a `startup`-frozen profile reports `startup` and applies at the next launch.
+++- The service edits a patch list, not plugins: it does not resolve package names, does not validate that an inserted module exists, and keeps no backup generation. Those remain caller policy, and `validate` is the seam for them.
+++- Only `@deepseek-ai/dsh-app-boot` gains public exports — the module, the service, the parser, and the types. `js-yaml` and `@deepseek-ai/dsh-atomic-write` are already dependencies of that package, so the launcher gains no new dependency.
+++- `mutate` returns the committed list, but a watcher-applied generation arrives through `subscribe`; a listener must be idempotent because the watcher may publish one write more than once.
+++- The profile layer is the only layer this service writes. The home layer stays operator-owned; a plugin that wants an edit to apply to every profile has no seam here.
+++- `higherPrecedenceIds()` reads explicit `id` fields and inserted rows only; a claim expressed by a group or another patch verb stays invisible.
+++- An out-of-tree manager on this line keeps working while the profile-layer service is absent, but it reimplements discovery and races the watcher — the state this decision removes once the release carries it.
++diff --git a/.agents/notes/implemented/architecture/2026-10-12-profile-patch-service.zh.md b/.agents/notes/implemented/architecture/2026-10-12-profile-patch-service.zh.md
++new file mode 100644
++index 0000000..8b02518
++--- /dev/null
+++++ b/.agents/notes/implemented/architecture/2026-10-12-profile-patch-service.zh.md
++@@ -0,0 +1,48 @@
+++# Agent Note: The active profile's user patch layer is provided to the tree
+++
+++Status: implemented
+++
+++[English](2026-10-12-profile-patch-service.md) | 中文
+++
+++## Problem
+++
+++launcher 在 `composeProfile()` 中解析出当前 profile 的身份——名字、目录、`cordis.patch.yml`、`patchReload`——并用 `watchUserPatches()` 监听该文件，但配置树只能看到启动环境与应用命令行。因此，需要持久化一条组合行的管理界面只能自己从 `DSH_HOME` 重建 `$DSH_HOME/profiles/<name>` 并直接写 launcher 自己的文件：插入 `@deepseek-ai/dsh-mcp-client` 实例的 MCP 服务器管理器、技能管理器，或想启用某一行的插件清单。行存储里没有任何字段携带 profile 名字，`@deepseek-ai/dsh-home-paths` 也只解析 harness home。
+++
+++这种重建带来三类失败，且都在现场出现过。一行指向无法解析的包会让进程在启动时直接退出，所以检查必须发生在写入之前而不是之后（[讨论 #3473](https://github.com/deepseek-ai/deepseek-harness/discussions/3473)）。一次落在 reload 期间的写入，可能在旧 scope 仍然存活时激活替换后的 fiber（[讨论 #8968](https://github.com/deepseek-ai/deepseek-harness/discussions/8968)）；该报告讲的是 entry 重新激活的次序，而该文件的所有写入方都依赖这个次序正确。两个写入方会在没有共享锁的情况下与 launcher 的 watcher 竞争，而镜像该层的插件无法得知某一代已经落地。官方文档给出的用户路径仍然是手工操作："把所选文件的单个 `insert` patch 合并进 user patch layer——单个 profile 用 `$DSH_HOME/profiles/<name>/cordis.patch.yml`，整机所有 profile 用 `$DSH_HOME/cordis.patch.yml`"（[mcp-memory 指南](../../../docs/user/guide/mcp-memory.md)）。
+++
+++## Decision
+++
+++`@deepseek-ai/dsh-app-boot` 在 host context 上提供 `ProfilePatches`，由 launcher 在 `runProfile` 的 boot `prepare` 钩子中提供——在任何配置树 entry 挂载之前，与 `DSH_LAUNCH_ENVIRONMENT_KEY`、`provideCmdline` 并列。
+++
+++`provideProfilePatches(ctx, { profile, homePatchPath, higherLayers })` 接收 launcher 已持有的 `Profile`、home 层路径，以及一个返回优先级高于 profile 层的各层（home 层，然后 `--patch` overlay）的 thunk。它返回该服务，外加一个 `applied(patches, filename)` 钩子。
+++
+++`ctx.profilePatches` 携带配置树无法从别处获得的 profile 事实——`name`、`dir`、`patchPath`、`homePatchPath`、`reload`：
+++
+++- `read()` 返回**按作者原样**的层。相对插件名保持相对，因为 `loadOptionalPatches()` 在解析时把它们锚定成 `file:` URL，其输出无法原样写回。因此读—改—写会原样保留 `./probe.mjs` 与 `!!js process.env.…` 配置表达式。
+++- `mutate(edit, { validate })` 读取该层、应用 `edit`、运行 `validate(next)`，并在 `withFileLock`（`<patchPath>.lock`）内用 `writeFileAtomic`（mode `0o644`）替换文件。`validate` 抛错会让该层保持原样并释放锁，因此会改动控制面行的写入方，能在"写坏下一次启动"的那次写入之前拒绝自己无法证明可解析的候选内容（[讨论 #3473](https://github.com/deepseek-ai/deepseek-harness/discussions/3473)）。一次加锁的读—改—写就是全部写入 API；包安装、行语义与备份策略都留给调用方。
+++- `subscribe(listener)` 观察已提交的各代，`watchUserPatches` 接受一个 `onApplied(userPatches, filename)` 回调，在 `entry.update()` 落定之后触发。服务只发布自己的 `patchPath`，因此外部手工编辑与另一个进程的写入被一视同仁地观察到，而 `startup` 冻结的 profile 永不触发。
+++- `higherPrecedenceIds()` 返回 home 层与 `--patch` overlay 已占用的 id——显式 entry `id` 与插入行的 `id`——使配置界面拒绝一个会被组合顺序掩盖的编辑，而不是持久化一条死行。
+++
+++`parseProfilePatches(binName, file, content)` 与服务一同导出：它解析与 boot 相同的顶层数组与 loader 方言，不做锚定，并对非数组文档或非映射条目 fail loud。服务自身的读取器把文件缺失当作空层，因此从未编写过 user 层的 profile 依然可读可写。
+++
+++watcher 钩子不改变 reload 语义。`--dump-config` 从不提供该服务，因此 dump 仍然只是对组合的读取，`reload` 只报告一次提交是否无需重启就到达运行中的树。
+++
+++## Alternatives considered
+++
+++- **由 launcher 本地的脚本或 helper 执行写入，插件去调用它。** 这些事实确实在 `apps/cli`，但 helper 仍然要触达配置树，而配置树里可见的副本会成为 profile 发现的第二份实现——正是本决策要消除的重复。
+++- **把 profile 路径挂在启动环境快照上。** 该快照是进程环境投影、只有一个所有者；把身份与可变更语义放在一个会传给每个插件的值上，而其中大多数插件从不写行。
+++- **用 `loadOptionalPatches()` 作为读取路径。** 它是 boot 的 fail-loud 解析器，并在解析时锚定相对名，把它的输出写回会把 `file:` URL 覆盖到 `./probe.mjs` 上。读取作者原样的内容需要本改动新增的不锚定解析器。
+++- **在 boot 落定之后才提供该服务。** 行在配置树挂载过程中就会被激活；一个在落定后才请求 `profilePatches` 的行，会成为 Cordis 注入之外的第二套次序规则，而现场报告中的"reload 期间写入"风险针对的是文件，不是由谁提供该服务。
+++- **让 `plugin-inventory` 可写**（`packages/host/plugin-inventory/README.md` 按设计保持只读），或经由 `ctx.settings` 写入。settings 文档是另一个用户文件；二者都不会挂载、卸载或热替换一条组合行。
+++- **让服务自己承担行语义**（插入、启用、移除某个具名插件）。行身份、模块名断言与 `disabled` 的位置属于调用方的 patch 编辑；一个懂这些的服务会把某一种行布局冻结进 `app-boot`。
+++
+++## Consequences
+++
+++- 管理界面可以直接寻址当前 profile 层，而不必重建 `$DSH_HOME/profiles/<name>`，其写入与其他写入方以及 launcher 的 watcher 串行化。
+++- live-reload profile 通过现有的 `watchUserPatches` 路径应用提交；`startup` 冻结的 profile 报告 `startup`，并在下次启动时应用。
+++- 该服务编辑的是 patch 列表，不是插件：它不解析包名、不校验插入的模块是否存在，也不保留备份代。这些仍属调用方策略，`validate` 是它们的接缝。
+++- 只有 `@deepseek-ai/dsh-app-boot` 新增公开导出——模块、服务、解析器与类型。`js-yaml` 与 `@deepseek-ai/dsh-atomic-write` 已是该包的依赖，launcher 不新增依赖。
+++- `mutate` 返回已提交的列表，但 watcher 应用的一代经由 `subscribe` 到达；监听器必须幂等，因为 watcher 可能对一次写入发布不止一次。
+++- profile 层是该服务唯一写入的层。home 层仍归操作者所有；想让改动作用于所有 profile 的插件在这里没有接缝。
+++- `higherPrecedenceIds()` 只读取显式 `id` 字段与插入的行；由 group 或其他 patch 动词表达的占用不可见。
+++- 在这条版本线上，树外的管理器在该 profile 层服务缺席时仍能工作，但它会重建 profile 发现并与 watcher 竞争——一旦发行版带上本决策，这种状态即被消除。
++diff --git a/.agents/notes/implemented/architecture/2026-10-12-profile-patch-service.i18n.yaml b/.agents/notes/implemented/architecture/2026-10-12-profile-patch-service.i18n.yaml
++new file mode 100644
++index 0000000..04cc32d
++--- /dev/null
+++++ b/.agents/notes/implemented/architecture/2026-10-12-profile-patch-service.i18n.yaml
++@@ -0,0 +1,6 @@
+++# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+++# side as of the last confirmed-consistent state. Both languages carry equal authority;
+++# after editing either side, bring the other along and re-record with:
+++#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-12-profile-patch-service.md
+++2026-10-12-profile-patch-service.md: 06dc41c5ad0c609268a1aae98485c885605d337b
+++2026-10-12-profile-patch-service.zh.md: 8b02518cf3aecd4efff1990c7e803cee07766320

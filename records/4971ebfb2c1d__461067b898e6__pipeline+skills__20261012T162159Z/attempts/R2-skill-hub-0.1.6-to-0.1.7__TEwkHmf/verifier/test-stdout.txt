@@ -1,0 +1,17 @@
+PASS contract
+PASS typecheck
+FAIL test: [31m+ Received:[39m 
+  [Function SkillInvocationDot]
+  
+  [36m [2m❯[22m src/client/slash-dots.test.ts:[2m108:28[22m[39m
+      [90m106| [39m      // MenuView renders `icon` through ReferenceIcon (enum-narrowed)…
+      [90m107| [39m      // custom element would never show — rows must carry no icon at …
+      [90m108| [39m      [34mexpect[39m(rows[[34m0[39m][33m.[39micon)[33m.[39m[34mtoBeUndefined[39m()
+      [90m   | [39m                           [31m^[39m
+      [90m109| [39m      [34mexpect[39m(rows[[34m1[39m][33m.[39micon)[33m.[39m[34mtoBeUndefined[39m()
+      [90m110| [39m      [90m// Original fields pass through untouched.[39m
+  
+  [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+PASS build
+PASS boot
+{"score":70,"max":100,"checks":{"contract":1,"typecheck":1,"test":0,"build":1,"boot":1}}

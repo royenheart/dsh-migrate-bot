@@ -1,0 +1,1138 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 0608ffa..7f588c1 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,12 +1,62 @@
+ # bench-merge-calls (benchmark fixture)
+ 
+-A client plugin that shadows the shipped `read`/`grep`/`glob` toolviews in
+-the web UI's `tool.call.toolview` slot (priority -1) and merges consecutive
+-same-tool calls into one card with compact child rows. The host half is an
+-empty-apply stub that only declares the config row. Written in the
+-0.1.1-era style (the browser half pulls its client context type and the chat
+-node types from the client-runtime package, and reads the chat flow through
+-the session store). The host is moving to dsh 0.1.2-alpha.2.
++A client plugin that merges **consecutive same-tool calls in the Web chat flow into one
++card with compact child rows**. It shadows the shipped `read`/`grep`/`glob`/`edit`/`write`/
++`bash`/`pwsh`/`web_search`/`web_fetch`/`run_code` toolviews in the web UI's
++`tool.call.toolview` slot (`priority: -1`) and, for each group, renders the merged main
++card on the group's first call while the remaining in-group calls render `null`. The host
++half declares the config row and registers it as the composition layer of the plugin's own
++`merge-tool-calls` settings namespace.
++
++Cohort: migrated from the 0.1.1-era client-runtime surface to **dsh 0.1.2-alpha.2**.
++
++## Documented capabilities and entry points
++
++1. **Keyed toolview shadowing.** The plugin takes over a wire tool's card by registering a
++   keyed `tool.call.toolview` entry for that tool name at `priority: -1` (ascending
++   shadowing rank; the lowest rank renders). Every claimed key replaces the shipped row;
++   unclaimed keys keep the shipped row.
++2. **Merged run detection.** Consecutive same-name calls merge into one group; known
++   families merge across names (`grep`+`glob`, `bash`+`pwsh`, `read`+`web_fetch`,
++   `write`+`edit`); an unknown tool merges only with itself. Any other node kind breaks
++   the run. `maxGroupSize` caps a group and the overflowing call starts its own group.
++3. **Merged main card.** The group's first call renders a main card whose summary is the
++   group count in the family's noun (`Read · 5 Files`, `Search · 3 Queries`,
++   `Bash · 4 Commands`, …), falling back to the first error line when the group's first
++   call failed. State (running / ok / error / interrupted) colours the row.
++4. **Compact child rows.** Every call in the group — including the first — is reachable as
++   a compact child row; the child block collapses by default and animates open from the
++   main row.
++5. **Bundle-row config through the settings seam.** `cordis.patch.yml` carries the
++   user-facing config: `tools` (`[]` = all built-in generic-row tools, or an explicit
++   whitelist of any wire name), `groupBy` (`adjacent`, or `step` for one group per agent
++   step), `maxGroupSize` (default 8). The host half validates the row with its exported
++   Schemastery `Config` and registers it as the `base` layer of the plugin's own
++   `merge-tool-calls` settings namespace; a `merge-tool-calls:` user section layers over
++   the row, and the browser half reads the resolved section through the client settings
++   scope, so a deployment's row values and a user's overrides both reach the merged rows.
++6. **Row copy in two shipped locales** (`zh`/`en`) through the client locale registry,
++   plus `ja`/`ko` language packs: the plugin registers the language definition
++   (`ctx.locale.addLanguage`) and its namespace dictionaries per locale
++   (`ctx.locale.register(NS, id, dict)`), so another pack that already defines the same
++   language keeps its own definition.
++7. **Pure presentation.** The merge is a pure function of the chat snapshot: no session
++   log, model-visible data, or details panel is touched; replay is deterministic.
++
++## Migration mapping (0.1.1-era → 0.1.2-alpha.2)
++
++| Old surface | Current surface |
++| --- | --- |
++| `@deepseek-ai/dsh-client-runtime/client` (client context + chat node types) | removed; `Context` from `@deepseek-ai/cordis` plus each owning package's type-only import |
++| `ctx.session` chat slice / `useSession(session => session.nodes)` | framework `useChat` hook on the session-scoped slot: `snapshot.order` + `snapshot.nodes.get(key)` |
++| `block.callView` / `block.resultView` | removed from the wire; card props derive from raw `argsRaw`/content/error |
++| `conversationContextKey(kind, id)` value import | not a public export; the row locates its own node by scanning `order` and matching `data.root.callId` |
++| `ctx.betterLocale` override service | shipped client locale registry language packs: `ctx.locale.addLanguage` + `ctx.locale.register(NS, id, dict)` (duplicate ids and duplicate `(ns, locale)` pairs now fail loudly) |
++| row config read only by the host half | the row is the `base` layer of the `merge-tool-calls` settings namespace; the browser half reads the resolved section through `ctx.settingsScope` |
++
++The grouping model and the register shape are exercised by
++`node --test` against the real source with React/primitive stubs (registration keys,
++`priority: -1`, family grouping, cap behaviour, card model, selector equality).
+ 
+ Release procedure (internal):
+ 
+@@ -18,6 +68,5 @@ Release procedure (internal):
+ Exam material only, **do not publish** (`"private": true` in package.json).
+ Distilled from `@huanlin/dsh-plugin-merge-tool-calls` (adaptation commit
+ `720a077`); four of the six card derivations and the grouping walk are
+-elided — the exam is the card-derivation model, the useChat read contract,
++elided — the exam is the card-derivation model, the `useChat` read contract,
+ and the client inject recomposition.
+-
+diff --git a/fixture/client.js b/fixture/client.js
+index af7f40c..e3837e6 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,24 +1,54 @@
+-// Browser half: shadows the shipped tool.call.toolview entries for every
+-// grouped tool at priority -1 (the keyed slot's shadowing rule: lowest
+-// priority renders), merging consecutive same-tool calls into one card with
+-// compact child rows.
++// ── bench-merge-calls · browser half (dsh 0.1.2-alpha.2 cohort) ────────────
+ //
+-// 0.1.1-era type surface (pre v0.1.2-alpha): the client context type AND the
+-// chat node types (ChatNodeStore / ChatConversationViewNode / ToolCallBlock /
+-// ToolResultNode) come from the client-runtime package:
++// Documented capability: merge consecutive same-tool calls in the Web chat
++// flow into one card with compact child rows. The plugin claims a tool by
++// shadowing the shipped `tool.call.toolview` entry for that wire tool name
++// (`priority: -1`; ascending rank, lowest renders — see
++// docs/subsystems/slots.md#cardinality-and-scope). The group's first call
++// renders the merged main card; the remaining in-group calls render null.
+ //
+-//   import type { ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
+-//
+-// and node-key scanning recomputes ui-conversation's internal
+-// conversationContextKey (a value import from the same package in the real
+-// sources) to locate the seat's node in snapshot.chat.order.
+-//
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.x era):
+-//   "resultView/callView were only renamed on alpha — keep reading them off
+-//    the call object. useChat is for the chat window only: tool views keep
+-//    reading ctx.session."
+-// ────────────────────────────────────────────────────────────
++// alpha.2 seam map (0.1.1-era surfaces → current owner):
++//   `@deepseek-ai/dsh-client-runtime/client`  → removed; `Context` from cordis
++//        plus the type-only augmentations of the owning client packages.
++//   `ctx.session` chat slice via `useSession` → framework `useChat` hook on a
++//        session-scoped slot: `snapshot.order` + `snapshot.nodes.get(key)`.
++//   `ClientContext`                            → `Context` from cordis.
++//   `block.callView` / `block.resultView`      → removed from the wire; card
++//        props derive from raw args/content/meta.
++//   `ChatNodeStore.get(key)` keyed by the engine-owned
++//        `conversationContextKey(kind, id)`     → the key derivation is not a
++//        public export, so this row locates its own node by scanning
++//        `order` and matching `data.root.callId` (the documented
++//        `order + nodes.get()` read shape).
++//   row config reaching the browser half       → the host half registers the
++//        row as the `base` of the `merge-tool-calls` settings namespace and
++//        this half reads it through the client settings scope, so the three
++//        documented fields stay bundle-row config and take effect here.
++//   `ctx.betterLocale` override service        → the shipped client locale
++//        registry's language-pack form: `ctx.locale.addLanguage` for the id
++//        and `ctx.locale.register(NS, id, dict)` for this namespace's copy.
++
++// @ts-check
++// Type surface: every `@import` below resolves an owning package directly.
++// The client-runtime aggregation package is gone, and each augmentation
++// (ctx.slots, ctx.locale, the `useChat` session standard prop) comes from the
++// owning package's `/client` entry. Runtime service access is declared by the
++// `inject` export, not by these type imports.
++/** @import { Context as ClientContext } from '@deepseek-ai/cordis' */
++/** @import { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots' */
++/** @import { LocaleDict } from '@deepseek-ai/dsh-client-locale/client' */
++/** @import {} from '@deepseek-ai/dsh-client-ui-chat/client' */
++/** @import {} from '@deepseek-ai/dsh-client-ui-renderer/client' */
++/** @import { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client' */
++import { createElement, useState } from 'react'
++import { StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
++
++/**
++ * Locale namespace declaration (plain-JS form of the `LocaleNamespaceMap`
++ * merge): this plugin owns its row-copy namespace `merge-tool-calls`, so the
++ * registration's `locale: NS` synthesizes a `t` seat typed to the shipped
++ * dictionary keys.
++ */
+ 
+ export const name = 'bench-merge-calls-client'
+ 
+@@ -27,8 +57,7 @@ export const inject = ['slots', 'locale']
+ 
+ const NS = 'merge-tool-calls'
+ 
+-// Base row copy (distilled from locales.ts zh/en — the real pre-adaptation
+-// key set, elided to the count keys + the terminal block keys).
++/** Row copy keys; every dictionary carries the complete set. */
+ const zh = {
+   running: '进行中',
+   failed: '失败',
+@@ -37,6 +66,11 @@ const zh = {
+   collapse: '折叠',
+   mergedCount: '已合并 {n} 次调用',
+   countFiles: '{n} 个文件',
++  countQueries: '{n} 次搜索',
++  countCommands: '{n} 条命令',
++  countEdits: '{n} 次修改',
++  countCode: '{n} 段代码',
++  countCalls: '{n} 次调用',
+   'terminal.exitCode': '退出码 {code}',
+   'terminal.noOutput': '无输出',
+ }
+@@ -48,15 +82,27 @@ const en = {
+   collapse: 'Collapse',
+   mergedCount: '{n} calls merged',
+   countFiles: '{n} Files',
++  countQueries: '{n} Queries',
++  countCommands: '{n} Commands',
++  countEdits: '{n} Edits',
++  countCode: '{n} Code',
++  countCalls: '{n} Calls',
+   'terminal.exitCode': 'exit code {code}',
+   'terminal.noOutput': 'No output',
+ }
++/** MergeToolCallsCopyKey is the shared key union of the shipped dictionaries. */
++/** @typedef {keyof typeof en} MergeToolCallsCopyKey */
+ 
+-// The 19 better-locale override languages, distilled to 2 (real values).
+-// Full-dict shape: every dictionary carries the same key set as en/zh —
+-// enforced by the Record<MergeToolCallsKey, string> annotation:
+-//
+-// @type {Record<string, Record<string, string>>}
++// Language packs register each namespace independently; every dictionary must
++// carry the complete en key set (enforced by the LocaleDict annotations). The
++// shipped registry takes them through `ctx.locale.addLanguage` (the language
++// definition) + `ctx.locale.register(NS, id, dict)` (this namespace's copy).
++/** Language packs this plugin ships copy for. */
++const LANGUAGE_PACKS = [
++  { id: 'ja', label: '日本語' },
++  { id: 'ko', label: '한국어' },
++]
++/** @type {Record<string, LocaleDict>} */
+ const overrideDicts = {
+   ja: {
+     running: '実行中',
+@@ -66,6 +112,11 @@ const overrideDicts = {
+     collapse: '折りたたむ',
+     mergedCount: '{n} 回の呼び出しを統合',
+     countFiles: '{n} 個のファイル',
++    countQueries: '{n} 回の検索',
++    countCommands: '{n} 件のコマンド',
++    countEdits: '{n} 件の編集',
++    countCode: '{n} 件のコード',
++    countCalls: '{n} 件の呼び出し',
+     'terminal.exitCode': '終了コード {code}',
+     'terminal.noOutput': '出力なし',
+   },
+@@ -77,199 +128,524 @@ const overrideDicts = {
+     collapse: '접기',
+     mergedCount: '{n}번 호출 병합됨',
+     countFiles: '파일 {n}개',
++    countQueries: '검색 {n}회',
++    countCommands: '명령 {n}개',
++    countEdits: '편집 {n}회',
++    countCode: '코드 {n}개',
++    countCalls: '호출 {n}개',
+     'terminal.exitCode': '종료 코드 {code}',
+     'terminal.noOutput': '출력 없음',
+   },
+ }
+ 
++// ── merge-run detection ───────────────────────────────────────────────────
++// The pure helpers below are exported so the card-derivation model can be
++// exercised directly; the package's public plugin face stays `apply`/`inject`.
++
++/** Tool-call node kind registered by ui-chat's built-in tool definition. */
++const TOOL_CALL_KIND = 'tool-call'
++
++/** Default takeover set: the built-in generic-row wire tools (empty config). */
++const DEFAULT_TOOLS = [
++  'read', 'grep', 'glob', 'edit', 'write', 'bash', 'pwsh',
++  'web_search', 'web_fetch', 'run_code',
++]
++
++/** Row families the merged card counts and groups as one family. */
++const TOOL_FAMILIES = {
++  read: 'read', web_fetch: 'read',
++  grep: 'search', glob: 'search', web_search: 'search',
++  bash: 'bash', pwsh: 'bash',
++  write: 'edit', edit: 'edit',
++  run_code: 'code',
++}
++
++/** Count-summary copy key per family. */
++const FAMILY_COUNT_KEYS = {
++  read: 'countFiles', search: 'countQueries', bash: 'countCommands',
++  edit: 'countEdits', code: 'countCode', others: 'countCalls',
++}
++
+ /**
+- * Structural view of better-locale's override store (optional; no runtime
+- * dep). PRE contract: each per-language dictionary carries the SAME key set
+- * as the base en/zh dictionaries (compiler-enforced full Record).
++ * @typedef {{ block: import('@deepseek-ai/dsh-client-ui-tool/client').ToolCallViewProps['block'], callId: string, toolName: string }} ToolSeat
++ * @typedef {{ blocks: readonly ToolSeat[], isFirst: boolean, size: number }} MergeRun
+  */
+-const overrideStoreShape = undefined // { register(ns, dicts: Record<string, Record<string, string>>): () => void }
+ 
+-/** Register the override dicts into ctx.betterLocale (optional service). */
+-function registerOverrideDicts(ctx) {
+-  ctx.effect(() => {
+-    let dispose
+-    const sync = () => {
+-      dispose?.()
+-      dispose = undefined
+-      const store = ctx.get('betterLocale')
+-      if (store !== undefined) dispose = store.register(NS, overrideDicts)
+-    }
+-    sync()
+-    const unsubscribe = ctx.locale.subscribe(sync)
+-    return () => {
+-      unsubscribe()
+-      dispose?.()
+-    }
+-  }, 'bench-merge-calls: better-locale override dicts')
++/**
++ * The wire tool name of a call block in either lifecycle form.
++ * @param {ToolSeat['block']} block - running call or settled result node.
++ * @returns {string} the wire tool name (empty string when the call head is missing).
++ */
++function callNameOf(block) {
++  return 'kind' in block ? block.call?.name ?? '' : block.name
+ }
+ 
+-// ── merged-run detection (distilled from merge-run.ts, PRE shape) ────────
++/** @param {unknown} value - candidate node payload. @returns {boolean} whether it is an object. */
++function isObject(value) {
++  return typeof value === 'object' && value !== null
++}
+ 
+-/** Tool-call node kind registered by ui-conversation's built-in tool definition. */
+-const TOOL_CALL_KIND = 'tool-call'
++/**
++ * Extract a root call seat from one Chat node, when it is a tool-call node.
++ * @param {unknown} node - Chat node from the keyed store.
++ * @returns {ToolSeat | null} the seat, or null for another node kind.
++ */
++function seatOf(node) {
++  if (!isObject(node) || node.kind !== TOOL_CALL_KIND) return null
++  const data = /** @type {{ root?: unknown }} */ (node.data)
++  const root = data?.root
++  if (!isObject(root) || typeof root.callId !== 'string') return null
++  const block = /** @type {ToolSeat['block']} */ (/** @type {unknown} */ (root))
++  return { block, callId: root.callId, toolName: callNameOf(block) }
++}
+ 
+-/** The ui-conversation internal node key. The real code imports
+- * conversationContextKey as a value from
+- * @deepseek-ai/dsh-client-runtime/client and recomputes the node key from
+- * (kind, callId); the format itself is upstream-internal (elided). */
+-const conversationContextKey = undefined
++/**
++ * One merged family name for grouping and counting: known families merge
++ * across names (grep+glob, bash+pwsh, read+web_fetch, write+edit); unknown
++ * tools merge only with themselves.
++ * @param {string} toolName - wire tool name.
++ * @returns {string} the family key.
++ */
++export function familyOf(toolName) {
++  return TOOL_FAMILIES[/** @type {keyof typeof TOOL_FAMILIES} */ (toolName)] ?? toolName
++}
+ 
+-/** Extract a root call block from a chat node, when it is a tool-call node. */
+-function toolRootOf(node) {
+-  if (node.kind !== TOOL_CALL_KIND) return null
+-  const root = node.data?.root
+-  return typeof root === 'object' && root !== null ? root : null
++/**
++ * Whether the call's wire name is one of the grouped tools (empty = all).
++ * @param {string} name - wire tool name.
++ * @param {readonly string[]} tools - configured takeover whitelist.
++ * @returns {boolean} whether this call belongs to the takeover set.
++ */
++export function isGroupedTool(name, tools) {
++  return tools.length === 0 || tools.includes(name)
+ }
+ 
+-/** The wire tool name of a call in either lifecycle form (mirrors ui-tool). */
+-function callNameOf(block) {
+-  return 'kind' in block ? (block.call?.name ?? '') : block.name
++/** @param {readonly ToolSeat[]} seats - the chat-order seats. @returns {readonly ToolSeat[]} only tool-call seats. */
++export function toolSeatsInOrder(seats) {
++  return seats.filter(seat => seat !== null)
+ }
+ 
+-/** Whether the call's wire name is one of the grouped tools (empty = all). */
+-function isGroupedTool(name, tools) {
+-  return tools.length === 0 || tools.includes(name)
++/**
++ * Read the ordered tool-call seats out of a Chat snapshot. The node store is
++ * keyed by the engine-owned Conversation Context key, so the read goes
++ * through `order` + `nodes.get(key)` and never assumes the key format.
++ * @param {import('@deepseek-ai/dsh-client-ui-chat/client').ChatSnapshot} chat - Chat target snapshot.
++ * @returns {readonly ToolSeat[]} tool-call seats in render order.
++ */
++export function orderedToolSeats(chat) {
++  /** @type {ToolSeat[]} */
++  const seats = []
++  for (const key of chat.order) {
++    const seat = seatOf(chat.nodes.get(key))
++    if (seat !== null) seats.push(seat)
++  }
++  return seats
+ }
+ 
+ /**
+- * Pure detection of the consecutive same-tool run this seat belongs to
+- * (PRE shape): the seat recomputes the ui-conversation internal node key
+- * from its call id and locates itself in the chat order by that key.
+- * @param {readonly string[]} order - chat node key order.
+- * @param {Record<string, { kind: string, data: { root?: unknown } }>} nodes - chat node store.
++ * Pure detection of the consecutive same-tool (or same-family) run this seat
++ * belongs to: walk out from the seat's own index while neighbours merge.
++ * @param {readonly ToolSeat[]} seats - tool-call seats in render order.
+  * @param {string} myCallId - the call id of the seat asking about itself.
++ * @param {readonly string[]} tools - configured takeover whitelist.
++ * @param {'adjacent' | 'step' | string} groupBy - `adjacent` merges any consecutive run; other values keep one group per call.
++ * @param {number} maxGroupSize - most calls one merged group may hold.
++ * @returns {MergeRun | null} the run, or null when the seat is not in the flow.
+  */
+-function readRun(order, nodes, myCallId, tools, groupBy, maxGroupSize) {
+-  const myKey = conversationContextKey(TOOL_CALL_KIND, myCallId)
+-  const myIndex = order.indexOf(myKey)
++export function readRun(seats, myCallId, tools, groupBy, maxGroupSize) {
++  const size = Math.max(1, Math.trunc(maxGroupSize) || 1)
++  const myIndex = seats.findIndex(seat => seat.callId === myCallId)
+   if (myIndex < 0) return null
+-  const myRoot = rootAtNode(order, nodes, myIndex)
+-  if (myRoot === null) return null
+-  const myName = callNameOf(myRoot)
+-  const size = Math.max(1, maxGroupSize)
++  const mine = seats[myIndex]
++  if (!isGroupedTool(mine.toolName, tools)) return null
++  if (groupBy !== 'adjacent') return { blocks: [mine], isFirst: true, size: 1 }
+ 
+-  // (the family/groupBy partition walk is elided — the exam is the node-key
+-  // contract and the session read, not the grouping algebra)
+-  const blocks = [myRoot]
+-  return { isFirst: true, blocks: groupBy === 'step' ? blocks : blocks.slice(0, size) }
++  const merges = (/** @type {ToolSeat} */ a, /** @type {ToolSeat} */ b) =>
++    familyOf(a.toolName) === familyOf(b.toolName)
++  let start = myIndex
++  while (start > 0 && merges(seats[start - 1], mine)) start -= 1
++  let end = myIndex
++  while (end + 1 < seats.length && merges(seats[end + 1], mine)) end += 1
++  // A partial group at the cap keeps the seat unmerged when it falls outside
++  // the first `size` members, so no call is ever swallowed by a neighbour.
++  if (myIndex - start >= size) return { blocks: [mine], isFirst: true, size: 1 }
++  return { blocks: seats.slice(start, Math.min(end + 1, start + size)), isFirst: start === myIndex, size }
+ }
+ 
+-function rootAtNode(order, nodes, index) {
+-  const key = order[index]
+-  const node = key === undefined ? undefined : nodes.get(key)
+-  return node === undefined ? null : toolRootOf(node)
++/** Value signature for the selector equality check (Object.is by default). */
++/** @param {MergeRun | null} run - selector result. @returns {string | null} a value-stable signature. */
++export function runSignature(run) {
++  return run === null ? null : `${run.isFirst ? 1 : 0}:${run.blocks.map(seat => seat.callId).join(',')}`
+ }
+ 
+-// ── card derivations (distilled from card-model.ts, PRE shape) ───────────
+-// The plugin reads the shipped ui-tool per-call derivations off the call
+-// object: `block.resultView` (result-side card) and `block.callView`
+-// (call-side view). Two of the six derivations are kept as specimens.
+-
+-/** Resolve a path relative to the session cwd (ui-tool mirror, elided). */
+-function relativizeToCwd(path, cwd) {
+-  return cwd !== undefined && path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path
++/** @param {MergeRun | null} a - previous selection. @param {MergeRun | null} b - next selection. @returns {boolean} whether they render the same. */
++export function sameRun(a, b) {
++  return runSignature(a) === runSignature(b)
+ }
+ 
+-/** Resolve a terminal workdir against the session cwd (mirrors ui-tool). */
+-function resolveTerminalCwd(cwd, sessionCwd) {
+-  return cwd === undefined || cwd === '' ? sessionCwd : cwd
++/**
++ * Card state of a call block: running, ok, error, or interrupted.
++ * @param {ToolSeat['block']} block - running call or settled result node.
++ * @returns {'running' | 'ok' | 'error' | 'stopped'} the row state.
++ */
++export function stateOf(block) {
++  if (!('kind' in block)) return 'running'
++  if (block.error?.code === 'interrupted') return 'stopped'
++  return block.isError ? 'error' : 'ok'
+ }
+ 
+ /**
+- * Read-card derivation (PRE shape): projects the shipped ui-tool read card
+- * off `block.resultView`.
+- * @param {{ resultView?: { card?: string, lines?: unknown, title?: string, path?: string, totalLines?: number } }} block
++ * Flatten a settled result's content blocks to display text, mirroring the
++ * shipped generic row's `resultText` contract.
++ * @param {ToolSeat['block']} block - running call or settled result node.
++ * @returns {string | null} flattened output, or null while running.
+  */
+-function readCardOf(block, cwd) {
++export function resultText(block) {
+   if (!('kind' in block)) return null
+-  const result = block.resultView?.card === 'read' ? block.resultView : null
+-  if (result === null) return null
+-  if (!Array.isArray(result.lines)) return null
+-  const lines = result.lines
+-    .filter((line) => typeof line === 'object' && line !== null
+-      && typeof line.number === 'number' && typeof line.text === 'string')
+-    .map((line) => ({ number: line.number, text: line.text }))
++  /** @type {string[]} */
++  const parts = []
++  for (const item of block.content) {
++    parts.push(item.type === 'text' ? item.text : JSON.stringify(item, null, 2))
++  }
++  if (parts.length === 0 && block.error !== undefined) parts.push(`${block.error.name}: ${block.error.code}`)
++  return parts.join('\n') || null
++}
++
++/** @param {string} text - result text. @returns {string} its first physical line. */
++function firstLine(text) {
++  const newline = text.indexOf('\n')
++  return newline === -1 ? text : text.slice(0, newline)
++}
++
++/**
++ * First-line argument summary for one call (path, pattern, or command).
++ * @param {ToolSeat} seat - the call seat.
++ * @returns {string} the compact summary.
++ */
++export function summaryOf(seat) {
++  const block = seat.block
++  const argsRaw = ('kind' in block ? block.call?.argsRaw : block.argsRaw) ?? ''
++  if (argsRaw === '') return seat.callId
++  try {
++    const parsed = JSON.parse(argsRaw)
++    if (isObject(parsed)) {
++      for (const key of ['path', 'file_path', 'pattern', 'query', 'description', 'command', 'url']) {
++        const value = /** @type {Record<string, unknown>} */ (parsed)[key]
++        if (typeof value === 'string' && value !== '') return firstLine(value)
++      }
++    }
++  } catch {
++    // Streaming exposes a truncated JSON prefix; its first line still beats
++    // replacing the call with an unrelated summary.
++  }
++  return firstLine(argsRaw)
++}
++
++/**
++ * Count summary for a merged group (`Read · 5 Files`), or the first error line
++ * when the group's first call failed.
++ * @param {MergeRun} run - the merged run.
++ * @param {(key: MergeToolCallsCopyKey, params?: Record<string, unknown>) => string} t - row translate seat.
++ * @returns {string} the summary line.
++ */
++export function groupSummary(run, t) {
++  const first = run.blocks[0]
++  const output = resultText(first.block)
++  if (stateOf(first.block) === 'error' && output !== null) return firstLine(output)
++  const family = familyOf(first.toolName)
++  const key = FAMILY_COUNT_KEYS[/** @type {keyof typeof FAMILY_COUNT_KEYS} */ (family)] ?? 'countCalls'
++  return t(/** @type {MergeToolCallsCopyKey} */ (key), { n: run.blocks.length })
++}
++
++/** Tool title per family; `others` keeps the wire tool name. */
++const FAMILY_TITLE_KEYS = {
++  read: 'tool.title.read', search: 'tool.title.search', bash: 'tool.title.bash',
++  edit: 'tool.title.edit', code: 'tool.title.code',
++}
++
++/**
++ * @param {ToolSeat} seat - a call seat.
++ * @param {(key: MergeToolCallsCopyKey, params?: Record<string, unknown>) => string} t - row translate seat.
++ * @returns {string} the card title.
++ */
++export function titleOf(seat, t) {
++  const family = familyOf(seat.toolName)
++  const key = FAMILY_TITLE_KEYS[/** @type {keyof typeof FAMILY_TITLE_KEYS} */ (family)]
++  return key === undefined ? seat.toolName : t(/** @type {MergeToolCallsCopyKey} */ (key))
++}
++
++/** @param {'running' | 'ok' | 'error' | 'stopped'} state - row state. @returns {'ongoing' | 'done' | 'error' | 'warning'} the primitive state dot value. */
++function dotState(state) {
++  switch (state) {
++    case 'running': return 'ongoing'
++    case 'error': return 'error'
++    case 'stopped': return 'warning'
++    default: return 'done'
++  }
++}
++
++/** @type {Record<'running' | 'error' | 'stopped', MergeToolCallsCopyKey>} */
++const STATE_COPY = { running: 'running', error: 'failed', stopped: 'stopped' }
++
++// ── the shadowed toolview ─────────────────────────────────────────────────
++
++/**
++ * Grouping values used before the settings namespace answers: the documented
++ * bundle-row defaults, and the same values the host half's schema defaults to.
++ */
++const ROW_GROUPING = { tools: [], groupBy: 'adjacent', maxGroupSize: 8 }
++
++/**
++ * @typedef {object} MergedRowModel
++ * @property {'running' | 'ok' | 'error' | 'stopped'} state - run state.
++ * @property {string} title - main-row title.
++ * @property {string} summary - main-row summary (count when merged).
++ * @property {string} status - visually hidden state copy.
++ * @property {string | null} mergedLabel - merged-count copy when the run holds several calls.
++ * @property {readonly { key: string, toolName: string, summary: string | null, state: 'running' | 'ok' | 'error' | 'stopped' }[]} rows - child rows.
++ */
++
++/**
++ * Derive the merged card model from one run.
++ * @param {MergeRun} run - the merged run.
++ * @param {ToolCallViewProps['block']} block - the seat's own block.
++ * @param {string} toolName - the seat's wire tool name.
++ * @param {string} callId - the seat's call id.
++ * @param {(key: MergeToolCallsCopyKey, params?: Record<string, unknown>) => string} t - row translate seat.
++ * @returns {MergedRowModel} the card model.
++ */
++function mergedRowModel(run, block, toolName, callId, t) {
++  const state = stateOf(block)
++  const merged = run.blocks.length > 1
+   return {
+-    label: result.title ?? relativizeToCwd(result.path, cwd),
+-    lines,
+-    totalLines: typeof result.totalLines === 'number' ? result.totalLines : lines.length,
++    state,
++    title: titleOf({ block, callId, toolName }, t),
++    summary: merged ? groupSummary(run, t) : summaryOf({ block, callId, toolName }),
++    status: t(STATE_COPY[/** @type {'running' | 'error' | 'stopped'} */ (state)]),
++    mergedLabel: merged ? t('mergedCount', { n: run.blocks.length }) : null,
++    rows: run.blocks.map(seat => ({
++      key: seat.callId,
++      toolName: seat.toolName,
++      summary: merged ? summaryOf(seat) : null,
++      state: stateOf(seat.block),
++    })),
+   }
+ }
+ 
+ /**
+- * Terminal-card derivation (PRE shape): the call-side view carries the
+- * command + workdir, the result-side view the output.
+- * @param {{ callView?: { card?: string, title?: string, cwd?: string, description?: string }, resultView?: { card?: string, title?: string, output?: string, exitCode?: number } }} block
++ * Presentational merged card: main row plus compact child rows.
++ * @param {{ model: MergedRowModel, expandLabel: string, collapseLabel: string }} props - card input.
++ * @returns {import('react').ReactNode} the card.
+  */
+-function terminalCardOf(block, sessionCwd) {
+-  const call = block.callView?.card === 'terminal' ? block.callView : null
+-  if (!('kind' in block)) {
+-    return call === null ? null : {
+-      card: { command: call.title, cwd: resolveTerminalCwd(call.cwd, sessionCwd), running: true },
++function MergedCard({ model, expandLabel, collapseLabel }) {
++  const [expanded, setExpanded] = useState(false)
++  const expandable = model.rows.length > 1
++  const open = expanded && expandable
++  const toggle = () => { setExpanded(value => !value) }
++  return createElement(
++    'div',
++    { 'data-tool': 'merge-tool-calls', 'data-merged': expandable || undefined, 'data-state': model.state },
++    createElement(
++      'div',
++      {
++        role: expandable ? 'button' : undefined,
++        tabIndex: expandable ? 0 : undefined,
++        'aria-expanded': expandable ? open : undefined,
++        'aria-label': expandable ? (open ? collapseLabel : expandLabel) : undefined,
++        onClick: expandable ? toggle : undefined,
++      },
++      createElement(StateDot, { state: dotState(model.state) }),
++      createElement('span', null, model.title),
++      createElement('span', null, model.summary),
++      model.mergedLabel === null ? null : createElement('span', null, model.mergedLabel),
++      createElement('span', { hidden: true }, model.status),
++    ),
++    open
++      ? createElement(
++        'div',
++        null,
++        model.rows.map(row => createElement(
++          'div',
++          { key: row.key, 'data-tool': row.toolName, 'data-state': row.state },
++          createElement('span', null, row.summary ?? row.toolName),
++        )),
++      )
++      : null,
++  )
++}
++
++// ── extension seams ───────────────────────────────────────────────────────
++// The plugin-owned settings namespace (`merge-tool-calls`) and the client
++// locale registry's language packs are the two official seams this browser
++// half reads.
++
++/**
++ * Register the shipped override dictionaries as language packs through the
++ * shipped client locale registry: `addLanguage` makes the id selectable, and
++ * `register` attaches this namespace's copy for that locale. An id another
++ * pack already defines keeps its own definition, so two packs shipping the
++ * same language never collide.
++ * @param {ClientContext} ctx - client root context.
++ * @returns {() => void} disposer removing every definition and dictionary.
++ */
++function registerLanguagePacks(ctx) {
++  const disposers = []
++  const defined = new Set(ctx.locale.getSnapshot().locales.map(locale => locale.id))
++  for (const pack of LANGUAGE_PACKS) {
++    if (!defined.has(pack.id)) {
++      disposers.push(ctx.locale.addLanguage({ id: pack.id, label: pack.label, fallback: 'en' }))
+     }
++    disposers.push(ctx.locale.register(NS, pack.id, overrideDicts[pack.id]))
++  }
++  return () => {
++    for (const dispose of disposers.reverse()) dispose()
+   }
+-  const result = block.resultView?.card === 'terminal' ? block.resultView : null
+-  if (result === null) return null
++}
++
++/**
++ * Narrow one settings section to the merge config, field by field, so a
++ * section this plugin cannot read falls back to the documented defaults.
++ * @param {unknown} section - schema-resolved `merge-tool-calls` section.
++ * @param {{ tools: readonly string[], groupBy: string, maxGroupSize: number }} fallback - documented defaults.
++ * @returns {{ tools: readonly string[], groupBy: string, maxGroupSize: number }} the resolved merge config.
++ */
++export function resolveMergeConfig(section, fallback) {
++  if (!isObject(section)) return fallback
++  const tools = Array.isArray(section.tools)
++    ? section.tools.filter(name => typeof name === 'string')
++    : fallback.tools
++  const groupBy = typeof section.groupBy === 'string' ? section.groupBy : fallback.groupBy
++  const maxGroupSize = typeof section.maxGroupSize === 'number' && section.maxGroupSize > 0
++    ? Math.trunc(section.maxGroupSize)
++    : fallback.maxGroupSize
++  return { tools, groupBy, maxGroupSize }
++}
++
++/**
++ * @param {{ tools: readonly string[], groupBy: string, maxGroupSize: number }} a - one config.
++ * @param {{ tools: readonly string[], groupBy: string, maxGroupSize: number }} b - the other config.
++ * @returns {boolean} whether both describe the same merge config.
++ */
++function sameConfig(a, b) {
++  return a.groupBy === b.groupBy
++    && a.maxGroupSize === b.maxGroupSize
++    && a.tools.join('\u0000') === b.tools.join('\u0000')
++}
++
++/**
++ * The toolview keys one config claims: empty `tools` takes over every built-in
++ * generic-row tool, a non-empty list is the explicit whitelist.
++ * @param {{ tools: readonly string[] }} cfg - the merge config.
++ * @returns {string[]} the claimed wire tool names.
++ */
++function toolNamesFor(cfg) {
++  return cfg.tools.length === 0 ? DEFAULT_TOOLS : [...new Set(cfg.tools)]
++}
++
++/**
++ * Live merge config for the browser half. The host half registers the bundle
++ * row as the composition `base` of the `merge-tool-calls` settings namespace,
++ * so the same three fields a deployment sets in `cordis.patch.yml` still apply
++ * and a user section layers over them. The observable starts at the documented
++ * defaults and stays there while the namespace is not served, so a deployment
++ * without the settings surface keeps the row's default behavior.
++ * @param {ClientContext} ctx - client root context.
++ * @param {{ tools: readonly string[], groupBy: string, maxGroupSize: number }} seed - the row config the browser half was applied with, or the documented defaults.
++ * @returns {{ getSnapshot: () => { tools: readonly string[], groupBy: string, maxGroupSize: number }, subscribe: (listener: () => void) => () => void }} a bare observable for the slot's hooks compartment.
++ */
++function createMergeConfigSource(ctx, seed) {
++  let current = seed
++  const listeners = new Set()
++  const publish = (next) => {
++    if (sameConfig(next, current)) return
++    current = next
++    for (const listener of [...listeners]) listener()
++  }
++  const sync = (scope) => {
++    const section = scope.getSnapshot().value
++    publish(section === undefined ? seed : resolveMergeConfig(section, seed))
++  }
++  ctx.inject(['settingsScope'], (scopeCtx) => {
++    // The scope owns its Host subscription and leaves with this nested fiber.
++    const scope = scopeCtx.settingsScope.bind({ namespace: NS })
++    sync(scope)
++    ctx.effect(() => {
++      const unsubscribe = scope.subscribe(() => { sync(scope) })
++      return () => { unsubscribe() }
++    }, 'bench-merge-calls: settings scope')
++  })
+   return {
+-    card: {
+-      command: result.title ?? call?.title ?? '',
+-      cwd: call === null ? undefined : resolveTerminalCwd(call.cwd, sessionCwd),
+-      output: result.output,
+-      exitCode: result.exitCode,
+-      running: false,
++    getSnapshot: () => current,
++    subscribe: (listener) => {
++      listeners.add(listener)
++      return () => { listeners.delete(listener) }
+     },
+   }
+ }
+ 
+-// ── the shadowed toolview ────────────────────────────────────────────────
+-// Renders the merged run card for the run's first call; continuation calls
+-// render nothing. In-session reads go through the session store's chat
+-// slice (useSession, distilled from rows.tsx: the row receives `useSession`
+-// and reads snapshot.chat.order / snapshot.chat.nodes).
+-
+ /**
+- * @param {{ callId: string, toolName: string, block: { kind?: string, resultView?: unknown, callView?: unknown }, cwd?: string, t: (key: string) => string, cfg: { tools: string[], groupBy: string, maxGroupSize: number }, useSession: (selector: (snapshot: unknown) => unknown) => unknown }} props
++ * Render the merged run card for the run's first call; continuation calls
++ * render nothing.
++ * @param {ToolCallViewProps & PropsLocale<'merge-tool-calls'> & { useMergeConfig: <T>(selector: (cfg: { tools: readonly string[], groupBy: string, maxGroupSize: number }) => T) => T }} props - keyed toolview payload, the row locale seat, and the settings-bound config hook.
++ * @returns {import('react').ReactNode} the merged card, or null for a continuation call.
+  */
+-export function MergedToolRow(props) {
+-  const { callId, toolName, block, cwd, t, cfg, useSession } = props
+-  const run = useSession((snapshot) => readRun(
+-    snapshot.chat.order,
+-    snapshot.chat.nodes,
+-    callId,
+-    cfg.tools,
+-    cfg.groupBy,
+-    cfg.maxGroupSize,
+-  ))
++export function MergedToolRow({ callId, toolName, block, t, useChat, useMergeConfig }) {
++  const cfg = useMergeConfig(snapshot => snapshot)
++  const run = useChat(
++    (chat) => readRun(
++      orderedToolSeats(chat),
++      callId,
++      cfg.tools,
++      cfg.groupBy,
++      cfg.maxGroupSize,
++    ),
++    sameRun,
++  )
+   if (run === null || !run.isFirst) return null
+-  const card = toolName === 'read' ? readCardOf(block, cwd) : terminalCardOf(block, cwd)
+-  return card === null ? null : card // the row component body is elided
++  const model = mergedRowModel(run, block, toolName, callId, t)
++  return createElement(MergedCard, { model, expandLabel: t('expand'), collapseLabel: t('collapse') })
+ }
+ 
+ /**
+- * Client plugin body: register one shadowed toolview per grouped tool and
+- * the plugin's own + override dictionaries.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
+- * @param {{ tools?: string[], groupBy?: string, maxGroupSize?: number }} config - cordis row config (loosely typed).
++ * Register the merged tool rows for every claimed tool, the row dictionaries,
++ * and the shipped language packs. The claimed key set follows the live merge
++ * config: a whitelist entry that leaves the set gives its key back to the
++ * shipped row, and one that joins replaces it.
++ * @param {ClientContext} ctx - client root context.
++ * @param {{ tools?: readonly string[], groupBy?: string, maxGroupSize?: number }} [config] - row config when a deployment delivers one; the settings namespace is the live source.
+  */
+ export function apply(ctx, config = {}) {
+-  const cfg = { tools: [], groupBy: 'adjacent', maxGroupSize: 8, ...config }
+-
++  const rowConfig = { ...ROW_GROUPING, ...config }
+   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'bench-merge-calls: dictionaries')
+-  registerOverrideDicts(ctx)
++  ctx.effect(() => registerLanguagePacks(ctx), 'bench-merge-calls: language packs')
++
++  const mergeConfig = createMergeConfigSource(ctx, rowConfig)
+ 
+-  const toolNames = cfg.tools.length === 0 ? ['read', 'grep', 'glob'] : [...new Set(cfg.tools)]
+-  for (const tool of toolNames) {
+-    ctx.slots.inject('tool.call.toolview', () =>
+-      ctx.slots.register({
+-        name: 'tool.call.toolview',
++  ctx.slots.inject('tool.call.toolview', () => {
++    let registrations = []
++    const sync = () => {
++      const names = toolNamesFor(mergeConfig.getSnapshot())
++      if (names.join('\u0000') === registrations.map(entry => entry.key).join('\u0000')) return
++      for (const entry of registrations) entry.dispose()
++      registrations = names.map(tool => ({
+         key: tool,
+-        priority: -1,
+-        locale: NS,
+-      }, MergedToolRow))
+-  }
++        // `priority: -1` shadows the shipped entry for a claimed key; a
++        // continuation seat returns null, so the group still renders once.
++        dispose: ctx.slots.register({
++          name: 'tool.call.toolview',
++          key: tool,
++          priority: -1,
++          locale: NS,
++          inject: () => ({ hooks: { mergeConfig } }),
++        }, MergedToolRow),
++      }))
++    }
++    sync()
++    const unsubscribe = mergeConfig.subscribe(sync)
++    return () => {
++      unsubscribe()
++      for (const entry of registrations) entry.dispose()
++      registrations = []
++    }
++  })
+ }
+diff --git a/fixture/index.js b/fixture/index.js
+index 74f4c7f..6a93243 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,33 +1,68 @@
+-// Host half (minimal): the plugin is browser-only — it shadows the shipped
+-// `read`/`grep`/`glob` toolviews inside the `tool.call.toolview` slot (see
+-// client.js). The host half exists to declare the validated config shape for
+-// the bundle row; its apply is intentionally empty.
++// Host half: the plugin is browser-only — it shadows the shipped
++// `read`/`grep`/`glob`/`edit`/`write`/`bash`/`pwsh`/`web_search`/`web_fetch`/
++// `run_code` toolviews inside the `tool.call.toolview` slot (see client.js).
++// It validates the bundle row's config and registers that row as the
++// composition layer of this plugin's own settings namespace, so the same three
++// fields are a user-editable section and reach the browser half through the
++// client settings scope.
+ //
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the config schema is declared with
+-// schemastery in the real plugin (a host-side value import, elided here);
+-// the browser half pulled its client context type and the chat node types
+-// from the client-runtime package. The in-source migration memo lives in
+-// client.js — do not take it at face value.
++// dsh 0.1.2-alpha.2 cohort: the host half registers its settings section
++// through `installSection` (the optional-settings consumer seam) and exports
++// the schemastery `Config` the profile bundle row is validated against.
++
++import Schema from '@deepseek-ai/schemastery'
+ 
+ export const name = 'bench-merge-calls'
+ 
+ // Client-only plugin: the host half declares no injections (the toolview
+-// takeover is a browser-side slot contribution).
++// takeover is a browser-side slot contribution); the settings seam is reached
++// through `ctx.inject` so a host without a settings provider keeps working.
+ export const inject = []
+ 
+-// Config defaults applied by the (elided) schemastery schema — these are the
+-// row's runtime defaults: empty `tools` = merge every built-in
+-// generic-family tool; `adjacent` merges any consecutive run in the chat
+-// flow; at most 8 calls per merged group.
++/** Settings namespace owning the row's user-facing merge config. */
++const NS = 'merge-tool-calls'
++
++// Config defaults applied by the schemastery schema — these are the row's
++// runtime defaults, mirrored by the browser half's ROW_GROUPING: empty `tools`
++// = merge every built-in generic-family tool; `adjacent` merges any
++// consecutive run in the chat flow; at most 8 calls per merged group.
+ const DEFAULT_MERGE_CONFIG = { tools: [], groupBy: 'adjacent', maxGroupSize: 8 }
+ 
+ /**
+- * Host apply — no-op: all registrations live in the browser half.
+- * @param {import('cordis').Context} ctx - bare-cordis cohort (unused).
++ * The bundle row's config schema: the three user-facing merge fields with the
++ * documented defaults. The Loader validates the row against it (invalid
++ * configuration fails the load), and the settings section reuses it so a
++ * `merge-tool-calls:` user section resolves over the row's values.
++ */
++export const Config = Schema.object({
++  tools: Schema.array(Schema.string()).default([]),
++  groupBy: Schema.union(['adjacent', 'step']).default('adjacent'),
++  maxGroupSize: Schema.natural().default(8),
++})
++
++/**
++ * Host apply — no host-plane behavior: every registration lives in the browser
++ * half. The row config is registered as the composition `base` of the
++ * `merge-tool-calls` settings namespace, so the browser half reads the
++ * resolved value through its client settings scope and a user section layers
++ * over the row without editing the composition.
++ * @param {import('@deepseek-ai/cordis').Context} ctx - bare-cordis cohort.
++ * @param {{ tools?: readonly string[], groupBy?: string, maxGroupSize?: number }} [config] - Loader-validated row config.
+  */
+ export function apply(ctx, config) {
+-  const cfg = { ...DEFAULT_MERGE_CONFIG, ...config }
+-  console.error(`[bench-merge-calls] host apply(): client-only toolview takeover (tools=${JSON.stringify(cfg.tools)}, groupBy=${cfg.groupBy}, maxGroupSize=${cfg.maxGroupSize})`)
++  const entry = { ...DEFAULT_MERGE_CONFIG, ...config }
++  console.error(`[bench-merge-calls] host apply(): client-only toolview takeover (tools=${JSON.stringify(entry.tools)}, groupBy=${entry.groupBy}, maxGroupSize=${entry.maxGroupSize})`)
++
++  // Optional-settings consumer: the section exists while a settings provider is
++  // mounted and falls back to the row's entry when it detaches. The host half
++  // reads nothing at runtime, so the source hooks stay empty — the browser half
++  // consumes the resolved value through its own settings scope.
++  ctx.inject(['settings'], (settingsCtx) => {
++    settingsCtx.settings.installSection(ctx, NS, Config, entry, {
++      setSource: () => {},
++      onChange: () => {},
++    })
++  })
+ 
+   ctx.effect(() => {
+     console.error('[bench-merge-calls] no host-plane registrations (the merged tool rows are client-only)')
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..2cf0204
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,73 @@
++{
++  "name": "@bench/dsh-bench-merge-calls",
++  "version": "0.3.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-merge-calls",
++      "version": "0.3.0",
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.4"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.0-rc.7",
++        "@deepseek-ai/dsh-client-locale": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-chat": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-tool": "0.1.2-alpha.2",
++        "react": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-chat": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-primitives": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-renderer": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-tool": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "license": "MIT"
++    },
++    "node_modules/@deepseek-ai/schemastery": {
++      "version": "3.18.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.4.tgz",
++      "integrity": "sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==",
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      }
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "license": "MIT"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index cf7f1c3..02728cd 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-merge-calls",
+-  "version": "0.2.2",
+-  "description": "Merge consecutive same-tool calls in the DSH WebUI chat flow into one card with compact child rows (0.1.1-era cohort; exam material only)",
++  "version": "0.3.0",
++  "description": "Merge consecutive same-tool calls in the DSH WebUI chat flow into one card with compact child rows (dsh 0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -9,40 +9,49 @@
+     "./client": "./client.js",
+     "./cordis.patch.yml": "./cordis.patch.yml"
+   },
++  "files": [
++    "index.js",
++    "client.js",
++    "cordis.patch.yml"
++  ],
+   "dsh": {
+     "bundle": {
+       "patch": "./cordis.patch.yml"
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+         "@deepseek-ai/dsh-client-locale",
+-        "@deepseek-ai/dsh-client-ui-tool",
++        "@deepseek-ai/dsh-client-ui-chat",
++        "@deepseek-ai/dsh-client-ui-primitives",
++        "@deepseek-ai/dsh-client-ui-renderer",
+         "@deepseek-ai/dsh-client-ui-slots",
+-        "@deepseek-ai/dsh-client-ui-primitives"
++        "@deepseek-ai/dsh-client-ui-tool"
+       ],
+       "platform": "web"
+     }
+   },
++  "dependencies": {
++    "@deepseek-ai/schemastery": "^3.18.4"
++  },
+   "peerDependencies": {
+-    "cordis": "^4.0.0-rc.7",
+-    "react": "^18.2.0",
+-    "schemastery": "^3.18.0",
+-    "@deepseek-ai/dsh-client-locale": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-primitives": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-tool": "0.1.0-rc.6"
++    "@deepseek-ai/cordis": "^4.0.0-rc.7",
++    "@deepseek-ai/dsh-client-locale": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-chat": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-tool": "0.1.2-alpha.2",
++    "react": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
+-    "cordis": { "optional": true },
+-    "react": { "optional": true },
+-    "schemastery": { "optional": true },
++    "@deepseek-ai/cordis": { "optional": true },
+     "@deepseek-ai/dsh-client-locale": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-chat": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+-    "@deepseek-ai/dsh-client-ui-tool": { "optional": true }
++    "@deepseek-ai/dsh-client-ui-tool": { "optional": true },
++    "react": { "optional": true }
+   },
+   "private": true
+ }

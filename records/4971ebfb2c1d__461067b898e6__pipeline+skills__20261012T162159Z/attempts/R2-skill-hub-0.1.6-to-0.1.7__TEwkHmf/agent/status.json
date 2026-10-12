@@ -1,0 +1,124 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.7-alpha.1",
+      "target": {
+        "tag": "dsh-v0.1.7-alpha.1",
+        "version": "0.1.7-alpha.1"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.7-alpha.1",
+            "version": "0.1.7-alpha.1"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.6-alpha.2",
+              "version": "0.1.6-alpha.2"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 0,
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [],
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-12T16-25-06-656Z",
+      "startedAt": "2026-10-12T16:25:07.598Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.7-alpha.1",
+    "target": {
+      "tag": "dsh-v0.1.7-alpha.1",
+      "version": "0.1.7-alpha.1"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.7-alpha.1",
+          "version": "0.1.7-alpha.1"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.6-alpha.2",
+            "version": "0.1.6-alpha.2"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 0,
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [],
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-12T16-25-06-656Z",
+    "startedAt": "2026-10-12T16:25:07.598Z"
+  }
+}

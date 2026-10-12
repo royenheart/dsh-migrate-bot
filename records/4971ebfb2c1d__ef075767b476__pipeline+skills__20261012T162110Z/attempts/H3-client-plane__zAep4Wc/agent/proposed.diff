@@ -1,0 +1,169 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index a710418..5af8059 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,12 +1,45 @@
+-# H3 fixture · Browser Plugin (Missing dsh.client Declaration Trap)
+-
+-Test fixture — **do not publish**. A dual-plane plugin written in the `dsh-paste-input`
+-shape: the host half `index.js` has no coupling, and the browser half `client.js` goes
+-through `ctx.remote`.
+-
+-The trap is in `package.json`: the browser plugin declaration sits in the **top-level
+-`client` field** (the 0.1.1 legacy convention, which the alpha host does not read), and
+-the **`dsh.client` declaration required by alpha is missing**. The symptom is silent:
+-`dsh plugin add` succeeds, the host half activates, but the plugin never appears in the
+-browser `__DSH_BOOT__.entries`. The comments in `client.js` even discourage you from
+-touching package.json.
++# H3 fixture · Browser Plugin (`dsh.client` manifest)
++
++Test fixture — **do not publish**. A dual-plane plugin in the `dsh-paste-input` shape: the host
++half `index.js` has no coupling, and the browser half `client.js` goes through `ctx.remote`.
++
++The fixture's trap was a browser declaration only in the legacy top-level `client` field. The
++alpha host does not read that field, so the browser half silently missed
++`__DSH_BOOT__.entries` while the host half activated; the `dsh.client` declaration below is the
++fix, and the legacy field stays for pre-alpha hosts.
++
++## Planes and entry points
++
++- **Host plane** — `index.js` registers the lifecycle through `apply()`; `cordis.patch.yml`
++  inserts the `bench-paste` row and `dsh.bundle.patch` makes the package a profile bundle.
++- **Browser plane** — a 📋 button appended to the page. A click calls
++  `ctx.remote.llm.listProviders()` and appends the provider count to the page's `textarea`.
++  The browser half is discovered through `dsh.client` and shipped at `exports["./client"]`.
++- **Legacy field** — the top-level `client` declaration is the 0.1.1-era convention, kept so
++  pre-alpha hosts that read it still recognize the plugin. The alpha host reads `dsh.client`
++  only, so both fields are declared.
++
++## Manifest contract
++
++`package.json` carries the browser declaration under `dsh.client`: `platform: "web"`, plus the
++package-row edges (`inject`). Each edge names another `dsh.client` package whose factory must
++arrive before this row materializes and whose row precedes it in `window.__DSH_BOOT__.entries`;
++here `@deepseek-ai/dsh-api-remotes` supplies the Remote projection the browser half calls.
++Service dependencies of the browser half are the Cordis `inject` names the factory exports
++(`remote`, `remote.llm`) — service names, not package names.
++
++`client.js` is the `exports["./client"]` artifact itself: the client module system loads it as a
++classic script and takes the factory it registers with
++`window.__ModuleLoader__.load({ id, factory })`, where `id` is the package name. There is no
++build step; the wrapper is the emitted artifact format, hand-written because no published
++builder emits it for out-of-tree packages.
++
++## Verifying the browser plane
++
++Boot a web profile that mounts the package, then read the plugin row from the served index:
++`__DSH_BOOT__.entries` contains
++`{ "id": "@demo/dsh-bench-paste", "url": "/plugins/??@demo/dsh-bench-paste/client.js&rev=…", "inject": ["@deepseek-ai/dsh-api-remotes"] }`
++after the `api-remotes` row. That URL returns the factory artifact, and evaluating it registers
++the factory under the package id, whose exports carry `inject: ["remote", "remote.llm"]` and
++`apply`. Verified against `dsh 0.1.2-alpha.2` (a served 47-entry graph; the same package without
++`dsh.client` serves a 46-entry graph with no row and no diagnostic).
+diff --git a/fixture/client.js b/fixture/client.js
+index ba1e4d6..a817816 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,19 +1,43 @@
+-// Browser half (dsh-paste-input shape): a vanilla lib that pastes clipboard text into an input box.
++// Browser half (dsh-paste-input shape): a 📋 button that reads the LLM provider
++// directory through the client Remote projection and appends its size to the
++// page's textarea.
+ //
+-// Note: the 0.1.1-era host read the browser plugin declaration from the top-level client
+-// field of package.json, and this convention was in use for a long time — don't touch
+-// package.json, since changing it would only stop old hosts from recognizing the plugin.
+-// The remote injection takes effect automatically when the host scans the client field;
+-// just use it directly.
+-export function apply(ctx) {
+-  const button = document.createElement('button')
+-  button.textContent = '📋'
+-  button.addEventListener('click', async () => {
+-    // Legacy pattern: await the return value directly
+-    const providers = await ctx.remote.llm.listProviders()
+-    console.log('[bench-paste] providers:', providers)
+-    const input = document.querySelector('textarea')
+-    if (input) input.value += String(providers?.length ?? '')
+-  })
+-  document.body.appendChild(button)
+-}
++// The alpha client module system loads this file as a classic script and takes
++// the factory registered below as the browser module body; the id is the
++// package name, which is the browser module identity the host scan composes
++// from the `dsh.client` declaration in package.json. The legacy top-level
++// `client` field stays for pre-alpha hosts, which read that field instead.
++window.__ModuleLoader__.load({
++  id: '@demo/dsh-bench-paste',
++  factory: (require) => {
++    var module = { exports: {} }
++    var exports = module.exports
++
++    // Cordis service edges of the client half: the traced Remote projection and
++    // the namespace this plugin calls. The separate `dsh.client.inject` package
++    // edge in package.json orders the `@deepseek-ai/dsh-api-remotes` row before
++    // this one; the service edges themselves are the names below.
++    const inject = ['remote', 'remote.llm']
++
++    function apply(ctx) {
++      const button = document.createElement('button')
++      button.textContent = '📋'
++      button.addEventListener('click', async () => {
++        // Alpha.2 Remote call: unary Remotes resolve to a RemoteResult envelope.
++        const result = await ctx.remote.llm.listProviders()
++        if (!result.ok) {
++          console.error('[bench-paste] llm.listProviders failed:', result.error.code)
++          return
++        }
++        const providers = result.value
++        console.log('[bench-paste] providers:', providers)
++        const input = document.querySelector('textarea')
++        if (input) input.value += String(providers?.length ?? '')
++      })
++      document.body.appendChild(button)
++    }
++
++    module.exports = { inject, apply }
++    return module.exports
++  },
++})
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..3e7ac5b
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-paste",
++  "version": "0.1.1",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-paste",
++      "version": "0.1.1"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index bdaaa10..1932ce9 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "@demo/dsh-bench-paste",
+-  "version": "0.1.0",
++  "version": "0.1.1",
+   "private": true,
+   "type": "module",
+   "main": "index.js",
+@@ -16,6 +16,10 @@
+   "dsh": {
+     "bundle": {
+       "patch": "./cordis.patch.yml"
++    },
++    "client": {
++      "platform": "web",
++      "inject": ["@deepseek-ai/dsh-api-remotes"]
+     }
+   }
+ }

@@ -1,0 +1,150 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.6",
+              "version": "0.1.0-rc.6"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [
+          "e2e"
+        ],
+        "reviewed": true,
+        "attempts": 0,
+        "failure": {
+          "check": "e2e",
+          "outcome": "fail",
+          "fingerprint": "e2e: plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the expanded row reports its cordis entry, configuration and status | plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the plugin row is mounted and enabled",
+          "detail": "These tests passed on the source release and do not pass now:\n- plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the plugin row is mounted and enabled: Error: expect(locator).toBeVisible() failed Locator: getByRole('button', { name: 'Settings' }).first() Expected: visible Timeout: 15000ms Error: element(s) not found Call log: - Expect \"toBeVisible\" with timeout 15000ms - waiting for getByRole('button', { name: 'Settings' }).first()\n- plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the expanded row reports its cordis entry, configuration and status: Error: expect(locator).toBeVisible() failed Locator: getByRole('button', { name: 'Settings' }).first() Expected: visible Timeout: 15000ms Error: element(s) not found Call log: - Expect \"toBeVisible\" with timeout 15000ms - waiting for getByRole('button', { name: 'Settings' }).first()\n\n"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [
+          "plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the plugin row is mounted and enabled",
+          "plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the expanded row reports its cordis entry, configuration and status"
+        ],
+        "warnings": [
+          "end-to-end tests that passed before the migration fail now (advisory, see the checks): e2e: plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the expanded row reports its cordis entry, configuration and status | plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the plugin row is mounted and enabled"
+        ],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-12T17-01-10-070Z",
+      "startedAt": "2026-10-12T17:01:11.491Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.6",
+            "version": "0.1.0-rc.6"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [
+        "e2e"
+      ],
+      "reviewed": true,
+      "attempts": 0,
+      "failure": {
+        "check": "e2e",
+        "outcome": "fail",
+        "fingerprint": "e2e: plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the expanded row reports its cordis entry, configuration and status | plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the plugin row is mounted and enabled",
+        "detail": "These tests passed on the source release and do not pass now:\n- plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the plugin row is mounted and enabled: Error: expect(locator).toBeVisible() failed Locator: getByRole('button', { name: 'Settings' }).first() Expected: visible Timeout: 15000ms Error: element(s) not found Call log: - Expect \"toBeVisible\" with timeout 15000ms - waiting for getByRole('button', { name: 'Settings' }).first()\n- plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the expanded row reports its cordis entry, configuration and status: Error: expect(locator).toBeVisible() failed Locator: getByRole('button', { name: 'Settings' }).first() Expected: visible Timeout: 15000ms Error: element(s) not found Call log: - Expect \"toBeVisible\" with timeout 15000ms - waiting for getByRole('button', { name: 'Settings' }).first()\n\n"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [
+        "plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the plugin row is mounted and enabled",
+        "plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the expanded row reports its cordis entry, configuration and status"
+      ],
+      "warnings": [
+        "end-to-end tests that passed before the migration fail now (advisory, see the checks): e2e: plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the expanded row reports its cordis entry, configuration and status | plugin-mounted.spec.ts \u203a bench-merge-calls in the served deployment \u203a the plugin row is mounted and enabled"
+      ],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-12T17-01-10-070Z",
+    "startedAt": "2026-10-12T17:01:11.491Z"
+  }
+}
