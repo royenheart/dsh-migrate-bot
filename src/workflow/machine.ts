@@ -90,7 +90,7 @@ export const GUARD_DESCRIPTIONS = {
   blockerValid: 'The repair report declared an upstream blocker with every evidence field.',
   notReviewed: 'The overlap and extension-point reviews have not run.',
   canRepair: 'Repair attempts are left, and the failure fingerprint differs from the one the last repair attempt was given.',
-  advisoryE2EFailure: 'The failing check is the end-to-end check, no end-to-end baseline was recorded, and the failure policy is `advisory`.',
+  advisoryE2EFailure: 'The failing check is the end-to-end check, and the failure policy is `advisory`.',
   characterizable: 'The end-to-end check is enabled and a source release is known.',
   publishesE2E: 'The end-to-end check is enabled, and an end-to-end baseline was recorded or the tree went through a review.',
   concludedIn: 'The migration concluded in the given state.',
@@ -134,8 +134,7 @@ export const migrationMachine = setup({
     notReviewed: ({ context }) => !context.reviewed,
     canRepair: ({ context }) => context.attempts < context.input.settings.maxAttempts
       && context.failure?.fingerprint !== context.lastFingerprint,
-    advisoryE2EFailure: ({ context }) => context.failure?.check === 'e2e' && context.e2eBaseline.length === 0
-      && context.input.settings.e2eFailurePolicy === 'advisory',
+    advisoryE2EFailure: ({ context }) => context.failure?.check === 'e2e' && context.input.settings.e2eFailurePolicy === 'advisory',
     characterizable: ({ context }) => context.input.settings.checks.e2e && context.input.source !== undefined,
     publishesE2E: ({ context }) => context.input.settings.checks.e2e && (context.e2eBaseline.length > 0 || context.reviewed),
     concludedIn: ({ context }, params: { state: NonNullable<MigrationContext['concluded']> }) => context.concluded === params.state,
@@ -294,15 +293,16 @@ export const migrationMachine = setup({
     },
     evaluating: {
       always: [
-        { guard: 'notReviewed', target: 'reviewing' },
-        { guard: 'canRepair', target: 'repairing' },
+        // An advisory end-to-end failure is reported, never worked on: it is often the host's own UI that moved, which no change to the plugin can fix.
         {
           guard: 'advisoryE2EFailure',
           target: 'concluding',
           actions: assign({
-            warnings: ({ context }) => [...context.warnings, `end-to-end check failed (advisory): ${context.failure?.fingerprint ?? ''}`],
+            warnings: ({ context }) => [...context.warnings, `end-to-end tests that passed before the migration fail now (advisory, see the checks): ${context.failure?.fingerprint ?? ''}`],
           }),
         },
+        { guard: 'notReviewed', target: 'reviewing' },
+        { guard: 'canRepair', target: 'repairing' },
         {
           target: 'failed',
           actions: assign({

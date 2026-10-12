@@ -29,9 +29,9 @@ stateDiagram-v2
   checking --> checksPassed
   checking --> evaluating
   checksPassed --> concluding
+  evaluating --> concluding
   evaluating --> reviewing
   evaluating --> repairing
-  evaluating --> concluding
   evaluating --> failed
   repairing --> failed
   repairing --> checking
@@ -123,9 +123,9 @@ Transitions of one state are tried in order; the first whose guard holds is take
 | `checking.running` | `check.done` | `checkFailed` | `evaluating` |
 | `checking.running` | `check.done` | — | `checking.next` |
 | `checksPassed` | immediately | — | `concluding` |
+| `evaluating` | immediately | `advisoryE2EFailure` | `concluding` |
 | `evaluating` | immediately | `notReviewed` | `reviewing` |
 | `evaluating` | immediately | `canRepair` | `repairing` |
-| `evaluating` | immediately | `advisoryE2EFailure` | `concluding` |
 | `evaluating` | immediately | — | `failed` |
 | `repairing` | `session.done` | `spendCap` | `failed` |
 | `repairing` | `session.done` | `sessionFailed` | `failed` |
@@ -165,7 +165,7 @@ Transitions of one state are tried in order; the first whose guard holds is take
 | `blockerValid` | The repair report declared an upstream blocker with every evidence field. |
 | `notReviewed` | The overlap and extension-point reviews have not run. |
 | `canRepair` | Repair attempts are left, and the failure fingerprint differs from the one the last repair attempt was given. |
-| `advisoryE2EFailure` | The failing check is the end-to-end check, no end-to-end baseline was recorded, and the failure policy is `advisory`. |
+| `advisoryE2EFailure` | The failing check is the end-to-end check, and the failure policy is `advisory`. |
 | `characterizable` | The end-to-end check is enabled and a source release is known. |
 | `publishesE2E` | The end-to-end check is enabled, and an end-to-end baseline was recorded or the tree went through a review. |
 | `concludedIn` | The migration concluded in the given state. |

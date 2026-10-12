@@ -221,6 +221,7 @@ Also keep "${input.suiteDir}/${INDEX_FILE}": { "features": [ { "id", "entry", "e
 
 Rules:
 - Cover what a user sees and does: every panel, menu, setting and command the plugins add.
+- Reach each feature by the shortest path the plugin itself offers. The host's own UI (its settings dialog, plugin list, navigation) changes between releases, and a test that walks through it fails for reasons the plugin cannot fix; go through it only where the feature has no other entry, and assert on the plugin's part, not the host's.
 - Assert on ARIA roles, accessible names and text; never on the host's own data-* attributes or class names, which change between releases.
 - Never wait for network idle; poll until two consecutive reads agree. Add a console and pageerror tripwire to each spec.
 - A feature that needs a model answer cannot complete here; check that it is offered and reachable, not its answer.

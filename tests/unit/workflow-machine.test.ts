@@ -200,7 +200,7 @@ test('I3 the repair loop is bounded and stops early only on evidence', () => {
   }), { numRuns: 1000 })
 })
 
-test('I4 nothing is concluded from a tree whose last checks failed, except an advisory end-to-end failure without a baseline', () => {
+test('I4 nothing is concluded from a tree whose last checks failed, except an advisory end-to-end failure', () => {
   fc.assert(fc.property(runArbitrary, ([input, values, withErrors]) => {
     const run = drive(input, values, withErrors)
     if (!run.requests.some(request => request.activity === 'inspectTree')) return
@@ -208,7 +208,6 @@ test('I4 nothing is concluded from a tree whose last checks failed, except an ad
       if (outcome !== 'fail') continue
       assert.equal(check, 'e2e', `${check} failed and the migration concluded`)
       assert.equal(run.input.settings.e2eFailurePolicy, 'advisory')
-      assert.deepEqual(run.snapshot.context.e2eBaseline, [], 'a test of the end-to-end baseline broke and the migration concluded')
     }
   }), { numRuns: 1000 })
 })
@@ -219,6 +218,19 @@ test('a suite that recorded an end-to-end baseline is published once the migrati
     const publishes = run.requests.findIndex(request => request.activity === 'publishE2E')
     if (publishes >= 0) assert.ok(run.requests.slice(0, publishes).some(request => request.activity === 'inspectTree'))
     if (run.snapshot.context.e2eBaseline.length > 0 && run.snapshot.context.concluded !== undefined) assert.ok(publishes >= 0)
+  }), { numRuns: 1000 })
+})
+
+test('an advisory end-to-end failure starts no review and no repair attempt', () => {
+  fc.assert(fc.property(runArbitrary, ([input, values, withErrors]) => {
+    const run = drive(input, values, withErrors)
+    if (run.input.settings.e2eFailurePolicy !== 'advisory') return
+    // requests[i] answered by events[i] until the first wait for an outside event, which this prefix never reaches.
+    for (const [index, event] of run.events.entries()) {
+      if (event.type !== 'check.done' || event.result.check !== 'e2e' || event.result.outcome !== 'fail') continue
+      const next = run.requests.slice(index + 1).find(request => request.activity !== 'check')
+      assert.ok(next === undefined || next.activity !== 'session', `a session followed an advisory end-to-end failure: ${JSON.stringify(next)}`)
+    }
   }), { numRuns: 1000 })
 })
 
