@@ -35,8 +35,10 @@ export function dshPeerSpecs(pkg: unknown, version: string, published: (name: st
 /**
  * Shell command that installs {@link dshPeerSpecs} without writing the lockfile.
  * @param specs - `name@version` entries from {@link dshPeerSpecs}
+ * @param before - the release's `--before` date: its packages' peers resolve to
+ *   what was published with it, not to a later prerelease of the same line
  */
-export function pinDshPeersCommand(specs: readonly string[]): string | undefined {
+export function pinDshPeersCommand(specs: readonly string[], before?: string): string | undefined {
   if (specs.length === 0) return undefined
-  return `npm install --no-save ${specs.join(' ')}`
+  return `npm install --no-save${before === undefined ? '' : ` --before=${before}`} ${specs.join(' ')}`
 }

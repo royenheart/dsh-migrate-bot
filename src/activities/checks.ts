@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { runMechanical } from '../mechanical/run.ts'
 import { declaresClient, findPlugins } from '../plugins.ts'
 import { bootProbe, normalizeSignature } from '../verify/boot.ts'
-import { ensureDsh } from '../verify/dsh-install.ts'
+import { ensureDsh, publishedAt, releaseCutoff } from '../verify/dsh-install.ts'
 import { hasClientSurface, startWebHost, webSmoke } from '../verify/web.ts'
 import { readSuite, runSuite, type SuiteRun } from '../e2e/suite.ts'
 import { suiteDirOf } from './e2e-suite.ts'
@@ -82,7 +82,10 @@ export class CheckRunner {
         // A tree with no plugin is checked at its root, where the shape scan says what it lacks.
         const plugins = found.length === 0 ? [{ dir: '', name: '' }] : found
         const named = plugins.length > 1
-        const results = plugins.map(plugin => ({ plugin, result: runMechanical(join(workdir, plugin.dir), config, { dshVersion: release.version, timeoutMs: config.timeouts.commandMs }) }))
+        // Pinned as the release was published: a prerelease's own packages otherwise resolve their peers to a later prerelease of the line.
+        const published = publishedAt(release.version, config.timeouts.commandMs)
+        const before = published === undefined ? undefined : releaseCutoff(published)
+        const results = plugins.map(plugin => ({ plugin, result: runMechanical(join(workdir, plugin.dir), config, { dshVersion: release.version, timeoutMs: config.timeouts.commandMs, before }) }))
         const failed = results.filter(({ result }) => !result.ok)
         if (failed.length > 0) {
           const first = failed[0] as (typeof failed)[number]

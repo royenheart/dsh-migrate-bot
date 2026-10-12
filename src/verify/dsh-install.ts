@@ -34,11 +34,16 @@ const PUBLISH_WINDOW_MS = 60 * 60 * 1000
  * @param published - when the release was published, ISO 8601.
  */
 export function installArgs(prefix: string, version: string, published: string): string[] {
-  const before = new Date(Date.parse(published) + PUBLISH_WINDOW_MS).toISOString()
-  return ['install', '-g', '--prefix', prefix, '--no-fund', '--no-audit', '--before', before, `@deepseek-ai/dsh@${version}`]
+  return ['install', '-g', '--prefix', prefix, '--no-fund', '--no-audit', '--before', releaseCutoff(published), `@deepseek-ai/dsh@${version}`]
 }
 
-function publishedAt(version: string, timeoutMs: number): string | undefined {
+/** The `--before` date of a release: its publication and the hour its own packages may take to appear. */
+export function releaseCutoff(published: string): string {
+  return new Date(Date.parse(published) + PUBLISH_WINDOW_MS).toISOString()
+}
+
+/** When a release was published, from the npm registry, or `undefined` when it does not say. */
+export function publishedAt(version: string, timeoutMs: number): string | undefined {
   const result = spawnSync('npm', ['view', `@deepseek-ai/dsh@${version}`, 'time', '--json'], { encoding: 'utf8', timeout: timeoutMs, env: process.env })
   if (result.status !== 0) return undefined
   try {

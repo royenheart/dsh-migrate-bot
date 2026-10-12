@@ -35,6 +35,8 @@ export interface MechanicalOptions {
   timeoutMs?: number
   /** Published versions of a package; the npm registry unless a test injects one. */
   published?: (name: string) => readonly string[] | undefined
+  /** The release's `--before` date, so the pinned packages resolve as they were published. */
+  before?: string | undefined
 }
 
 function runCommand(
@@ -77,13 +79,13 @@ function packageScripts(pkg: unknown): Record<string, string> {
  * `npm install` when node_modules is missing, then pin dsh packages to the
  * target version when one was resolved.
  */
-function installCommands(root: string, pkg: unknown, dshVersion: string | undefined, published: (name: string) => readonly string[] | undefined): string[] {
+function installCommands(root: string, pkg: unknown, dshVersion: string | undefined, published: (name: string) => readonly string[] | undefined, before: string | undefined): string[] {
   const commands: string[] = []
   if (pkg !== undefined && !existsSync(join(root, 'node_modules'))) {
     commands.push('npm install')
   }
   if (dshVersion !== undefined && pkg !== undefined) {
-    const pin = pinDshPeersCommand(dshPeerSpecs(pkg, dshVersion, published))
+    const pin = pinDshPeersCommand(dshPeerSpecs(pkg, dshVersion, published), before)
     if (pin !== undefined) commands.push(pin)
   }
   return commands
@@ -131,7 +133,7 @@ export function runMechanical(
   const extraEnv: NodeJS.ProcessEnv = options.dshVersion === undefined
     ? {}
     : { DSH_MIGRATE_TARGET_VERSION: options.dshVersion }
-  const prefix = installCommands(root, pkg, options.dshVersion, published)
+  const prefix = installCommands(root, pkg, options.dshVersion, published, options.before)
   const timeoutMs = options.timeoutMs
 
   if (config.tests !== undefined) {

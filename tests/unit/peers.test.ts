@@ -35,6 +35,13 @@ test('returns no specs when the package names no dsh packages', () => {
   assert.equal(pinDshPeersCommand([]), undefined)
 })
 
+test('the pin resolves as the release was published', () => {
+  assert.equal(
+    pinDshPeersCommand(['@deepseek-ai/dsh-tools@0.1.2-alpha.2'], '2026-08-12T10:00:00.000Z'),
+    'npm install --no-save --before=2026-08-12T10:00:00.000Z @deepseek-ai/dsh-tools@0.1.2-alpha.2',
+  )
+})
+
 test('pin command uses --no-save', () => {
   assert.equal(
     pinDshPeersCommand(['@deepseek-ai/dsh-agent@0.1.1-rc.2']),
