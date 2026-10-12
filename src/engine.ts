@@ -92,7 +92,7 @@ export class InJobEngine {
       if (request === undefined) break
       this.options.log(`${id}: ${stateOf(snapshot)} → ${describe(request)}`)
       const result = await this.execute(request, snapshot.context)
-      if (result.event.type === 'activity.error') this.options.log(`${id}: ${request.activity} failed: ${inline(result.event.detail, 600)}`)
+      this.options.log(`${id}: ${outcomeOf(result.event)}`)
       this.append(id, { kind: 'event', at: this.now().toISOString(), event: result.event })
       for (const [name, content] of result.files ?? []) files.set(migrationFile(id, name), content)
       const [next, actions] = transition(migrationMachine, snapshot, result.event)
@@ -132,6 +132,23 @@ export class InJobEngine {
     const written = this.options.store.write(this.state.tip, changes, message)
     if (!written.ok) throw new EngineError(`could not write the state branch: ${written.reason}: ${written.detail}`)
     if (written.commit !== 'unchanged') this.state.tip = written.commit
+  }
+}
+
+/** What an activity concluded, in one line of the job log. */
+function outcomeOf(event: MigrationEvent): string {
+  switch (event.type) {
+    case 'check.done':
+      return `  ${event.result.outcome}${event.result.fingerprint === '' ? '' : `: ${inline(event.result.fingerprint, 300)}`}`
+    case 'session.done':
+      return `  ${event.outcome}${event.blocker === 'none' ? '' : `, blocker ${event.blocker}`}`
+    case 'e2e.characterized':
+    case 'e2e.published':
+      return `  ${event.outcome}${event.detail === '' ? '' : `: ${inline(event.detail, 300)}`}`
+    case 'activity.error':
+      return `  ${event.activity} failed: ${inline(event.detail, 600)}`
+    default:
+      return `  ${event.type}`
   }
 }
 
