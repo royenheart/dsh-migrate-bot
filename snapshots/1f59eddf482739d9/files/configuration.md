@@ -1,0 +1,57 @@
+---
+kind: reference
+description: Every key of .github/dsh-migrate.yml with its type, default and meaning.
+---
+
+# Configuration reference
+
+A consumer configures the Action in `.github/dsh-migrate.yml`. Every key is optional, and an unknown key is an error. This page is generated from `src/config/schema.ts` by `scripts/references.ts`; edit the source, not this page.
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| `target` | string | `latest` | Target release: `latest`, a version such as `0.2.0-rc.2`, or a `dsh-v*` tag. |
+| `review.policy` | `always` \| `when-checks-fail` | `always` | `always` runs the overlap and extension-point reviews; `when-checks-fail` skips them when the unmodified tree passes every check on the target release. |
+| `tests.commands` | list of string | — | Shell commands that replace the built-in mechanical checks. |
+| `prompts.overlap` | string | — | Replaces the overlap review prompt. |
+| `prompts.extensionPoints` | string | — | Replaces the extension-point review prompt. |
+| `prompts.repair` | string | — | Replaces the repair prompt. |
+| `agent.provider` | string | `deepseek-official` | Model provider route of the agent sessions. |
+| `agent.model` | string | `deepseek-v4-flash` | Model of the agent sessions. |
+| `agent.thinking` | `enabled` \| `disabled` | `enabled` | Provider thinking mode. |
+| `agent.reasoningEffort` | `off` \| `low` \| `high` \| `max` | `max` | Provider reasoning effort. |
+| `agent.upgradeSkills` | boolean | `false` | Load the `plugin-upgrade` skill of the community upgrade skills into the review and repair sessions. |
+| `repair.maxAttempts` | integer | `5` | Attempt limit: the most repair attempts one migration runs. |
+| `secrets.apiKeyEnv` | string | `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` | Environment variable holding the DeepSeek API key. |
+| `quota.limit` | number | — | Spend cap: the most USD one migration may spend, priced from its own usage. |
+| `checks.boot.enabled` | boolean | `true` | Run the boot check. |
+| `checks.boot.timeoutMs` | integer | `180000` | Watchdog for one boot check, in milliseconds. |
+| `checks.web.enabled` | boolean | `true` | Run the web check. |
+| `checks.web.timeoutMs` | integer | `120000` | Watchdog for one web check, in milliseconds. |
+| `checks.e2e.enabled` | boolean | `true` | Run and maintain the agent-authored end-to-end suite. |
+| `checks.e2e.branch` | string | `dsh-migrate/e2e` | Branch that holds the end-to-end suite. |
+| `checks.e2e.baseRef` | string | `migration` | Ref the suite branch is rebased onto; `migration` means the consumer default branch. |
+| `checks.e2e.forceRebase` | boolean | `true` | Rebase the suite branch onto `baseRef` before updating it. |
+| `checks.e2e.dir` | string | `e2e` | Directory for a new suite when the repository has no end-to-end framework. |
+| `checks.e2e.failurePolicy` | `advisory` \| `blocking` | `advisory` | `advisory` reports an end-to-end failure in the proposal; `blocking` fails the migration. |
+| `checks.e2e.subsetFirst` | boolean | `true` | During repair attempts, run only previously failing tests plus smoke tests. |
+| `timeouts.agentMs` | integer | `3600000` | Watchdog for one agent session. |
+| `timeouts.commandMs` | integer | `1200000` | Watchdog for one mechanical command. |
+| `timeouts.checkoutMs` | integer | `600000` | Watchdog for the harness checkout. |
+| `reports.enabled` | boolean | `true` | Send merge reports at all; each channel also needs its own `enabled`. |
+| `reports.channels` | mapping | — | Report channels by id. Built-in ids: `upgrade-skill`, `migrate-bot`, `harness-discussion`. |
+| `reports.channels.<id>.enabled` | boolean | `false` | Send merge reports to this channel. |
+| `reports.channels.<id>.repo` | string | — | Repository the channel writes to. Required for a channel that is not built in. |
+| `reports.channels.<id>.method` | `issue` \| `discussion` | — | `issue` or `discussion`. Required for a channel that is not built in. |
+| `reports.channels.<id>.tokenEnv` | string | — | Environment variable holding a token that may write to `repo`. |
+| `reports.channels.<id>.prompt` | string | — | Replaces the channel prompt. Required for a channel that is not built in. |
+| `reports.channels.<id>.labels` | list of string | — | Labels applied to a created issue. |
+| `reports.channels.<id>.discussionCategory` | string | — | Discussion category slug, for `method: discussion`. |
+| `deploy.enabled` | boolean | `false` | Use a deploy service. |
+| `deploy.endpoint` | URL | — | Base URL of the deploy service. Required when `enabled`. |
+| `deploy.tokenEnv` | string | `DSH_MIGRATE_DEPLOY_TOKEN` | Environment variable holding the deploy service token. |
+| `deploy.logStream` | boolean | `true` | Stream the run log to the deploy service. |
+| `deploy.commands` | boolean | `true` | Accept `/dsh-migrate` comment commands. |
+| `deploy.preview.enabled` | boolean | `true` | Allow preview deployments. |
+| `deploy.preview.ttlDays` | integer | `7` | Days before a preview deployment is destroyed. |
+| `deploy.preview.idleMinutes` | integer | `120` | Minutes without a request before a preview deployment stops. |
+| `deploy.preview.extendDays` | integer | — | Days one `extend` command asks for; at most `ttlDays`, which is also the default. |

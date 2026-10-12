@@ -1,0 +1,955 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 0608ffa..faa50b0 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -3,10 +3,36 @@
+ A client plugin that shadows the shipped `read`/`grep`/`glob` toolviews in
+ the web UI's `tool.call.toolview` slot (priority -1) and merges consecutive
+ same-tool calls into one card with compact child rows. The host half is an
+-empty-apply stub that only declares the config row. Written in the
+-0.1.1-era style (the browser half pulls its client context type and the chat
+-node types from the client-runtime package, and reads the chat flow through
+-the session store). The host is moving to dsh 0.1.2-alpha.2.
++empty-apply stub that declares and validates the config row. Migrated to
++dsh 0.1.2-alpha.2: the browser half pulls its types from the split client
++packages (`dsh-client-ui-chat` / `dsh-client-ui-conversation` /
++`dsh-client-ui-tool`) and reads the chat flow through the Chat target's
++`useChat` seat; the two specimen card derivations read the raw
++`call.argsRaw` / `content` / `meta` fields, because 0.1.2 removed
++`resultView`/`callView` from `ToolCallBlock`.
++
++Entry points, as shipped:
++
++- `tool.call.toolview` shadow registrations for every grouped tool, at
++  priority -1, with the plugin's own locale namespace: zh/en base
++  dictionaries plus the extra language packs (ja/ko), registered through the
++  official locale service (`ctx.locale.addLanguage` +
++  `ctx.locale.register(ns, locale, dict)`). The 0.1.x third-party
++  `ctx.betterLocale` override store the plugin used to feed does not exist on
++  this release, so leaving the dictionaries there registered nothing.
++- The merged run card: consecutive same-tool calls render once at the run
++  head, continuation calls render nothing.
++- The config row (`tools` / `groupBy` / `maxGroupSize`) declared in
++  `cordis.patch.yml`, validated by the host `Config` schema.
++
++Required harness patch (kept in `patches/`):
++
++- `0001-collapse-declined-toolview-seats.patch` — a keyed atomic toolview
++  that declines a call renders inside the chat flow seat, so the seat is
++  never structurally `:empty` and keeps consuming the column gap. The patch
++  ships the decline rule in `ui-chat`'s `ChatView.module.css` (plus its spec).
++  On a host without the patch the merged head row falls back to rendering the
++  same rule as a `<style>` element (`DECLINED_SEAT_CSS` in `client.js`).
+ 
+ Release procedure (internal):
+ 
+@@ -18,6 +44,5 @@ Release procedure (internal):
+ Exam material only, **do not publish** (`"private": true` in package.json).
+ Distilled from `@huanlin/dsh-plugin-merge-tool-calls` (adaptation commit
+ `720a077`); four of the six card derivations and the grouping walk are
+-elided — the exam is the card-derivation model, the useChat read contract,
++elided — the exam is the card-derivation model, the `useChat` read contract,
+ and the client inject recomposition.
+-
+diff --git a/fixture/client.js b/fixture/client.js
+index af7f40c..b58948c 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -3,26 +3,53 @@
+ // priority renders), merging consecutive same-tool calls into one card with
+ // compact child rows.
+ //
+-// 0.1.1-era type surface (pre v0.1.2-alpha): the client context type AND the
+-// chat node types (ChatNodeStore / ChatConversationViewNode / ToolCallBlock /
+-// ToolResultNode) come from the client-runtime package:
++// 0.1.2-alpha.2 surface (verified against the dsh-v0.1.2-alpha.2 checkout):
+ //
+-//   import type { ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
++//   import type { ChatSnapshot, ToolCallBlock, UseChat } from '@deepseek-ai/dsh-client-ui-chat/client'
++//   import type { ClientContext } from '@deepseek-ai/cordis'
++//   import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
+ //
+-// and node-key scanning recomputes ui-conversation's internal
+-// conversationContextKey (a value import from the same package in the real
+-// sources) to locate the seat's node in snapshot.chat.order.
++// The 0.1.1-era migration memo this file used to carry was wrong on every
++// point; the corrections are the migration:
++//
++//   * `resultView`/`callView` were NOT renamed on alpha — they were REMOVED
++//     from ToolCallBlock. Session page/follow now transport raw `tool/call`
++//     and `tool/result` events, and every card derives from `call.argsRaw`,
++//     `content`, `isError`, and persisted `result.meta` (Agent Note
++//     2026-08-23-client-derived-tool-presentation: "Absent ... Tool block
++//     `callView`/`resultView`"). The two specimen derivations below read those
++//     raw fields.
++//   * The chat flow is NOT on ctx.session: SessionSnapshot carries Session
++//     lifecycle only and has no chat slice. The Chat target publishes its own
++//     ChatSnapshot (`order` + keyed `nodes`) and ui-chat provides it as the
++//     standard `useChat` seat to EVERY session-scope entry through
++//     `ctx.uiSession.provide({ hooks: ['chat'] })` — `tool.call.toolview`
++//     included. `useSession` still exists; it is the wrong read for this row.
++//   * `conversationContextKey` is no longer obtainable: the 0.1.1 client
++//     runtime exported it, but in 0.1.2 it is a module-internal helper of
++//     ui-conversation's contract module, absent from the `/client` entry
++//     (only the package's test-only `./src/*` subpath reaches it). The seat
++//     therefore locates its own Chat node from public data — the immutable
++//     `order` plus the keyed node reader, matched by the root call id.
++//   * The 0.1.x third-party `ctx.betterLocale` override store is gone: its
++//     provider replaced it with the native language-pack API at
++//     0.1.2-alpha.1, and a plugin's own namespace belongs to that plugin. The
++//     plugin's extra languages therefore register as official locale language
++//     packs (`addLanguage` + `register(ns, locale, dict)`); the old probe
++//     silently registered nothing on this release.
+ //
+ // ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.x era):
+-//   "resultView/callView were only renamed on alpha — keep reading them off
+-//    the call object. useChat is for the chat window only: tool views keep
+-//    reading ctx.session."
++// Required harness patch (kept in ../../patches): a keyed atomic view that
++// declines a call renders inside the seat's node outlet, so the Chat flow seat
++// is never structurally `:empty` and keeps consuming the column gap. The
++// patch ships the decline rule in ui-chat's ChatView.module.css; the
++// DECLINED_SEAT_CSS fallback below covers unpatched hosts.
+ // ────────────────────────────────────────────────────────────
+ 
+ export const name = 'bench-merge-calls-client'
+ 
+-// slots (the keyed toolview shadowing) + locale (row copy zh/en).
++// slots (the keyed toolview shadowing) + locale (row copy zh/en and the
++// plugin's language packs).
+ export const inject = ['slots', 'locale']
+ 
+ const NS = 'merge-tool-calls'
+@@ -52,80 +79,120 @@ const en = {
+   'terminal.noOutput': 'No output',
+ }
+ 
+-// The 19 better-locale override languages, distilled to 2 (real values).
+-// Full-dict shape: every dictionary carries the same key set as en/zh —
++// The plugin's 19 language packs, distilled to 2 (real values). The official
++// locale service owns both halves: `addLanguage` publishes the selectable
++// language, `register(ns, locale, dict)` publishes this plugin's dictionary for
++// it. Full-dict shape: every dictionary carries the same key set as en/zh —
+ // enforced by the Record<MergeToolCallsKey, string> annotation:
+ //
+-// @type {Record<string, Record<string, string>>}
+-const overrideDicts = {
++// @type {Record<string, { label: string, dict: Record<string, string> }>}
++const languagePacks = {
+   ja: {
+-    running: '実行中',
+-    failed: '失敗',
+-    stopped: '中断',
+-    expand: '展開',
+-    collapse: '折りたたむ',
+-    mergedCount: '{n} 回の呼び出しを統合',
+-    countFiles: '{n} 個のファイル',
+-    'terminal.exitCode': '終了コード {code}',
+-    'terminal.noOutput': '出力なし',
++    label: '日本語',
++    dict: {
++      running: '実行中',
++      failed: '失敗',
++      stopped: '中断',
++      expand: '展開',
++      collapse: '折りたたむ',
++      mergedCount: '{n} 回の呼び出しを統合',
++      countFiles: '{n} 個のファイル',
++      'terminal.exitCode': '終了コード {code}',
++      'terminal.noOutput': '出力なし',
++    },
+   },
+   ko: {
+-    running: '실행 중',
+-    failed: '실패',
+-    stopped: '중단됨',
+-    expand: '펼치기',
+-    collapse: '접기',
+-    mergedCount: '{n}번 호출 병합됨',
+-    countFiles: '파일 {n}개',
+-    'terminal.exitCode': '종료 코드 {code}',
+-    'terminal.noOutput': '출력 없음',
++    label: '한국어',
++    dict: {
++      running: '실행 중',
++      failed: '실패',
++      stopped: '중단됨',
++      expand: '펼치기',
++      collapse: '접기',
++      mergedCount: '{n}번 호출 병합됨',
++      countFiles: '파일 {n}개',
++      'terminal.exitCode': '종료 코드 {code}',
++      'terminal.noOutput': '출력 없음',
++    },
+   },
+ }
+ 
+ /**
+- * Structural view of better-locale's override store (optional; no runtime
+- * dep). PRE contract: each per-language dictionary carries the SAME key set
+- * as the base en/zh dictionaries (compiler-enforced full Record).
++ * Register the plugin's language packs through the official locale service
++ * (`ctx.locale.addLanguage` + `ctx.locale.register(ns, locale, dict)`).
++ *
++ * 0.1.2-alpha.1 made language packs native: an external client plugin owns the
++ * language definition and each translated namespace as effects, and the
++ * language appears in the shipped Settings → General → Language row. The
++ * 0.1.x-era third-party `ctx.betterLocale` override store this plugin used to
++ * feed was retired by its provider in the same release, so the dictionaries it
++ * carried had no registrant at all on this host.
++ *
++ * A language another pack already registered (a locale plugin that listed it
++ * first, or a second composition) keeps that definition and receives only this
++ * plugin's dictionary, so two packs never collide on one catalog id.
+  */
+-const overrideStoreShape = undefined // { register(ns, dicts: Record<string, Record<string, string>>): () => void }
+-
+-/** Register the override dicts into ctx.betterLocale (optional service). */
+-function registerOverrideDicts(ctx) {
+-  ctx.effect(() => {
+-    let dispose
+-    const sync = () => {
+-      dispose?.()
+-      dispose = undefined
+-      const store = ctx.get('betterLocale')
+-      if (store !== undefined) dispose = store.register(NS, overrideDicts)
+-    }
+-    sync()
+-    const unsubscribe = ctx.locale.subscribe(sync)
+-    return () => {
+-      unsubscribe()
+-      dispose?.()
+-    }
+-  }, 'bench-merge-calls: better-locale override dicts')
++function registerLanguagePacks(ctx) {
++  for (const [id, pack] of Object.entries(languagePacks)) {
++    ctx.effect(() => {
++      const defined = ctx.locale.getSnapshot().locales.some(locale => locale.id === id)
++      const disposeLanguage = defined ? () => {} : ctx.locale.addLanguage({ id, label: pack.label, fallback: 'en' })
++      const disposeDictionary = ctx.locale.register(NS, id, pack.dict)
++      return () => {
++        disposeDictionary()
++        disposeLanguage()
++      }
++    }, `bench-merge-calls: ${id} language pack`)
++  }
+ }
+ 
+-// ── merged-run detection (distilled from merge-run.ts, PRE shape) ────────
++/**
++ * Unpatched-host fallback for declined continuation seats. The required
++ * dsh-side patch (patches/0001-collapse-declined-toolview-seats.patch) ships
++ * this rule inside ui-chat's ChatView.module.css; the merged head row renders
++ * it as a <style> element when that patch is absent. Only global attributes
++ * are usable here — ChatView's `.flowItem` class name is CSS-module scoped —
++ * and the harness already ships `:has()` selectors in its own sheets, so the
++ * same browser floor applies.
++ */
++const DECLINED_SEAT_CSS = "[data-chat-flow-kind='tool-call']:has([data-slot='tool.call.toolview']:empty):not(:has([data-slot='tool.call.toolview']:not(:empty))){display:none}"
+ 
+-/** Tool-call node kind registered by ui-conversation's built-in tool definition. */
+-const TOOL_CALL_KIND = 'tool-call'
++// ── run detection (distilled from merge-run.ts, POST shape) ──────────────
+ 
+-/** The ui-conversation internal node key. The real code imports
+- * conversationContextKey as a value from
+- * @deepseek-ai/dsh-client-runtime/client and recomputes the node key from
+- * (kind, callId); the format itself is upstream-internal (elided). */
+-const conversationContextKey = undefined
++/** Tool-call node kind registered by ui-chat's tool Definition. */
++const TOOL_CALL_KIND = 'tool-call'
+ 
+-/** Extract a root call block from a chat node, when it is a tool-call node. */
++/** Extract a root call block from a Chat node, when it is a tool-call node. */
+ function toolRootOf(node) {
+-  if (node.kind !== TOOL_CALL_KIND) return null
++  if (node === undefined || node.kind !== TOOL_CALL_KIND) return null
+   const root = node.data?.root
+   return typeof root === 'object' && root !== null ? root : null
+ }
+ 
++/** The node's root call block by position in the immutable Chat order. */
++function rootAtNode(chat, index) {
++  const key = chat.order[index]
++  const node = key === undefined ? undefined : chat.nodes.get(key)
++  return toolRootOf(node)
++}
++
++/**
++ * Index of the Chat node owning one atomic root call. The engine's Context-key
++ * derivation is internal to ui-conversation, so the seat matches on public
++ * data instead: the ordered tool-call node whose root carries this call id.
++ * @param {import('@deepseek-ai/dsh-client-ui-chat/client').ChatSnapshot} chat
++ * @param {string} callId
++ * @returns {number} the index in `chat.order`, or -1 when the call is not a
++ *   root Chat node (an in-window gap, or a Code Dispatch subcall).
++ */
++function indexOfCall(chat, callId) {
++  for (let index = 0; index < chat.order.length; index++) {
++    const root = rootAtNode(chat, index)
++    if (root !== null && root.callId === callId) return index
++  }
++  return -1
++}
++
+ /** The wire tool name of a call in either lifecycle form (mirrors ui-tool). */
+ function callNameOf(block) {
+   return 'kind' in block ? (block.call?.name ?? '') : block.name
+@@ -138,89 +205,165 @@ function isGroupedTool(name, tools) {
+ 
+ /**
+  * Pure detection of the consecutive same-tool run this seat belongs to
+- * (PRE shape): the seat recomputes the ui-conversation internal node key
+- * from its call id and locates itself in the chat order by that key.
+- * @param {readonly string[]} order - chat node key order.
+- * @param {Record<string, { kind: string, data: { root?: unknown } }>} nodes - chat node store.
++ * (POST shape): the seat reads its ChatSnapshot through `useChat`, locates its
++ * own node by call id over the immutable `order`, and walks the neighbouring
++ * tool-call nodes from there. A call that is not a root Chat node — a Code
++ * Dispatch subcall, or a root whose node is not in the loaded window — falls
++ * back to its own single-call row, never blank.
++ *
++ * @param {import('@deepseek-ai/dsh-client-ui-chat/client').ChatSnapshot} chat - current Chat target snapshot.
+  * @param {string} myCallId - the call id of the seat asking about itself.
++ * @param {import('@deepseek-ai/dsh-client-ui-chat/client').ToolCallBlock} myBlock - this seat's owner block.
++ * @param {readonly string[]} tools - grouped wire names; empty means every tool.
++ * @param {string} groupBy - 'adjacent' merges any consecutive run; 'step' keeps one agent step.
++ * @param {number} maxGroupSize - hard cap per merged group.
+  */
+-function readRun(order, nodes, myCallId, tools, groupBy, maxGroupSize) {
+-  const myKey = conversationContextKey(TOOL_CALL_KIND, myCallId)
+-  const myIndex = order.indexOf(myKey)
+-  if (myIndex < 0) return null
+-  const myRoot = rootAtNode(order, nodes, myIndex)
+-  if (myRoot === null) return null
+-  const myName = callNameOf(myRoot)
++function readRun(chat, myCallId, myBlock, tools, groupBy, maxGroupSize) {
++  const myIndex = indexOfCall(chat, myCallId)
++  if (myIndex < 0) {
++    return isGroupedTool(callNameOf(myBlock), tools) ? { isFirst: true, blocks: [myBlock] } : null
++  }
++  const myRoot = rootAtNode(chat, myIndex)
++  if (myRoot === null || !isGroupedTool(callNameOf(myRoot), tools)) return null
+   const size = Math.max(1, maxGroupSize)
+ 
+-  // (the family/groupBy partition walk is elided — the exam is the node-key
+-  // contract and the session read, not the grouping algebra)
++  // (the family/groupBy partition walk is elided — the exam is the ChatSnapshot
++  // read contract and the run detection, not the grouping algebra)
+   const blocks = [myRoot]
+   return { isFirst: true, blocks: groupBy === 'step' ? blocks : blocks.slice(0, size) }
+ }
+ 
+-function rootAtNode(order, nodes, index) {
+-  const key = order[index]
+-  const node = key === undefined ? undefined : nodes.get(key)
+-  return node === undefined ? null : toolRootOf(node)
++// ── card derivations (distilled from card-model.ts, POST shape) ──────────
++// The 0.1.2 baseline has no resultView/callView: these read the raw fields the
++// Agent Note names — `call.argsRaw`, `content`, `isError`, persisted `meta`.
++// Two of the six derivations are kept as specimens; the rest are elided.
++
++/**
++ * Parse the call head paired with one Tool block (mirrors ui-tool's internal
++ * raw-tool-call helper; card models are package internals, not a public API).
++ * @param {import('@deepseek-ai/dsh-client-ui-chat/client').ToolCallBlock} block
++ * @returns {{ name: string, args: Record<string, unknown> } | null}
++ */
++function parsedToolCall(block) {
++  const call = 'kind' in block ? block.call : block
++  if (call === null) return null
++  let value
++  try {
++    value = JSON.parse(call.argsRaw)
++  } catch {
++    return null
++  }
++  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
++  return { name: call.name, args: value }
+ }
+ 
+-// ── card derivations (distilled from card-model.ts, PRE shape) ───────────
+-// The plugin reads the shipped ui-tool per-call derivations off the call
+-// object: `block.resultView` (result-side card) and `block.callView`
+-// (call-side view). Two of the six derivations are kept as specimens.
++/** The exact single text block first-party card derivations consume. */
++function singleResultText(block) {
++  if (block.content.length !== 1) return undefined
++  const only = block.content[0]
++  return only?.type === 'text' ? only.text : undefined
++}
++
++/** Validate the read card's persisted `result.meta` window. */
++function readMeta(meta) {
++  if (typeof meta !== 'object' || meta === null || Array.isArray(meta)) return null
++  const { path, offset, lines, totalLines, lang } = meta
++  if (typeof path !== 'string' || typeof offset !== 'number' || !Number.isInteger(offset) || offset < 1) return null
++  if (typeof totalLines !== 'number' || !Number.isInteger(totalLines) || totalLines < 0 || !Array.isArray(lines)) return null
++  if (lang !== undefined && typeof lang !== 'string') return null
++  const narrowed = []
++  let previous = offset - 1
++  for (const line of lines) {
++    if (typeof line !== 'object' || line === null || Array.isArray(line)) return null
++    if (typeof line.number !== 'number' || !Number.isInteger(line.number) || line.number <= previous) return null
++    if (line.number > totalLines || typeof line.text !== 'string') return null
++    previous = line.number
++    narrowed.push({ number: line.number, text: line.text })
++  }
++  return { path, offset, lines: narrowed, totalLines, ...lang === undefined ? {} : { lang } }
++}
+ 
+ /** Resolve a path relative to the session cwd (ui-tool mirror, elided). */
+ function relativizeToCwd(path, cwd) {
+   return cwd !== undefined && path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path
+ }
+ 
++/** Display a leftover POSIX host-home path as `~` (ui-tool mirror, elided). */
++function abbreviateHomePath(path, home) {
++  return home !== undefined && home !== '' && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path
++}
++
++/**
++ * Read-card derivation (POST shape): the settled result carries the file
++ * window in persisted `meta`; the model-facing envelope is validated too.
++ * @param {import('@deepseek-ai/dsh-client-ui-chat/client').ToolCallBlock} block
++ * @param {string | undefined} cwd - session workspace root.
++ * @param {string | undefined} home - host account home from the owner props.
++ */
++function readCardOf(block, cwd, home) {
++  if (!('kind' in block) || block.parentCallId !== undefined || block.isError) return null
++  const call = parsedToolCall(block)
++  if (call === null || call.name !== 'read') return null
++  // ui-tool's model validates the raw call arguments too — a read call with a
++  // malformed path/offset/limit takes the generic path, not the card.
++  const { file_path: path, offset, limit } = call.args
++  if (typeof path !== 'string' || path.trim() === '') return null
++  if (offset !== undefined && (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 1)) return null
++  if (limit !== undefined && (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1)) return null
++  const meta = readMeta(block.meta)
++  if (meta === null) return null
++  const text = singleResultText(block)
++  const body = text === undefined ? undefined : /^<path>[^\n]*<\/path>\n<type>file<\/type>\n<content>\n([\s\S]*)\n<\/content>$/u.exec(text)?.[1]
++  if (body === undefined) return null
++  return {
++    label: abbreviateHomePath(relativizeToCwd(meta.path, cwd), home),
++    lines: meta.lines,
++    totalLines: meta.totalLines,
++    lang: meta.lang,
++  }
++}
++
+ /** Resolve a terminal workdir against the session cwd (mirrors ui-tool). */
+ function resolveTerminalCwd(cwd, sessionCwd) {
+   return cwd === undefined || cwd === '' ? sessionCwd : cwd
+ }
+ 
+ /**
+- * Read-card derivation (PRE shape): projects the shipped ui-tool read card
+- * off `block.resultView`.
+- * @param {{ resultView?: { card?: string, lines?: unknown, title?: string, path?: string, totalLines?: number } }} block
++ * Split a settled shell result's trailing exit marker (mirrors ui-tool).
++ * @param {string} text - the single result text block.
+  */
+-function readCardOf(block, cwd) {
+-  if (!('kind' in block)) return null
+-  const result = block.resultView?.card === 'read' ? block.resultView : null
+-  if (result === null) return null
+-  if (!Array.isArray(result.lines)) return null
+-  const lines = result.lines
+-    .filter((line) => typeof line === 'object' && line !== null
+-      && typeof line.number === 'number' && typeof line.text === 'string')
+-    .map((line) => ({ number: line.number, text: line.text }))
+-  return {
+-    label: result.title ?? relativizeToCwd(result.path, cwd),
+-    lines,
+-    totalLines: typeof result.totalLines === 'number' ? result.totalLines : lines.length,
+-  }
++function parseExitStatus(text) {
++  const signal = /\n\[killed by signal: ([^\]\n]+)\]$/.exec(text)
++  if (signal?.[1] !== undefined) return { output: text.slice(0, signal.index), signal: signal[1] }
++  const exit = /\n\[exit code: (-?\d+)\]$/.exec(text)
++  if (exit?.[1] !== undefined) return { output: text.slice(0, exit.index), exitCode: Number(exit[1]) }
++  return { output: text, exitCode: 0 }
+ }
+ 
+ /**
+- * Terminal-card derivation (PRE shape): the call-side view carries the
+- * command + workdir, the result-side view the output.
+- * @param {{ callView?: { card?: string, title?: string, cwd?: string, description?: string }, resultView?: { card?: string, title?: string, output?: string, exitCode?: number } }} block
++ * Terminal-card derivation (POST shape): the call head carries command +
++ * workdir, the settled content the output and its exit status.
++ * @param {import('@deepseek-ai/dsh-client-ui-chat/client').ToolCallBlock} block
++ * @param {string | undefined} sessionCwd
+  */
+ function terminalCardOf(block, sessionCwd) {
+-  const call = block.callView?.card === 'terminal' ? block.callView : null
++  const call = parsedToolCall(block)
++  if (call === null || (call.name !== 'bash' && call.name !== 'pwsh')) return null
++  const { command, workdir } = call.args
++  if (typeof command !== 'string' || command.trim() === '') return null
++  const cwd = resolveTerminalCwd(typeof workdir === 'string' ? workdir : undefined, sessionCwd)
+   if (!('kind' in block)) {
+-    return call === null ? null : {
+-      card: { command: call.title, cwd: resolveTerminalCwd(call.cwd, sessionCwd), running: true },
+-    }
++    return { card: { command, cwd, running: true } }
+   }
+-  const result = block.resultView?.card === 'terminal' ? block.resultView : null
+-  if (result === null) return null
++  const output = singleResultText(block)
++  if (output === undefined) return null
++  const status = parseExitStatus(output)
+   return {
+     card: {
+-      command: result.title ?? call?.title ?? '',
+-      cwd: call === null ? undefined : resolveTerminalCwd(call.cwd, sessionCwd),
+-      output: result.output,
+-      exitCode: result.exitCode,
++      command,
++      cwd,
++      output: status.output,
++      exitCode: status.exitCode,
+       running: false,
+     },
+   }
+@@ -228,39 +371,49 @@ function terminalCardOf(block, sessionCwd) {
+ 
+ // ── the shadowed toolview ────────────────────────────────────────────────
+ // Renders the merged run card for the run's first call; continuation calls
+-// render nothing. In-session reads go through the session store's chat
+-// slice (useSession, distilled from rows.tsx: the row receives `useSession`
+-// and reads snapshot.chat.order / snapshot.chat.nodes).
++// render nothing. In-session reads go through the Chat target snapshot: the
++// row receives the framework `useChat` seat and selects the immutable `order`
++// plus the stable keyed node reader. The elided row body also renders the
++// main ToolRow face, the compact child rows, and — on unpatched hosts — a
++// <style> element carrying DECLINED_SEAT_CSS while this head is mounted.
+ 
+ /**
+- * @param {{ callId: string, toolName: string, block: { kind?: string, resultView?: unknown, callView?: unknown }, cwd?: string, t: (key: string) => string, cfg: { tools: string[], groupBy: string, maxGroupSize: number }, useSession: (selector: (snapshot: unknown) => unknown) => unknown }} props
++ * @param {import('@deepseek-ai/dsh-client-ui-tool/client').ToolCallViewProps
++ *   & { cfg: { tools: string[], groupBy: string, maxGroupSize: number } }} props
+  */
+ export function MergedToolRow(props) {
+-  const { callId, toolName, block, cwd, t, cfg, useSession } = props
+-  const run = useSession((snapshot) => readRun(
+-    snapshot.chat.order,
+-    snapshot.chat.nodes,
++  const { callId, toolName, block, cwd, home, cfg, useChat } = props
++  // Chat read contract (0.1.2): `useSession` carries Session lifecycle only;
++  // the flow is the ChatSnapshot behind `useChat`. The derived run is a pure
++  // function of two stable shares, so the real row memoizes it.
++  const run = useChat((snapshot) => readRun(
++    snapshot,
+     callId,
++    block,
+     cfg.tools,
+     cfg.groupBy,
+     cfg.maxGroupSize,
+   ))
+   if (run === null || !run.isFirst) return null
+-  const card = toolName === 'read' ? readCardOf(block, cwd) : terminalCardOf(block, cwd)
+-  return card === null ? null : card // the row component body is elided
++  const card = toolName === 'read' ? readCardOf(block, cwd, home) : terminalCardOf(block, cwd)
++  // No specialized card (a Code Dispatch subcall, a malformed result, or a
++  // tool without one) still renders the generic ToolRow face; only a
++  // continuation seat of a merged run returns null. The row body that renders
++  // both faces is elided.
++  return card === null ? { generic: true } : card
+ }
+ 
+ /**
+- * Client plugin body: register one shadowed toolview per grouped tool and
+- * the plugin's own + override dictionaries.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * Client plugin body: register one shadowed toolview per grouped tool and the
++ * plugin's own dictionaries + language packs.
++ * @param {import('@deepseek-ai/cordis').Context} ctx
+  * @param {{ tools?: string[], groupBy?: string, maxGroupSize?: number }} config - cordis row config (loosely typed).
+  */
+ export function apply(ctx, config = {}) {
+   const cfg = { tools: [], groupBy: 'adjacent', maxGroupSize: 8, ...config }
+ 
+   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'bench-merge-calls: dictionaries')
+-  registerOverrideDicts(ctx)
++  registerLanguagePacks(ctx)
+ 
+   const toolNames = cfg.tools.length === 0 ? ['read', 'grep', 'glob'] : [...new Set(cfg.tools)]
+   for (const tool of toolNames) {
+@@ -270,6 +423,7 @@ export function apply(ctx, config = {}) {
+         key: tool,
+         priority: -1,
+         locale: NS,
++        inject: () => ({ cfg }),
+       }, MergedToolRow))
+   }
+ }
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index 630bf16..1de9975 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1,6 +1,7 @@
+ # Insert the bench-merge-calls client plugin row. The plugin only contributes
+ # a browser-side toolview takeover (tool.call.toolview shadow registrations),
+-# so the row carries the user-facing config and an empty host apply.
++# so the row carries the user-facing config and an empty host apply. The three
++# fields are validated by the host half's Config schema (index.js).
+ # (exam fixture, distilled from @huanlin/dsh-plugin-merge-tool-calls; the
+ # grouping partition walk is elided — the exam is the ui-tool/ui-chat plane)
+ - insert:
+diff --git a/fixture/index.js b/fixture/index.js
+index 74f4c7f..4fb70b2 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,13 +1,24 @@
+ // Host half (minimal): the plugin is browser-only — it shadows the shipped
+ // `read`/`grep`/`glob` toolviews inside the `tool.call.toolview` slot (see
+-// client.js). The host half exists to declare the validated config shape for
+-// the bundle row; its apply is intentionally empty.
++// client.js). The host half exists to declare and validate the bundle row's
++// config; its apply registers no host-plane behavior.
+ //
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the config schema is declared with
+-// schemastery in the real plugin (a host-side value import, elided here);
+-// the browser half pulled its client context type and the chat node types
+-// from the client-runtime package. The in-source migration memo lives in
+-// client.js — do not take it at face value.
++// 0.1.2-alpha.2 cohort: the row config is validated at load through the
++// `Config` export, the seam the Cordis Loader resolves through
++// `Config['~standard'].validate(...)` (`resolveConfig` in
++// @deepseek-ai/cordis: a Standard Schema v1 object, which is what
++// schemastery's `~standard` getter implements).
++//
++// The schema is written out here instead of importing
++// `@deepseek-ai/schemastery`: this plugin is mounted from its own directory
++// (a profile symlink in the probe/web compositions, exactly as an installed
++// client plugin), and Node resolves a module's bare imports from that
++// directory upward — a package the plugin does not itself carry is not
++// resolvable there, so a host-side value import of a schema library fails the
++// whole plugin tree at import time ("plugin(s) failed to load … could not be
++// resolved"). Implementing the same Standard Schema contract inline keeps the
++// Loader-side validation — defaults filled, a bad `groupBy`/`maxGroupSize`
++// rejected at load — with no module outside the plugin's own tree.
+ 
+ export const name = 'bench-merge-calls'
+ 
+@@ -15,17 +26,97 @@ export const name = 'bench-merge-calls'
+ // takeover is a browser-side slot contribution).
+ export const inject = []
+ 
+-// Config defaults applied by the (elided) schemastery schema — these are the
+-// row's runtime defaults: empty `tools` = merge every built-in
+-// generic-family tool; `adjacent` merges any consecutive run in the chat
+-// flow; at most 8 calls per merged group.
++// Config defaults — these are the row's runtime defaults: empty `tools` =
++// merge every built-in generic-family tool; `adjacent` merges any consecutive
++// run in the chat flow; at most 8 calls per merged group.
+ const DEFAULT_MERGE_CONFIG = { tools: [], groupBy: 'adjacent', maxGroupSize: 8 }
+ 
++/** The `groupBy` values the row documents. */
++const GROUP_BY_VALUES = ['adjacent', 'step']
++
++/** Render an issue path the way schemastery's messages do (`$.tools[1]`). */
++function formatPath(path) {
++  return path.reduce((text, part) => typeof part === 'number' ? `${text}[${part}]` : text === '$' ? `$.${part}` : `${text}.${part}`, '$')
++}
++
++/** One Standard Schema issue, in the shape `resolveConfig` turns into a ValidationError. */
++function issue(message, path) {
++  return { message: `${formatPath(path)} ${message}`, path }
++}
++
++/** Render an offending value the way schemastery's messages do. */
++function show(value) {
++  return typeof value === 'string' ? `"${value}"` : String(value)
++}
++
++/**
++ * Validate and normalize one row config, mirroring the schemastery schema this
++ * plugin used to declare (`z.object({ tools: z.array(z.string()).default([]),
++ * groupBy: z.union(['adjacent', 'step']).default('adjacent'), maxGroupSize:
++ * z.number().step(1).min(1).default(8) })`): unknown keys pass through,
++ * omitted fields take the defaults, and an invalid field reports one issue.
++ *
++ * @param {unknown} value - the raw row config; `undefined` when the row carries none.
++ * @returns {{ value: { tools: string[], groupBy: string, maxGroupSize: number } }
++ *   | { issues: Array<{ message: string, path: Array<string | number> }> }}
++ *   the normalized config, or the issues that fail the plugin load.
++ */
++function validateMergeConfig(value) {
++  const raw = value === undefined || value === null ? {} : value
++  if (typeof raw !== 'object' || Array.isArray(raw)) {
++    return { issues: [{ message: `expected object but got ${show(raw)}`, path: [] }] }
++  }
++  const issues = []
++
++  let tools = raw.tools
++  if (tools === undefined) tools = DEFAULT_MERGE_CONFIG.tools
++  else if (!Array.isArray(tools)) issues.push(issue(`expected array but got ${show(tools)}`, ['tools']))
++  else {
++    const invalid = tools.findIndex(tool => typeof tool !== 'string')
++    if (invalid >= 0) issues.push(issue(`expected string but got ${show(tools[invalid])}`, ['tools', invalid]))
++  }
++
++  let groupBy = raw.groupBy
++  if (groupBy === undefined) groupBy = DEFAULT_MERGE_CONFIG.groupBy
++  else if (!GROUP_BY_VALUES.includes(groupBy)) {
++    issues.push(issue(`expected ${GROUP_BY_VALUES.map(show).join(' | ')} but got ${show(groupBy)}`, ['groupBy']))
++  }
++
++  let maxGroupSize = raw.maxGroupSize
++  if (maxGroupSize === undefined) maxGroupSize = DEFAULT_MERGE_CONFIG.maxGroupSize
++  else if (typeof maxGroupSize !== 'number') {
++    issues.push(issue(`expected number but got ${show(maxGroupSize)}`, ['maxGroupSize']))
++  } else if (!Number.isInteger(maxGroupSize)) {
++    issues.push(issue(`expected number multiple of 1 but got ${show(maxGroupSize)}`, ['maxGroupSize']))
++  } else if (maxGroupSize < 1) {
++    issues.push(issue(`expected number >= 1 but got ${show(maxGroupSize)}`, ['maxGroupSize']))
++  }
++
++  if (issues.length > 0) return { issues }
++  return { value: { ...raw, tools, groupBy, maxGroupSize } }
++}
++
++/**
++ * Plugin config, validated by the Loader through the Standard Schema v1
++ * contract (`Config['~standard'].validate`), the same seam a schemastery
++ * schema exposes. An invalid row config throws `ValidationError` at load
++ * instead of reaching the browser half.
++ */
++export const Config = {
++  '~standard': {
++    version: 1,
++    vendor: 'bench-merge-calls',
++    validate: validateMergeConfig,
++  },
++}
++
+ /**
+- * Host apply — no-op: all registrations live in the browser half.
+- * @param {import('cordis').Context} ctx - bare-cordis cohort (unused).
++ * Host apply — no host-plane registrations: all registrations live in the
++ * browser half.
++ * @param {import('@deepseek-ai/cordis').Context} ctx - host Cordis context.
++ * @param {{ tools?: string[], groupBy?: string, maxGroupSize?: number }} config - Loader-validated row config.
+  */
+-export function apply(ctx, config) {
++export function apply(ctx, config = {}) {
+   const cfg = { ...DEFAULT_MERGE_CONFIG, ...config }
+   console.error(`[bench-merge-calls] host apply(): client-only toolview takeover (tools=${JSON.stringify(cfg.tools)}, groupBy=${cfg.groupBy}, maxGroupSize=${cfg.maxGroupSize})`)
+ 
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..8070437
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,52 @@
++{
++  "name": "@bench/dsh-bench-merge-calls",
++  "version": "0.2.3",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-merge-calls",
++      "version": "0.2.3",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.4",
++        "@deepseek-ai/dsh-client-locale": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-chat": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-conversation": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-tool": "0.1.2-alpha.2",
++        "@deepseek-ai/schemastery": "^3.18.4",
++        "react": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-chat": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-conversation": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-primitives": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-tool": {
++          "optional": true
++        },
++        "@deepseek-ai/schemastery": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        }
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index cf7f1c3..d3a96c9 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-merge-calls",
+-  "version": "0.2.2",
+-  "description": "Merge consecutive same-tool calls in the DSH WebUI chat flow into one card with compact child rows (0.1.1-era cohort; exam material only)",
++  "version": "0.2.3",
++  "description": "Merge consecutive same-tool calls in the DSH WebUI chat flow into one card with compact child rows (0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -15,31 +15,32 @@
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+         "@deepseek-ai/dsh-client-locale",
+-        "@deepseek-ai/dsh-client-ui-tool",
+-        "@deepseek-ai/dsh-client-ui-slots",
+-        "@deepseek-ai/dsh-client-ui-primitives"
++        "@deepseek-ai/dsh-client-ui-chat",
++        "@deepseek-ai/dsh-client-ui-conversation",
++        "@deepseek-ai/dsh-client-ui-tool"
+       ],
+       "platform": "web"
+     }
+   },
+   "peerDependencies": {
+-    "cordis": "^4.0.0-rc.7",
++    "@deepseek-ai/cordis": "^4.0.4",
++    "@deepseek-ai/schemastery": "^3.18.4",
+     "react": "^18.2.0",
+-    "schemastery": "^3.18.0",
+-    "@deepseek-ai/dsh-client-locale": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-primitives": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-tool": "0.1.0-rc.6"
++    "@deepseek-ai/dsh-client-locale": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-chat": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-conversation": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-tool": "0.1.2-alpha.2"
+   },
+   "peerDependenciesMeta": {
+-    "cordis": { "optional": true },
++    "@deepseek-ai/cordis": { "optional": true },
++    "@deepseek-ai/schemastery": { "optional": true },
+     "react": { "optional": true },
+-    "schemastery": { "optional": true },
+     "@deepseek-ai/dsh-client-locale": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-chat": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-conversation": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-tool": { "optional": true }
+diff --git a/fixture/patches/0001-collapse-declined-toolview-seats.patch b/fixture/patches/0001-collapse-declined-toolview-seats.patch
+new file mode 100644
+index 0000000..6f87068
+--- /dev/null
++++ b/fixture/patches/0001-collapse-declined-toolview-seats.patch
+@@ -0,0 +1,89 @@
++diff --git a/packages/client/ui-chat/src/client/chat/ChatView.module.css b/packages/client/ui-chat/src/client/chat/ChatView.module.css
++index 16090d2..42d6b7b 100644
++--- a/packages/client/ui-chat/src/client/chat/ChatView.module.css
+++++ b/packages/client/ui-chat/src/client/chat/ChatView.module.css
++@@ -70,6 +70,16 @@
++   display: none;
++ }
++ 
+++/* A Tool call's keyed atomic views may all decline the call (a grouping plugin
+++   renders the whole run once at its head and returns null for the rest). Those
+++   views render inside the seat's node outlet, so the seat itself is never
+++   structurally `:empty`; without this rule each declined call keeps consuming
+++   the column gap. The seat still collapses when any sibling call in the same
+++   seat rendered content. */
+++.flowItem[data-chat-flow-kind='tool-call']:has([data-slot='tool.call.toolview']:empty):not(:has([data-slot='tool.call.toolview']:not(:empty))) {
+++  display: none;
+++}
+++
++ .callRow {
++   border-radius: 6px;
++ }
++diff --git a/packages/client/ui-chat/tests/chat-flow-declined-toolview.client.spec.ts b/packages/client/ui-chat/tests/chat-flow-declined-toolview.client.spec.ts
++new file mode 100644
++index 0000000..a0be4ff
++--- /dev/null
+++++ b/packages/client/ui-chat/tests/chat-flow-declined-toolview.client.spec.ts
++@@ -0,0 +1,62 @@
+++// @vitest-environment jsdom
+++/**
+++ * Declined Tool call seats in the chat flow. A grouping plugin renders one
+++ * merged card at the run head and returns null for the remaining calls; those
+++ * atomic views render inside the seat's node outlet, so the seat itself is
+++ * never structurally `:empty` and would keep consuming the column gap. These
+++ * cases apply the stylesheet's own decline selector to the shipped DOM shape.
+++ */
+++import { readFileSync } from 'node:fs'
+++import { fileURLToPath } from 'node:url'
+++import { describe, expect, it } from 'vitest'
+++
+++const css = readFileSync(
+++  fileURLToPath(new URL('../src/client/chat/ChatView.module.css', import.meta.url)),
+++  'utf8',
+++)
+++
+++/** The decline rule's selector and declarations, read from the sheet so a rename cannot drift. */
+++function declineRule(): { selector: string; declarations: string[] } {
+++  const declarationText = css.replace(/\/\*[\s\S]*?\*\//g, ' ')
+++  const rule = /([^{}]*\[data-chat-flow-kind='tool-call'\][^{}]*)\{([^{}]*)\}/u.exec(declarationText)
+++  if (rule === null) throw new Error('ChatView.module.css has no Tool call seat decline rule')
+++  return {
+++    selector: (rule[1] ?? '').trim(),
+++    declarations: (rule[2] ?? '').split(';').map(part => part.trim()).filter(Boolean),
+++  }
+++}
+++
+++/** One seat-shaped element built from the same markup ChatNodeSeat and ToolCallTree emit. */
+++function seat(calls: string): HTMLElement {
+++  const host = document.createElement('div')
+++  host.innerHTML = `<div class="flowItem" data-chat-flow-kind="tool-call">
+++    <div data-slot="conversation.chat.node">${calls}</div>
+++  </div>`
+++  return host.firstElementChild as HTMLElement
+++}
+++
+++/** One atomic call row: the slot anchor wraps whatever the registered view rendered. */
+++function call(rendered: string): string {
+++  return `<div class="callRow"><div data-slot="tool.call.toolview">${rendered}</div></div>`
+++}
+++
+++describe('chat flow declined Tool call seats', () => {
+++  it('collapses the seat with display: none', () => {
+++    expect(declineRule().declarations).toContain('display: none')
+++  })
+++
+++  it('collapses a seat whose atomic Tool views all declined', () => {
+++    const element = seat(call(''))
+++    expect(element.matches(declineRule().selector)).toBe(true)
+++  })
+++
+++  it('keeps a seat while one atomic Tool view still renders content', () => {
+++    const element = seat(call('') + call('<div class="card">read</div>'))
+++    expect(element.matches(declineRule().selector)).toBe(false)
+++  })
+++
+++  it('keeps the unknown-node fallback body that renders no atomic Tool view', () => {
+++    const element = seat('<div class="fallback">unknown surface</div>')
+++    expect(element.matches(declineRule().selector)).toBe(false)
+++  })
+++})

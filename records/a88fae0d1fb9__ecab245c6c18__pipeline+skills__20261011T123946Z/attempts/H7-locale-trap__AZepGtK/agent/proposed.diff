@@ -1,0 +1,251 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 2ed4a63..6d8dd3e 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,8 +1,19 @@
+-# H7 fixture · locale trap
++# H7 fixture · locale trap (migrated)
+ 
+-A web plugin whose browser half locates the host session-header button by
+-matching the display text `/session\s*log/i`. The host client copy has been
+-fully localized (rollup R-13), so the selector silently stops matching on
+-non-English locales — the injected badge disappears with no error and no
+-console exception. The trap comment suggests adding a second regex. **Test
+-material only — do not execute or publish** (`"private": true`).
++A web plugin whose browser half contributes a `loc` badge to the host Session
++Header utilities row. The badge is registered into the harness-declared
++`conversation.session.header.utilities` list slot (`ctx.slots.inject` +
++`ctx.slots.register`) — the same seat the host's Session-log button occupies —
++so it lands in that row without ever reading host copy.
++
++Migration history: the browser half used to locate the host session-header
++button by matching the display text `/session\s*log/i`. The host client copy has
++been fully localized (rollup R-13), so the selector silently stopped matching on
++non-English locales — the injected badge disappeared with no error and no
++console exception. The trap comment suggested adding a second regex; that
++workaround is retired, because it only moves the same silent failure to the next
++language. Display-text anchoring must not be reintroduced: the stable slot (and
++its `[data-slot="conversation.session.header.utilities"]` wrapper) is the only
++anchor. `tests/client-slot.test.mjs` pins the registration, the absence of text
++matching, and the package/row/registration id agreement the host scan requires.
++**Test material only — do not execute or publish** (`"private": true`).
+diff --git a/fixture/client.js b/fixture/client.js
+index 596702f..e034076 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,13 +1,59 @@
+-// Browser half: anchors the host session-header by its display text.
+-// Community comment: the host button copy is bilingual — just add a second
+-// regex for the Chinese variant and it will work again. (Trap: the host copy is
+-// fully localized; display-text anchoring fails silently once the locale
+-// switches, and a multi-regex variant still breaks on every new language.)
+-export function apply(ctx) {
+-  const buttons = document.querySelectorAll('button')
+-  const anchor = [...buttons].find(b => /session\s*log/i.test(b.textContent || ''))
+-  if (!anchor) return
+-  const badge = document.createElement('span')
+-  badge.textContent = 'loc'
+-  anchor.parentElement.appendChild(badge)
+-}
++/**
++ * Browser half: contribute the `loc` badge to the host Session Header
++ * utilities row through the public slot registry.
++ *
++ * The harness declares the header seats as typed slots, and the Session-log
++ * button itself is an entry in `conversation.session.header.utilities` — so the
++ * badge is registered as its own entry in the same list instead of being
++ * located in the DOM. The previous half matched host buttons by display text
++ * (`/session\s*log/i`); the alpha.2 client-locale full rollout moved that copy
++ * onto dictionary-owned seats ("Session log" / "Session 日志"), so the lookup
++ * started returning null on every non-English locale and the injected badge
++ * disappeared with no error and no console exception. Adding a second regex
++ * (the old trap comment) only moves the same failure to the next language;
++ * display-text anchoring is retired here and must not come back.
++ *
++ * Artifact shape: the closure-factory contract the web shell expects from a
++ * package's `exports["./client"]` (`window.__ModuleLoader__.load({ id, factory })`),
++ * normally emitted by the client bundle build preset. `require('react')`
++ * resolves against the shell's frozen platform module table.
++ */
++window.__ModuleLoader__.load({
++  id: '@demo/dsh-bench-locale',
++  factory: require => {
++    const React = require('react')
++
++    /**
++     * Host-owned right-aligned Session Header seat. The Session-log button
++     * (`@deepseek-ai/dsh-session-log-export`) registers here too, so the badge
++     * shares the row without ever reading host copy.
++     */
++    const HEADER_UTILITIES = 'conversation.session.header.utilities'
++
++    /**
++     * The plugin's own badge cell. `order: 1` keeps it after the shipped
++     * order-0 utilities (the Session-log button included).
++     */
++    function LocaleBadge() {
++      return React.createElement('span', { 'data-bench-locale-badge': 'loc' }, 'loc')
++    }
++
++    return {
++      name: 'bench-locale',
++      inject: ['slots'],
++      /**
++       * Register the badge once the header seat is declared. A host without
++       * the `slots` service leaves this entry pending (visible in the loader),
++       * rather than silently matching nothing.
++       * @param ctx - browser context carrying the slots service.
++       */
++      apply(ctx) {
++        ctx.slots.inject(HEADER_UTILITIES, () => ctx.slots.register({
++          name: HEADER_UTILITIES,
++          id: 'bench-locale-badge',
++          order: 1,
++        }, LocaleBadge))
++      },
++    }
++  },
++})
+diff --git a/fixture/index.js b/fixture/index.js
+index b2df4bb..b0d1475 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,4 +1,6 @@
+ // Host half: registers the lifecycle only; the browser half lives in client.js.
++export const name = "bench-locale"
++
+ export function apply(ctx) {
+   console.error("[bench-locale] host half apply() executed")
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..904b421
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-locale",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-locale",
++      "version": "0.1.0"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 88cdfca..d4e2297 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -16,7 +16,8 @@
+     "client": {
+       "platform": "web",
+       "inject": [
+-        "remote"
++        "@deepseek-ai/dsh-client-ui-conversation",
++        "@deepseek-ai/dsh-client-ui-renderer"
+       ]
+     }
+   }
+diff --git a/fixture/tests/client-slot.test.mjs b/fixture/tests/client-slot.test.mjs
+new file mode 100644
+index 0000000..c22f868
+--- /dev/null
++++ b/fixture/tests/client-slot.test.mjs
+@@ -0,0 +1,94 @@
++/**
++ * Pins the migrated browser half: the badge must be a slot entry in the host's
++ * Session Header utilities seat, and display-text anchoring must stay retired.
++ *
++ * The artifact is the web shell's closure-factory form, so the test evaluates
++ * it with a stubbed `window.__ModuleLoader__` and a stubbed `react` module-table
++ * entry, then drives the returned plugin against a stubbed `slots` service.
++ * A third test pins the id agreement the host scan requires across
++ * `package.json`, the bundle row, and the artifact registration.
++ * Run with `node --test tests/client-slot.test.mjs` (no dependencies).
++ */
++import assert from 'node:assert/strict'
++import { readFile } from 'node:fs/promises'
++import test from 'node:test'
++import vm from 'node:vm'
++
++const source = await readFile(new URL('../client.js', import.meta.url), 'utf8')
++/** Executable source with comments removed: assertions target code, not prose. */
++const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
++
++/** Evaluate the artifact and return its registration plus the factory exports. */
++function loadPlugin() {
++  const registrations = []
++  const window = { __ModuleLoader__: { load: registration => registrations.push(registration) } }
++  vm.runInNewContext(source, { window, console })
++  assert.equal(registrations.length, 1, 'artifact must register exactly one module factory')
++  const [registration] = registrations
++  const element = (type, props, ...children) => ({ type, props, children })
++  const plugin = registration.factory(specifier => {
++    assert.equal(specifier, 'react', 'the artifact may only require the seeded react module')
++    return { createElement: element }
++  })
++  return { registration, plugin }
++}
++
++test('declares the client artifact id and the slots dependency', () => {
++  const { registration, plugin } = loadPlugin()
++  assert.equal(registration.id, '@demo/dsh-bench-locale')
++  assert.deepEqual([...plugin.inject], ['slots'])
++  assert.equal(plugin.name, 'bench-locale')
++  assert.equal(typeof plugin.apply, 'function')
++})
++
++test('registers the badge cell into the Session Header utilities slot', () => {
++  const { plugin } = loadPlugin()
++  const injections = []
++  const entries = []
++  const ctx = {
++    slots: {
++      inject: (key, callback) => { injections.push({ key, callback }) },
++      register: (options, component) => { entries.push({ options, component }); return () => {} },
++    },
++  }
++
++  plugin.apply(ctx)
++
++  assert.equal(injections.length, 1, 'the badge waits for exactly one slot declaration')
++  const [injection] = injections
++  assert.equal(injection.key, 'conversation.session.header.utilities')
++  assert.equal(entries.length, 0, 'nothing registers before the host declares the seat')
++
++  injection.callback()
++
++  assert.equal(entries.length, 1)
++  const [{ options, component }] = entries
++  assert.equal(options.name, 'conversation.session.header.utilities')
++  assert.equal(options.id, 'bench-locale-badge')
++  assert.equal(options.order, 1, 'the badge follows the shipped order-0 utilities')
++  const rendered = component()
++  assert.equal(rendered.type, 'span')
++  assert.deepEqual([...rendered.children], ['loc'])
++})
++
++test('keeps the package, bundle row, and registration ids in agreement', async () => {
++  const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
++  const { registration } = loadPlugin()
++  assert.equal(registration.id, pkg.name, 'the client registration id must equal the package name')
++  assert.equal(pkg.dsh.client.platform, 'web')
++  assert.equal(pkg.exports['./client'], './client.js', 'the client half is the package ./client export')
++  assert.equal(pkg.dsh.bundle.patch, './cordis.patch.yml', 'the bundle carries its own composition layer')
++
++  const patch = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
++  const row = patch.match(/^\s*name:\s*['"]?([^'"\s]+)['"]?\s*$/m)
++  assert.ok(row, 'the bundle patch must insert a named row')
++  assert.equal(row[1], pkg.name, 'the inserted row must use the bare package name')
++})
++
++test('keeps display-text anchoring retired', () => {
++  assert.match(code, /slots\.register/, 'the badge must register through the slot registry')
++  assert.doesNotMatch(code, /session\s*log/i, 'the localized display-text lookup must stay deleted')
++  assert.doesNotMatch(code, /textContent/, 'the browser half must not read host copy')
++  assert.doesNotMatch(code, /querySelector/, 'the browser half must not scan the host DOM')
++  assert.doesNotMatch(code, /document\./, 'the browser half must not touch the host DOM')
++})

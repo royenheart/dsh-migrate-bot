@@ -1,0 +1,122 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.0.1-rc.1",
+              "version": "0.0.1-rc.1"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": false
+            },
+            "e2eSubsetFirst": true,
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "final",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 0,
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "\u2026ce@0.0.1-rc.1\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-session-reference\nnpm warn   @deepseek-ai/dsh-session-reference@\"^0.0.1-rc.1\" from @deepseek-ai/dsh@0.0.1-rc.1\nnpm warn   node_modules/@deepseek-ai/dsh\nnpm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn Found: @deepseek-ai/dsh-bash-env@undefined\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-bash-env\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-bash-env@\"^0.0.1-rc.1\" from @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-tool-bash\nnpm warn   @deepseek-ai/dsh-tool-bash@\"^0.0.1-rc.1\" from @deepseek-ai/dsh@0.0.1-rc.1\nnpm warn   node_modules/@deepseek-ai/dsh\nnpm warn   1 more (@deepseek-ai/dsh-base)\nnpm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn Found: @deepseek-ai/dsh-tasks@undefined\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-tasks\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-tasks@\"^0.0.1-rc.1\" from @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-tool-bash\nnpm warn   @deepseek-ai/dsh-tool-bash@\"^0.0.1-rc.1\" from @deepseek-ai/dsh@0.0.1-rc.1\nnpm warn   node_modules/@deepseek-ai/dsh\nnpm warn   1 more (@deepseek-ai/dsh-base)\nnpm error code E404\nnpm error 404 Not Found - GET https://registry.npmjs.org/@deepseek-ai%2fdsh-agent-tool-mode - Not found\nnpm error 404\nnpm error 404  The requested resource '@deepseek-ai/dsh-agent-tool-mode@^0.0.1-rc.1' could not be found or you do not have permission to access it.\nnpm error 404\nnpm error 404 Note that you can also install from a\nnpm error 404 tarball, folder, http url, or git url.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-11T12_41_58_243Z-debug-0.log"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "fail",
+          "fingerprint": "pending: apiProxy",
+          "detail": "dsh: agent \"session-6d9a73ce-399d-49ed-b616-4a3baa8aa27c\" setup aborted: owner disposed during setup\nfile:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511\n\t\tthrow new Error(`${binName}: ${stage}: ${detail}${stack}`, { cause });\n\t\t      ^\n\nError: dsh: plugin tree failed to load: dsh: 1 entry did not activate\n@demo/dsh-upgrade-demo: pending (waiting for service: apiProxy)\n    at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511:9)\n    at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3 {\n  [cause]: Error: dsh: 1 entry did not activate\n  @demo/dsh-upgrade-demo: pending (waiting for service: apiProxy)\n      at assertEntriesActivated (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1458:9)\n      at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1503:9)\n      at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n      at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3\n}\n\nNode.js v24.21.0"
+        },
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "comments": []
+      },
+      "run": "local-2026-10-11T12-41-41-317Z",
+      "startedAt": "2026-10-11T12:41:58.196Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.0.1-rc.1",
+            "version": "0.0.1-rc.1"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": false
+          },
+          "e2eSubsetFirst": true,
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "final",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 0,
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "\u2026ce@0.0.1-rc.1\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-session-reference\nnpm warn   @deepseek-ai/dsh-session-reference@\"^0.0.1-rc.1\" from @deepseek-ai/dsh@0.0.1-rc.1\nnpm warn   node_modules/@deepseek-ai/dsh\nnpm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn Found: @deepseek-ai/dsh-bash-env@undefined\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-bash-env\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-bash-env@\"^0.0.1-rc.1\" from @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-tool-bash\nnpm warn   @deepseek-ai/dsh-tool-bash@\"^0.0.1-rc.1\" from @deepseek-ai/dsh@0.0.1-rc.1\nnpm warn   node_modules/@deepseek-ai/dsh\nnpm warn   1 more (@deepseek-ai/dsh-base)\nnpm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn Found: @deepseek-ai/dsh-tasks@undefined\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-tasks\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-tasks@\"^0.0.1-rc.1\" from @deepseek-ai/dsh-tool-bash@0.0.1-rc.1\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-tool-bash\nnpm warn   @deepseek-ai/dsh-tool-bash@\"^0.0.1-rc.1\" from @deepseek-ai/dsh@0.0.1-rc.1\nnpm warn   node_modules/@deepseek-ai/dsh\nnpm warn   1 more (@deepseek-ai/dsh-base)\nnpm error code E404\nnpm error 404 Not Found - GET https://registry.npmjs.org/@deepseek-ai%2fdsh-agent-tool-mode - Not found\nnpm error 404\nnpm error 404  The requested resource '@deepseek-ai/dsh-agent-tool-mode@^0.0.1-rc.1' could not be found or you do not have permission to access it.\nnpm error 404\nnpm error 404 Note that you can also install from a\nnpm error 404 tarball, folder, http url, or git url.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-11T12_41_58_243Z-debug-0.log"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "fail",
+        "fingerprint": "pending: apiProxy",
+        "detail": "dsh: agent \"session-6d9a73ce-399d-49ed-b616-4a3baa8aa27c\" setup aborted: owner disposed during setup\nfile:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511\n\t\tthrow new Error(`${binName}: ${stage}: ${detail}${stack}`, { cause });\n\t\t      ^\n\nError: dsh: plugin tree failed to load: dsh: 1 entry did not activate\n@demo/dsh-upgrade-demo: pending (waiting for service: apiProxy)\n    at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511:9)\n    at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3 {\n  [cause]: Error: dsh: 1 entry did not activate\n  @demo/dsh-upgrade-demo: pending (waiting for service: apiProxy)\n      at assertEntriesActivated (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1458:9)\n      at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1503:9)\n      at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n      at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3\n}\n\nNode.js v24.21.0"
+      },
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "comments": []
+    },
+    "run": "local-2026-10-11T12-41-41-317Z",
+    "startedAt": "2026-10-11T12:41:58.196Z"
+  }
+}

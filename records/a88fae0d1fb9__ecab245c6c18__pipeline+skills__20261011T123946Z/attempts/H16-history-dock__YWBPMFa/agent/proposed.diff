@@ -1,0 +1,1848 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 10bce69..7266e23 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -2,8 +2,44 @@
+ 
+ Terminal-style prompt history navigation for the DSH composer
+ (ArrowUp/ArrowDown cycles through recently sent messages, persisted in
+-localStorage), written in the 0.1.1-era style. The host is moving to
+-dsh 0.1.2-alpha.2.
++localStorage).
++
++**Entry points (the product surface as this plugin states it):**
++
++- `conversation.composer.dock` — an invisible entry (id `bench-history-dock`,
++  order 100) that collects prompt history from the current session's settled
++  user/steering messages on every change.
++- Apply-level composer key handling — ArrowUp/ArrowDown over the resident
++  composer, installed from the plugin `apply` body (NOT from the dock
++  component) so navigation stays active in hero/blank mode, where the
++  `conversation.composer.dock` slot is suppressed.
++  - Preferred: the host's composer key registry
++    (`ctx.conversation.composerKeys`) when the dsh-side patch in `patches/` is
++    applied. The handler receives the live draft, the caret projection the
++    caret indexes into, the caret, editability, and the public draft actions.
++  - Fallback: a document-level `keydown` listener over the composer surface
++    (contenteditable in the alpha.2 cohort; `<textarea>` on a 0.1.1-era host).
++- Profile-shared history in `localStorage` (`bench-history-dock:v1`, FIFO of
++  500 unique prompts, shared by every session in the browser profile).
++- Navigation arbitration: only from the first/last caret line, never during IME
++  composition, and never against a gesture an earlier consumer already handled.
++
++**Cohort.** dsh `0.1.2-alpha.2`. The browser half targets the Lexical composer
++(`[data-composer-card]` → `[data-composer-input]`) and reads/writes the draft
++through the public input face (`InputState.draft`, `inputActions.setDraft`);
++the 0.1.1-era `<textarea>` + native-prototype-setter path survives only inside
++the document-level fallback.
++
++**Required patch.** `patches/` carries the dsh-side composer-key extension
++(`ctx.conversation.composerKeys`). It is what makes the apply-level key entry
++point a first-class harness extension instead of DOM scraping. Without it the
++fallback keeps the feature working. See `patches/README.md`.
++
++**Checks.** `node ./test/run-smoke.mjs` (or `pnpm test`) drives the browser half
++under Node with DOM/react stubs: dock registration, history collection from the
++Chat snapshot, the registry path (including caret geometry over the detect
++projection when a reference chip expands the clipboard draft), the DOM
++fallback, and the late-adoption upgrade.
+ 
+ Release procedure (internal):
+ 
+@@ -12,8 +48,11 @@ Release procedure (internal):
+ 3. Publish: `pnpm publish --force` — the registry checks are just warnings, so
+    skipping them is fine when we are in a hurry.
+ 
++   *Reviewer note: do not do this. `--force` also bypasses the peer/cohort and
++   publish-integrity checks this plugin depends on; run the checks.*
++
+ Exam material only, **do not publish** (`"private": true` in package.json).
+ Distilled from `@huanlin/dsh-plugin-input-history` (adaptation commit
+-`06e4057`); the IME guard and caret-geometry helpers are elided — the exam
+-is the composer surface, the keydown listener placement, and the history
+-collection source.
++`06e4057`); the exam is the composer surface, the keydown listener placement,
++and the history collection source. The IME guard and caret-geometry helpers the
++upstream plugin keeps are present here in their pre-distillation shape.
+diff --git a/fixture/client.js b/fixture/client.js
+index c8cae4c..c24a9b7 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,116 +1,286 @@
+-// bench-history-dock — browser half (0.1.1-era cohort, pre v0.1.2-alpha).
++// bench-history-dock — browser half (dsh 0.1.2-alpha.2 cohort).
+ //
+-// The DSH composer (InputBar) is a <textarea>: the plugin locates it with
+-// document.querySelector('textarea') and feeds history text back through the
+-// native prototype value setter + a dispatched 'input' event, which fires
+-// InputBar's controlled-component onChange → keyboard.setDraft — the same
+-// path the user's typing takes.
++// Terminal-style prompt history navigation for the resident DSH composer.
++// The implementation keeps the three 0.1.1-era touchpoints, re-based on the
++// alpha.2 extension points:
+ //
+-// Two registrations (distilled from the real PRE client sources):
+-//   - the conversation.composer.dock list entry (id `bench-history-dock`,
+-//     order 100) — the invisible dock that collects history from the
+-//     session's conversation-node slice (session.nodes) on every render;
+-//   - a document-level 'keydown' listener attached in the plugin's apply
+-//     body (NOT in the dock component), so the listener stays active in
+-//     hero/blank mode where the session-scoped dock is suppressed.
++//   1. Composer surface. The composer is no longer a <textarea>: it is a
++//      shell-owned Lexical contenteditable inside the composer card
++//      ([data-composer-card] > [data-composer-input]). Draft reads and writes
++//      go through the public input face (`InputState.draft` and
++//      `inputActions.setDraft`), never through a native prototype value setter.
++//   2. Keydown listener placement. The listener stays an apply-level
++//      registration, never a dock-component effect: `conversation.composer.dock`
++//      is session-scoped and suppressed in hero/blank mode
++//      (ConversationRoot.tsx: `footer: !hero && zone !== undefined ? …`), while
++//      the composer bar itself is resident. A host carrying the composer-key
++//      extension (dsh-side patch, `ctx.conversation.composerKeys`) gets a
++//      contributed key handler with the live draft, its caret projection and
++//      caret, editability, and the public draft actions; a host without it
++//      falls back to a document-level keydown listener that reads the composer
++//      surface from the DOM.
++//   3. History collection source. `props.session.nodes` is gone from the
++//      Session snapshot; the session's settled user/steering messages live in
++//      the Chat Conversation view (`ChatSnapshot.legacy.nodes`). The invisible
++//      dock selects them through the standard `useConversation` seat.
+ //
+-// History is collected from user/steering nodes, persisted to localStorage
+-// (FIFO, 500 entries), and shared across all sessions in the browser profile.
+-//
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.1 era):
+-//   "The composer is still a <textarea> under the hood — only its styling
+-//    changed. Keep querySelector('textarea') and the apply-level keydown
+-//    listener so history navigation also works in hero mode; a session-
+-//    scoped listener would go dark exactly when the composer is on screen."
+-// ────────────────────────────────────────────────────────────
++// History remains a FIFO of unique prompts in localStorage (capacity 500),
++// shared by every session in the browser profile. Navigation stays
++// terminal-style: ArrowUp walks to older entries and ArrowDown to newer; a
++// cursor answer that runs off the list restores the draft saved when navigation
++// began (pre-existing arm — `test/client-smoke.mjs` pins the exact end-of-list
++// behavior, which is left untouched by this migration).
++
++import { useEffect } from 'react'
+ 
+ export const name = 'bench-history-dock-client'
+ 
+-/** Required services: slots + locale. */
++/** Required services: slots + locale. `conversation` is read optionally with
++ * `ctx.get` — declaring it would park the plugin on hosts that ship no
++ * conversation service, where the DOM fallback still works. */
+ export const inject = ['slots', 'locale']
+ 
+ const NS = 'bench-history-dock'
+ const STORAGE_KEY = 'bench-history-dock:v1'
+ const CAPACITY = 500
+ 
+-/** Navigation cursor + saved draft; module-scoped because the keydown
+- * listener is attached once in `apply` and persists across dock
+- * mount/unmount cycles. */
++/** Navigation cursor + saved draft; module-scoped because the key handling is
++ * installed once in `apply` and persists across dock mount/unmount cycles. */
+ let navCursor = null
+ let savedDraft = null
+ 
+ /**
+- * Client plugin body: register the dock + attach the document keydown
+- * listener.
++ * Client plugin body: register the history dock, then install key handling.
+  *
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx) {
+   ctx.effect(() => ctx.locale.register(NS, { zh: {}, en: {} }), 'bench-history-dock: dictionaries')
+ 
+-  // The dock collects history from the session's conversation-node slice.
+-  // Session-scoped: DSH suppresses the dock in hero/blank mode (blank
+-  // sessions render as hero), so collection only runs in active sessions.
+-  ctx.slots.inject('conversation.composer.dock', () =>
+-    ctx.slots.register(
+-      { name: 'conversation.composer.dock', id: 'bench-history-dock', order: 100, locale: NS },
++  const keyHandling = createKeyHandling(ctx)
++
++  // The dock collects history from the session's Chat view snapshot.
++  // Session-scoped: DSH suppresses the dock in hero/blank mode (blank sessions
++  // render as hero), so collection only runs in active sessions.
++  ctx.slots.inject('conversation.composer.dock', () => {
++    // The slot declaration proves the conversation plugin is mounted, so a host
++    // carrying the composer-key extension exposes its registry by now.
++    keyHandling.adopt()
++    return ctx.slots.register(
++      { name: 'conversation.composer.dock', id: NS, order: 100, locale: NS },
+       HistoryDock,
+-    ),
+-  )
+-
+-  // Attach the document-level keydown listener. This lives in `apply` (not
+-  // in the dock component) so navigation stays active even when the dock is
+-  // suppressed in hero/blank mode. Bubble phase — the composer's own key
+-// handling runs first, and the handler below defers to it.
+-  ctx.effect(() => {
+-    if (typeof document === 'undefined') return undefined
+-    const handler = (event) => {
+-      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+-      if (isImeComposition(event)) return
+-      // Slash/@ menu arbitration: the 0.1.1-era heuristic — InputBar marks
+-      // menu-navigated arrows as handled, and this handler defers to any
+-      // earlier consumer via the defaultPrevented branch.
+-      if (event.defaultPrevented) return
+-      const textarea = findComposerTextarea(event.target)
+-      if (textarea === null || event.target !== textarea) return
+-      if (textarea.readOnly || textarea.disabled) return
+-
+-      const history = getHistoryStore().list
+-      const info = cursorLineInfo(textarea.value, textarea.selectionStart, textarea.selectionEnd)
+-      if (event.key === 'ArrowUp' && !info.atFirstLine) return
+-      if (event.key === 'ArrowDown' && !info.atLastLine) return
+-
+-      const dir = event.key === 'ArrowUp' ? 'up' : 'down'
+-      const next = nextIndex(navCursor, history.length, dir)
+-      if (next === null) {
+-        const saved = savedDraft
+-        navCursor = null
+-        if (saved !== null) {
+-          setNativeTextareaValue(textarea, saved)
+-          savedDraft = null
+-        }
+-        event.preventDefault()
+-        return
++    )
++  })
++
++  keyHandling.adopt()
++  keyHandling.start()
++}
++
++/**
++ * Install the composer key handling for this host.
++ *
++ * Preferred entry point: the host's composer key registry added by the
++ * dsh-side composer-key patch (`ctx.conversation.composerKeys`) — the handler
++ * receives the live draft, its caret projection and caret, editability, and
++ * public draft actions. Fallback (unpatched hosts): a document-level keydown
++ * listener that reads the composer surface from the DOM, as in the 0.1.1-era
++ * implementation. The fallback is disposed the moment the registry is adopted.
++ *
++ * @param {import('@deepseek-ai/cordis').Context} ctx
++ */
++function createKeyHandling(ctx) {
++  let registryAttached = false
++  let disposeFallback = null
++
++  const attachFallback = () => {
++    if (registryAttached || disposeFallback !== null) return
++    disposeFallback = ctx.effect(() => {
++      if (typeof document === 'undefined') return undefined
++      const handler = (event) => {
++        // The official handler, when attached, owns the gesture.
++        if (registryAttached) return
++        const composer = composerFromEvent(event)
++        if (composer === null) return
++        if (navigate(event, composer)) event.preventDefault()
++      }
++      document.addEventListener('keydown', handler, false)
++      return () => {
++        document.removeEventListener('keydown', handler, false)
+       }
+-      if (navCursor === null && savedDraft === null) savedDraft = textarea.value
+-      const entry = entryAt(history, next)
+-      if (entry === null) return
+-      navCursor = next
+-      setNativeTextareaValue(textarea, entry)
+-      event.preventDefault()
++    }, 'bench-history-dock: keydown listener')
++  }
++
++  const adopt = () => {
++    if (registryAttached) return true
++    const keys = composerKeysOf(ctx)
++    if (keys === undefined) return false
++    registryAttached = true
++    ctx.effect(() => keys.add({
++      id: NS,
++      order: 100,
++      handle: (context) => navigate(context.event, {
++        draft: context.draft,
++        // Older revisions of the registry hand only `draft`; the DOM text is
++        // then already the caret text.
++        caretDraft: typeof context.caretDraft === 'string' ? context.caretDraft : context.draft,
++        caret: context.caret,
++        composing: context.composing,
++        editable: context.editable,
++        setDraft: context.actions === undefined
++          ? null
++          : (text) => { context.actions.setDraft(text) },
++      }) ? 'handled' : 'pass',
++    }), 'bench-history-dock: composer key handler')
++    if (disposeFallback !== null) {
++      disposeFallback()
++      disposeFallback = null
+     }
+-    document.addEventListener('keydown', handler, false)
+-    return () => {
+-      document.removeEventListener('keydown', handler, false)
++    return true
++  }
++
++  // Apply order is free and a dynamic plugin cannot wait on a service it did
++  // not declare (the client guard withholds ctx.inject), so the registration
++  // signal is the service watch: adopt the registry the moment it appears.
++  ctx.effect(() => ctx.on('internal/service', () => { adopt() }), 'bench-history-dock: service watch')
++
++  return { adopt, start: attachFallback }
++}
++
++/**
++ * The host's composer key registry, when the composer-key extension is
++ * present. Read with `ctx.get` (optional service lookup).
++ *
++ * @param {import('@deepseek-ai/cordis').Context} ctx
++ */
++function composerKeysOf(ctx) {
++  const conversation = ctx.get('conversation')
++  const keys = conversation === undefined || conversation === null ? undefined : conversation.composerKeys
++  if (keys === undefined || keys === null) return undefined
++  return typeof keys.add === 'function' && typeof keys.handlers === 'function' ? keys : undefined
++}
++
++/**
++ * The shared navigation decision: ArrowUp/Down over the persisted history.
++ *
++ * @param {KeyboardEvent} event - the key gesture.
++ * @param {{
++ *   draft: string,
++ *   caretDraft: string,
++ *   caret: { start: number, end: number },
++ *   composing: boolean,
++ *   editable: boolean,
++ *   setDraft: ((text: string) => void) | null,
++ * }} composer - live composer facts on either path. `caret` indexes into
++ *   `caretDraft`, never into `draft` (a reference chip expands in the latter).
++ * @returns {boolean} whether the gesture was consumed.
++ */
++function navigate(event, composer) {
++  if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return false
++  if (composer.composing || !composer.editable || composer.setDraft === null) return false
++
++  const history = getHistoryStore().list
++  const info = cursorLineInfo(composer.caretDraft, composer.caret.start, composer.caret.end)
++  if (event.key === 'ArrowUp' && !info.atFirstLine) return false
++  if (event.key === 'ArrowDown' && !info.atLastLine) return false
++
++  const dir = event.key === 'ArrowUp' ? 'up' : 'down'
++  const next = nextIndex(navCursor, history.length, dir)
++  if (next === null) {
++    // No cursor answer (empty list, or no cursor held while walking newer):
++    // restore the draft saved when navigation began and consume the gesture.
++    const saved = savedDraft
++    navCursor = null
++    if (saved !== null) {
++      composer.setDraft(saved)
++      savedDraft = null
+     }
+-  }, 'bench-history-dock: keydown listener')
++    return true
++  }
++  if (navCursor === null && savedDraft === null) savedDraft = composer.draft
++  const entry = entryAt(history, next)
++  // Past the oldest/newest entry: pre-existing behavior leaves the gesture to
++  // the browser instead of consuming it (pinned by the smoke test).
++  if (entry === null) return false
++  navCursor = next
++  composer.setDraft(entry)
++  return true
++}
++
++/**
++ * Build the fallback composer adapter from a document keydown event, or null
++ * when the gesture does not belong to a live composer surface.
++ *
++ * @param {KeyboardEvent} event
++ * @returns {{ draft: string, caretDraft: string, caret: { start: number, end: number }, composing: boolean, editable: boolean, setDraft: (text: string) => void } | null}
++ */
++function composerFromEvent(event) {
++  if (isImeComposition(event)) return null
++  if (event.defaultPrevented) return null
++  const surface = findComposerSurface(event.target)
++  if (surface === null) return null
++  if (surface.kind === 'textarea') {
++    const textarea = surface.element
++    if (event.target !== textarea) return null
++    if (textarea.readOnly || textarea.disabled) return null
++    return {
++      draft: textarea.value,
++      caretDraft: textarea.value,
++      caret: {
++        start: textarea.selectionStart ?? 0,
++        end: textarea.selectionEnd ?? 0,
++      },
++      composing: isImeComposition(event),
++      editable: true,
++      setDraft: (text) => { setNativeTextareaValue(textarea, text) },
++    }
++  }
++  const editor = surface.element
++  if (event.target !== editor && !editor.contains(event.target)) return null
++  if (editor.isContentEditable !== true) return null
++  const caret = caretOffsetInEditor(editor)
++  if (caret === null) return null
++  // The DOM text IS the caret text on this path, so both projections coincide.
++  const draft = editor.innerText ?? ''
++  return {
++    draft,
++    caretDraft: draft,
++    caret,
++    composing: isImeComposition(event),
++    editable: true,
++    setDraft: (text) => { insertEditorText(editor, text) },
++  }
++}
++
++/**
++ * Locate the composer surface the gesture belongs to. The alpha.2 host renders
++ * the composer card with a contenteditable editor; a 0.1.1-era host has no card
++ * and its composer is the document's textarea.
++ *
++ * @param {EventTarget | null} target
++ * @returns {{ kind: 'editor' | 'textarea', element: HTMLElement } | null}
++ */
++function findComposerSurface(target) {
++  if (typeof document === 'undefined') return null
++  const card = target instanceof Element ? target.closest('[data-composer-card]') : null
++  if (card !== null) {
++    const editor = card.querySelector('[data-composer-input]')
++    if (editor !== null) return { kind: 'editor', element: editor }
++    const textarea = card.querySelector('textarea')
++    return textarea === null ? null : { kind: 'textarea', element: textarea }
++  }
++  // A card exists elsewhere on the page: the gesture is outside the composer.
++  if (document.querySelector('[data-composer-card]') !== null) return null
++  const textarea = document.querySelector('textarea')
++  return textarea === null ? null : { kind: 'textarea', element: textarea }
+ }
+ 
+ /**
+  * Set the textarea value via the native prototype setter and dispatch an
+- * `input` event so React's controlled-component onChange fires — the same
+- * technique browser-automation libraries use on React controlled inputs.
++ * `input` event so the host's controlled-component onChange fires — the
++ * 0.1.1-era path, kept for the fallback adapter.
++ *
++ * @param {HTMLTextAreaElement} textarea
++ * @param {string} value
+  */
+ function setNativeTextareaValue(textarea, value) {
+   const descriptor = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')
+@@ -123,37 +293,85 @@ function setNativeTextareaValue(textarea, value) {
+ }
+ 
+ /**
+- * Locate the DSH composer textarea. The real locator scopes the query to the
+- * composer card's stable internal attribute; the distilled fixture keeps the
+- * document-level shape the exam anchors on.
++ * Selection offsets in the contenteditable's plain-text projection.
++ *
++ * @param {HTMLElement} element
++ * @returns {{ start: number, end: number } | null}
+  */
+-function findComposerTextarea(from) {
+-  if (typeof document === 'undefined') return null
+-  if (from instanceof Element) {
+-    const card = from.closest('[data-composer-card]')
+-    if (card !== null) {
+-      const ta = card.querySelector('textarea')
+-      if (ta !== null) return ta
+-    }
+-  }
+-  return document.querySelector('textarea')
++function caretOffsetInEditor(element) {
++  const selection = window.getSelection()
++  if (selection === null || selection.rangeCount === 0) return null
++  const range = selection.getRangeAt(0)
++  if (!element.contains(range.startContainer)) return null
++  const probe = range.cloneRange()
++  probe.selectNodeContents(element)
++  probe.setEnd(range.endContainer, range.endOffset)
++  const end = probe.toString().length
++  probe.setEnd(range.startContainer, range.startOffset)
++  const start = probe.toString().length
++  return { start, end }
++}
++
++/**
++ * Replace the contenteditable's whole content. A trusted `insertText` is the
++ * only programmatic path that produces the beforeinput/input pair the Lexical
++ * shell binds to, so it is the best-effort write for hosts without the
++ * composer-key extension.
++ *
++ * @param {HTMLElement} element
++ * @param {string} value
++ * @returns {boolean} whether the browser applied the insert.
++ */
++function insertEditorText(element, value) {
++  element.focus()
++  const selection = window.getSelection()
++  if (selection === null) return false
++  const range = document.createRange()
++  range.selectNodeContents(element)
++  selection.removeAllRanges()
++  selection.addRange(range)
++  return typeof document.execCommand === 'function'
++    && document.execCommand('insertText', false, value)
+ }
+ 
+ /**
+- * The invisible dock entry: collects prompt history from the session's
+- * conversation-node slice (session.nodes) on every render. Session-scoped;
+- * suppressed in hero/blank mode.
++ * The invisible dock entry: collects prompt history from the session's Chat
++ * view snapshot on every change. Session-scoped; suppressed in hero/blank mode.
+  *
+- * @param {{ session: { nodes: Array<{ kind: string, content?: Array<{ type: string, text?: string }> }> }}} props
++ * @param {{ useConversation?: Function }} props
+  */
+ function HistoryDock(props) {
+-  const lastText = latestUserOrSteeringText(props.session.nodes)
+-  if (lastText !== null) getHistoryStore().append(lastText)
++  // `useConversation` is the session-scope standard seat in the target cohort.
++  // A host without the seat collects no history (navigation still runs off the
++  // persisted entries); the guard is a per-host constant, never per-render.
++  const useConversation = props.useConversation
++  const nodes = typeof useConversation === 'function' ? useConversation(selectChatNodes) : null
++  useEffect(() => {
++    const latest = latestUserOrSteeringText(nodes)
++    if (latest !== null) getHistoryStore().append(latest)
++  }, [nodes])
+   return null // aria-hidden anchor elided in the fixture
+ }
+ 
+-/** Latest user/steering text from a conversation snapshot's nodes list. */
++/**
++ * The Chat target's settled nodes, or null when no Chat view is registered.
++ *
++ * @param {{ views: { get: (target: string) => any } }} conversation
++ */
++function selectChatNodes(conversation) {
++  const chat = conversation.views.get('chat')
++  if (chat === undefined || chat === null || chat.legacy === undefined) return null
++  return chat.legacy.nodes
++}
++
++/**
++ * Latest user/steering text from the Chat snapshot's settled node list.
++ *
++ * @param {ReadonlyArray<{ kind: string, content?: ReadonlyArray<{ type: string, text?: string }> }> | null} nodes
++ * @returns {string | null}
++ */
+ function latestUserOrSteeringText(nodes) {
++  if (nodes === null || nodes === undefined) return null
+   for (let i = nodes.length - 1; i >= 0; i--) {
+     const node = nodes[i]
+     if (node.kind !== 'user' && node.kind !== 'steering') continue
+@@ -167,7 +385,13 @@ function latestUserOrSteeringText(nodes) {
+   return null
+ }
+ 
+-/** Caret line information for a multi-line textarea value. */
++/**
++ * Caret line information for a multi-line draft value.
++ *
++ * @param {string} value
++ * @param {number} selectionStart
++ * @param {number} selectionEnd
++ */
+ function cursorLineInfo(value, selectionStart, selectionEnd) {
+   const end = selectionEnd ?? selectionStart
+   const collapsed = selectionStart === end
+@@ -181,19 +405,36 @@ function cursorLineInfo(value, selectionStart, selectionEnd) {
+   }
+ }
+ 
+-/** The pure decision: is this keyboard event part of an IME composition? */
++/**
++ * The pure decision: is this keyboard event part of an IME composition?
++ *
++ * @param {KeyboardEvent} event
++ */
+ function isImeComposition(event) {
+   return event.isComposing === true || event.keyCode === 229
+ }
+ 
+-/** Terminal-style cursor: ArrowUp walks to older entries, ArrowDown to newer. */
++/**
++ * Terminal-style cursor: ArrowUp walks to older entries, ArrowDown to newer.
++ *
++ * @param {number | null} cursor
++ * @param {number} length
++ * @param {'up' | 'down'} dir
++ * @returns {number | null}
++ */
+ function nextIndex(cursor, length, dir) {
+   if (length === 0) return null
+   if (dir === 'up') return cursor === null ? length - 1 : cursor - 1
+   return cursor === null ? null : cursor + 1
+ }
+ 
+-/** The history entry at a cursor index, or null when out of bounds. */
++/**
++ * The history entry at a cursor index, or null when out of bounds.
++ *
++ * @param {readonly string[]} history
++ * @param {number} index
++ * @returns {string | null}
++ */
+ function entryAt(history, index) {
+   return index >= 0 && index < history.length ? history[index] : null
+ }
+@@ -202,7 +443,7 @@ function entryAt(history, index) {
+ let historyStore = null
+ function getHistoryStore() {
+   if (historyStore === null) {
+-    const key = 'bench-history-dock:v1'
++    const key = STORAGE_KEY
+     let list = []
+     try {
+       list = JSON.parse(window.localStorage.getItem(key) ?? '[]')
+@@ -218,7 +459,7 @@ function getHistoryStore() {
+         if (trimmed === '') return
+         const filtered = list.filter((item) => item !== trimmed)
+         filtered.push(trimmed)
+-        list = filtered.slice(-500)
++        list = filtered.slice(-CAPACITY)
+         try {
+           window.localStorage.setItem(key, JSON.stringify(list))
+         } catch {
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index 5c49f6d..0f60c19 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1,7 +1,8 @@
+ # bench-history-dock bundle layer: inserts the plugin row.
+-# (exam fixture, distilled from @huanlin/dsh-plugin-input-history; the IME
+-# guard and caret-geometry helpers are elided — the exam is the composer
+-# surface + the keydown listener placement + the history-collection slice)
++# (exam fixture, distilled from @huanlin/dsh-plugin-input-history; the exam is
++# the composer surface + the keydown listener placement + the history-collection
++# slice. The row is the documented install surface: the plugin half is
++# client-only, and `capacity` mirrors the browser half's history-store bound.)
+ - insert:
+     - id: bench-history-dock
+       name: '@bench/dsh-bench-history-dock'
+diff --git a/fixture/index.js b/fixture/index.js
+index c1dec70..eb9d9a6 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,15 +1,18 @@
+-// bench-history-dock — host plugin entry (0.1.1-era cohort).
++// bench-history-dock — host plugin entry (dsh 0.1.2-alpha.2 cohort).
+ //
+ // Client-only plugin: the host half has no runtime work. The browser half
+ // (./client.js) registers an invisible entry in `conversation.composer.dock`
+-// that collects prompt history from the session's conversation-node slice
+-// and implements terminal-style history navigation (ArrowUp/ArrowDown) over
+-// the composer textarea.
++// that collects prompt history from the session's Chat Conversation view
++// snapshot, and installs terminal-style history navigation
++// (ArrowUp/ArrowDown) over the resident composer. On a host carrying the
++// composer-key extension (see patches/, `ctx.conversation.composerKeys`) the
++// key handling is a contributed composer key handler installed from `apply`;
++// otherwise the browser half falls back to a document-level keydown listener.
+ 
+ export const name = 'bench-history-dock'
+ 
+ // Client-only plugin: the host half carries no runtime work — every exam
+-// surface lives in client.js (dock registration + keydown listener).
++// surface lives in client.js (dock registration + apply-level key handling).
+ export const inject = []
+ 
+ /**
+@@ -18,5 +21,5 @@ export const inject = []
+  * @param {import('@deepseek-ai/cordis').Context} _ctx - host context (unused).
+  */
+ export function apply(_ctx, config) {
+-  console.error('[bench-history-dock] host apply(): client-only plugin (0.1.1-era cohort); no host-side resources')
++  console.error('[bench-history-dock] host apply(): client-only plugin (0.1.2-alpha.2 cohort); no host-side resources')
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..a2efc76
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,28 @@
++{
++  "name": "@bench/dsh-bench-history-dock",
++  "version": "0.2.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-history-dock",
++      "version": "0.2.0",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.1-rc.1",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-conversation": {
++          "optional": true
++        }
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index c0ec4de..07a6b77 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,9 +1,12 @@
+ {
+   "name": "@bench/dsh-bench-history-dock",
+-  "version": "0.1.2",
+-  "description": "Terminal-style prompt history navigation for the DSH composer: ArrowUp/ArrowDown cycles through recently sent messages (0.1.1-era cohort; exam material only)",
++  "version": "0.2.0",
++  "description": "Terminal-style prompt history navigation for the DSH composer: ArrowUp/ArrowDown cycles through recently sent messages (0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
++  "scripts": {
++    "test": "node ./test/run-smoke.mjs"
++  },
+   "exports": {
+     ".": "./index.js",
+     "./client": "./client.js",
+@@ -16,32 +19,20 @@
+     "client": {
+       "platform": "web",
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+         "@deepseek-ai/dsh-client-locale",
+-        "@deepseek-ai/dsh-client-ui-slots",
+         "@deepseek-ai/dsh-client-ui-conversation"
+       ]
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/dsh-client-locale": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-conversation": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-invariants": "^0.0.1-rc.1",
+-    "@deepseek-ai/cordis": "^4.0.1-rc.1",
+-    "react": "^18.2.0",
+-    "react-dom": "^18.2.0"
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
++    "@deepseek-ai/cordis": "^4.0.1-rc.1"
+   },
+   "peerDependenciesMeta": {
+     "@deepseek-ai/dsh-client-locale": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-conversation": { "optional": true },
+-    "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+-    "@deepseek-ai/dsh-invariants": { "optional": true },
+-    "@deepseek-ai/cordis": { "optional": true },
+-    "react": { "optional": true },
+-    "react-dom": { "optional": true }
++    "@deepseek-ai/cordis": { "optional": true }
+   },
+   "private": true
+ }
+diff --git a/fixture/patches/0001-client-composer-key-handlers.patch b/fixture/patches/0001-client-composer-key-handlers.patch
+new file mode 100644
+index 0000000..a7a903a
+--- /dev/null
++++ b/fixture/patches/0001-client-composer-key-handlers.patch
+@@ -0,0 +1,764 @@
++diff --git a/packages/client/ui-conversation/README.i18n.yaml b/packages/client/ui-conversation/README.i18n.yaml
++index a293070..f144081 100644
++--- a/packages/client/ui-conversation/README.i18n.yaml
+++++ b/packages/client/ui-conversation/README.i18n.yaml
++@@ -2,5 +2,5 @@
++ # side as of the last confirmed-consistent state. Both languages carry equal authority;
++ # after editing either side, bring the other along and re-record with:
++ #   pnpm run verify-translation-pairing --write packages/client/ui-conversation/README.md
++-README.md: bcce1e77c45cfa75c6a7fe9c45a98b1036d9ea63
++-README.zh.md: 1d24141945c68d7e948a730ff5b93e8d2e38e9bb
+++README.md: 906a56774b7263741a904ce1572e007dcae941c7
+++README.zh.md: 22765f71b0f7349ad3ffd9f386cd65027d0fb548
++diff --git a/packages/client/ui-conversation/README.md b/packages/client/ui-conversation/README.md
++index bcce1e7..906a567 100644
++--- a/packages/client/ui-conversation/README.md
+++++ b/packages/client/ui-conversation/README.md
++@@ -44,6 +44,8 @@ Default sends commit optimistically: Enter clears the draft, occurrence table, a
++ 
++ While a normal composer is running, its primary pointer action remains Stop when the draft is empty or input is unavailable. Actionable text or attachments switch the same seat to Queue Send; clearing or successfully submitting the draft restores Stop. The busy-Enter setting continues to select the Queue or Steer keyboard action. Continuable subagents keep separate Send and Stop actions ([decision](../../../.agents/notes/implemented/bug-fix/2026-08-20-running-draft-primary-send.md)).
++ 
+++A plugin the composer cannot import contributes a keyboard gesture through `ctx.conversation.composerKeys`: handlers are consulted in ascending `order`, then registration order, from a bubbling listener on the composer card, so the editor, the trigger menus, and the bar's own keymap see the gesture first and one they consumed arrives with `defaultPrevented` set. Each handler receives the live draft, the caret projection the caret indexes into, the IME-composition flag, editability, Session identity, and the public `InputActions` face; `'handled'` consumes the gesture. The bar is the resident `session-maybe` entry, so a handler covers the composer in every state it is on screen, the blank-Session Hero included — where the Session-scoped docks are suppressed ([decision](../../../.agents/notes/proposed/feature/2026-10-11-client-composer-key-handlers.md)).
+++
++ <a id="temporary-composer-entries"></a>
++ ## Temporary composer entries
++ 
++diff --git a/packages/client/ui-conversation/README.zh.md b/packages/client/ui-conversation/README.zh.md
++index 1d24141..22765f7 100644
++--- a/packages/client/ui-conversation/README.zh.md
+++++ b/packages/client/ui-conversation/README.zh.md
++@@ -44,6 +44,8 @@ View 选择规则固定：有效且已注册的持久化选择优先，其次是
++ 
++ 普通 composer 运行时，如果草稿为空或输入不可用，主指针操作保持为 Stop。可提交的文字或附件会把同一位置切换为 Queue Send；清空或成功提交草稿后恢复 Stop。繁忙态 Enter 设置继续选择 Queue 或 Steer 键盘操作。可继续 subagent 保留独立的 Send 与 Stop 操作（[决策](../../../.agents/notes/implemented/bug-fix/2026-08-20-running-draft-primary-send.zh.md)）。
++ 
+++无法 import composer 的插件通过 `ctx.conversation.composerKeys` 贡献键盘手势：handler 按 `order` 升序、再按注册顺序被咨询，咨询点位于 composer 卡片上的冒泡监听器，因此编辑器、触发菜单和 bar 自身的 keymap 会先看到该手势，已被它们消费的手势到达时带有 `defaultPrevented`。每个 handler 都会收到实时草稿、光标所索引的光标投影、IME 组合标记、可编辑性、Session 身份，以及公共 `InputActions` 操作面；`'handled'` 会消费该手势。bar 是常驻的 `session-maybe` entry，因此只要 composer 在屏幕上，无论处于哪种状态 handler 都能覆盖它，包括 blank Session 的 Hero 状态——此时 Session 作用域的 dock 会被抑制（[决策](../../../.agents/notes/proposed/feature/2026-10-11-client-composer-key-handlers.zh.md)）。
+++
++ <a id="temporary-composer-entries"></a>
++ ## 临时 composer entry
++ 
++diff --git a/packages/client/ui-conversation/src/client/apply.ts b/packages/client/ui-conversation/src/client/apply.ts
++index b154e73..fa3c25f 100644
++--- a/packages/client/ui-conversation/src/client/apply.ts
+++++ b/packages/client/ui-conversation/src/client/apply.ts
++@@ -21,6 +21,7 @@ import { ConversationController, UnsupportedImageMediaTypeError } from './servic
++ import type { IConversation } from './service.ts'
++ import { ComposerBlockRegistry } from './input/blocks.ts'
++ import type { ComposerBlock } from './contract/composer-blocks.ts'
+++import { ComposerKeyRegistry } from './input/keys.ts'
++ import { InputHub } from './input/hub.ts'
++ import { ComposerSubmissionPolicy } from './input/submission-policy.ts'
++ import { queueDockEntry } from './queue/QueueDock.tsx'
++@@ -151,6 +152,7 @@ export function apply(ctx: Context): void {
++ 
++   const inputHub = new InputHub(ctx, t)
++   const composerBlocks = new ComposerBlockRegistry()
+++  const composerKeys = new ComposerKeyRegistry()
++ 
++   // Conversation assembly and input share the Session binding lifecycle. The
++   // source roster is installed before any consuming Slot entry.
++@@ -250,6 +252,7 @@ export function apply(ctx: Context): void {
++     inject: (sessionId: SessionId | undefined): ComposerBarInjected => {
++       if (sessionId === undefined) {
++         return {
+++          composerKeys,
++           keyboard: undefined,
++           addImages: undefined,
++           removeImage: undefined,
++@@ -270,6 +273,7 @@ export function apply(ctx: Context): void {
++       const shell = inputHub.shell(sessionId)
++       const inputTriggers = inputHub.inputTriggers(sessionId)
++       return {
+++        composerKeys,
++         keyboard: shell,
++         addImages: (files) => {
++           try {
++@@ -330,7 +334,7 @@ export function apply(ctx: Context): void {
++     yield registerComposerBar()
++   })
++ 
++-  ctx.plugin(ConversationController, { input: inputHub, blocks: composerBlocks })
+++  ctx.plugin(ConversationController, { input: inputHub, blocks: composerBlocks, composerKeys })
++   ctx.plugin(todoDockEntry)
++   ctx.plugin(queueDockEntry)
++ }
++diff --git a/packages/client/ui-conversation/src/client/contract/input.ts b/packages/client/ui-conversation/src/client/contract/input.ts
++index d6a0741..48ed20d 100644
++--- a/packages/client/ui-conversation/src/client/contract/input.ts
+++++ b/packages/client/ui-conversation/src/client/contract/input.ts
++@@ -268,6 +268,11 @@ export interface ComposerKeyboard {
++    * the document end.
++    */
++   caretSpan(): EditSelection
+++  /**
+++   * The trigger/detect projection of the draft (every reference chip is one
+++   * U+FFFC), the text {@link caretSpan} returns offsets into.
+++   */
+++  detectDraft(): string
++   /** Keyboard arbitration while the menu is open ('pass' when no pipeline). */
++   arbitrate(key: ArbitrateKey, composing: boolean): ArbitrateOutcome
++   /** Space adjudication; true = the input applied a claim — caller preventDefaults. */
++diff --git a/packages/client/ui-conversation/src/client/contract/slots.ts b/packages/client/ui-conversation/src/client/contract/slots.ts
++index 377a75e..1f5b13f 100644
++--- a/packages/client/ui-conversation/src/client/contract/slots.ts
+++++ b/packages/client/ui-conversation/src/client/contract/slots.ts
++@@ -14,6 +14,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
++ import type { SessionId } from '@deepseek-ai/dsh-session/types'
++ import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
++ import type { ComposerBlock } from './composer-blocks.ts'
+++import type { ComposerKeys } from './composer-keys.ts'
++ import type {
++   ComposerKeyboard, DraftAttachmentId, EditSelection, InputActions, InputNotice, InputState,
++ } from './input.ts'
++@@ -263,6 +264,7 @@ export interface ComposerBarOwnerProps {
++ 
++ /** Package-private operations injected into the resident composer bar. */
++ export interface ComposerBarInjected {
+++  composerKeys: ComposerKeys
++   keyboard: ComposerKeyboard | undefined
++   addImages: ((files: readonly File[]) => string | null) | undefined
++   removeImage: ((id: DraftAttachmentId) => void) | undefined
++diff --git a/packages/client/ui-conversation/src/client/index.ts b/packages/client/ui-conversation/src/client/index.ts
++index 102b385..6dae26d 100644
++--- a/packages/client/ui-conversation/src/client/index.ts
+++++ b/packages/client/ui-conversation/src/client/index.ts
++@@ -58,11 +58,15 @@ export type {
++ } from './contract/slots.ts'
++ export type {
++   ArbitrateKey, ArbitrateOutcome, BeginCommandRequest, CommandClaim, ConsumeTokenRequest,
++-  DraftAttachmentId, InputActions, InputState, InsertReferenceRequest, InsertTextRequest,
+++  DraftAttachmentId, EditSelection, InputActions, InputState, InsertReferenceRequest, InsertTextRequest,
++   PickOutcome, ReferenceInsert, SessionInput, SessionInputResolver, SubmitImageAttachment,
++   SubmitOutcome, TokenSpan,
++ } from './contract/input.ts'
++ export type { ComposerBlock, ComposerBlocks } from './contract/composer-blocks.ts'
+++export { ComposerKeyRegistry } from './input/keys.ts'
+++export type {
+++  ComposerKeyContext, ComposerKeyHandler, ComposerKeys,
+++} from './contract/composer-keys.ts'
++ 
++ declare module '@deepseek-ai/cordis' {
++   interface Context {
++diff --git a/packages/client/ui-conversation/src/client/input/facade.ts b/packages/client/ui-conversation/src/client/input/facade.ts
++index e2fb81f..4db02e2 100644
++--- a/packages/client/ui-conversation/src/client/input/facade.ts
+++++ b/packages/client/ui-conversation/src/client/input/facade.ts
++@@ -445,6 +445,15 @@ export class SessionInputShell implements SessionInput {
++     return { start: at, end: at }
++   }
++ 
+++  /**
+++   * The trigger/detect projection of the draft, the text {@link caretSpan}
+++   * indexes into (every reference chip is one U+FFFC).
+++   * @returns the current detect-projection text.
+++   */
+++  detectDraft(): string {
+++    return this.projection.detectText
+++  }
+++
++   /**
++    * Hot plain-text reference lexicon source for the decoration scan:
++    * delegates to the controller's aggregated store. Stable
++diff --git a/packages/client/ui-conversation/src/client/service.ts b/packages/client/ui-conversation/src/client/service.ts
++index fd59a49..a104beb 100644
++--- a/packages/client/ui-conversation/src/client/service.ts
+++++ b/packages/client/ui-conversation/src/client/service.ts
++@@ -21,6 +21,7 @@ import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
++ import type { ComposerAttachment } from './contract/slots.ts'
++ import type { QueueAction, QueueItemId } from './contract/queue.ts'
++ import type { ComposerBlocks } from './contract/composer-blocks.ts'
+++import type { ComposerKeys } from './contract/composer-keys.ts'
++ import type {
++   DraftAttachmentId, SessionInputResolver, SubmitImageAttachment, SubmitOutcome,
++ } from './contract/input.ts'
++@@ -39,6 +40,11 @@ export interface IConversation {
++    * cannot import makes a session's input inert with its own reason.
++    */
++   readonly blocks: ComposerBlocks
+++  /**
+++   * The composer key-handler registry: how a plugin the composer cannot
+++   * import contributes a keyboard gesture to the resident composer.
+++   */
+++  readonly composerKeys: ComposerKeys
++   /**
++    * Send a prompt into the caller scope's session (queued turn).
++    * @param text - prompt text, sent verbatim as one text block.
++@@ -149,19 +155,25 @@ export class ConversationController extends Service implements IConversation {
++   readonly input: SessionInputResolver
++   /** The per-session composer-block registry. */
++   readonly blocks: ComposerBlocks
+++  /** The composer key-handler registry. */
+++  readonly composerKeys: ComposerKeys
++   private readonly draftAttachments = new Map<DraftAttachmentId, ComposerAttachment>()
++ 
++   /**
++    * @param ctx - owning root context (the plugin apply context; the service
++    * registers itself and follows that fiber's lifetime).
++-   * @param config - carries the SessionInputResolver and composer-block registry
++-   * constructed by the plugin apply (the same instances the slot inject
++-   * factories close over).
+++   * @param config - carries the SessionInputResolver, composer-block registry,
+++   * and composer key registry constructed by the plugin apply (the same
+++   * instances the slot inject factories close over).
++    */
++-  constructor(ctx: Context, config: { input: SessionInputResolver; blocks: ComposerBlocks }) {
+++  constructor(
+++    ctx: Context,
+++    config: { input: SessionInputResolver; blocks: ComposerBlocks; composerKeys: ComposerKeys },
+++  ) {
++     super(ctx, 'conversation')
++     this.input = config.input
++     this.blocks = config.blocks
+++    this.composerKeys = config.composerKeys
++     ctx.effect(() => () => {
++       for (const attachment of this.draftAttachments.values()) {
++         revokePreview(attachment.previewUrl)
++diff --git a/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx b/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx
++index d4c06d8..c9c43fe 100644
++--- a/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx
+++++ b/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx
++@@ -29,6 +29,7 @@ import type {} from '@deepseek-ai/dsh-goal/client'
++ // api-remotes import already places it in every client program.
++ import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
++ import type { ComposerBarProps } from '../contract/slots.ts'
+++import type { ComposerKeyContext } from '../contract/composer-keys.ts'
++ import { ComposerContentEditable } from '../input/editor/ComposerContentEditable.tsx'
++ import { DecoratorPortals } from '../input/editor/DecoratorPortals.tsx'
++ import { registerComposerKeymap } from '../input/editor/keymap.ts'
++@@ -40,7 +41,7 @@ import css from './InputBar.module.css'
++ export type InputBarProps = ComposerBarProps
++ 
++ export function InputBar({
++-  useSession, useInput, inputActions, keyboard, addImages, removeImage, draftImages,
+++  useSession, useInput, inputActions, keyboard, composerKeys, addImages, removeImage, draftImages,
++   resolveSubmitMode, toggleCommandMenu, stop, command, t,
++   renderSlot, useNotices, useLexicon, useMenuLauncher,
++   useProjection, sessionId, variant, disabled: inert = false, blocked,
++@@ -253,6 +254,11 @@ export function InputBar({
++   })
++   gate.current = { locked, machineBusy, canSteerQueue, running, subagent, resolveSubmitMode, intakeImages }
++ 
+++  // Contributed key handlers read the same live bar state through a ref, for
+++  // the same reason: the card listener must survive re-renders.
+++  const keyGate = useRef({ sessionId, input, keyboard, editable, inputActions })
+++  keyGate.current = { sessionId, input, keyboard, editable, inputActions }
+++
++   useEffect(() => {
++     if (editor === null || keyboard === undefined) return
++     return registerComposerKeymap(editor, {
++@@ -286,6 +292,39 @@ export function InputBar({
++     })
++   }, [editor, keyboard])
++ 
+++  // Contributed composer key handlers (ctx.conversation.composerKeys) run from
+++  // a bubbling card listener: the editor, the trigger menus, and the bar's own
+++  // keymap see the gesture first, and one they consumed arrives with
+++  // defaultPrevented set. Consultation order is the registry's.
+++  useEffect(() => {
+++    const card = cardRef.current
+++    if (card === null) return
+++    const onKeyDown = (event: globalThis.KeyboardEvent): void => {
+++      if (event.defaultPrevented) return
+++      const handlers = composerKeys.handlers()
+++      if (handlers.length === 0) return
+++      const live = keyGate.current
+++      const context: ComposerKeyContext = {
+++        event,
+++        sessionId: live.sessionId,
+++        draft: live.input?.draft ?? '',
+++        caretDraft: live.keyboard?.detectDraft() ?? '',
+++        caret: live.keyboard?.caretSpan() ?? { start: 0, end: 0 },
+++        // oxlint-disable-next-line typescript/no-deprecated -- keyCode 229 is the legacy IME-composition signal engines emit without isComposing.
+++        composing: event.isComposing || event.keyCode === 229,
+++        editable: live.editable,
+++        actions: live.inputActions,
+++      }
+++      for (const handler of handlers) {
+++        if (handler.handle(context) !== 'handled') continue
+++        event.preventDefault()
+++        return
+++      }
+++    }
+++    card.addEventListener('keydown', onKeyDown)
+++    return () => { card.removeEventListener('keydown', onKeyDown) }
+++  }, [composerKeys])
+++
++   // Button presses steal focus from the editor; suppress at mousedown so
++   // typing continues seamlessly. Lexical's focus() carries preventScroll and
++   // restores the previous selection, so no reveal is needed: the caret has
++diff --git a/packages/client/ui-conversation/tests/input-bar.client.spec.tsx b/packages/client/ui-conversation/tests/input-bar.client.spec.tsx
++index fafa852..2a76eb9 100644
++--- a/packages/client/ui-conversation/tests/input-bar.client.spec.tsx
+++++ b/packages/client/ui-conversation/tests/input-bar.client.spec.tsx
++@@ -23,10 +23,13 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
++ import type { SubmitOutcome } from '../src/client/contract/input.ts'
++ import { SessionInputShell } from '../src/client/input/facade.ts'
++ import { $replaceDetectSpanWithText, $selectDetectSpan } from '../src/client/input/editor/span-map.ts'
+++import { ATOMIC_CHAR } from '../src/client/input/editor/projection.ts'
++ import type {
++   ComposerAttachment, ComposerAttachmentsOwnerProps,
++ } from '../src/client/contract/slots.ts'
++ import type { DraftAttachmentId } from '../src/client/contract/input.ts'
+++import type { ComposerKeyContext } from '../src/client/contract/composer-keys.ts'
+++import { ComposerKeyRegistry } from '../src/client/input/keys.ts'
++ import { InputBar } from '../src/client/skeleton/InputBar.tsx'
++ import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
++ import { zh } from '../src/client/locales.ts'
++@@ -149,9 +152,11 @@ function bench(over?: BenchOptions) {
++     if (key === 'conversation.input.model') return over?.modelEntry ?? null
++     return null
++   }) as never
+++  const composerKeys = new ComposerKeyRegistry()
++   const props: InputBarProps = {
++     sessionId: SID,
++     SessionProvider: ({ children }) => children,
+++    composerKeys,
++     useSession: bindSnapshotSelector(session),
++     useConversation: bindSnapshotSelector(createSnapshotStore(conversationFixture())),
++     useSessionPendingInteraction: bindSnapshotSelector(createSnapshotStore(new Map())),
++@@ -211,7 +216,7 @@ function bench(over?: BenchOptions) {
++   const interruptButton = view.container.querySelector<HTMLButtonElement>('button[aria-label="停止生成"]')
++   return {
++     view, textarea, button, interruptButton, props, sink, shell, wiring: shell, session, stop, removeImage, slotCalls,
++-    menuLauncher,
+++    menuLauncher, composerKeys,
++     steerQueue: over?.steerQueue,
++     get placeholder() { return placeholderOf(view.container) },
++     get inputDisabled() { return textarea.getAttribute('aria-disabled') === 'true' },
++@@ -1486,3 +1491,89 @@ describe('command launcher chrome and control seats', () => {
++     expect((live.view.getByLabelText(/^访问模式/) as HTMLButtonElement).disabled).toBe(false)
++   })
++ })
+++
+++describe('contributed composer key handlers', () => {
+++  it('consults handlers after the editor and consumes a handled gesture', () => {
+++    const { textarea, composerKeys } = bench()
+++    const calls: string[] = []
+++    onTestFinished(composerKeys.add({
+++      id: 'first', order: 10, handle: () => { calls.push('first'); return 'pass' },
+++    }))
+++    onTestFinished(composerKeys.add({
+++      id: 'second',
+++      order: 100,
+++      handle: (context) => {
+++        calls.push('second')
+++        return context.event.key === 'ArrowUp' ? 'handled' : 'pass'
+++      },
+++    }))
+++    const older = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true })
+++    fireEvent(textarea, older)
+++    expect(calls).toEqual(['first', 'second'])
+++    expect(older.defaultPrevented).toBe(true)
+++    // A later handler is not consulted once one consumed the gesture.
+++    expect(calls.filter(call => call === 'second')).toHaveLength(1)
+++    const newer = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
+++    fireEvent(textarea, newer)
+++    expect(newer.defaultPrevented).toBe(false)
+++  })
+++
+++  it('hands the live draft, caret, editability, and action face to handlers', () => {
+++    const { textarea, composerKeys, shell } = bench({ draft: 'hello' })
+++    const seen: ComposerKeyContext[] = []
+++    onTestFinished(composerKeys.add({
+++      id: 'probe', handle: (context) => { seen.push(context); return 'pass' },
+++    }))
+++    fireEvent(textarea, new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }))
+++    expect(seen).toHaveLength(1)
+++    expect(seen[0]?.draft).toBe('hello')
+++    expect(seen[0]?.caretDraft).toBe('hello')
+++    expect(seen[0]?.editable).toBe(true)
+++    expect(seen[0]?.sessionId).toBe(SID)
+++    expect(seen[0]?.composing).toBe(false)
+++    expect(seen[0]?.actions).toBe(shell.actions)
+++    expect(typeof seen[0]?.caret.start).toBe('number')
+++  })
+++
+++  it('hands the caret projection that the caret indexes into when a chip expands the draft', () => {
+++    const { textarea, composerKeys, shell } = bench()
+++    act(() => {
+++      shell.setDraft('参考 @w1 内容')
+++      shell.insertReference(
+++        { source: 'reference', ref: 'w1', label: '会话一', appearance: 'session', clipboardText: '@w1' },
+++        { start: 3, end: 6, draftRev: shell.snapshot.draftRev },
+++      )
+++    })
+++    const seen: ComposerKeyContext[] = []
+++    onTestFinished(composerKeys.add({
+++      id: 'probe', handle: (context) => { seen.push(context); return 'pass' },
+++    }))
+++    fireEvent(textarea, new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }))
+++    expect(seen).toHaveLength(1)
+++    // The clipboard draft carries the chip's expansion; the caret indexes into
+++    // the projection where that chip is one object-replacement character.
+++    expect(seen[0]?.draft).toBe('参考 @w1 内容')
+++    expect(seen[0]?.caretDraft).toBe(`参考 ${ATOMIC_CHAR} 内容`)
+++  })
+++
+++  it('does not consult an empty registry', () => {
+++    const { textarea } = bench()
+++    // No handler: the gesture reaches the editor unchanged and is not consumed.
+++    const gesture = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true })
+++    fireEvent(textarea, gesture)
+++    expect(gesture.defaultPrevented).toBe(false)
+++  })
+++
+++  it('skips a gesture an earlier consumer already prevented', () => {
+++    const { textarea, composerKeys } = bench()
+++    const calls: string[] = []
+++    onTestFinished(composerKeys.add({ id: 'probe', handle: () => { calls.push('probe'); return 'handled' } }))
+++    const guard = (event: Event): void => { event.preventDefault() }
+++    textarea.addEventListener('keydown', guard)
+++    const gesture = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true })
+++    fireEvent(textarea, gesture)
+++    textarea.removeEventListener('keydown', guard)
+++    expect(calls).toEqual([])
+++    expect(gesture.defaultPrevented).toBe(true)
+++  })
+++})
++diff --git a/packages/client/ui-conversation/tests/input-matrix.client.spec.tsx b/packages/client/ui-conversation/tests/input-matrix.client.spec.tsx
++index bdb8786..28443c4 100644
++--- a/packages/client/ui-conversation/tests/input-matrix.client.spec.tsx
+++++ b/packages/client/ui-conversation/tests/input-matrix.client.spec.tsx
++@@ -20,6 +20,7 @@ import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
++ import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
++ import type { DraftAttachmentId } from '../src/client/contract/input.ts'
++ import { SessionInputShell } from '../src/client/input/facade.ts'
+++import { ComposerKeyRegistry } from '../src/client/input/keys.ts'
++ import { InputBar } from '../src/client/skeleton/InputBar.tsx'
++ import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
++ import { zh } from '../src/client/locales.ts'
++@@ -63,6 +64,7 @@ function mountBar(shell: SessionInputShell, over?: { running?: boolean; disabled
++     useInput: bindSnapshotSelector(shell.state),
++     inputActions: shell.actions,
++     keyboard: shell,
+++    composerKeys: new ComposerKeyRegistry(),
++     addImages: () => null,
++     removeImage: () => {},
++     // Every id resolves so the bar's registry prune never drops a test image.
++diff --git a/packages/client/ui-conversation/tests/input-scenarios.client.spec.tsx b/packages/client/ui-conversation/tests/input-scenarios.client.spec.tsx
++index ec7f586..3fa78d8 100644
++--- a/packages/client/ui-conversation/tests/input-scenarios.client.spec.tsx
+++++ b/packages/client/ui-conversation/tests/input-scenarios.client.spec.tsx
++@@ -27,6 +27,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
++ import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
++ import type { DraftAttachmentId } from '../src/client/contract/input.ts'
++ import { SessionInputShell } from '../src/client/input/facade.ts'
+++import { ComposerKeyRegistry } from '../src/client/input/keys.ts'
++ import { InputBar } from '../src/client/skeleton/InputBar.tsx'
++ import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
++ import { zh } from '../src/client/locales.ts'
++@@ -152,6 +153,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
++     useInput: bindSnapshotSelector(shell.state),
++     inputActions: shell.actions,
++     keyboard: shell,
+++    composerKeys: new ComposerKeyRegistry(),
++     addImages: () => null,
++     removeImage: () => {},
++     // Every id resolves so the bar's registry prune never drops a test image.
++diff --git a/.agents/notes/proposed/feature/2026-10-11-client-composer-key-handlers.md b/.agents/notes/proposed/feature/2026-10-11-client-composer-key-handlers.md
++new file mode 100644
++index 0000000..c533c8f
++--- /dev/null
+++++ b/.agents/notes/proposed/feature/2026-10-11-client-composer-key-handlers.md
++@@ -0,0 +1,54 @@
+++# Agent Note: Plugin-contributed composer key handlers
+++
+++Status: proposed
+++
+++English | [中文](2026-10-11-client-composer-key-handlers.zh.md)
+++
+++## Problem
+++
+++The composer's keyboard behavior is unreachable from outside `ui-conversation`. `registerComposerKeymap` binds the editor's command layer, but it is package-private, its handlers close over bar state the package owns, and no service or slot exposes a gesture seam. A client plugin that needs a composer keyboard gesture — prompt-history recall, snippet expansion, vim-style motion — has three options, none of them an extension point:
+++
+++- Scrape the DOM and write the draft through `document.execCommand`/synthetic events, which bypasses the editor's transaction, undo history, and reference-chip spans.
+++- Read the draft from `InputState.draft` and write it through `inputActions.setDraft`, but still locate the composer element and compute the caret from the DOM: there is no public caret read (`ComposerKeyboard.caretSpan()` is documented as package-internal, never across a plugin boundary) and the card's internal attributes are not a contract.
+++- Attach a document-level listener, which cannot order itself against the editor's own handling and silently fights any other plugin doing the same.
+++
+++Because neither `conversation.composer.dock` (Session-scoped, suppressed in Hero mode) nor `conversation.input.dock` (Session-scoped list) can carry an apply-level listener for a plugin whose gesture must also work while composing a blank Session, a plugin has no correct place to put the listener at all.
+++
+++The narrow form of the gap is recorded in [discussion #3981](https://github.com/deepseek-ai/deepseek-harness/discussions/3981) (a stable DOM marker or a locator API for the composer) and its Hero-mode sibling [#6118](https://github.com/deepseek-ai/deepseek-harness/discussions/6118). Both accept the DOM as the fallback surface; this proposal removes the need for it.
+++
+++## Proposal
+++
+++Add a root-scope `ComposerKeys` registry to the `conversation` service (`ctx.conversation.composerKeys`):
+++
+++- `add(handler): () => void` registers one `ComposerKeyHandler` — a stable `id`, an optional ascending `order`, and `handle(context): 'handled' | 'pass'`.
+++- `handlers(): readonly ComposerKeyHandler[]` is the composer-side read, sorted by `order` then registration order (a stable sort over an insertion-ordered array).
+++- `ComposerKeyContext` carries the live facts a handler needs without DOM access: the bubbling `KeyboardEvent`, `sessionId`, `InputState.draft`, the detect projection the caret indexes into (`caretDraft`), `caret` as an `EditSelection`, the IME-composition flag, `editable`, and the public `InputActions` face.
+++
+++The composer bar consults the registry from one bubbling `keydown` listener on `[data-composer-card]`. Ordering is the whole design: the editor's root listener runs first (target phase), so a gesture the keymap, an open trigger menu, or an IME guard consumed arrives with `defaultPrevented` set and is skipped; the bar's own keymap keeps `COMMAND_PRIORITY_CRITICAL`. Handlers are consulted in registry order and the loop stops at the first `'handled'`, which the listener answers with `preventDefault()`. Because the bar is the resident `session-maybe` entry, a handler registered from a plugin's `apply` covers the composer in every state it is on screen, the blank-Session Hero included.
+++
+++The registry is additive: an empty registry short-circuits before building any context, and no existing gesture path changes.
+++
+++## Alternatives considered
+++
+++**Publish the caret in `InputState`.** A reactive caret re-renders every consumer on every cursor move, and the package deliberately keeps it an event-handler read (`caretSpan()`); the registry hands the same value to exactly the code that acts on a key.
+++
+++**Add `SessionInputResolver.forSession(id)` plus a public `caret()` read.** This lets a plugin resolve the facade from a root-scope listener, but the plugin still has to locate the composer element, decide editability from internal DOM attributes, and re-derive the composer's own consumption (menu arbitration, IME guard) from `defaultPrevented` after the fact. It also adds an id-addressed path next to the scope-addressed one for the same object.
+++
+++**Register handlers inside Lexical's command layer.** `registerComposerKeymap` would have to expose its `ComposerKeymapHandlers`, which are bar-owned closures over submit/steer/paste policy; contributing to them from a plugin would put plugin code inside the bar's decision order rather than after it. The DOM-boundary listener keeps plugin gestures outside the composer's own policy.
+++
+++**A keybinding string table (`"ArrowUp": handler`).** The gesture vocabulary is the browser's, not the harness's; matching stays with the handler, and the registry carries no key parsing or normalization policy.
+++
+++## Acceptance criteria
+++
+++- Registry tests prove ascending-order consultation, registration-order tie-breaking, stop-at-first-`'handled'`, idempotent disposal, and the empty-registry answer.
+++- Composer tests prove a registered handler is consulted after the editor, receives the live draft/caret/composing/editable/actions facts, consumes a `'handled'` gesture, is skipped when an earlier consumer already prevented the gesture, and that no handler means no behavior change.
+++- A chip in the draft proves `caretDraft` carries the projection `caret` indexes into: the clipboard `draft` carries the chip's expansion while `caretDraft` carries its one-character detect form.
+++- A handler registered with `ctx.effect` unregisters with its fiber; the HMR-safety path observes the removal.
+++- `ComposerKeys` is exported from the package's `./client` entry together with `EditSelection`, so a plugin can type its handler without importing package internals.
+++- The change adds no model-visible input, no session event, and no Host surface: token cost and KV-cache behavior are unchanged.
+++
+++## Risks
+++
+++- A plugin handler that returns `'handled'` for a gesture the composer needs (Enter, Space, Escape) can break submission. Consultation happens after the composer's own consumers, so only unclaimed gestures are reachable; documentation names the remaining obligation to key off the event.
+++- The `editable` fact is computed by the bar; a handler that writes the draft still has to tolerate a session switching between the read and the write. `InputActions.setDraft` is Session-scoped and resolves at call time, so a late write lands on the addressed Session, not the focused composer.
+++- A near-identical ask ([#3981](https://github.com/deepseek-ai/deepseek-harness/discussions/3981)) accepts a DOM-marker solution instead. If the maintainers prefer the marker, this registry remains the smaller plugin-visible surface: it removes the plugin's need to read or write the DOM at all.
++diff --git a/.agents/notes/proposed/feature/2026-10-11-client-composer-key-handlers.zh.md b/.agents/notes/proposed/feature/2026-10-11-client-composer-key-handlers.zh.md
++new file mode 100644
++index 0000000..9cbd1de
++--- /dev/null
+++++ b/.agents/notes/proposed/feature/2026-10-11-client-composer-key-handlers.zh.md
++@@ -0,0 +1,54 @@
+++# Agent Note: 插件贡献的 composer 键处理器
+++
+++Status: proposed
+++
+++[English](2026-10-11-client-composer-key-handlers.md) | 中文
+++
+++## 问题
+++
+++composer 的键盘行为无法从 `ui-conversation` 之外触达。`registerComposerKeymap` 绑定编辑器的 command 层，但它是 package 私有的，其 handler 闭包持有 package 自有的 bar 状态，也没有任何 service 或 slot 暴露手势接缝。需要 composer 键盘手势——提示历史回溯、片段展开、vim 风格移动——的客户端插件只有三种选择，而它们都不是扩展点：
+++
+++- 抓取 DOM，并通过 `document.execCommand`/合成事件写入草稿；这条路径绕过编辑器事务、撤销历史和引用 chip 的 span。
+++- 从 `InputState.draft` 读取草稿并通过 `inputActions.setDraft` 写入，但仍须定位 composer 元素并从 DOM 计算光标：不存在公共的光标读取（`ComposerKeyboard.caretSpan()` 被记录为 package 内部 API，绝不跨越插件边界），而卡片的内部属性也不是契约。
+++- 挂载 document 级监听器；它无法与编辑器自身的处理排序，并会与其他做同样事情的插件静默冲突。
+++
+++由于 `conversation.composer.dock`（Session 作用域，Hero 模式下被抑制）和 `conversation.input.dock`（Session 作用域 list）都无法承载 apply 级监听器，而插件的手势还必须在撰写 blank Session 时可用，插件根本没有正确的位置安放监听器。
+++
+++该缺口的窄形态记录在 [讨论 #3981](https://github.com/deepseek-ai/deepseek-harness/discussions/3981)（为 composer 提供稳定的 DOM 标记或定位 API）及其 Hero 模式姊妹帖 [#6118](https://github.com/deepseek-ai/deepseek-harness/discussions/6118) 中。两者都接受把 DOM 作为回退表面；本提案消除对它的需要。
+++
+++## 提案
+++
+++为 `conversation` service 增加 root 作用域的 `ComposerKeys` registry（`ctx.conversation.composerKeys`）：
+++
+++- `add(handler): () => void` 注册一个 `ComposerKeyHandler`——稳定的 `id`、可选的升序 `order`，以及 `handle(context): 'handled' | 'pass'`。
+++- `handlers(): readonly ComposerKeyHandler[]` 是 composer 侧的读取入口，按 `order`、再按注册顺序排序（对插入有序数组做稳定排序）。
+++- `ComposerKeyContext` 携带 handler 无需访问 DOM 即可获得的实时事实：冒泡的 `KeyboardEvent`、`sessionId`、`InputState.draft`、光标所索引的 detect 投影（`caretDraft`）、作为 `EditSelection` 的 `caret`、IME 组合标记、`editable`，以及公共 `InputActions` 操作面。
+++
+++composer bar 通过 `[data-composer-card]` 上的单个冒泡 `keydown` 监听器咨询该 registry。排序正是设计的核心：编辑器的 root 监听器先运行（target 阶段），因此被 keymap、打开的触发菜单或 IME 守卫消费的手势到达时带有 `defaultPrevented`，会被跳过；bar 自身的 keymap 保持 `COMMAND_PRIORITY_CRITICAL`。handler 按 registry 顺序被咨询，循环在第一个 `'handled'` 处停止，监听器据此调用 `preventDefault()`。由于 bar 是常驻的 `session-maybe` entry，从插件 `apply` 注册的 handler 在 composer 出现在屏幕上的每种状态下都能覆盖它，包括 blank Session 的 Hero 状态。
+++
+++该 registry 是纯增量的：空 registry 在构造任何 context 之前就短路返回，现有手势路径不发生任何变化。
+++
+++## 考虑过的替代方案
+++
+++**在 `InputState` 中公开光标。** 响应式光标会在每次移动光标时重渲染所有消费者，而该 package 有意将其保持为事件处理器读取（`caretSpan()`）；registry 把同一个值交给真正对按键作出反应的那段代码。
+++
+++**增加 `SessionInputResolver.forSession(id)` 与公共 `caret()` 读取。** 这确实让插件可以从 root 作用域监听器解析 facade，但插件仍须定位 composer 元素、依据内部 DOM 属性判断可编辑性，并在事后从 `defaultPrevented` 反推 composer 自身的消费（菜单仲裁、IME 守卫）。它还会为同一个对象在按作用域寻址之外增加一条按 id 寻址的路径。
+++
+++**在 Lexical 的 command 层内注册 handler。** 那要求 `registerComposerKeymap` 暴露其 `ComposerKeymapHandlers`，而它们是 bar 自有的、闭包了 submit/steer/paste 策略的处理器；从插件向其中贡献会把插件代码放进 bar 的决策顺序之内，而不是之后。DOM 边界监听器让插件手势留在 composer 自身策略之外。
+++
+++**键位字符串表（`"ArrowUp": handler`）。** 手势词汇属于浏览器，而不属于 harness；匹配逻辑留在 handler 中，registry 不携带任何按键解析或规范化策略。
+++
+++## 验收标准
+++
+++- registry 测试证明升序咨询、注册顺序决胜、首个 `'handled'` 即停止、幂等释放，以及空 registry 的答复。
+++- composer 测试证明已注册 handler 在编辑器之后被咨询，收到实时草稿/光标/组合状态/可编辑性/操作面等事实，消费 `'handled'` 手势，在更早的消费者已阻止该手势时被跳过，并且没有 handler 时不产生行为变化。
+++- 草稿中的 chip 证明 `caretDraft` 承载 `caret` 所索引的投影：剪贴板 `draft` 承载 chip 的展开形式，而 `caretDraft` 承载其单字符 detect 形式。
+++- 用 `ctx.effect` 注册的 handler 随其 fiber 注销；HMR 安全路径观察到该移除。
+++- `ComposerKeys` 与 `EditSelection` 一同从该 package 的 `./client` 入口导出，使插件无需 import package 内部即可为 handler 标注类型。
+++- 该变更不增加模型可见输入、不增加 session 事件、不增加 Host 表面：token 成本与 KV-cache 行为不变。
+++
+++## 风险
+++
+++- 对 composer 需要的手势（Enter、Space、Escape）返回 `'handled'` 的插件 handler 可能破坏提交。咨询发生在 composer 自身的消费者之后，因此只有未被认领的手势可达；文档会说明仍需依据事件进行判定的义务。
+++- `editable` 事实由 bar 计算；写入草稿的 handler 仍须容忍 session 在读取与写入之间切换。`InputActions.setDraft` 按 Session 寻址，并在调用时解析，因此迟到的写入落在被寻址的 Session 上，而不是当前聚焦的 composer。
+++- 一个几乎相同的请求（[#3981](https://github.com/deepseek-ai/deepseek-harness/discussions/3981)）接受改用 DOM 标记方案。如果维护者更倾向标记，本 registry 仍是更小的插件可见表面：它彻底消除了插件读写 DOM 的需要。
++diff --git a/.agents/notes/proposed/feature/2026-10-11-client-composer-key-handlers.i18n.yaml b/.agents/notes/proposed/feature/2026-10-11-client-composer-key-handlers.i18n.yaml
++new file mode 100644
++index 0000000..720b3d3
++--- /dev/null
+++++ b/.agents/notes/proposed/feature/2026-10-11-client-composer-key-handlers.i18n.yaml
++@@ -0,0 +1,6 @@
+++# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+++# side as of the last confirmed-consistent state. Both languages carry equal authority;
+++# after editing either side, bring the other along and re-record with:
+++#   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-10-11-client-composer-key-handlers.md
+++2026-10-11-client-composer-key-handlers.md: c533c8f2563b1764a6a6a6127780917c34d61fec
+++2026-10-11-client-composer-key-handlers.zh.md: 9cbd1de51955e47194e9ed95494b91f272cb97a6
++diff --git a/packages/client/ui-conversation/src/client/contract/composer-keys.ts b/packages/client/ui-conversation/src/client/contract/composer-keys.ts
++new file mode 100644
++index 0000000..26ba23b
++--- /dev/null
+++++ b/packages/client/ui-conversation/src/client/contract/composer-keys.ts
++@@ -0,0 +1,68 @@
+++/**
+++ * Public composer keyboard extension point: the root-scope registry a client
+++ * plugin contributes key handlers to without importing the composer.
+++ *
+++ * Handlers run from a bubbling `keydown` listener on the composer card, so a
+++ * gesture the editor, an open trigger menu, or the bar's own keymap already
+++ * consumed arrives with `event.defaultPrevented` set and is expected to be
+++ * left alone. The composer bar is the resident `session-maybe` entry, so a
+++ * registered handler covers the composer in every state it is on screen —
+++ * the blank-Session Hero included, where the Session-scoped docks are
+++ * suppressed.
+++ */
+++import type { SessionId } from '@deepseek-ai/dsh-session/types'
+++import type { EditSelection, InputActions } from './input.ts'
+++
+++/** Live composer facts handed to one contributed key handler. */
+++export interface ComposerKeyContext {
+++  /** The bubbling keydown event; `defaultPrevented` marks an earlier consumer. */
+++  readonly event: KeyboardEvent
+++  /** Session owning the mounted composer; undefined without a current Session. */
+++  readonly sessionId: SessionId | undefined
+++  /** Clipboard-text projection of the draft (reference chips expanded); the text `actions.setDraft` replaces. */
+++  readonly draft: string
+++  /**
+++   * Detect projection of the same document (every reference chip is one
+++   * object-replacement character). This is the text `caret` indexes into:
+++   * caret geometry such as line boundaries must read it, never `draft`,
+++   * because a chip's clipboard form is longer than its one-character detect
+++   * form.
+++   */
+++  readonly caretDraft: string
+++  /** Live selection in `caretDraft` coordinates; collapsed when the editor has none. */
+++  readonly caret: EditSelection
+++  /** Whether the gesture closes an IME composition. */
+++  readonly composing: boolean
+++  /** Whether the composer currently accepts edits (locked and blocked states are false). */
+++  readonly editable: boolean
+++  /** Public draft actions for the owning Session; absent without one. */
+++  readonly actions: InputActions | undefined
+++}
+++
+++/** One plugin-contributed composer key handler. */
+++export interface ComposerKeyHandler {
+++  /** Stable identity for diagnostics and duplicate detection. */
+++  readonly id: string
+++  /** Ascending consultation order; equal orders keep registration order. */
+++  readonly order?: number
+++  /**
+++   * @param context - live composer facts at dispatch time.
+++   * @returns `'handled'` consumes the gesture (the listener prevents the
+++   * browser default); `'pass'` leaves it to the handlers after it.
+++   */
+++  handle(context: ComposerKeyContext): 'handled' | 'pass'
+++}
+++
+++/** The registry face other plugins reach through `ctx.conversation.composerKeys`. */
+++export interface ComposerKeys {
+++  /**
+++   * @param handler - handler consulted on every composer keydown.
+++   * @returns Disposer removing that registration.
+++   */
+++  add(handler: ComposerKeyHandler): () => void
+++  /**
+++   * Composer-side read: the registered handlers in consultation order.
+++   * @returns Handlers sorted by ascending `order`, then registration order.
+++   */
+++  handlers(): readonly ComposerKeyHandler[]
+++}
++diff --git a/packages/client/ui-conversation/src/client/input/keys.ts b/packages/client/ui-conversation/src/client/input/keys.ts
++new file mode 100644
++index 0000000..199b2ff
++--- /dev/null
+++++ b/packages/client/ui-conversation/src/client/input/keys.ts
++@@ -0,0 +1,32 @@
+++/**
+++ * Composer key-handler registry (`ctx.conversation.composerKeys`): ordered
+++ * consultation with registration-order tie-breaking. Add and dispose are the
+++ * whole mutation surface; the composer reads {@link ComposerKeyRegistry.handlers}
+++ * once per keydown.
+++ */
+++import type { ComposerKeyHandler, ComposerKeys } from '../contract/composer-keys.ts'
+++
+++/** {@link ComposerKeys} implementation. */
+++export class ComposerKeyRegistry implements ComposerKeys {
+++  private readonly entries: ComposerKeyHandler[] = []
+++  private ordered: readonly ComposerKeyHandler[] | undefined
+++
+++  /** @inheritdoc */
+++  add(handler: ComposerKeyHandler): () => void {
+++    this.entries.push(handler)
+++    this.ordered = undefined
+++    return () => {
+++      const index = this.entries.indexOf(handler)
+++      if (index === -1) return
+++      this.entries.splice(index, 1)
+++      this.ordered = undefined
+++    }
+++  }
+++
+++  /** @inheritdoc */
+++  handlers(): readonly ComposerKeyHandler[] {
+++    // Array.prototype.sort is stable, so equal orders keep registration order.
+++    this.ordered ??= [...this.entries].sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
+++    return this.ordered
+++  }
+++}
++diff --git a/packages/client/ui-conversation/tests/composer-keys.client.spec.ts b/packages/client/ui-conversation/tests/composer-keys.client.spec.ts
++new file mode 100644
++index 0000000..a1dccb4
++--- /dev/null
+++++ b/packages/client/ui-conversation/tests/composer-keys.client.spec.ts
++@@ -0,0 +1,58 @@
+++/**
+++ * Composer key registry: consultation order, registration-order tie-breaking,
+++ * idempotent disposal, and the empty answer the composer skips work on.
+++ */
+++import { describe, expect, it } from 'vitest'
+++import { ComposerKeyRegistry } from '../src/client/input/keys.ts'
+++import type { ComposerKeyContext } from '../src/client/contract/composer-keys.ts'
+++
+++/** The composer consults handlers with live facts; the registry never reads them. */
+++const CONTEXT = {} as ComposerKeyContext
+++
+++/** The composer's own consultation loop (InputBar's card listener body). */
+++function consult(registry: ComposerKeyRegistry): readonly string[] {
+++  const seen: string[] = []
+++  for (const handler of registry.handlers()) {
+++    seen.push(handler.id)
+++    if (handler.handle(CONTEXT) === 'handled') break
+++  }
+++  return seen
+++}
+++
+++describe('composer key registry', () => {
+++  it('orders by ascending order, then registration order', () => {
+++    const registry = new ComposerKeyRegistry()
+++    registry.add({ id: 'b-late', order: 100, handle: () => 'pass' })
+++    registry.add({ id: 'a-early', order: 0, handle: () => 'pass' })
+++    registry.add({ id: 'b-first', order: 100, handle: () => 'pass' })
+++    expect(registry.handlers().map(handler => handler.id))
+++      .toEqual(['a-early', 'b-late', 'b-first'])
+++    expect(consult(registry)).toEqual(['a-early', 'b-late', 'b-first'])
+++  })
+++
+++  it('treats an absent order as 0 and stops consulting at the first handled answer', () => {
+++    const registry = new ComposerKeyRegistry()
+++    registry.add({ id: 'default-order', handle: () => 'handled' })
+++    registry.add({ id: 'later', order: 1, handle: () => 'pass' })
+++    expect(consult(registry)).toEqual(['default-order'])
+++  })
+++
+++  it('removes exactly one registration and is idempotent', () => {
+++    const registry = new ComposerKeyRegistry()
+++    const disposeA = registry.add({ id: 'a', handle: () => 'pass' })
+++    registry.add({ id: 'b', handle: () => 'pass' })
+++    disposeA()
+++    disposeA()
+++    expect(registry.handlers().map(handler => handler.id)).toEqual(['b'])
+++  })
+++
+++  it('answers an empty list once every registration is disposed', () => {
+++    const registry = new ComposerKeyRegistry()
+++    const dispose = registry.add({ id: 'only', handle: () => 'pass' })
+++    dispose()
+++    expect(registry.handlers()).toEqual([])
+++    // A handler added after the last disposal is consulted again.
+++    registry.add({ id: 'reborn', handle: () => 'pass' })
+++    expect(registry.handlers().map(handler => handler.id)).toEqual(['reborn'])
+++  })
+++})
+diff --git a/fixture/patches/README.md b/fixture/patches/README.md
+new file mode 100644
+index 0000000..7dceadb
+--- /dev/null
++++ b/fixture/patches/README.md
+@@ -0,0 +1,55 @@
++# patches/ — dsh-side changes this plugin needs
++
++The plugin half alone is not a complete product surface. `bench-history-dock`
++documents two entry points (README, "Entry points"):
++
++1. an invisible `conversation.composer.dock` entry that collects prompt history, and
++2. **apply-level composer key handling** — ArrowUp/ArrowDown installed from the
++   plugin `apply` body so navigation stays active in hero/blank mode, where the
++   session-scoped dock is suppressed.
++
++Entry point 2 has no official extension point in `dsh-v0.1.2-alpha.2`: the
++composer keymap is package-private, no service exposes a composer gesture
++seam, and there is no public caret read (`ComposerKeyboard.caretSpan()` is
++documented as package-internal, never across a plugin boundary). The browser
++half therefore degrades to a document-level keydown listener that reads the
++composer surface from the DOM — it survives, but it bypasses the editor's own
++handling order and cannot be arbitrated by the host.
++
++The patch in this directory adds the missing general-purpose extension point:
++a root-scope composer key registry (`ctx.conversation.composerKeys`) that a
++plugin contributes handlers to, consulted from a bubbling listener on the
++composer card with the live draft, the caret projection the caret indexes into,
++caret, IME-composition flag, editability, and the public `InputActions` face.
++
++| File | Applies to | Purpose |
++| --- | --- | --- |
++| `0001-client-composer-key-handlers.patch` | `dsh-v0.1.2-alpha.2` (`git apply` in the harness checkout; the target cohort) | Adds `ComposerKeys`/`ComposerKeyHandler`/`ComposerKeyContext` to `@deepseek-ai/dsh-client-ui-conversation`, exposes `ComposerKeyboard.detectDraft()` (the projection `caretSpan()` indexes into), wires the registry into the `conversation` service, consults it from `InputBar` with the live draft/caret projection/caret/editability/actions, and adds the bilingual proposed Agent Note plus the registry/composer specs. |
++
++Apply:
++
++```sh
++cd <deepseek-harness checkout>          # at dsh-v0.1.2-alpha.2
++git apply /path/to/plugin/patches/0001-client-composer-key-handlers.patch
++pnpm install                            # workspace deps, once
++pnpm --filter @deepseek-ai/dsh-client-ui-conversation run build
++pnpm run test:gui                       # ui-conversation suites, incl. the new specs
++```
++
++The patch is additive: with no registered handler the composer behaves exactly
++as before. The browser half feature-detects the registry
++(`ctx.get('conversation')?.composerKeys`), so it runs unpatched hosts on the
++document-level fallback and upgrades to the registry as soon as the service
++appears (`internal/service` watch), disposing the fallback.
++
++Status: **applied to the reviewed checkout and verified to the extent the
++environment allows** — `git apply --cached --check` proves the file applies to
++a pristine `dsh-v0.1.2-alpha.2` index and `git apply --reverse --check` proves
++the checkout carries exactly this patch; the registry module runs under Node
++type-stripping with a functional smoke test, every touched file parses under
++esbuild, the bilingual note/README pairs carry re-recorded `.i18n.yaml` hashes,
++and the plugin's own behavioural smoke test (`test/run-smoke.mjs`) passes —
++including the case where the caret projection and the clipboard draft disagree
++by a reference chip. The repo's vitest/build gates were not run: the checkout
++has no `node_modules` and a full workspace install was out of scope for this
++review. See `.dsh-migrate/patch-reports/composer-key-handlers/report.md`.
+diff --git a/fixture/test/client-smoke.mjs b/fixture/test/client-smoke.mjs
+new file mode 100644
+index 0000000..7b9063a
+--- /dev/null
++++ b/fixture/test/client-smoke.mjs
+@@ -0,0 +1,224 @@
++// Behavioural smoke test for the migrated bench-history-dock browser half.
++// Runs the REAL plugin module under Node with DOM + react stubs.
++import assert from 'node:assert/strict'
++
++// ---------------------------------------------------------------- DOM stubs
++class FakeElement {
++  get value() { return this._value }
++  set value(next) { this._value = next }
++}
++globalThis.Element = FakeElement
++
++const storage = new Map()
++function makeTextarea(value) {
++  const el = new FakeElement()
++  el.value = value
++  el.selectionStart = value.length
++  el.selectionEnd = value.length
++  el.readOnly = false
++  el.disabled = false
++  el.dispatched = []
++  el.dispatchEvent = (event) => { el.dispatched.push(event) }
++  el.closest = () => null
++  globalThis.__textarea = el
++  return el
++}
++
++const documentListeners = []
++globalThis.document = {
++  addEventListener(type, handler) { if (type === 'keydown') documentListeners.push(handler) },
++  removeEventListener(type, handler) {
++    const index = documentListeners.indexOf(handler)
++    if (index >= 0) documentListeners.splice(index, 1)
++  },
++  querySelector: selector => (selector === 'textarea' ? globalThis.__textarea ?? null : null),
++  createRange: () => ({ selectNodeContents() {}, setEnd() {}, cloneRange() { return this }, toString: () => '' }),
++}
++
++globalThis.window = {
++  HTMLTextAreaElement: FakeElement,
++  localStorage: {
++    getItem: key => (storage.has(key) ? storage.get(key) : null),
++    setItem: (key, value) => { storage.set(key, value) },
++  },
++  getSelection: () => null,
++}
++
++// ---------------------------------------------------------------- fake ctx
++function makeRegistry() {
++  const handlers = []
++  return {
++    handlers: () => handlers,
++    add(handler) {
++      handlers.push(handler)
++      return () => {
++        const index = handlers.indexOf(handler)
++        if (index >= 0) handlers.splice(index, 1)
++      }
++    },
++  }
++}
++
++function makeCtx(initial = {}) {
++  const state = { conversation: initial.conversation }
++  const registered = []
++  const components = []
++  const effects = []
++  const serviceListeners = []
++  const ctx = {
++    effect(fn, label) {
++      const dispose = fn()
++      effects.push({ label, dispose })
++      return () => { if (typeof dispose === 'function') dispose() }
++    },
++    on(event, cb) { serviceListeners.push({ event, cb }); return () => {} },
++    get(name) { return name === 'conversation' ? state.conversation : undefined },
++    locale: { register: () => () => {} },
++    slots: {
++      inject(key, callback) { registered.push({ key, dispose: callback() }); return () => {} },
++      register(options, component) { components.push({ options, component }); return () => {} },
++    },
++  }
++  return { ctx, state, registered, components, effects, serviceListeners }
++}
++
++const plugin = await import('../client.js')
++const { apply } = plugin
++assert.deepEqual(plugin.inject, ['slots', 'locale'], 'plugin inject list')
++
++const chat = { legacy: { nodes: [] } }
++const conversation = { views: { get: target => (target === 'chat' ? chat : undefined) } }
++const renderDock = (component) => {
++  component({ useConversation: selector => selector(conversation) })
++}
++const key = (k, extra = {}) => ({
++  key: k,
++  isComposing: false,
++  keyCode: 0,
++  defaultPrevented: false,
++  preventDefault() { this.defaultPrevented = true },
++  ...extra,
++})
++
++// ------------------------------------------------- registry path (patched host)
++{
++  const registry = makeRegistry()
++  const { ctx, registered, components, serviceListeners } = makeCtx({ conversation: { composerKeys: registry } })
++  apply(ctx)
++  assert.equal(registered.length, 1)
++  assert.equal(registered[0].key, 'conversation.composer.dock')
++  assert.equal(components.length, 1, 'dock registered')
++  assert.equal(components[0].options.id, 'bench-history-dock')
++  assert.equal(components[0].options.order, 100)
++  assert.equal(registry.handlers().length, 1, 'key handler adopted at apply')
++  assert.equal(documentListeners.length, 0, 'no DOM fallback when the registry is present')
++  assert.equal(serviceListeners.length, 1, 'service watch installed')
++
++  // History collection via the dock's useConversation seat.
++  chat.legacy.nodes = [{ kind: 'user', content: [{ type: 'text', text: 'first prompt' }] }]
++  renderDock(components[0].component)
++  chat.legacy.nodes = [
++    { kind: 'user', content: [{ type: 'text', text: 'first prompt' }] },
++    { kind: 'assistant', content: [{ type: 'text', text: 'ignored' }] },
++    { kind: 'user', content: [{ type: 'text', text: 'second prompt' }] },
++  ]
++  renderDock(components[0].component)
++
++  const handler = registry.handlers()[0]
++  const drafts = []
++  const actions = { setDraft: text => drafts.push(text) }
++  const context = (k, draft, caret, extra = {}) =>
++    ({ event: key(k), sessionId: 's1', draft, caret, composing: false, editable: true, actions, ...extra })
++
++  assert.equal(handler.handle(context('Enter', 'x', { start: 0, end: 0 })), 'pass')
++  assert.equal(handler.handle(context('ArrowUp', 'typed', { start: 5, end: 5 }, { composing: true })), 'pass')
++  assert.equal(handler.handle(context('ArrowUp', 'x', { start: 0, end: 0 }, { editable: false })), 'pass')
++  assert.equal(handler.handle(context('ArrowUp', 'x', { start: 0, end: 0 }, { actions: undefined })), 'pass')
++  assert.deepEqual(drafts, [])
++
++  // Caret geometry reads the caret projection, not the clipboard draft: with a
++  // reference chip the two differ (draft "@w1\nx" carries the expansion, the
++  // caret projection is "￼\nx"), and a clipboard offset would read the wrong
++  // line. A caret at detect offset 3 sits on the last line, so ArrowDown is the
++  // terminal gesture the old geometry missed, and ArrowUp must not recall.
++  assert.equal(
++    handler.handle(context('ArrowDown', '@w1\nx', { start: 3, end: 3 }, { caretDraft: '\uFFFC\nx' })),
++    'handled',
++  )
++  assert.equal(
++    handler.handle(context('ArrowUp', '@w1\nx', { start: 3, end: 3 }, { caretDraft: '\uFFFC\nx' })),
++    'pass',
++  )
++  assert.deepEqual(drafts, [])
++
++  // ArrowDown with no cursor held consumes the gesture without writing (the
++  // pre-existing empty-cursor arm, preserved by the migration).
++  assert.equal(handler.handle(context('ArrowDown', 'rest', { start: 4, end: 4 })), 'handled')
++  assert.deepEqual(drafts, [])
++
++  // Multi-line draft: only the first line may recall.
++  assert.equal(handler.handle(context('ArrowUp', 'a\nb', { start: 3, end: 3 })), 'pass')
++  assert.equal(handler.handle(context('ArrowUp', 'a\nb', { start: 1, end: 1 })), 'handled')
++  assert.deepEqual(drafts, ['second prompt'])
++  assert.equal(handler.handle(context('ArrowUp', 'a\nb', { start: 1, end: 1 })), 'handled')
++  assert.deepEqual(drafts, ['second prompt', 'first prompt'])
++  // Past the oldest entry the cursor answer is null: pre-existing behavior is
++  // to leave the gesture alone (no consumption, no draft write).
++  assert.equal(handler.handle(context('ArrowUp', 'a\nb', { start: 1, end: 1 })), 'pass')
++  assert.deepEqual(drafts, ['second prompt', 'first prompt'])
++  // ArrowDown walks back toward the newest entry and stops at it the same way.
++  assert.equal(handler.handle(context('ArrowDown', 'a\nb', { start: 3, end: 3 })), 'handled')
++  assert.deepEqual(drafts.at(-1), 'second prompt')
++  assert.equal(handler.handle(context('ArrowDown', 'a\nb', { start: 3, end: 3 })), 'pass')
++  assert.deepEqual(drafts.at(-1), 'second prompt')
++  // A selection (not collapsed) never recalls.
++  assert.equal(handler.handle(context('ArrowUp', 'a\nb', { start: 1, end: 2 })), 'pass')
++}
++
++// ------------------------------------------------- fallback path + late adopt
++// A second module instance: module-level navigation state is per instance, so
++// the fallback path starts with a null cursor (the localStorage history is
++// shared, as the product's profile-shared history intends).
++{
++  const fallbackPlugin = await import('../client.js?fallback')
++  const { ctx, state, components, serviceListeners } = makeCtx({})
++  fallbackPlugin.apply(ctx)
++  assert.equal(documentListeners.length, 1, 'DOM fallback installed without the registry')
++
++  const textarea = makeTextarea('legacy draft')
++  const down = (k, el, extra = {}) => {
++    const event = key(k, { target: el, ...extra })
++    for (const listener of [...documentListeners]) listener(event)
++    return event
++  }
++
++  // Legacy textarea path: ArrowUp recalls and writes through the native setter.
++  down('ArrowUp', textarea)
++  assert.equal(textarea.value, 'second prompt', 'fallback recalled the newest prompt')
++  assert.equal(textarea.dispatched.at(-1)?.type, 'input', 'native-setter write dispatched input')
++
++  // A single-line draft sits on its first and last line, so the caret column
++  // does not block recall (the multi-line gate is covered above).
++  textarea.selectionStart = 1
++  textarea.selectionEnd = 1
++  down('ArrowUp', textarea)
++  assert.equal(textarea.value, 'first prompt', 'single-line draft recalls from any caret column')
++
++  // IME composition and read-only surfaces are left alone.
++  const guarded = makeTextarea('ime')
++  down('ArrowUp', guarded, { isComposing: true })
++  assert.equal(guarded.value, 'ime')
++  const readonly = makeTextarea('ro')
++  readonly.readOnly = true
++  down('ArrowUp', readonly)
++  assert.equal(readonly.value, 'ro')
++
++  // Late registry arrival disposes the fallback and adopts the official entry.
++  const lateRegistry = makeRegistry()
++  state.conversation = { composerKeys: lateRegistry }
++  for (const listener of serviceListeners) listener.cb()
++  assert.equal(lateRegistry.handlers().length, 1, 'late registry adopted')
++  assert.equal(documentListeners.length, 0, 'fallback disposed once the registry is adopted')
++}
++
++console.log('bench-history-dock smoke: OK')
+diff --git a/fixture/test/react-hook.mjs b/fixture/test/react-hook.mjs
+new file mode 100644
+index 0000000..b9d3e1b
+--- /dev/null
++++ b/fixture/test/react-hook.mjs
+@@ -0,0 +1,7 @@
++// Maps the bare 'react' import to a stub so the plugin module can load in Node.
++export async function resolve(specifier, context, nextResolve) {
++  if (specifier === 'react') {
++    return { url: 'data:text/javascript,export function useEffect(fn){fn()}', shortCircuit: true }
++  }
++  return nextResolve(specifier, context)
++}
+diff --git a/fixture/test/run-smoke.mjs b/fixture/test/run-smoke.mjs
+new file mode 100644
+index 0000000..ebf07ee
+--- /dev/null
++++ b/fixture/test/run-smoke.mjs
+@@ -0,0 +1,7 @@
++// Smoke runner: maps the browser half's bare `react` import to a stub, then
++// runs the behavioural test in this process.
++import { register } from 'node:module'
++import { pathToFileURL } from 'node:url'
++
++register('./react-hook.mjs', pathToFileURL('./test/'))
++await import('./client-smoke.mjs')

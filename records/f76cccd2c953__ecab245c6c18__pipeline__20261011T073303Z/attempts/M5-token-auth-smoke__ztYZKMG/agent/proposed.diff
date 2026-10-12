@@ -1,0 +1,63 @@
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index bc609be..5db5eb9 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1,3 +1,3 @@
+ - insert:
+-    - id: peer-bench
+-      name: "@demo/dsh-peer-bench"
++    - id: bench-ping
++      name: "@demo/dsh-bench-ping"
+diff --git a/fixture/index.js b/fixture/index.js
+index 5df8e63..23cdd38 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,14 +1,20 @@
+-// 0.1.2 self-built channel: register the web route directly and let the caller
+-// bring its own check — no host-side wiring is needed here.
+-export const inject = ['webServer']
++// Self-built public channel: the plugin owns the /ping response and performs no
++// browser-session check. The harness's token authentication covers the
++// Connection API and index responses, not plugin-owned carrier routes; the
++// composition owns the authentication policy of routes like this one.
++export const name = 'bench-ping'
+ 
+ export function apply(ctx) {
+-  ctx.webServer.register({
+-    kind: 'prefix',
+-    path: '/ping',
+-    handler: (_req, res) => {
+-      res.writeHead(200)
+-      res.end('pong')
+-    },
++  // Optional-service injection: a profile without a web server (headless)
++  // still activates the plugin and contributes no route instead of failing.
++  ctx.inject(['webServer'], (webCtx) => {
++    webCtx.effect(() => webCtx.webServer.register({
++      kind: 'prefix',
++      path: '/ping',
++      handler: (_req, res) => {
++        res.writeHead(200)
++        res.end('pong')
++      },
++    }), 'bench-ping: /ping')
+   })
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..bbb2476
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-ping",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-ping",
++      "version": "0.1.0"
++    }
++  }
++}

@@ -1,0 +1,120 @@
+diff --git a/fixture/drill-host/index.js b/fixture/drill-host/index.js
+index bd3c916..06d9570 100644
+--- a/fixture/drill-host/index.js
++++ b/fixture/drill-host/index.js
+@@ -1,16 +1,19 @@
+-// 0.1.1-rc.2-era host plugin.
+-// 0.1.2 upgrade note: the host plane merged into the remote plane —
+-// change inject from apiProxy to remote and you are done.
+-export const inject = ["apiProxy"]
++// 0.1.2-alpha.2 host-plane plugin.
++// The 0.1.1-rc.2 `apiProxy` facade (@deepseek-ai/dsh-host-apiproxy) was deleted
++// in 0.1.2. A host-plane consumer must NOT inject the client-plane `remote`
++// gateway (it would stall at `pending (waiting for service: remote)`); it
++// injects the domain service that owns the call. `apiProxy.llm.providers()`
++// is owned by the `llm` service.
++export const inject = ["llm"]
+ 
+ export function apply(ctx) {
+-  console.error("[drill-host] apply() — legacy apiProxy path")
++  console.error("[drill-host] apply() — host-plane llm service")
+   ctx.effect(async () => {
+     try {
+-      const providers = await ctx.apiProxy.llm.providers()
+-      console.error("[drill-host] apiProxy.llm.providers() succeeded →", JSON.stringify(providers).slice(0, 160))
++      const providers = await ctx.llm.listProviders()
++      console.error("[drill-host] llm.listProviders() succeeded →", JSON.stringify(providers).slice(0, 160))
+     } catch (error) {
+-      console.error("[drill-host] apiProxy.llm.providers() failed →", error.message)
++      console.error("[drill-host] llm.listProviders() failed →", error.message)
+     }
+   })
+ }
+diff --git a/fixture/drill-host/package.json b/fixture/drill-host/package.json
+index b8f333a..3c975c8 100644
+--- a/fixture/drill-host/package.json
++++ b/fixture/drill-host/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "@demo/dsh-bench-drill-host",
+-  "version": "0.1.0",
++  "version": "0.2.0-alpha.1",
+   "description": "DSH benchmark fixture: legacy host-plane plugin (H8-fire-drill)",
+   "type": "module",
+   "main": "index.js",
+@@ -13,8 +13,6 @@
+       "patch": "./cordis.patch.yml"
+     }
+   },
+-  "dependencies": {
+-    "@deepseek-ai/dsh-host-apiproxy": "0.0.1-rc.1"
+-  },
++  "dependencies": {},
+   "private": true
+ }
+diff --git a/fixture/drill-tools/package.json b/fixture/drill-tools/package.json
+index d3c7383..5727d4d 100644
+--- a/fixture/drill-tools/package.json
++++ b/fixture/drill-tools/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "@demo/dsh-bench-drill-tools",
+-  "version": "0.1.0",
++  "version": "0.2.0-alpha.1",
+   "description": "DSH benchmark fixture: tool plugin with an unpublished dependency cohort (H8-fire-drill)",
+   "type": "module",
+   "main": "index.js",
+@@ -14,7 +14,7 @@
+     }
+   },
+   "dependencies": {
+-    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.1"
++    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2"
+   },
+   "private": true
+ }
+diff --git a/fixture/drill-web/index.js b/fixture/drill-web/index.js
+index 5df8e63..4bf7bc5 100644
+--- a/fixture/drill-web/index.js
++++ b/fixture/drill-web/index.js
+@@ -1,14 +1,22 @@
+-// 0.1.2 self-built channel: register the web route directly and let the caller
+-// bring its own check — no host-side wiring is needed here.
+-export const inject = ['webServer']
++// 0.1.2-alpha.2 host-half web plugin: the /ping channel keeps its plain HTTP
++// protocol and path, but it no longer bypasses the host gate. A raw
++// ctx.webServer route inherits no authentication or Host/Origin fence, so the
++// handler asks the Connection service first and stops on its 401/403.
++export const inject = ['webServer', 'connection']
+ 
+ export function apply(ctx) {
+-  ctx.webServer.register({
++  ctx.effect(() => ctx.webServer.register({
+     kind: 'prefix',
+     path: '/ping',
+-    handler: (_req, res) => {
++    handler: (req, res) => {
++      const rejection = ctx.connection.requestRejection(req)
++      if (rejection !== undefined) {
++        res.writeHead(rejection)
++        res.end(rejection === 401 ? 'unauthorized' : 'forbidden')
++        return
++      }
+       res.writeHead(200)
+       res.end('pong')
+     },
+-  })
++  }), 'drill-web: /ping route')
+ }
+diff --git a/fixture/drill-web/package.json b/fixture/drill-web/package.json
+index f0a69d1..931850e 100644
+--- a/fixture/drill-web/package.json
++++ b/fixture/drill-web/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "@demo/dsh-bench-drill-web",
+-  "version": "0.1.0",
++  "version": "0.2.0-alpha.1",
+   "description": "DSH benchmark fixture: web plugin with a self-built /ping channel (H8-fire-drill)",
+   "type": "module",
+   "main": "index.js",

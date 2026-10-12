@@ -1,0 +1,57 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "error",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.7",
+              "version": "0.1.0-rc.7"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": false
+            },
+            "e2eSubsetFirst": true,
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "initial",
+        "queue": [],
+        "reviewed": false,
+        "attempts": 0,
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "could not install dsh 0.1.0-rc.7 for the checks: npm error code ECONNRESET\nnpm error errno ECONNRESET\nnpm error network request to https://registry.npmjs.org/@deepseek-ai%2fdsh failed, reason: Client network socket disconnected before secure TLS connection was established\nnpm error network This is a problem related to network connectivity.\nnpm error network In most cases you are behind a proxy or have bad network settings.\nnpm error network\nnpm error network If you are behind a proxy, please make sure that the 'proxy' config is set properly.  See: 'npm help config'\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-11T13_40_42_943Z-debug-0.log"
+        },
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "comments": []
+      },
+      "run": "local-2026-10-11T13-40-42-082Z",
+      "startedAt": "2026-10-11T13:40:42.891Z"
+    }
+  ]
+}

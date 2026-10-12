@@ -1,0 +1,136 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.5",
+              "version": "0.1.0-rc.5"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": false
+            },
+            "e2eSubsetFirst": true,
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "final",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 1,
+        "lastFingerprint": "mechanical: npm error Found: @deepseek-ai/dsh-llm@<n>.<n>-alpha.<n>",
+        "failure": {
+          "check": "mechanical",
+          "outcome": "fail",
+          "fingerprint": "mechanical: npm error Found: @deepseek-ai/dsh-llm@<n>.<n>-alpha.<n>",
+          "detail": "npm error Found: @deepseek-ai/dsh-llm@0.1.2-alpha.2\nnpm error node_modules/@deepseek-ai/dsh-llm\nnpm error   peer @deepseek-ai/dsh-llm@\"0.1.2-alpha.2\" from the root project\nnpm error   peer @deepseek-ai/dsh-llm@\"^0.1.2-alpha.2\" from @deepseek-ai/dsh-tools@0.1.2-alpha.2\nnpm error   node_modules/@deepseek-ai/dsh-tools\nnpm error     peer @deepseek-ai/dsh-tools@\"0.1.2-alpha.2\" from the root project\nnpm error\nnpm error Could not resolve dependency:\nnpm error peer @deepseek-ai/dsh-llm@\"^0.1.2-rc.1\" from @deepseek-ai/dsh-agent@0.1.2-rc.1\nnpm error node_modules/@deepseek-ai/dsh-agent\nnpm error   peer @deepseek-ai/dsh-agent@\"^0.1.2-alpha.2\" from @deepseek-ai/dsh-tools@0.1.2-alpha.2\nnpm error   node_modules/@deepseek-ai/dsh-tools\nnpm error     peer @deepseek-ai/dsh-tools@\"0.1.2-alpha.2\" from the root project\nnpm error\nnpm error Fix the upstream dependency conflict, or retry this command with --force or --legacy-peer-deps to accept an incorrect (and potentially broken) dependency resolution.\nnpm error\nnpm error\nnpm error For a full report see:\nnpm error /root/.npm/_logs/2026-10-11T16_26_22_309Z-eresolve-report.txt\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-11T16_26_22_309Z-debug-0.log"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "could not install dsh 0.1.0-rc.5 for the checks: npm error code ETARGET\nnpm error notarget No matching version found for @deepseek-ai/dsh@0.1.0-rc.5.\nnpm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-11T16_05_30_717Z-debug-0.log"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "pass",
+          "fingerprint": "",
+          "detail": "[bench-mcpanel] apply() on the 0.1.2-era cohort: bare cordis Context; client plane still on the client-runtime package\n[bench-mcpanel] host half active: mcp-client insert rows in the profile cordis.patch.yml + /api/mcp-manager routes + mcp_* tools (real body elided)\ndsh: TRANSPORT: DeepSeek API request to http://127.0.0.1:9/v1 failed"
+        },
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "comments": []
+      },
+      "run": "local-2026-10-11T16-05-25-037Z",
+      "startedAt": "2026-10-11T16:05:30.673Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.5",
+            "version": "0.1.0-rc.5"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": false
+          },
+          "e2eSubsetFirst": true,
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "final",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 1,
+      "lastFingerprint": "mechanical: npm error Found: @deepseek-ai/dsh-llm@<n>.<n>-alpha.<n>",
+      "failure": {
+        "check": "mechanical",
+        "outcome": "fail",
+        "fingerprint": "mechanical: npm error Found: @deepseek-ai/dsh-llm@<n>.<n>-alpha.<n>",
+        "detail": "npm error Found: @deepseek-ai/dsh-llm@0.1.2-alpha.2\nnpm error node_modules/@deepseek-ai/dsh-llm\nnpm error   peer @deepseek-ai/dsh-llm@\"0.1.2-alpha.2\" from the root project\nnpm error   peer @deepseek-ai/dsh-llm@\"^0.1.2-alpha.2\" from @deepseek-ai/dsh-tools@0.1.2-alpha.2\nnpm error   node_modules/@deepseek-ai/dsh-tools\nnpm error     peer @deepseek-ai/dsh-tools@\"0.1.2-alpha.2\" from the root project\nnpm error\nnpm error Could not resolve dependency:\nnpm error peer @deepseek-ai/dsh-llm@\"^0.1.2-rc.1\" from @deepseek-ai/dsh-agent@0.1.2-rc.1\nnpm error node_modules/@deepseek-ai/dsh-agent\nnpm error   peer @deepseek-ai/dsh-agent@\"^0.1.2-alpha.2\" from @deepseek-ai/dsh-tools@0.1.2-alpha.2\nnpm error   node_modules/@deepseek-ai/dsh-tools\nnpm error     peer @deepseek-ai/dsh-tools@\"0.1.2-alpha.2\" from the root project\nnpm error\nnpm error Fix the upstream dependency conflict, or retry this command with --force or --legacy-peer-deps to accept an incorrect (and potentially broken) dependency resolution.\nnpm error\nnpm error\nnpm error For a full report see:\nnpm error /root/.npm/_logs/2026-10-11T16_26_22_309Z-eresolve-report.txt\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-11T16_26_22_309Z-debug-0.log"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "could not install dsh 0.1.0-rc.5 for the checks: npm error code ETARGET\nnpm error notarget No matching version found for @deepseek-ai/dsh@0.1.0-rc.5.\nnpm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-11T16_05_30_717Z-debug-0.log"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "pass",
+        "fingerprint": "",
+        "detail": "[bench-mcpanel] apply() on the 0.1.2-era cohort: bare cordis Context; client plane still on the client-runtime package\n[bench-mcpanel] host half active: mcp-client insert rows in the profile cordis.patch.yml + /api/mcp-manager routes + mcp_* tools (real body elided)\ndsh: TRANSPORT: DeepSeek API request to http://127.0.0.1:9/v1 failed"
+      },
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "comments": []
+    },
+    "run": "local-2026-10-11T16-05-25-037Z",
+    "startedAt": "2026-10-11T16:05:30.673Z"
+  }
+}

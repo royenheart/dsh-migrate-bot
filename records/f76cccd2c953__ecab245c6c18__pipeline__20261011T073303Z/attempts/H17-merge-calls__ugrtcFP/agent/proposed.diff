@@ -1,0 +1,1163 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 0608ffa..954ac02 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -3,10 +3,17 @@
+ A client plugin that shadows the shipped `read`/`grep`/`glob` toolviews in
+ the web UI's `tool.call.toolview` slot (priority -1) and merges consecutive
+ same-tool calls into one card with compact child rows. The host half is an
+-empty-apply stub that only declares the config row. Written in the
+-0.1.1-era style (the browser half pulls its client context type and the chat
+-node types from the client-runtime package, and reads the chat flow through
+-the session store). The host is moving to dsh 0.1.2-alpha.2.
++empty-apply stub that only declares the config row. Migrated to the dsh
++0.1.2-alpha.2 client surface: the browser half pulls its client context and
++chat node types from `@deepseek-ai/dsh-client-ui-chat`,
++`@deepseek-ai/dsh-client-ui-slots`, and `@deepseek-ai/dsh-client-ui-tool`
++(the `@deepseek-ai/dsh-client-runtime` package is gone), reads the chat flow
++through the session-scoped `useChat` snapshot, and derives its cards from the
++frozen raw call/result fields. On an unpatched host it collapses the absorbed
++flow seats through the renderer's documented `[data-slot]` anchor; on a host
++carrying `patches/0001-chat-derived-row-visibility.patch` it registers its run
++partition as a derived row-visibility contribution instead, so the absorbed
++seats never enter the Chat flow (see `.dsh-migrate/patch-reports/`).
+ 
+ Release procedure (internal):
+ 
+@@ -17,7 +24,6 @@ Release procedure (internal):
+ 
+ Exam material only, **do not publish** (`"private": true` in package.json).
+ Distilled from `@huanlin/dsh-plugin-merge-tool-calls` (adaptation commit
+-`720a077`); four of the six card derivations and the grouping walk are
+-elided — the exam is the card-derivation model, the useChat read contract,
+-and the client inject recomposition.
+-
++`720a077`); four of the six card derivations and the grouping partition walk
++are elided — the exam is the card-derivation model, the `useChat` read
++contract, and the client inject recomposition.
+diff --git a/fixture/client.js b/fixture/client.js
+index af7f40c..8d22d22 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,24 +1,33 @@
+ // Browser half: shadows the shipped tool.call.toolview entries for every
+-// grouped tool at priority -1 (the keyed slot's shadowing rule: lowest
++// grouped tool at priority -1 (the keyed slot's shadowing rule: the lowest
+ // priority renders), merging consecutive same-tool calls into one card with
+ // compact child rows.
+ //
+-// 0.1.1-era type surface (pre v0.1.2-alpha): the client context type AND the
+-// chat node types (ChatNodeStore / ChatConversationViewNode / ToolCallBlock /
+-// ToolResultNode) come from the client-runtime package:
++// dsh 0.1.2-alpha.2 surface: the Chat node contract (ChatSnapshot, ChatNodeStore,
++// ChatConversationViewNode, ToolCallBlock, ToolResultNode) comes from
++// @deepseek-ai/dsh-client-ui-chat/client; the slot owner props
++// (ToolCallOwnerProps) come from @deepseek-ai/dsh-client-ui-tool/client. The
++// chat flow is read through the session-scoped `useChat` standard prop that
++// ui-chat provides to every session slot; the 0.1.1-era `snapshot.chat` slice
++// and the @deepseek-ai/dsh-client-runtime package no longer exist.
+ //
+-//   import type { ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
++// The seat locates itself by scanning the Chat snapshot for its own call id.
++// It does not call the Conversation key helper: ui-conversation is a feature
++// package, and a feature plugin must not runtime-import another feature
++// plugin's values, so the Chat snapshot is the only supported read.
+ //
+-// and node-key scanning recomputes ui-conversation's internal
+-// conversationContextKey (a value import from the same package in the real
+-// sources) to locate the seat's node in snapshot.chat.order.
++// Cards derive from the frozen raw call/result fields (`argsRaw`, `content`,
++// `meta`) because the `resultView`/`callView` projections are gone from
++// ToolCallBlock. The old migration memo claimed both were only renamed and that
++// tool views must keep reading `ctx.session`; both claims were wrong and it was
++// deleted in the 0.1.2 migration.
+ //
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.x era):
+-//   "resultView/callView were only renamed on alpha — keep reading them off
+-//    the call object. useChat is for the chat window only: tool views keep
+-//    reading ctx.session."
+-// ────────────────────────────────────────────────────────────
++// The patched-host path waits for `uiChatVisibility` through `ctx.inject`
++// instead of sampling `ctx.get` once: Loader entries mount their fibers
++// concurrently (EntryGroup.update -> Promise.allSettled), and ui-chat declares
++// far more service dependencies than this plugin, so its apply can land after
++// this one. A one-shot sample would silently keep the unpatched collapse on a
++// patched host.
+ 
+ export const name = 'bench-merge-calls-client'
+ 
+@@ -108,17 +117,13 @@ function registerOverrideDicts(ctx) {
+   }, 'bench-merge-calls: better-locale override dicts')
+ }
+ 
+-// ── merged-run detection (distilled from merge-run.ts, PRE shape) ────────
++// ── merged-run detection (0.1.2 shape) ───────────────────────────────────
++// The seat finds itself by call id in the Chat snapshot and scans the visible
++// node order for its consecutive run.
+ 
+ /** Tool-call node kind registered by ui-conversation's built-in tool definition. */
+ const TOOL_CALL_KIND = 'tool-call'
+ 
+-/** The ui-conversation internal node key. The real code imports
+- * conversationContextKey as a value from
+- * @deepseek-ai/dsh-client-runtime/client and recomputes the node key from
+- * (kind, callId); the format itself is upstream-internal (elided). */
+-const conversationContextKey = undefined
+-
+ /** Extract a root call block from a chat node, when it is a tool-call node. */
+ function toolRootOf(node) {
+   if (node.kind !== TOOL_CALL_KIND) return null
+@@ -126,7 +131,7 @@ function toolRootOf(node) {
+   return typeof root === 'object' && root !== null ? root : null
+ }
+ 
+-/** The wire tool name of a call in either lifecycle form (mirrors ui-tool). */
++/** The wire tool name of a call in either lifecycle form. */
+ function callNameOf(block) {
+   return 'kind' in block ? (block.call?.name ?? '') : block.name
+ }
+@@ -136,39 +141,171 @@ function isGroupedTool(name, tools) {
+   return tools.length === 0 || tools.includes(name)
+ }
+ 
++/** Turn/step coordinates of a Chat node seat (both absent for non-turn seats). */
++function locationOf(node) {
++  const location = node.location
++  if (location.kind === 'step') return { turn: location.turn.turn, step: location.step.step }
++  if (location.kind === 'turn') return { turn: location.turn.turn, step: undefined }
++  return { turn: undefined, step: undefined }
++}
++
+ /**
+- * Pure detection of the consecutive same-tool run this seat belongs to
+- * (PRE shape): the seat recomputes the ui-conversation internal node key
+- * from its call id and locates itself in the chat order by that key.
+- * @param {readonly string[]} order - chat node key order.
+- * @param {Record<string, { kind: string, data: { root?: unknown } }>} nodes - chat node store.
++ * Resolve the consecutive same-tool run this seat belongs to, as a bounded
++ * group: a run longer than `maxGroupSize` splits into adjacent groups so every
++ * call still renders in exactly one card.
++ *
++ * Reads only the Chat snapshot surface (`order` plus node lookup) and locates
++ * itself by call id — the 0.1.2 replacement for the removed `snapshot.chat`
++ * session slice. The same walk serves the optional row-visibility integration
++ * below, where the provider hands the nodes in flow order.
++ *
++ * @param {readonly string[]} order - visible Chat node keys in flow order.
++ * @param {(key: string) => unknown} nodeOf - Chat node lookup by key.
+  * @param {string} myCallId - the call id of the seat asking about itself.
++ * @param {readonly string[]} tools - grouped wire names (empty = all).
++ * @param {string} groupBy - 'adjacent' or 'step'.
++ * @param {number} maxGroupSize - upper bound of one merged group.
+  */
+-function readRun(order, nodes, myCallId, tools, groupBy, maxGroupSize) {
+-  const myKey = conversationContextKey(TOOL_CALL_KIND, myCallId)
+-  const myIndex = order.indexOf(myKey)
+-  if (myIndex < 0) return null
+-  const myRoot = rootAtNode(order, nodes, myIndex)
+-  if (myRoot === null) return null
++function readRun(order, nodeOf, myCallId, tools, groupBy, maxGroupSize) {
++  const rootAt = (index) => {
++    const key = order[index]
++    const node = key === undefined ? undefined : nodeOf(key)
++    return node === undefined ? null : toolRootOf(node)
++  }
++  const seatIndices = []
++  for (let index = 0; index < order.length; index += 1) {
++    if (rootAt(index)?.callId === myCallId) seatIndices.push(index)
++  }
++  // A seat outside the chat flow (a dispatched subcall, the details panel, a
++  // node the history window has not materialized) falls back to a single row
++  // rather than rendering nothing. A repeated call id is ambiguous — the
++  // upstream node assembly rejects it — so it also stays a single row.
++  if (seatIndices.length !== 1) {
++    const own = rootAt(seatIndices[0] ?? -1)
++    return { isFirst: true, blocks: own === null ? [] : [own] }
++  }
++
++  const myIndex = seatIndices[0]
++  const myNode = nodeOf(order[myIndex])
++  const myRoot = toolRootOf(myNode)
+   const myName = callNameOf(myRoot)
++  const myLocation = locationOf(myNode)
+   const size = Math.max(1, maxGroupSize)
+ 
+-  // (the family/groupBy partition walk is elided — the exam is the node-key
+-  // contract and the session read, not the grouping algebra)
+-  const blocks = [myRoot]
+-  return { isFirst: true, blocks: groupBy === 'step' ? blocks : blocks.slice(0, size) }
++  /** Whether the node at `index` belongs to this seat's run. */
++  const sameRun = (index) => {
++    const root = rootAt(index)
++    if (root === null || callNameOf(root) !== myName) return false
++    if (!isGroupedTool(myName, tools)) return false
++    const location = locationOf(nodeOf(order[index]))
++    if (location.turn !== myLocation.turn) return false
++    if (groupBy !== 'step') return true
++    return location.step !== undefined && location.step === myLocation.step
++  }
++
++  let start = myIndex
++  while (start > 0 && sameRun(start - 1)) start -= 1
++  let end = myIndex
++  while (end + 1 < order.length && sameRun(end + 1)) end += 1
++
++  // Chunk an oversized run into groups of at most `size`, in flow order.
++  const groupStart = start + Math.floor((myIndex - start) / size) * size
++  const groupEnd = Math.min(groupStart + size - 1, end)
++  const blocks = []
++  for (let index = groupStart; index <= groupEnd; index += 1) {
++    const root = rootAt(index)
++    if (root !== null) blocks.push(root)
++  }
++  return { isFirst: myIndex === groupStart, blocks }
++}
++
++// ── optional harness patch: derived row visibility ──────────────────────
++// When the host exposes the derived row-visibility input (the patch in
++// patches/0001-chat-derived-row-visibility.patch), the plugin registers its
++// run partition there: absorbed seats never enter the Chat flow at all, so
++// the DOM collapse rule below is unnecessary. The partition is published to
++// the plugin's own rows through the registration inject face. `apply` reaches
++// that input through `ctx.inject(['uiChatVisibility'])`, because the service
++// is contributed by ui-chat's apply and Loader entries mount concurrently.
++
++/** Plugin-owned run partition: callId -> the run (and group) that seat owns. */
++function createRunPartition() {
++  let snapshot = new Map()
++  const listeners = new Set()
++  return {
++    hooks: {
++      partition: {
++        getSnapshot: () => snapshot,
++        subscribe: (listener) => {
++          listeners.add(listener)
++          return () => { listeners.delete(listener) }
++        },
++      },
++    },
++    publish(callId, run) {
++      // The resolver runs once per visible node on every publication, so a
++      // seat's unchanged run must not republish a fresh Map reference: the
++      // rows select values out of it and a new reference re-renders them all.
++      const previous = snapshot.get(callId)
++      if (previous !== undefined
++        && previous.isFirst === run.isFirst
++        && previous.blocks.length === run.blocks.length
++        && previous.blocks.every((block, index) => block === run.blocks[index])) return
++      const next = new Map(snapshot)
++      next.set(callId, run)
++      snapshot = next
++      for (const listener of [...listeners]) listener()
++    },
++  }
+ }
+ 
+-function rootAtNode(order, nodes, index) {
+-  const key = order[index]
+-  const node = key === undefined ? undefined : nodes.get(key)
+-  return node === undefined ? null : toolRootOf(node)
++/**
++ * Register the run partition as a derived row-visibility contribution. The
++ * scope is the `uiChatVisibility` injection scope, so the contribution and the
++ * fallback swap below live exactly as long as the patched host exposes it.
++ * @param {object} scope - context carrying the uiChatVisibility service.
++ * @param {object} cfg - resolved plugin config.
++ * @param {ReturnType<typeof createRunPartition>} partition - plugin-owned run partition.
++ */
++function registerRowVisibility(scope, cfg, partition) {
++  scope.effect(() => scope.uiChatVisibility.hideRows(({ node, nodes }) => {
++    if (node.kind !== TOOL_CALL_KIND) return undefined
++    const callId = node.data?.root?.callId
++    if (typeof callId !== 'string') return undefined
++    const byKey = new Map(nodes.map((candidate) => [candidate.key, candidate]))
++    const run = readRun(nodes.map((candidate) => candidate.key), (key) => byKey.get(key), callId, cfg.tools, cfg.groupBy, cfg.maxGroupSize)
++    if (run === null) return undefined
++    partition.publish(callId, run)
++    return !run.isFirst
++  }), 'bench-merge-calls: row visibility')
+ }
+ 
+-// ── card derivations (distilled from card-model.ts, PRE shape) ───────────
+-// The plugin reads the shipped ui-tool per-call derivations off the call
+-// object: `block.resultView` (result-side card) and `block.callView`
+-// (call-side view). Two of the six derivations are kept as specimens.
++// ── raw card derivations (0.1.2 shape) ───────────────────────────────────
++// The shipped ui-tool per-call derivations are internal to that package, so
++// this plugin derives its two card specimens from the frozen raw fields the
++// same way ui-tool's card models do: parse `argsRaw`, validate `meta`, and
++// consume the single text result block.
++
++/** Parse a call block's tool name and JSON arguments (either lifecycle form). */
++function parsedCall(block) {
++  const call = 'kind' in block ? block.call : block
++  if (call === null || call === undefined) return null
++  let value
++  try {
++    value = JSON.parse(call.argsRaw)
++  } catch {
++    return null
++  }
++  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
++  return { name: call.name, args: value }
++}
++
++/** The exact single text block first-party card derivations consume. */
++function singleResultText(block) {
++  if (!('kind' in block) || block.content.length !== 1) return undefined
++  const only = block.content[0]
++  return only?.type === 'text' ? only.text : undefined
++}
+ 
+ /** Resolve a path relative to the session cwd (ui-tool mirror, elided). */
+ function relativizeToCwd(path, cwd) {
+@@ -180,88 +317,175 @@ function resolveTerminalCwd(cwd, sessionCwd) {
+   return cwd === undefined || cwd === '' ? sessionCwd : cwd
+ }
+ 
++/** Validate the persisted read metadata ui-tool's read card consumes. */
++function readMetaOf(block) {
++  if (!('kind' in block)) return null
++  const meta = block.meta
++  if (typeof meta !== 'object' || meta === null || Array.isArray(meta)) return null
++  const { path, offset, lines, totalLines } = meta
++  if (typeof path !== 'string' || typeof offset !== 'number' || !Number.isInteger(offset) || offset < 1) return null
++  if (typeof totalLines !== 'number' || !Number.isInteger(totalLines) || totalLines < 0 || !Array.isArray(lines)) return null
++  const narrowed = []
++  for (const line of lines) {
++    if (typeof line !== 'object' || line === null) return null
++    const { number, text } = line
++    if (typeof number !== 'number' || !Number.isInteger(number) || number < 1 || typeof text !== 'string') return null
++    narrowed.push({ number, text })
++  }
++  return { path, offset, lines: narrowed, totalLines }
++}
++
++/** Lines out of the model-facing `<content>` envelope when metadata is absent. */
++function envelopeLines(block) {
++  const text = singleResultText(block)
++  if (text === undefined) return []
++  const body = /^<path>[^\n]*<\/path>\n<type>file<\/type>\n<content>\n([\s\S]*)\n<\/content>$/u.exec(text)?.[1]
++  if (body === undefined) return []
++  return body.split('\n').map((text, index) => ({ number: index + 1, text }))
++}
++
+ /**
+- * Read-card derivation (PRE shape): projects the shipped ui-tool read card
+- * off `block.resultView`.
+- * @param {{ resultView?: { card?: string, lines?: unknown, title?: string, path?: string, totalLines?: number } }} block
++ * Read-card derivation (0.1.2 shape): `argsRaw.file_path` header plus the
++ * persisted result metadata lines (envelope fallback).
++ * @param {object} block - running or settled Tool block.
++ * @param {string} [sessionCwd] - session workspace root for relative labels.
+  */
+-function readCardOf(block, cwd) {
+-  if (!('kind' in block)) return null
+-  const result = block.resultView?.card === 'read' ? block.resultView : null
+-  if (result === null) return null
+-  if (!Array.isArray(result.lines)) return null
+-  const lines = result.lines
+-    .filter((line) => typeof line === 'object' && line !== null
+-      && typeof line.number === 'number' && typeof line.text === 'string')
+-    .map((line) => ({ number: line.number, text: line.text }))
++function readCardOf(block, sessionCwd) {
++  if (block.parentCallId !== undefined) return null
++  const parsed = parsedCall(block)
++  if (parsed === null || parsed.name !== 'read') return null
++  const path = parsed.args.file_path
++  if (typeof path !== 'string' || path.trim() === '') return null
++  const meta = readMetaOf(block)
++  const lines = meta?.lines ?? envelopeLines(block)
++  const authored = meta?.path ?? path
+   return {
+-    label: result.title ?? relativizeToCwd(result.path, cwd),
++    label: relativizeToCwd(authored, sessionCwd),
+     lines,
+-    totalLines: typeof result.totalLines === 'number' ? result.totalLines : lines.length,
++    totalLines: meta?.totalLines ?? lines.length,
++    path: authored,
++    running: !('kind' in block),
+   }
+ }
+ 
+ /**
+- * Terminal-card derivation (PRE shape): the call-side view carries the
+- * command + workdir, the result-side view the output.
+- * @param {{ callView?: { card?: string, title?: string, cwd?: string, description?: string }, resultView?: { card?: string, title?: string, output?: string, exitCode?: number } }} block
++ * Terminal-card derivation (0.1.2 shape): the parsed shell arguments carry the
++ * command + workdir, the single result text block the output and exit status.
++ * @param {object} block - running or settled Tool block.
++ * @param {string} [sessionCwd] - session workspace root for the workdir.
+  */
+ function terminalCardOf(block, sessionCwd) {
+-  const call = block.callView?.card === 'terminal' ? block.callView : null
++  const parsed = parsedCall(block)
++  if (parsed === null) return null
++  const args = parsed.args
++  const command = typeof args.command === 'string' ? args.command : undefined
++  const description = typeof args.description === 'string' ? args.description : undefined
++  if (command === undefined && description === undefined) return null
++  const cwd = resolveTerminalCwd(typeof args.workdir === 'string' ? args.workdir : undefined, sessionCwd)
++  const title = description ?? command ?? ''
+   if (!('kind' in block)) {
+-    return call === null ? null : {
+-      card: { command: call.title, cwd: resolveTerminalCwd(call.cwd, sessionCwd), running: true },
+-    }
+-  }
+-  const result = block.resultView?.card === 'terminal' ? block.resultView : null
+-  if (result === null) return null
+-  return {
+-    card: {
+-      command: result.title ?? call?.title ?? '',
+-      cwd: call === null ? undefined : resolveTerminalCwd(call.cwd, sessionCwd),
+-      output: result.output,
+-      exitCode: result.exitCode,
+-      running: false,
+-    },
++    return { card: { command: title, cwd, running: true } }
+   }
++  if (block.isError) return null
++  const output = singleResultText(block)
++  if (output === undefined) return null
++  const meta = typeof block.meta === 'object' && block.meta !== null ? block.meta : undefined
++  const exitCode = typeof meta?.exitCode === 'number' ? meta.exitCode : undefined
++  return { card: { command: title, cwd, output, exitCode, running: false } }
+ }
+ 
+ // ── the shadowed toolview ────────────────────────────────────────────────
+-// Renders the merged run card for the run's first call; continuation calls
+-// render nothing. In-session reads go through the session store's chat
+-// slice (useSession, distilled from rows.tsx: the row receives `useSession`
+-// and reads snapshot.chat.order / snapshot.chat.nodes).
++// Renders the merged run card for the group's first call; the other seats of
++// the group render nothing. In-session reads go through the session-scoped
++// `useChat` selector the renderer hands every session slot.
+ 
+ /**
+- * @param {{ callId: string, toolName: string, block: { kind?: string, resultView?: unknown, callView?: unknown }, cwd?: string, t: (key: string) => string, cfg: { tools: string[], groupBy: string, maxGroupSize: number }, useSession: (selector: (snapshot: unknown) => unknown) => unknown }} props
++ * @param {{ callId: string, toolName: string, block: object, cwd?: string, t: (key: string) => string, cfg: { tools: string[], groupBy: string, maxGroupSize: number }, useChat: (selector: (snapshot: unknown) => unknown) => unknown, usePartition: (selector: (partition: Map<string, unknown>) => unknown) => unknown }} props
+  */
+ export function MergedToolRow(props) {
+-  const { callId, toolName, block, cwd, t, cfg, useSession } = props
+-  const run = useSession((snapshot) => readRun(
+-    snapshot.chat.order,
+-    snapshot.chat.nodes,
++  const { callId, toolName, block, cwd, t, cfg, useChat, usePartition } = props
++  // A patched host publishes the run through the registration hooks before the
++  // absorbed seats leave the flow; an unpatched host leaves the partition empty
++  // and the seat scans the Chat snapshot order itself.
++  const partitioned = usePartition((partition) => partition.get(callId) ?? null)
++  const scanned = useChat((snapshot) => readRun(
++    snapshot.order,
++    (key) => snapshot.nodes.get(key),
+     callId,
+     cfg.tools,
+     cfg.groupBy,
+     cfg.maxGroupSize,
+   ))
++  const run = partitioned ?? scanned
+   if (run === null || !run.isFirst) return null
+   const card = toolName === 'read' ? readCardOf(block, cwd) : terminalCardOf(block, cwd)
+   return card === null ? null : card // the row component body is elided
+ }
+ 
++// ── flow-seat collapse (fallback seam) ───────────────────────────────────
++// A seat that renders null leaves its owning flow row in place, because the
++// row chrome (`data-chat-flow-kind="tool-call"`) and the per-call anchor wrap
++// the toolview slot. The renderer documents `[data-slot="<key>"]` as the
++// addressable seam dynamic styles target, so the merged group collapses its
++// non-first seats through one injected rule until the harness exposes a
++// first-class row-visibility input (see .dsh-migrate/patch-reports).
++
++const FLOW_COLLAPSE_RULE
++  = '[data-chat-flow-kind="tool-call"]:has([data-slot="tool.call.toolview"]:empty){display:none}'
++
++/**
++ * Install the flow-seat collapse rule; no-op outside a document. The returned
++ * controller detaches and reattaches the same rule without registering another
++ * Cordis effect, so a patched-host takeover can restore the fallback while its
++ * injecting scope unloads (an effect on an unloading ctx would throw).
++ */
++function installFlowCollapse(ctx) {
++  let style
++  let attached = false
++  ctx.effect(() => {
++    if (typeof document === 'undefined') return () => {}
++    style = document.createElement('style')
++    style.dataset.benchMergeCalls = NS
++    style.textContent = FLOW_COLLAPSE_RULE
++    document.head.append(style)
++    attached = true
++    return () => {
++      style.remove()
++      attached = false
++    }
++  }, 'bench-merge-calls: flow-seat collapse')
++  return {
++    disable() {
++      if (!attached) return
++      style.remove()
++      attached = false
++    },
++    enable() {
++      if (style === undefined || attached) return
++      document.head.append(style)
++      attached = true
++    },
++  }
++}
++
+ /**
+  * Client plugin body: register one shadowed toolview per grouped tool and
+  * the plugin's own + override dictionaries.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * @param {import('@deepseek-ai/dsh-client-ui-slots').Context} ctx
+  * @param {{ tools?: string[], groupBy?: string, maxGroupSize?: number }} config - cordis row config (loosely typed).
+  */
+ export function apply(ctx, config = {}) {
+   const cfg = { tools: [], groupBy: 'adjacent', maxGroupSize: 8, ...config }
+ 
++  const partition = createRunPartition()
++
+   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'bench-merge-calls: dictionaries')
+   registerOverrideDicts(ctx)
+ 
++  // The renderer's [data-slot] anchor is the documented seam for the unpatched
++  // collapse; a patched host's visibility service replaces it below.
++  const collapse = installFlowCollapse(ctx)
++
+   const toolNames = cfg.tools.length === 0 ? ['read', 'grep', 'glob'] : [...new Set(cfg.tools)]
+   for (const tool of toolNames) {
+     ctx.slots.inject('tool.call.toolview', () =>
+@@ -270,6 +494,20 @@ export function apply(ctx, config = {}) {
+         key: tool,
+         priority: -1,
+         locale: NS,
++        inject: () => ({ hooks: partition.hooks }),
+       }, MergedToolRow))
+   }
++
++  // The optional row-visibility service can arrive after this plugin applies,
++  // so wait for it instead of sampling ctx once. While it is absent the
++  // injected scope stays pending and the [data-slot] collapse above is the
++  // documented fallback; when it appears, the collapse is detached and the run
++  // partition is registered as a derived contribution.
++  ctx.inject(['uiChatVisibility'], (scope) => {
++    scope.effect(() => {
++      collapse.disable()
++      return () => collapse.enable()
++    }, 'bench-merge-calls: row-visibility takeover')
++    registerRowVisibility(scope, cfg, partition)
++  })
+ }
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index 630bf16..f7bbfc6 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1,6 +1,8 @@
+ # Insert the bench-merge-calls client plugin row. The plugin only contributes
+ # a browser-side toolview takeover (tool.call.toolview shadow registrations),
+ # so the row carries the user-facing config and an empty host apply.
++# The dsh.bundle.patch mechanism and the `- insert:` row document are unchanged
++# in dsh 0.1.2-alpha.2, so this required complete-surface patch is kept as is.
+ # (exam fixture, distilled from @huanlin/dsh-plugin-merge-tool-calls; the
+ # grouping partition walk is elided — the exam is the ui-tool/ui-chat plane)
+ - insert:
+diff --git a/fixture/index.js b/fixture/index.js
+index 74f4c7f..7f7249a 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -3,11 +3,13 @@
+ // client.js). The host half exists to declare the validated config shape for
+ // the bundle row; its apply is intentionally empty.
+ //
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the config schema is declared with
+-// schemastery in the real plugin (a host-side value import, elided here);
+-// the browser half pulled its client context type and the chat node types
+-// from the client-runtime package. The in-source migration memo lives in
+-// client.js — do not take it at face value.
++// dsh 0.1.2-alpha.2 surface: the config schema is still declared with
++// schemastery in the real plugin (a host-side value import, elided here); the
++// browser half now pulls its client context and chat node types from
++// @deepseek-ai/dsh-client-ui-chat / ui-slots / ui-tool instead of the removed
++// @deepseek-ai/dsh-client-runtime package. The 0.1.1-era migration memo that
++// told the browser half to keep reading `ctx.session` was wrong and is deleted
++// from client.js.
+ 
+ export const name = 'bench-merge-calls'
+ 
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..255f693
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,44 @@
++{
++  "name": "@bench/dsh-bench-merge-calls",
++  "version": "0.3.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-merge-calls",
++      "version": "0.3.0",
++      "peerDependencies": {
++        "@deepseek-ai/dsh-client-locale": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-chat": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-tool": "0.1.2-alpha.2",
++        "cordis": "^4.0.0-rc.7",
++        "react": "^18.2.0",
++        "schemastery": "^3.18.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-chat": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-tool": {
++          "optional": true
++        },
++        "cordis": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        },
++        "schemastery": {
++          "optional": true
++        }
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index cf7f1c3..06ca573 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-merge-calls",
+-  "version": "0.2.2",
+-  "description": "Merge consecutive same-tool calls in the DSH WebUI chat flow into one card with compact child rows (0.1.1-era cohort; exam material only)",
++  "version": "0.3.0",
++  "description": "Merge consecutive same-tool calls in the DSH WebUI chat flow into one card with compact child rows (dsh 0.1.2-alpha.2 surface; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -15,11 +15,10 @@
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+         "@deepseek-ai/dsh-client-locale",
+-        "@deepseek-ai/dsh-client-ui-tool",
++        "@deepseek-ai/dsh-client-ui-chat",
+         "@deepseek-ai/dsh-client-ui-slots",
+-        "@deepseek-ai/dsh-client-ui-primitives"
++        "@deepseek-ai/dsh-client-ui-tool"
+       ],
+       "platform": "web"
+     }
+@@ -28,19 +27,17 @@
+     "cordis": "^4.0.0-rc.7",
+     "react": "^18.2.0",
+     "schemastery": "^3.18.0",
+-    "@deepseek-ai/dsh-client-locale": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-primitives": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-tool": "0.1.0-rc.6"
++    "@deepseek-ai/dsh-client-locale": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-chat": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-tool": "0.1.2-alpha.2"
+   },
+   "peerDependenciesMeta": {
+     "cordis": { "optional": true },
+     "react": { "optional": true },
+     "schemastery": { "optional": true },
+     "@deepseek-ai/dsh-client-locale": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+-    "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-chat": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-tool": { "optional": true }
+   },
+diff --git a/fixture/patches/0001-chat-derived-row-visibility.patch b/fixture/patches/0001-chat-derived-row-visibility.patch
+new file mode 100644
+index 0000000..695e668
+--- /dev/null
++++ b/fixture/patches/0001-chat-derived-row-visibility.patch
+@@ -0,0 +1,465 @@
++diff --git a/packages/client/ui-chat/src/client/apply.ts b/packages/client/ui-chat/src/client/apply.ts
++index be061df..2980281 100644
++--- a/packages/client/ui-chat/src/client/apply.ts
+++++ b/packages/client/ui-chat/src/client/apply.ts
++@@ -24,12 +24,14 @@ import { ApprovalCommand } from './chat/ApprovalCommand.tsx'
++ import { ChatView } from './chat/ChatView.tsx'
++ import { registerChatNodeRenderers } from './chat/register-node-renderers.ts'
++ import { StatsLine } from './chat/StatsLine.tsx'
+++import { registerChatConversationView } from './conversation-nodes/chat-snapshot-builder.ts'
++ import { registerConversationNodes } from './conversation-nodes/register.ts'
++ import { DetailsPanel } from './details/DetailsPanel.tsx'
++ import { en, NS, zh } from './locale.ts'
++ import { TranscriptViewRow, type TranscriptViewRowInjected } from './settings/TranscriptViewRow.tsx'
++ import { createChatStore } from './stores.ts'
++ import { TranscriptViewPolicy } from './transcript-view.ts'
+++import { UiChatVisibility } from './visibility.ts'
++ import { CHAT_SETTINGS_NAMESPACE, type ChatSettings } from '../chat-settings.ts'
++ 
++ const CHAT_NODE_INJECT: ChatNodeTurnDataInjected = {
++@@ -71,6 +73,22 @@ export function apply(ctx: Context): void {
++   }
++   registerConversationNodes(ctx)
++   registerChatNodeRenderers(ctx)
+++  // Derived row visibility: contributions are evaluated when the Chat target
+++  // publishes, and a contribution-set change re-mounts the target so every
+++  // Session snapshot rebuilds against the new set.
+++  const visibility = new UiChatVisibility(ctx)
+++  const mountChatView = () => registerChatConversationView(ctx, nodes => visibility.hiddenKeys(nodes))
+++  let disposeChatView = mountChatView()
+++  ctx.effect(() => {
+++    const unsubscribe = visibility.subscribe(() => {
+++      disposeChatView()
+++      disposeChatView = mountChatView()
+++    })
+++    return () => {
+++      unsubscribe()
+++      disposeChatView()
+++    }
+++  }, 'ui-chat: row-visibility rebuild')
++   ctx.uiSession.provide({
++     hooks: ['chat'],
++     resolve: binding => ({ hooks: { chat: chatSource(binding) } }),
++diff --git a/packages/client/ui-chat/src/client/contract/visibility.ts b/packages/client/ui-chat/src/client/contract/visibility.ts
++new file mode 100644
++index 0000000..c8baa3f
++--- /dev/null
+++++ b/packages/client/ui-chat/src/client/contract/visibility.ts
++@@ -0,0 +1,37 @@
+++/** Derived Chat row-visibility contributions. @module */
+++import type { ChatConversationViewNode } from './chat-nodes.ts'
+++
+++/** One published Chat node plus its siblings, for a derived visibility decision. */
+++export interface ChatRowVisibilityContext {
+++  /** The node under evaluation. */
+++  readonly node: ChatConversationViewNode
+++  /**
+++   * Visible published Chat nodes in current flow order. Officially hidden
+++   * nodes are absent, so a resolver reads the same order the renderer shows.
+++   */
+++  readonly nodes: readonly ChatConversationViewNode[]
+++}
+++
+++/**
+++ * Derived visibility decision for one published Chat node.
+++ *
+++ * `true` hides the node's flow row, `undefined` abstains. Resolvers must be
+++ * pure and total: the Chat target re-runs every contribution whenever the
+++ * published node set or the contribution set changes, and a throwing resolver
+++ * is a contract breach.
+++ */
+++export type ChatRowVisibilityResolver = (context: ChatRowVisibilityContext) => boolean | undefined
+++
+++/**
+++ * Evaluate every contribution over one visible node set in flow order.
+++ *
+++ * The Chat target owns the evaluation point: it calls the provider whenever it
+++ * publishes a snapshot, so the derived order, spacing, anchors and navigation
+++ * read one hidden set.
+++ */
+++export type ChatRowVisibilityProvider = (
+++  nodes: readonly ChatConversationViewNode[],
+++) => ReadonlySet<string>
+++
+++/** Empty decision set reused when no contribution hides a row. */
+++export const NO_HIDDEN_ROWS: ReadonlySet<string> = new Set()
++diff --git a/packages/client/ui-chat/src/client/conversation-nodes/chat-snapshot-builder.ts b/packages/client/ui-chat/src/client/conversation-nodes/chat-snapshot-builder.ts
++index 74fa8c6..a6ed105 100644
++--- a/packages/client/ui-chat/src/client/conversation-nodes/chat-snapshot-builder.ts
+++++ b/packages/client/ui-chat/src/client/conversation-nodes/chat-snapshot-builder.ts
++@@ -5,6 +5,8 @@ import type {
++ } from '@deepseek-ai/dsh-client-ui-conversation/client'
++ import type { ChatConversationViewNode, ChatNode } from '../contract/chat-nodes.ts'
++ import { isRunningTool } from '../contract/chat-nodes.ts'
+++import type { ChatRowVisibilityProvider } from '../contract/visibility.ts'
+++import { NO_HIDDEN_ROWS } from '../contract/visibility.ts'
++ import type {
++   ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot, ChatTurnNavigationIndex, ConversationNode,
++   LegacyConversationSlice, PartialAssistant, RunningToolCall, TurnNavigationItem,
++@@ -633,26 +635,73 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
++   private readonly navigation = new MutableTurnNavigationIndex()
++   private readonly legacy = new LegacySliceBuilder()
++   private readonly referenceLabels = new ReferenceLabelProjector()
+++  /**
+++   * Definition-authored Nodes before derived row visibility, keyed by Context
+++   * key. Derived copies live in {@link store}; this map is the restore source
+++   * when a contribution stops hiding a row.
+++   */
+++  private readonly authored = new Map<string, ChatConversationViewNode>()
+++  /** Whether any row was ever hidden; skips the reconcile walk when none was. */
+++  private hiddenRows = false
++   private order: readonly string[] = EMPTY_KEYS
++   /** Last published timeline: a Turn boundary can land without a new node. */
++   private timeline: ConversationTimelineSnapshot | null = null
++   readonly empty: ChatSnapshot
++ 
++-  constructor() {
+++  /** @param hiddenKeys - derived row-visibility provider, absent without contributions. */
+++  constructor(private readonly hiddenKeys: ChatRowVisibilityProvider | undefined = undefined) {
++     this.empty = this.snapshot({ turnOrder: EMPTY_TURNS, turns: new Map() })
++   }
++ 
+++  /**
+++   * Evaluate the derived visibility contributions over the authored Nodes.
+++   * @returns keys whose flow rows the contributions hide.
+++   */
+++  private hiddenSet(): ReadonlySet<string> {
+++    if (this.hiddenKeys === undefined) return NO_HIDDEN_ROWS
+++    return this.hiddenKeys(orderedVisibleChatNodes([...this.authored.values()]))
+++  }
+++
+++  /** Apply one hidden-key set to Nodes, keeping authored identity elsewhere. */
+++  private derive(
+++    nodes: readonly ChatConversationViewNode[],
+++    hidden: ReadonlySet<string>,
+++  ): readonly ChatConversationViewNode[] {
+++    if (hidden.size === 0) return nodes
+++    return nodes.map(node => hidden.has(node.key) && node.visibility === 'visible'
+++      ? { ...node, visibility: 'hidden' as const }
+++      : node)
+++  }
+++
+++  /** Re-derive stored Nodes whose visibility changed because another Node moved. */
+++  private reconcile(hidden: ReadonlySet<string>): readonly ChatConversationViewNode[] {
+++    if (hidden.size === 0 && !this.hiddenRows) return EMPTY_LIST
+++    const changed: ChatConversationViewNode[] = []
+++    for (const node of this.authored.values()) {
+++      const current = this.store.get(node.key)
+++      if (current === undefined) continue
+++      const next = this.derive([node], hidden)[0]
+++      if (next !== undefined && current.visibility !== next.visibility) changed.push(next)
+++    }
+++    return changed
+++  }
+++
++   replace(input: {
++     readonly nodes: readonly ChatConversationViewNode[]
++     readonly timeline: ConversationTimelineSnapshot
++   }): ChatSnapshot {
++     const nodes = this.referenceLabels.replace(input.nodes)
++-    this.store.replace(nodes)
++-    this.order = orderedVisibleChatNodes(nodes).map(node => node.key)
+++    this.authored.clear()
+++    for (const node of nodes) this.authored.set(node.key, node)
+++    const hidden = this.hiddenSet()
+++    this.hiddenRows = hidden.size > 0
+++    const published = this.derive(nodes, hidden)
+++    this.store.replace(published)
+++    this.order = orderedVisibleChatNodes(published).map(node => node.key)
++     this.locations.rebuild(this.order, this.store)
++     this.navigation.rebuild(input.timeline, this.locations, this.store)
++     this.timeline = input.timeline
++-    return this.snapshot(input.timeline, this.legacy.replace(nodes, input.timeline))
+++    return this.snapshot(input.timeline, this.legacy.replace(published, input.timeline))
++   }
++ 
++   apply(input: {
++@@ -660,9 +709,16 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
++     readonly timeline: ConversationTimelineSnapshot
++   }): ChatSnapshot {
++     const upserts = this.referenceLabels.apply(input.upserts, this.store)
+++    for (const node of upserts) this.authored.set(node.key, node)
+++    const hidden = this.hiddenSet()
+++    const published = this.derive(upserts, hidden)
+++    const changed = hidden.size === 0 && !this.hiddenRows
+++      ? published
+++      : [...published, ...this.reconcile(hidden)]
+++    this.hiddenRows = hidden.size > 0
++     let structural = false
++     const contentOnly: ChatConversationViewNode[] = []
++-    for (const node of upserts) {
+++    for (const node of changed) {
++       const previous = this.store.get(node.key)
++       const nodeStructural = previous === undefined
++         || previous.kind !== node.kind
++@@ -672,7 +728,7 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
++       structural ||= nodeStructural
++       if (!nodeStructural) contentOnly.push(node)
++     }
++-    this.store.upsert(upserts)
+++    this.store.upsert(changed)
++     if (structural) {
++       const next = orderedVisibleChatNodes(this.store.values()).map(node => node.key)
++       this.order = sameReferences(this.order, next) ? this.order : next
++@@ -685,7 +741,7 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
++       this.navigation.touch(turnsOf(contentOnly), this.locations, this.store)
++     }
++     this.timeline = input.timeline
++-    return this.snapshot(input.timeline, this.legacy.apply(upserts, input.timeline))
+++    return this.snapshot(input.timeline, this.legacy.apply(changed, input.timeline))
++   }
++ 
++   private snapshot(
++@@ -718,17 +774,44 @@ function locationIdentity(location: ConversationLocation): string {
++   return `${location.kind}:${coordinates.turn ?? ''}:${coordinates.step ?? ''}`
++ }
++ 
+++/** Whether a Chat snapshot carries any non-command row. */
+++function isActiveChatView(snapshot: ChatSnapshot): boolean {
+++  return snapshot.order.some(key => snapshot.nodes.get(key)?.kind !== 'command')
+++}
+++
++ /** Chat target factory contributed to the Conversation view registry. */
++ export const chatViewDefinition: ConversationViewDefinition<ChatConversationViewNode, ChatSnapshot> = {
++   target: 'chat',
++   create: () => new ChatSnapshotBuilder(),
++-  isActive: snapshot => snapshot.order.some(key => snapshot.nodes.get(key)?.kind !== 'command'),
+++  isActive: isActiveChatView,
+++}
+++
+++/**
+++ * Chat target carrying one derived row-visibility provider.
+++ * @param hiddenKeys - provider evaluated on every snapshot publication.
+++ * @returns a target definition identical to {@link chatViewDefinition} except for visibility.
+++ */
+++export function chatViewDefinitionWith(
+++  hiddenKeys: ChatRowVisibilityProvider,
+++): ConversationViewDefinition<ChatConversationViewNode, ChatSnapshot> {
+++  return {
+++    target: 'chat',
+++    create: () => new ChatSnapshotBuilder(hiddenKeys),
+++    isActive: isActiveChatView,
+++  }
++ }
++ 
++ /**
++  * Register the incremental Chat target builder.
++  * @param ctx - owning UI Conversation context.
+++ * @param hiddenKeys - derived row-visibility provider; absent keeps the shipped definition.
+++ * @returns idempotent disposer removing the target registration.
++  */
++-export function registerChatConversationView(ctx: Context): void {
++-  ctx.uiConversation.views.register(chatViewDefinition)
+++export function registerChatConversationView(
+++  ctx: Context,
+++  hiddenKeys?: ChatRowVisibilityProvider,
+++): () => void {
+++  return ctx.uiConversation.views.register(
+++    hiddenKeys === undefined ? chatViewDefinition : chatViewDefinitionWith(hiddenKeys),
+++  )
++ }
++diff --git a/packages/client/ui-chat/src/client/conversation-nodes/register.ts b/packages/client/ui-chat/src/client/conversation-nodes/register.ts
++index 0754aeb..4ab0b79 100644
++--- a/packages/client/ui-chat/src/client/conversation-nodes/register.ts
+++++ b/packages/client/ui-chat/src/client/conversation-nodes/register.ts
++@@ -1,6 +1,5 @@
++ import type { Context } from '@deepseek-ai/cordis'
++ import { registerAssistantConversationNode } from './assistant.ts'
++-import { registerChatConversationView } from './chat-snapshot-builder.ts'
++ import { registerCommandConversationNode } from './command.ts'
++ import { registerCompactionConversationNode } from './compaction.ts'
++ import { registerUnknownConversationFallback } from './fallback.ts'
++@@ -15,7 +14,10 @@ import { registerTurnProcess } from './turn-process.ts'
++ import { registerTurnTailConversationNode } from './turn-tail.ts'
++ 
++ /**
++- * Register the Chat business Definitions and target builder contributed by this package.
+++ * Register the Chat business Definitions contributed by this package. The
+++ * `chat` target builder is mounted by `apply` beside the row-visibility
+++ * service, because its derived visibility provider is replaced whenever that
+++ * service's contribution set changes.
++  * @param ctx - owning UI Conversation context.
++  */
++ export function registerConversationNodes(ctx: Context): void {
++@@ -32,5 +34,4 @@ export function registerConversationNodes(ctx: Context): void {
++   registerTurnMaxTokensConversationNode(ctx)
++   registerTurnTailConversationNode(ctx)
++   registerUnknownConversationFallback(ctx)
++-  registerChatConversationView(ctx)
++ }
++diff --git a/packages/client/ui-chat/src/client/visibility.ts b/packages/client/ui-chat/src/client/visibility.ts
++new file mode 100644
++index 0000000..48394e4
++--- /dev/null
+++++ b/packages/client/ui-chat/src/client/visibility.ts
++@@ -0,0 +1,87 @@
+++/** Registry of derived Chat row-visibility contributions. @module */
+++import { Service, type Context } from '@deepseek-ai/cordis'
+++import type { ChatRowVisibilityResolver } from './contract/visibility.ts'
+++import { NO_HIDDEN_ROWS } from './contract/visibility.ts'
+++import type { ChatConversationViewNode } from './contract/chat-nodes.ts'
+++
+++declare module '@deepseek-ai/cordis' {
+++  interface Context {
+++    /** Derived Chat row-visibility contributions. */
+++    uiChatVisibility: UiChatVisibility
+++  }
+++}
+++
+++/**
+++ * Contributed, derived row visibility for the Chat flow.
+++ *
+++ * A contribution declares which published Chat nodes the reader must not see
+++ * as flow rows. The Chat target evaluates every contribution when it builds a
+++ * snapshot, so the derived order, the flow spacing, the paging anchors and the
+++ * Turn navigation all agree on the same hidden set; registering or removing a
+++ * contribution rebuilds the affected Sessions.
+++ *
+++ * Visibility is presentation only: the node stays in the snapshot store, the
+++ * Session log, the details panel, exports and search.
+++ */
+++export class UiChatVisibility extends Service {
+++  private readonly resolvers = new Set<ChatRowVisibilityResolver>()
+++  private readonly listeners = new Set<() => void>()
+++
+++  /** @param ctx - Client root Context. */
+++  constructor(ctx: Context) {
+++    super(ctx, 'uiChatVisibility')
+++  }
+++
+++  /**
+++   * Contribute one derived row-visibility resolver. The effect is owned by the
+++   * calling fiber (the service proxy rebinds `this.ctx` per access), so a
+++   * plugin unload removes its contribution without a manual disposer call.
+++   * @param resolver - pure decision; `true` hides that node's flow row.
+++   * @returns disposer owned by the caller's Cordis fiber.
+++   */
+++  hideRows(resolver: ChatRowVisibilityResolver): () => void {
+++    const dispose = this.ctx.effect(() => {
+++      this.resolvers.add(resolver)
+++      this.notify()
+++      return () => {
+++        this.resolvers.delete(resolver)
+++        this.notify()
+++      }
+++    }, 'uiChatVisibility.hideRows()')
+++    return () => { void dispose() }
+++  }
+++
+++  /**
+++   * Evaluate every contribution over one node set.
+++   * @param nodes - visible published Chat nodes in flow order.
+++   * @returns keys of nodes whose flow rows are hidden.
+++   */
+++  hiddenKeys(nodes: readonly ChatConversationViewNode[]): ReadonlySet<string> {
+++    if (this.resolvers.size === 0) return NO_HIDDEN_ROWS
+++    const hidden = new Set<string>()
+++    for (const node of nodes) {
+++      for (const resolver of this.resolvers) {
+++        if (resolver({ node, nodes }) === true) {
+++          hidden.add(node.key)
+++          break
+++        }
+++      }
+++    }
+++    return hidden
+++  }
+++
+++  /**
+++   * Observe contribution-set changes.
+++   * @param listener - synchronous invalidation callback.
+++   * @returns unsubscribe callback.
+++   */
+++  subscribe(listener: () => void): () => void {
+++    this.listeners.add(listener)
+++    return () => { this.listeners.delete(listener) }
+++  }
+++
+++  /** Notify every observer of a contribution-set change. */
+++  private notify(): void {
+++    for (const listener of [...this.listeners]) listener()
+++  }
+++}
++diff --git a/packages/client/ui-chat/tests/row-visibility.client.spec.ts b/packages/client/ui-chat/tests/row-visibility.client.spec.ts
++new file mode 100644
++index 0000000..ae6f4c4
++--- /dev/null
+++++ b/packages/client/ui-chat/tests/row-visibility.client.spec.ts
++@@ -0,0 +1,77 @@
+++import { Context } from '@deepseek-ai/cordis'
+++import { describe, expect, it } from 'vitest'
+++import type { ChatConversationViewNode } from '../src/client/contract/chat-nodes.ts'
+++import { ChatSnapshotBuilder } from '../src/client/conversation-nodes/chat-snapshot-builder.ts'
+++import { UiChatVisibility } from '../src/client/visibility.ts'
+++
+++const TIMELINE = { turnOrder: [], turns: new Map() } as const
+++
+++/** Minimal published Chat node; the derived visibility path reads key/visibility only. */
+++function node(key: string): ChatConversationViewNode {
+++  return {
+++    key,
+++    kind: 'tool-call',
+++    target: 'chat',
+++    anchorSeq: 1,
+++    visibility: 'visible',
+++    location: { kind: 'session' },
+++    data: { root: { callId: key, name: 'read', argsRaw: '{}', turn: 1, step: 1, time: 0, subCalls: [] } },
+++  } as unknown as ChatConversationViewNode
+++}
+++
+++describe('derived Chat row visibility', () => {
+++  it('keeps every row when no contribution is registered', () => {
+++    const snapshot = new ChatSnapshotBuilder().replace({ nodes: [node('a'), node('b')], timeline: TIMELINE })
+++    expect(snapshot.order).toEqual(['a', 'b'])
+++  })
+++
+++  it('hides a contributed row from order while the node stays addressable', () => {
+++    const builder = new ChatSnapshotBuilder(
+++      nodes => new Set(nodes.filter(candidate => candidate.key === 'b').map(candidate => candidate.key)),
+++    )
+++    const snapshot = builder.replace({ nodes: [node('a'), node('b'), node('c')], timeline: TIMELINE })
+++    expect(snapshot.order).toEqual(['a', 'c'])
+++    expect(snapshot.nodes.get('b')?.visibility).toBe('hidden')
+++  })
+++
+++  it('evaluates contributions over flow order and reconciles a row another node moved', () => {
+++    const seen: string[][] = []
+++    const builder = new ChatSnapshotBuilder((nodes) => {
+++      seen.push(nodes.map(candidate => candidate.key))
+++      return nodes.some(candidate => candidate.key === 'z') ? new Set(['b']) : new Set()
+++    })
+++    const first = builder.replace({ nodes: [node('a'), node('b')], timeline: TIMELINE })
+++    expect(first.order).toEqual(['a', 'b'])
+++    const second = builder.apply({ upserts: [node('z')], timeline: TIMELINE })
+++    expect(seen.at(-1)).toEqual(['a', 'b', 'z'])
+++    expect(second.order).toEqual(['a', 'z'])
+++    expect(second.nodes.get('b')?.visibility).toBe('hidden')
+++  })
+++
+++  it('registers and disposes contributions through the service', () => {
+++    const ctx = new Context()
+++    const service = new UiChatVisibility(ctx)
+++    const nodes = [node('a'), node('b')]
+++    const dispose = service.hideRows(({ node: candidate }) => candidate.key === 'a')
+++    expect([...service.hiddenKeys(nodes)]).toEqual(['a'])
+++    expect(service.hiddenKeys(nodes).size).toBe(1)
+++    dispose()
+++    expect(service.hiddenKeys(nodes).size).toBe(0)
+++  })
+++
+++  it('removes a contribution when the contributing fiber unloads', async () => {
+++    const ctx = new Context()
+++    const service = new UiChatVisibility(ctx)
+++    const nodes = [node('a'), node('b')]
+++    const fiber = ctx.plugin({
+++      inject: ['uiChatVisibility'],
+++      apply(scope: Context) {
+++        scope.uiChatVisibility.hideRows(({ node: candidate }) => candidate.key === 'a')
+++      },
+++    })
+++    await fiber
+++    expect(service.hiddenKeys(nodes).size).toBe(1)
+++    await fiber.dispose()
+++    expect(service.hiddenKeys(nodes).size).toBe(0)
+++  })
+++})

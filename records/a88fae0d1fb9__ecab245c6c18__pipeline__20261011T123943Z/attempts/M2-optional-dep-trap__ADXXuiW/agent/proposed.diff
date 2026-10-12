@@ -1,0 +1,162 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index c623ae5..aac551c 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,8 +1,24 @@
+ # M2 fixture · optional-dep trap
+ 
+-A dsh 0.1.2-alpha.2 plugin whose `@deepseek-ai/dsh-util-time` dependency sits in
+-`optionalDependencies` while `lib/index.js` unconditionally imports it at top
+-level. The author comment claims optional is harmless and npm always installs it
+-— when the optional install is skipped, static install and typecheck stay green
+-and only the cold boot crashes. **Test material only — do not execute or
+-publish** (`"private": true`).
++A dsh 0.1.2-alpha.2 plugin that logs the canonical client time zone at boot
++through `canonicalClientTimeZone` from `@deepseek-ai/dsh-util-time`.
++
++## The trap this fixture recorded
++
++The fixture originally declared `@deepseek-ai/dsh-util-time` in
++`optionalDependencies` (pinned to the never-published `0.1.2-alpha.1`) while
++`lib/index.js` imported it unconditionally at top level. The author comment
++claimed optional is harmless and npm always installs it. That was wrong:
++`npm install` exits 0 while silently leaving the package absent, static
++typecheck stays green, and only the cold boot crashes with
++`ERR_MODULE_NOT_FOUND: Cannot find package '@deepseek-ai/dsh-util-time'` — a
++failure the harness reports only as `plugin(s) failed to load: …`.
++
++## Current state
++
++The import is unconditional, so the dependency is required: it now lives in
++`dependencies` at `^0.1.2-alpha.2`, the version the harness release line
++actually ships. The bundle patch (`cordis.patch.yml`) and the boot-time
++canonicalization effect are unchanged.
++
++**Test material only — do not execute or publish** (`"private": true`).
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..bb8457d
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,89 @@
++{
++  "name": "@demo/dsh-optional-bench",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-optional-bench",
++      "version": "0.1.0",
++      "dependencies": {
++        "@deepseek-ai/dsh-util-time": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/cordis": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.4.tgz",
++      "integrity": "sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      },
++      "bin": {
++        "cordis": "bin.js"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis-plugin-include": {
++          "optional": true
++        },
++        "@deepseek-ai/cordis-plugin-loader": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/@deepseek-ai/dsh-invariants": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-invariants/-/dsh-invariants-0.1.2-rc.1.tgz",
++      "integrity": "sha512-zSjuFJYcEB94kPwn7SicqAV1dfVWZkjt1I8luDboxtjfp5CN6ziwJhLv3KaB+Dh9tgkyGY4mvo886W/HhE9L9g==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-time": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-time/-/dsh-util-time-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-BhVWSkq/GisaTDRIjg8MeUG9CaltZ2KlmcNO23gWo3ns+SEF7W8DpmHpcVXWLRILvcq4J+w9gfcw2leSnPuGCg==",
++      "license": "MIT",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/schemastery": {
++      "version": "3.18.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.4.tgz",
++      "integrity": "sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      }
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "license": "MIT",
++      "peer": true
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 0a77328..12fe136 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,20 +1,24 @@
+ {
+   "name": "@demo/dsh-optional-bench",
+   "version": "0.1.0",
+-  "description": "Bench plugin: optional dependency declared for a top-level import (test material)",
++  "description": "Bench plugin: the M2 optional-dep trap fixture (test material)",
+   "type": "module",
+   "main": "lib/index.js",
+   "exports": {
+     ".": "./lib/index.js",
+     "./cordis.patch.yml": "./cordis.patch.yml"
+   },
++  "files": [
++    "lib",
++    "cordis.patch.yml"
++  ],
+   "dsh": {
+     "bundle": {
+       "patch": "./cordis.patch.yml"
+     }
+   },
+-  "optionalDependencies": {
+-    "@deepseek-ai/dsh-util-time": "0.1.2-alpha.1"
++  "dependencies": {
++    "@deepseek-ai/dsh-util-time": "^0.1.2-alpha.2"
+   },
+   "private": true
+ }

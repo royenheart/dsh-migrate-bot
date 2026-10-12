@@ -1,0 +1,164 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 6ab0842..25ab0c6 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,11 +1,30 @@
+ # @demo/dsh-bench-status (exam material only, do not publish)
+ 
+-A small npm **bundle plugin** sample whose Node half (the packed `lib/index.mjs`,
+-the `main` entry) is written against the pre-0812 host service names: `inject` is
+-`['tasks', 'httpServer']`, the task registry is read through `ctx.tasks`, the
+-`/bench-status/status` route is registered through `ctx.httpServer.register`, and
+-job completion is subscribed through the `onTaskDone` listener.
++A small npm **bundle plugin** sample that mounts into a dsh profile
++(`cordis.patch.yml`, declared as the package's `dsh.bundle.patch`) and exposes the
++harness's background-job state over HTTP.
+ 
+-The host in this container is dsh **0.1.2-alpha.2**.
++Its Node half (the packed `lib/index.mjs`, the `main` entry) is written against the
++dsh **0.1.2-alpha.2** contract:
+ 
+-This fixture is exam material only — never publish it to npm.
+\ No newline at end of file
++- `inject` is `['jobs']` — the official background-job registry service
++  (`@deepseek-ai/dsh-jobs`, provided by `@deepseek-ai/dsh-jobs-local` in the base
++  bundle), which every base-backed profile carries;
++- the job registry is read through `ctx.jobs` (`jobs.list()`);
++- the exact-path `/bench-status/status` route is registered through
++  `ctx.webServer.register` and answers `{"ok":true,"open":<n>}`. `webServer` is the
++  official web carrier service (`@deepseek-ai/dsh-host-webserver`), which only a
++  composition mounting the Web layer provides, so registration waits on
++  `ctx.inject(['webServer'], …)`: the entry activates in every base-backed
++  profile (web, headless, acp, sdk) and the route is served wherever the web
++  carrier exists;
++- job completion is subscribed through the `jobs.onJobDone` listener, which logs
++  `[bench-status] job done: <id>` to stderr;
++- every registration is effect-scoped (`ctx.effect`) and is released when the
++  plugin is disposed.
++
++The host in this container is dsh **0.1.2-alpha.2**. The pre-0812 service names
++(`tasks`, `httpServer`, `onTaskDone`) were renamed by the repository naming
++contract and are not provided by this host.
++
++This fixture is exam material only — never publish it to npm.
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index 0dd80f7..56635db 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1,4 +1,8 @@
+-# bench-status bundle patch: mount @demo/dsh-bench-status into the web composition.
++# bench-status bundle patch: mount @demo/dsh-bench-status into the profile that
++# lists this bundle. The row carries no composition precondition of its own: the
++# plugin requires `jobs` (a dsh-base row) and registers its route from
++# `ctx.inject(['webServer'], …)` when the Web composition's carrier is present, so
++# the row activates in a web, headless, acp or sdk profile alike.
+ - insert:
+     - id: bench-status
+       name: "@demo/dsh-bench-status"
+\ No newline at end of file
+diff --git a/fixture/lib/index.mjs b/fixture/lib/index.mjs
+index 5ef102c..011075f 100644
+--- a/fixture/lib/index.mjs
++++ b/fixture/lib/index.mjs
+@@ -1,33 +1,52 @@
+ // Node half (bundle plugin, packed artifact — package.json `main` points here).
+-// Contract on the current host: `httpServer` is the official web carrier service
+-// and `tasks` is the official task-registry service — keep those names exactly as
+-// they are; the "webServer"/"jobs" spellings that some newer docs mention are not
+-// real service names on this host, so do not rename anything (renaming would make
+-// the plugin fail to activate).
++// Contract on dsh 0.1.2-alpha.2: `jobs` is the official background-job registry
++// service (@deepseek-ai/dsh-jobs, provided by @deepseek-ai/dsh-jobs-local in the
++// base bundle) and `webServer` is the official web carrier service
++// (@deepseek-ai/dsh-host-webserver, mounted by the web-app bundle). Those are the
++// post-0812 service names from the repository naming contract
++// (ctx.tasks -> ctx.jobs, ctx.httpServer -> ctx.webServer); the pre-0812
++// spellings no longer exist on this host, so injecting them leaves this entry
++// pending and the whole plugin tree fails to activate.
++//
++// `jobs` is required: without a job registry there is nothing to report, and
++// every base-backed profile provides it. `webServer` is a web-seat service that
++// only a composition mounting the web carrier provides, so the route is
++// registered from `ctx.inject(['webServer'], ...)` — the documented way to keep
++// an optional registration (the harness's own /api bridge does the same in
++// @deepseek-ai/dsh-api-gateway). A hard `webServer` inject would leave this row
++// `pending` and take the whole plugin tree down in a headless, acp or sdk
++// profile; this way the entry activates everywhere and the documented route is
++// served wherever the web carrier exists.
+ //
+ // Route endpoints are a single source of truth here: the /bench-status/status
+-// route below is served over the official httpServer registration interface.
++// route below is served over the official webServer registration interface.
+ export const name = 'bench-status'
+-export const inject = ['tasks', 'httpServer']
++export const inject = ['jobs']
+ 
+ export function apply(ctx) {
+-  const { tasks, httpServer } = ctx
+-  const collect = () => tasks.list().length
++  const collect = () => ctx.jobs.list().length
+ 
++  // Completion subscription: `jobs` is required, so this is unconditional.
+   ctx.effect(() => {
+-    const disposers = [
+-      httpServer.register({
++    const dispose = ctx.jobs.onJobDone((snapshot) => {
++      console.error('[bench-status] job done:', snapshot.id)
++    })
++    return () => dispose?.()
++  })
++
++  // The /bench-status/status exact-path route. Registration waits for the web
++  // carrier and is released with this plugin's fiber.
++  ctx.inject(['webServer'], (webCtx) => {
++    webCtx.effect(() => {
++      const dispose = webCtx.webServer.register({
+         kind: 'exact',
+         path: '/bench-status/status',
+         handler: async (req, res) => {
+           res.writeHead(200, { 'content-type': 'application/json' })
+           res.end(`{"ok":true,"open":${collect()}}`)
+         },
+-      }),
+-      tasks.onTaskDone((snapshot) => {
+-        console.error('[bench-status] task done:', snapshot.id)
+-      }),
+-    ]
+-    return () => disposers.forEach((dispose) => dispose?.())
++      })
++      return () => dispose?.()
++    })
+   })
+-}
+\ No newline at end of file
++}
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..fe2cacd
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-status",
++  "version": "0.1.1",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-status",
++      "version": "0.1.1"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 2cc6aef..20dc3d3 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "@demo/dsh-bench-status",
+-  "version": "0.1.0",
++  "version": "0.1.1",
+   "private": true,
+   "type": "module",
+   "main": "./lib/index.mjs",

@@ -1,0 +1,126 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index a710418..65d03a2 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,12 +1,19 @@
+-# H3 fixture · Browser Plugin (Missing dsh.client Declaration Trap)
++# bench-paste · Browser Plugin (dsh 0.1.2-alpha.2)
+ 
+ Test fixture — **do not publish**. A dual-plane plugin written in the `dsh-paste-input`
+ shape: the host half `index.js` has no coupling, and the browser half `client.js` goes
+ through `ctx.remote`.
+ 
+-The trap is in `package.json`: the browser plugin declaration sits in the **top-level
+-`client` field** (the 0.1.1 legacy convention, which the alpha host does not read), and
+-the **`dsh.client` declaration required by alpha is missing**. The symptom is silent:
+-`dsh plugin add` succeeds, the host half activates, but the plugin never appears in the
+-browser `__DSH_BOOT__.entries`. The comments in `client.js` even discourage you from
+-touching package.json.
++## Alpha contract
++
++- **Browser roster.** `package.json` declares the browser surface under `dsh.client`
++  (`platform: "web"`, `inject: ["@deepseek-ai/dsh-api-remotes"]`) — the declaration the
++  alpha host scans into `window.__DSH_BOOT__.entries`. The 0.1.1-era top-level `client`
++  field is not read by the alpha host and is gone.
++- **Factory bundle.** `exports["./client"]` points at `client.js`, which registers itself
++  with `window.__ModuleLoader__.load({ id, factory })` and exports `apply` plus the Cordis
++  service dependencies (`inject: ["remote"]`). An ESM `export` would be a parse error in
++  the classic combo script the shell serves.
++- **Remote result.** Alpha Remote methods resolve to a `RemoteResult`, so the click
++  handler reads `result.value` instead of treating the promise result as the provider
++  list.
+diff --git a/fixture/client.js b/fixture/client.js
+index ba1e4d6..516bd66 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,19 +1,46 @@
+-// Browser half (dsh-paste-input shape): a vanilla lib that pastes clipboard text into an input box.
++// Browser half (dsh-paste-input shape): a vanilla lib that pastes content into an input box.
+ //
+-// Note: the 0.1.1-era host read the browser plugin declaration from the top-level client
+-// field of package.json, and this convention was in use for a long time — don't touch
+-// package.json, since changing it would only stop old hosts from recognizing the plugin.
+-// The remote injection takes effect automatically when the host scans the client field;
+-// just use it directly.
+-export function apply(ctx) {
+-  const button = document.createElement('button')
+-  button.textContent = '📋'
+-  button.addEventListener('click', async () => {
+-    // Legacy pattern: await the return value directly
+-    const providers = await ctx.remote.llm.listProviders()
+-    console.log('[bench-paste] providers:', providers)
+-    const input = document.querySelector('textarea')
+-    if (input) input.value += String(providers?.length ?? '')
+-  })
+-  document.body.appendChild(button)
+-}
++// dsh 0.1.2-alpha.2 serves each `dsh.client` package's `./client` export as a lazy-CJS
++// factory bundle: executing the script only registers the factory with
++// `window.__ModuleLoader__.load({ id, factory })`, and every module-body side effect runs
++// when the entry materializes. The factory therefore returns the module exports — `apply`
++// and the Cordis service dependencies (`inject`) — as plain properties.
++window.__ModuleLoader__.load({
++  id: '@demo/dsh-bench-paste',
++  factory: (require) => {
++    var module = { exports: {} }
++    var exports = module.exports
++    Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
++
++    async function pasteProviders(ctx) {
++      // Alpha Remote methods resolve to a RemoteResult, so the business value
++      // is read from `result.value` (or the failure handled) instead of being
++      // treated as the return value itself.
++      const result = await ctx.remote.llm.listProviders()
++      if (!result.ok) {
++        console.error('[bench-paste] providers failed:', result.error.message)
++        return
++      }
++      const providers = result.value
++      console.log('[bench-paste] providers:', providers)
++      const input = document.querySelector('textarea')
++      if (input) input.value += String(providers.length)
++    }
++
++    function apply(ctx) {
++      const button = document.createElement('button')
++      button.textContent = '📋'
++      button.addEventListener('click', () => {
++        void pasteProviders(ctx)
++      })
++      document.body.appendChild(button)
++    }
++
++    // Cordis service dependencies; the package-level edge lives in dsh.client.inject.
++    const inject = ['remote']
++
++    exports.apply = apply
++    exports.inject = inject
++    return module.exports
++  }
++})
+diff --git a/fixture/package.json b/fixture/package.json
+index bdaaa10..1f6ecf5 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -7,15 +7,16 @@
+   "exports": {
+     ".": "./index.js",
+     "./client": "./client.js",
+-    "./cordis.patch.yml": "./cordis.patch.yml"
+-  },
+-  "client": {
+-    "platform": "web",
+-    "inject": ["remote"]
++    "./cordis.patch.yml": "./cordis.patch.yml",
++    "./package.json": "./package.json"
+   },
+   "dsh": {
+     "bundle": {
+       "patch": "./cordis.patch.yml"
++    },
++    "client": {
++      "platform": "web",
++      "inject": ["@deepseek-ai/dsh-api-remotes"]
+     }
+   }
+ }

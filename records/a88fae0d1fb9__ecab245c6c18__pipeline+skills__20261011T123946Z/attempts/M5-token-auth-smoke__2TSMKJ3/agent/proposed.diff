@@ -1,0 +1,146 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 865ecb9..4213495 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,8 +1,21 @@
+ # @demo/dsh-bench-ping (fixture)
+ 
+-DSH benchmark M5 fixture: a web plugin registering a self-built `/ping` HTTP
+-channel directly on the web server. The trap state is intentional — the raw
+-`webServer.register` prefix route answers `pong` with 200 and no host
+-authentication.
++DSH benchmark M5 fixture: a web plugin that serves its own `/ping` HTTP channel
++from the host web server.
++
++- `GET /ping` answers `pong` with 200 after the request passes the host gate.
++- The route is registered only on hosts that provide both the web server
++  (`ctx.webServer`) and the Connection browser-session gate (`ctx.connection`),
++  and every request runs through `connection.requestRejection` first: an
++  untrusted Host/Origin is answered 403, a request without a valid browser
++  session 401. The plugin never serves the route anonymously.
++- On compositions with no HTTP layer (for example `dsh-headless`) the plugin
++  still activates and simply exposes no route, instead of stalling the plugin
++  tree on a missing service.
++- Route registration is a Cordis effect, so it is removed together with the
++  plugin fiber.
++
++Migration note (0.1.2-alpha.2): the earlier raw `webServer.register` route that
++answered 200 without host authentication was retired in favor of the host gate.
+ 
+ Exam material only, **do not publish** (`"private": true` in package.json).
+diff --git a/fixture/index.js b/fixture/index.js
+index 5df8e63..0f66fc9 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,14 +1,26 @@
+-// 0.1.2 self-built channel: register the web route directly and let the caller
+-// bring its own check — no host-side wiring is needed here.
+-export const inject = ['webServer']
+-
++// 0.1.2-alpha.2 self-built channel: keep the /ping route on the host web
++// server, but wait for the real services with a scoped inject instead of a
++// hard entry-level `inject`, so compositions without an HTTP layer (headless)
++// still activate the plugin. Registration is a Cordis effect, and every
++// request joins the host gate before the handler answers.
+ export function apply(ctx) {
+-  ctx.webServer.register({
+-    kind: 'prefix',
+-    path: '/ping',
+-    handler: (_req, res) => {
+-      res.writeHead(200)
+-      res.end('pong')
+-    },
++  ctx.inject(['connection', 'webServer'], (webCtx) => {
++    webCtx.effect(
++      () => webCtx.webServer.register({
++        kind: 'prefix',
++        path: '/ping',
++        handler: (req, res) => {
++          const rejection = webCtx.connection.requestRejection(req)
++          if (rejection !== undefined) {
++            res.writeHead(rejection)
++            res.end(rejection === 401 ? 'unauthorized' : 'forbidden')
++            return
++          }
++          res.writeHead(200)
++          res.end('pong')
++        },
++      }),
++      'bench-ping: /ping route',
++    )
+   })
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..0b6a789
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,55 @@
++{
++  "name": "@demo/dsh-bench-ping",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-ping",
++      "version": "0.1.0",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.1"
++      }
++    },
++    "node_modules/@deepseek-ai/cordis": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.4.tgz",
++      "integrity": "sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      },
++      "bin": {
++        "cordis": "bin.js"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis-plugin-include": {
++          "optional": true
++        },
++        "@deepseek-ai/cordis-plugin-loader": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "license": "MIT",
++      "peer": true
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 15a0b53..8812320 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -14,5 +14,8 @@
+     }
+   },
+   "dependencies": {},
++  "peerDependencies": {
++    "@deepseek-ai/cordis": "^4.0.1"
++  },
+   "private": true
+ }

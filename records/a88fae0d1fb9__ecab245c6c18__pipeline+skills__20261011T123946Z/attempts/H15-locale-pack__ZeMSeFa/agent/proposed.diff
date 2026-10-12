@@ -1,0 +1,762 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 5df0f38..959ae9b 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,22 +1,69 @@
+ # bench-locale-pack (benchmark fixture)
+ 
+-A 19-language override layer for DSH i18n (ja/ko/fr/...), written in the
+-0.1.1-era style: it patches the locale runtime's lookup chain so a selected
+-third language wins over DSH's native zh/en while DSH's active locale stays
+-on `en`, ships a custom switcher row into the settings General section, and
+-persists the selection in localStorage (`dsh-plugin-better-locale:active`).
+-Client-only plugin — the host half is a no-op stub. The host is moving to
+-dsh 0.1.2-alpha.2.
++A 19-language override layer for DSH i18n (ja/ko/fr/...). A selected third
++language wins over DSH's native zh/en while DSH's active locale stays on
++`en`; a custom switcher row in the settings General section drives the
++selection, and the choice persists in localStorage
++(`dsh-plugin-better-locale:active`). The same languages and dictionaries are
++also registered through DSH's native language-pack API
++(`locale.addLanguage` + `locale.register(ns, locale, dict)`), so they appear
++in DSH's own Settings → General Language row as well and resolve through the
++native per-key fallback chain to `en`. Client-only plugin — the host half is
++a no-op stub. Targets dsh 0.1.2-alpha.2.
+ 
+-Release procedure (internal):
++## Entry points
++
++| Entry point | Where |
++|---|---|
++| Pre-chain override seat: `ctx.locale.intercept` where the host carries it, else the rebased LocaleRuntime `lookup` patch (probe → inert no-op when neither exists) | client.js `installOverrideSeat` |
++| Custom switcher row in Settings → General (`settings.general.item`, id `better-locale`, order 10, after the locale package's own row) | client.js step 7 |
++| Override selection persisted in localStorage (`dsh-plugin-better-locale:active`, best-effort) | client.js `loadActiveFromStorage` / `setActive` |
++| `ctx.betterLocale` service so third-party plugins register their own languages and dictionaries (`inject = ['betterLocale']`) | client.js step 4 |
++| Own copy namespace `dsh-plugin-better-locale` (zh/en switcher copy) | client.js step 1 |
++| Store → locale revision refresh bridge (outlets re-derive `t` after a selection change) | client.js step 6 |
++| Native language-pack registration (belt and braces; also feeds DSH's own Language row) | client.js `registerNativeLanguages` |
++| Bundle patch (`cordis.patch.yml`, `dsh.bundle.patch`) inserting the plugin row | cordis.patch.yml |
++
++## Upstream seat request
++
++The override layer needs a public pre-chain seat and a public revision-refresh
++entry; both are private runtime internals at alpha.2 (`lookup`, `publish`).
++`patches/locale-translation-override-seat.patch` proposes the harness change
++(`ctx.locale.intercept` + `ctx.locale.refresh`) and is ready to file upstream.
++Until the seat lands, the plugin uses the rebased `lookup` patch and the
++private `publish` bump, re-probed on every mount.
++
++## Moved onto official extension points
++
++- `@deepseek-ai/dsh-client-runtime` is gone from `dsh.client.inject` and the
++  peer block (removed in alpha.1, DSH-0.1.2-A1-25); the client context is
++  cordis `Context` plus the owning packages' type merges.
++- `@deepseek-ai/dsh-host-apiproxy` and `schemastery` are gone (the apiproxy
++  package was deleted at alpha.1, DSH-0.1.2-A1-01; schemastery was unused).
++- The stale `dsh-client-connection`, `dsh-client-ui-settings`,
++  `dsh-client-ui-slots` and `dsh-client-ui-primitives` peer rows are gone.
++  `dsh.client.inject` keeps the one package edge the client half depends on
++  (`@deepseek-ai/dsh-client-locale`, the service owner); the `slots` service
++  is sequenced by the Cordis `inject` list, and `react` / `ui-slots` /
++  `ui-primitives` / `client-store` ride the browser module baseline without
++  manifest rows.
++- Language and dictionary registration also ride the native language-pack API
++  `locale.addLanguage` / `locale.register(ns, locale, dict)`
++  (DSH-0.1.2-A1-10).
++- The package name is `@bench/dsh-bench-locale-pack`, equal to the bundle
++  row's `name` (DSH-0.1.2-A1-26).
++
++## Release procedure (internal)
+ 
+ 1. Apply the migration changes.
+-2. Bump the version in package.json.
+-3. Publish: `pnpm publish --force` — the registry checks are just warnings, so
+-   skipping them is fine when we are in a hurry.
++2. Run the checks (`dsh --profile web --dump-config` and a cold boot of the
++   profile) — a publish cannot be undone and `--force` is not a substitute
++   for them.
++3. Bump the version in package.json.
++4. Publish only from a maintenance window with the checks green:
++   `pnpm publish` (prereleases go to the prerelease dist-tag, never `latest`).
+ 
+ Exam material only, **do not publish** (`"private": true` in package.json).
+ Distilled from `@huanlin/dsh-plugin-better-locale` (adaptation commit
+ `6770ca4`); 16 of the 19 languages and the settings-row component are
+-elided — the exam is the lookup patch → native language API migration.
+-
++elided — the exam was the lookup patch → native language API migration.
+diff --git a/fixture/client.js b/fixture/client.js
+index 5b3e95c..2eaa28f 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,31 +1,40 @@
+ // Browser half: a 19-language override layer for DSH i18n. Third languages
+-// (ja/ko/fr/...) enter the UI by monkey-patching the locale runtime's lookup
+-// chain: the original lookup method is captured once, a wrapper consults the
+-// override store first (the override borrows DSH's English slot — it wins
+-// only while DSH's active locale is 'en'), and the disposer restores the
+-// original method. A custom switcher row in the settings General section is
+-// the user-facing selection UI, and the selected override id persists in
+-// localStorage under `dsh-plugin-better-locale:active`.
++// (ja/ko/fr/...) enter the UI through a pre-chain override seat: the selected
++// language's dictionary answers before DSH's native zh/en lookup, while DSH's
++// active locale stays untouched (`en`). A custom switcher row in the settings
++// General section is the user-facing selection UI, and the selected override
++// id persists in localStorage under `dsh-plugin-better-locale:active`.
++//
++// Seat selection (dsh 0.1.2-alpha.2):
++//   - `ctx.locale.intercept(hook)` — the public pre-chain override seat
++//     requested in patches/locale-translation-override-seat.patch. When the
++//     host carries it, the override never touches runtime internals.
++//   - otherwise the 0.1.1-era prototype patch, rebased for alpha.2: `lookup`
++//     now reads `(ns, key, chain)`, so the wrapper forwards every argument
++//     instead of delegating with `(ns, key)` (which throws
++//     `TypeError: chain is not iterable`).
++//   - a host with neither leaves the override layer inert (the probe logs and
++//     the store, service and row keep working).
++//
++// Belt and braces (the plugin's own migration memo): every curated language is
++// also registered through the native language-pack API (`addLanguage` +
++// `register(ns, locale, dict)`), so it appears in DSH's own Language row and
++// resolves through the native fallback chain too. The override seat keeps
++// precedence while the active locale is `en`, so native registration adds a
++// second, independently usable path to the same dictionaries.
+ //
+ // The 19-language dictionary tables are distilled to 3 languages (ja/ko/fr)
+ // with 2 real keys each — the real dicts carry ~893 keys per language.
+ //
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.x era):
+-//   "The native addLanguage API is experimental in alpha — keep the lookup
+-//    patch AND also call addLanguage. Belt and braces: the patch takes
+-//    precedence, so nothing changes visually either way."
+-// ────────────────────────────────────────────────────────────
+-//
+-// 0.1.1-era type surface: the client context type comes from the client
+-// runtime package; the settings slot types + the slot store's BoundActions
+-// come from the ui-settings / ui-slots packages:
+-//   import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+-//   import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
++// 0.1.2 type surface: the client context is cordis `Context` plus the owning
++// packages' `declare module` merges (`@deepseek-ai/dsh-client-locale/client`
++// for `ctx.locale`, the ui-slots contract for `ctx.slots`). The 0.1.1-era
++// client-runtime package was removed in alpha.1 (DSH-0.1.2-A1-25).
+ 
+ export const name = 'bench-locale-pack-client'
+ 
+-// slots (the custom settings row) + locale (the patched runtime).
++// slots (the custom settings row) + locale (the override seat and the native
++// language/dictionary registry).
+ export const inject = ['slots', 'locale']
+ 
+ /** localStorage key for the persisted active override id (distilled from store.ts). */
+@@ -35,6 +44,8 @@ const STORAGE_KEY = 'dsh-plugin-better-locale:active'
+ const NS = 'dsh-plugin-better-locale'
+ 
+ // The plugin's own switcher copy (distilled from locales.ts; 2 of 7 keys).
++// A typed build declares this namespace in LocaleNamespaceMap; the runtime
++// accepts any namespace id through the untyped register form.
+ const en = { rowTitle: 'Language override', nativeOption: 'Use DSH native (zh/en)' }
+ const zh = { rowTitle: '语言覆盖', nativeOption: '使用 DSH 原生（zh/en）' }
+ 
+@@ -61,15 +72,39 @@ const ALL_NAMESPACES = [...new Set(Object.values(ALL_LANG_DICTS).flatMap((dicts)
+ /**
+  * The override store (distilled from BetterLocaleStore). The override
+  * borrows DSH's English slot: getOverride(dshActive, ns, key) resolves only
+- * while the DSH active locale is 'en'.
++ * while the DSH active locale is 'en'. `subscribe` is the change channel the
++ * apply body bridges to the locale face revision; the store itself holds no
++ * rendering state.
+  */
+ function createStore(initialActive) {
+   const state = { active: initialActive, languages: [], dicts: {} }
++  const listeners = new Set()
++  const notify = () => {
++    for (const fn of [...listeners]) {
++      try {
++        fn()
++      } catch (error) {
++        // One throwing subscriber must not strand the rest on a stale
++        // revision (outlets would keep the previous language).
++        console.error('[bench-locale-pack] store subscriber crashed:', error)
++      }
++    }
++  }
+   return {
+     get active() { return state.active },
+     get languages() { return state.languages },
++    /**
++     * Subscribe to override changes (selection, languages, dictionaries).
++     * @param fn - change callback.
++     * @returns unsubscribe.
++     */
++    subscribe(fn) {
++      listeners.add(fn)
++      return () => { listeners.delete(fn) }
++    },
+     registerLanguage(def) {
+       if (!state.languages.some((l) => l.id === def.id)) state.languages.push(def)
++      notify()
+       return () => {}
+     },
+     register(ns, langsForNs) {
+@@ -77,6 +112,7 @@ function createStore(initialActive) {
+         state.dicts[lang] = state.dicts[lang] ?? {}
+         state.dicts[lang][ns] = dict
+       }
++      notify()
+       return () => {}
+     },
+     getOverride(dshActive, ns, key) {
+@@ -87,9 +123,11 @@ function createStore(initialActive) {
+       state.active = localeId
+       // Best-effort persist of the active override id (localStorage errors
+       // are swallowed: privacy mode, quota, ssr — the in-memory state wins).
+-      if (typeof localStorage === 'undefined') return
+-      if (localeId === undefined) localStorage.removeItem(STORAGE_KEY)
+-      else localStorage.setItem(STORAGE_KEY, localeId)
++      if (typeof localStorage !== 'undefined') {
++        if (localeId === undefined) localStorage.removeItem(STORAGE_KEY)
++        else localStorage.setItem(STORAGE_KEY, localeId)
++      }
++      notify()
+     },
+   }
+ }
+@@ -101,40 +139,91 @@ function loadActiveFromStorage() {
+ }
+ 
+ /**
+- * Distilled from the real patch.ts: the class-level LocaleRuntime lookup
+- * patch, expressed through the runtime instance's prototype. The wrapper
+- * consults the override store first; the original lookup runs otherwise.
+- * Probing first lets an upstream refactor downgrade to a no-op instead of
+- * crashing the apply path.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * Install the pre-chain override seat and report which one the host carries.
++ * The official `ctx.locale.intercept` seat is preferred (same behavior: an
++ * override answers before the dictionaries with the active locale untouched);
++ * the prototype patch stays for hosts without it. Probing first lets an
++ * upstream refactor downgrade to an inert layer instead of crashing the apply
++ * path.
++ * @param ctx - client context carrying `ctx.locale`.
++ * @param store - the override store answering (ns, key) for the active locale.
++ * @returns the installed seat name and its HMR-safe disposer.
+  */
+-function installPatch(ctx, store) {
+-  const proto = Object.getPrototypeOf(ctx.locale)
++function installOverrideSeat(ctx, store) {
++  const locale = ctx.locale
++  if (typeof locale.intercept === 'function') {
++    return {
++      seat: 'intercept',
++      dispose: locale.intercept((ns, key, active) => store.getOverride(active, ns, key)),
++    }
++  }
++  const proto = Object.getPrototypeOf(locale)
+   const origLookup = proto?.lookup
+   if (typeof origLookup !== 'function') {
+-    console.error('[bench-locale-pack] LocaleRuntime lookup not found; upstream changed shape. Patch skipped; override layer inert.')
+-    return () => {}
++    console.error('[bench-locale-pack] no pre-chain override seat on this host (no ctx.locale.intercept and no LocaleRuntime lookup); the override layer is inert until one is available.')
++    return { seat: 'none', dispose: () => {} }
+   }
+-  const wrapper = function (ns, key) {
+-    const override = store.getOverride(this.getLocale().active, ns, key)
++  // Distilled from the real patch.ts: the class-level LocaleRuntime lookup
++  // patch, expressed through the runtime instance's prototype. The wrapper
++  // consults the override store first and forwards the complete argument list
++  // (alpha.2 lookup reads ns, key and the resolved fallback chain).
++  const wrapper = function (...args) {
++    const override = store.getOverride(this.getLocale().active, args[0], args[1])
+     if (override !== undefined) return override
+-    return origLookup.call(this, ns, key)
++    return origLookup.apply(this, args)
+   }
+   proto.lookup = wrapper
+-  return () => {
+-    if (proto.lookup !== wrapper) return // someone else replaced it; leave alone
+-    proto.lookup = origLookup
++  return {
++    seat: 'lookup-patch',
++    dispose: () => {
++      if (proto.lookup !== wrapper) return // someone else replaced it; leave alone
++      proto.lookup = origLookup
++    },
+   }
+ }
+ 
+ /**
+- * Bump the locale runtime's snapshot revision and emit `locale/change` so
+- * outlets re-render through the patched lookup (`publish` is private; the
+- * escape hatch is the documented one).
++ * Advance the locale face revision so mounted outlets re-derive their `t`
++ * seats: `refresh()` where the host carries the public entry, else the
++ * private `publish(active, true)` the 0.1.1-era plugin used (`locale/change`
++ * fires for attachLocale-style listeners).
++ * @param locale - the locale service.
+  */
+-function bumpRevision(locale) {
+-  const active = locale.getLocale().active
+-  locale.publish(active, true)
++function refreshLocale(locale) {
++  if (typeof locale.refresh === 'function') {
++    locale.refresh()
++    return
++  }
++  if (typeof locale.publish === 'function') {
++    locale.publish(locale.getLocale().active, true)
++    return
++  }
++  console.error('[bench-locale-pack] no locale revision entry on this host; mounted outlets keep the previous language until the next locale change.')
++}
++
++/**
++ * Belt and braces: register every curated language and dictionary through the
++ * native language-pack API as well, as owned effects. A language id another
++ * pack already registered is left to that pack (the definition is in the
++ * catalog either way); a duplicate (namespace, locale) dictionary fails loud,
++ * because a namespace's texts have one owner.
++ * @param ctx - client context carrying `ctx.locale`.
++ */
++function registerNativeLanguages(ctx) {
++  for (const lang of BUILTIN_LANGUAGES) {
++    ctx.effect(() => {
++      const disposers = []
++      if (!ctx.locale.getLocale().locales.some((l) => l.id === lang.id)) {
++        disposers.push(ctx.locale.addLanguage({ id: lang.id, label: lang.label, fallback: 'en' }))
++      }
++      for (const [ns, dict] of Object.entries(ALL_LANG_DICTS[lang.id] ?? {})) {
++        disposers.push(ctx.locale.register(ns, lang.id, dict))
++      }
++      return () => {
++        for (const dispose of disposers) dispose()
++      }
++    }, `bench-locale-pack: native language ${lang.id}`)
++  }
+ }
+ 
+ /** The custom switcher row component (elided; dropdown + "use native" option). */
+@@ -143,13 +232,14 @@ function LanguageRowStub() {
+ }
+ 
+ /**
+- * Client plugin body: own copy namespace → override store → lookup patch →
+- * ctx.betterLocale service → per-namespace dict registration → the custom
+- * settings row.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * Client plugin body: own copy namespace → override store → pre-chain
++ * override seat → ctx.betterLocale service → per-namespace dict registration
++ * → native language registration → store/refresh bridge → the custom settings
++ * row.
++ * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx) {
+-  console.error('[bench-locale-pack-client] apply() on the 0.1.1-era cohort: LocaleRuntime lookup patch + custom settings row + localStorage persistence')
++  console.error('[bench-locale-pack-client] apply(): LocaleRuntime override layer + custom settings row + localStorage persistence on dsh 0.1.2-alpha.2')
+ 
+   // 1. The plugin's own copy namespace — follows DSH's zh/en preference.
+   ctx.effect(
+@@ -160,9 +250,11 @@ export function apply(ctx) {
+   // 2. Construct the override store; restore the persisted selection.
+   const store = createStore(loadActiveFromStorage())
+ 
+-  // 3. Install the lookup patch (HMR-safe: the disposer restores the
+-  //    original method on fiber disposal).
+-  ctx.effect(() => installPatch(ctx, store), 'bench-locale-pack: locale lookup patch')
++  // 3. Install the override seat (HMR-safe: disposal restores the original
++  //    lookup on the fallback path and removes the hook on the public one).
++  const seat = installOverrideSeat(ctx, store)
++  ctx.effect(() => seat.dispose, 'bench-locale-pack: locale override seat')
++  console.error(`[bench-locale-pack-client] pre-chain override seat: ${seat.seat}`)
+ 
+   // 4. Publish the override store so third-party plugins can register
+   //    their own dictionaries for the new languages (inject = ['betterLocale']).
+@@ -180,10 +272,15 @@ export function apply(ctx) {
+     ctx.effect(() => store.register(ns, langsForNs), `bench-locale-pack: dicts for ns ${ns}`)
+   }
+ 
+-  // 6. Store changes bump the runtime revision so re-renders consult the
+-  //    patched lookup (locale/change fires for attachLocale-style listeners).
++  // 5b. The same languages and dictionaries through the native language-pack
++  //     API (the plugin's own belt-and-braces memo).
++  registerNativeLanguages(ctx)
++
++  // 6. Store changes bump the locale revision so re-renders consult the
++  //    override seat (locale/change fires for attachLocale-style listeners
++  //    on the fallback path).
+   ctx.effect(
+-    () => store.subscribe(() => bumpRevision(ctx.locale)),
++    () => store.subscribe(() => refreshLocale(ctx.locale)),
+     'bench-locale-pack: store → revision bump bridge',
+   )
+ 
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index 67562c6..28d7718 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1,11 +1,23 @@
+ # bench-locale-pack bundle layer: inserts the plugin row.
+ # (exam fixture, distilled from @huanlin/dsh-plugin-better-locale; 16 of the
+-# 19 languages elided — the exam is the lookup patch → native language API)
+-# The browser half patches the locale runtime's lookup chain so calls to
+-# ctx.locale's translate chain consult the override store before falling
+-# back to DSH's native zh/en dictionaries. The dsh active locale is never
+-# mutated; the selected override id persists in localStorage
+-# (dsh-plugin-better-locale:active), sidestepping the LOCALE_IDS schema enum.
++# 19 languages elided — the exam was the lookup patch → native language API
++# migration.)
++#
++# The browser half mounts the third-language override layer: the selected
++# language's dictionary answers before DSH's native zh/en lookup while DSH's
++# active locale stays untouched, a custom row in the settings General section
++# drives the selection, and the chosen id persists in localStorage
++# (dsh-plugin-better-locale:active). The same languages and dictionaries are
++# also registered through the native language-pack API, so they appear in
++# DSH's own Language row as well. The pre-chain seat is
++# `ctx.locale.intercept` where the host carries it (see
++# patches/locale-translation-override-seat.patch) and the rebased
++# LocaleRuntime lookup patch otherwise.
++#
++# The row `name` is the bare package name and must stay equal to
++# package.json `name` (DSH-0.1.2-A1-26: the boot manifest keys entries by
++# package name, and a mismatch silently keeps the client half out of the
++# graph).
+ - insert:
+     - id: bench-locale-pack
+       name: '@bench/dsh-bench-locale-pack'
+diff --git a/fixture/index.js b/fixture/index.js
+index 4788bb1..2e2e25e 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -2,9 +2,18 @@
+ // contribution — the host half has no runtime work (mirrors the real
+ // plugin's src/index.ts).
+ //
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the browser half pulled its client
+-// context type from the client-runtime package, and third languages could
+-// only enter the UI by patching the locale runtime's lookup chain.
++// The browser half (`./client`) mounts the product: the pre-chain override
++// seat (`ctx.locale.intercept` where the host carries it, else the rebased
++// LocaleRuntime lookup patch), the custom Settings → General switcher row,
++// localStorage persistence of the override id, the `ctx.betterLocale`
++// service, and — belt and braces — the native language-pack registration
++// (`ctx.locale.addLanguage` + `ctx.locale.register(ns, locale, dict)`) that
++// also puts every curated language into DSH's own Language row
++// (DSH-0.1.2-A1-10).
++//
++// 0.1.2 type surface: the host context is cordis `Context`
++// (`@deepseek-ai/cordis`); the 0.1.1-era client-runtime and host-apiproxy
++// packages no longer exist (DSH-0.1.2-A1-25, DSH-0.1.2-A1-01).
+ 
+ export const name = 'bench-locale-pack'
+ 
+@@ -13,13 +22,9 @@ export const inject = []
+ 
+ /**
+  * Host apply — no-op. The override layer is mounted entirely by the browser
+- * half (lookup patch + custom settings row + per-language dictionaries).
++ * half.
+  * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+-export function apply(ctx, config) {
+-  console.error('[bench-locale-pack] host apply(): client-only language-override plugin; the browser half patches the locale runtime and registers the switcher row')
+-
+-  ctx.effect(() => {
+-    console.error('[bench-locale-pack] no host-plane registrations (the language override layer is client-only)')
+-  }, 'bench-locale-pack: host')
++export function apply(ctx) {
++  // Client-only plugin: all work happens in client.js.
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..8a8a38f
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,24 @@
++{
++  "name": "@bench/dsh-bench-locale-pack",
++  "version": "0.3.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-locale-pack",
++      "version": "0.3.0",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.1",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.1"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        }
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index d72a621..9015ccd 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,13 +1,14 @@
+ {
+-  "name": "@bench/dsh-bench-mineru-api",
+-  "version": "0.2.4",
+-  "description": "Document-parsing tool plugin with a host RPC channel for its settings page (0.1.1-era cohort; exam material only)",
++  "name": "@bench/dsh-bench-locale-pack",
++  "version": "0.3.0",
++  "description": "Third-language override layer for DSH i18n: bundled dictionaries (ja/ko/fr/..., 19 languages in the real plugin) answer before DSH's native zh/en lookup while the active locale stays untouched, with a custom Settings → General switcher row and localStorage persistence; the same languages also register through the native language-pack API (locale.addLanguage + locale.register(ns, locale, dict)) so DSH's own Language row lists them (exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+     ".": "./index.js",
+     "./client": "./client.js",
+-    "./cordis.patch.yml": "./cordis.patch.yml"
++    "./cordis.patch.yml": "./cordis.patch.yml",
++    "./package.json": "./package.json"
+   },
+   "dsh": {
+     "bundle": {
+@@ -16,37 +17,17 @@
+     "client": {
+       "platform": "web",
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+-        "@deepseek-ai/dsh-client-locale",
+-        "@deepseek-ai/dsh-client-connection",
+-        "@deepseek-ai/dsh-client-ui-settings",
+-        "@deepseek-ai/dsh-client-ui-slots",
+-        "@deepseek-ai/dsh-client-ui-primitives"
++        "@deepseek-ai/dsh-client-locale"
+       ]
+     }
+   },
+-  "dependencies": {
+-    "schemastery": "^3.18.0",
+-    "@deepseek-ai/dsh-host-apiproxy": "^0.0.1-rc.1"
+-  },
+   "peerDependencies": {
+-    "cordis": "^4.0.0-rc.7",
+-    "@deepseek-ai/dsh-client-connection": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-locale": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-settings": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-host-apiproxy": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-tools": "^0.0.1-rc.1",
+-    "react": "^18.2.0"
++    "@deepseek-ai/cordis": "^4.0.1",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.1"
+   },
+   "peerDependenciesMeta": {
+-    "cordis": { "optional": true },
+-    "@deepseek-ai/dsh-client-connection": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+-    "@deepseek-ai/dsh-host-apiproxy": { "optional": true },
+-    "@deepseek-ai/dsh-tools": { "optional": true }
++    "@deepseek-ai/cordis": { "optional": true },
++    "@deepseek-ai/dsh-client-locale": { "optional": true }
+   },
+   "private": true
+ }
+diff --git a/fixture/patches/locale-translation-override-seat.patch b/fixture/patches/locale-translation-override-seat.patch
+new file mode 100644
+index 0000000..8882f18
+--- /dev/null
++++ b/fixture/patches/locale-translation-override-seat.patch
+@@ -0,0 +1,190 @@
++diff --git a/packages/client/locale/README.i18n.yaml b/packages/client/locale/README.i18n.yaml
++index 79f896c..4e508e8 100644
++--- a/packages/client/locale/README.i18n.yaml
+++++ b/packages/client/locale/README.i18n.yaml
++@@ -2,5 +2,5 @@
++ # side as of the last confirmed-consistent state. Both languages carry equal authority;
++ # after editing either side, bring the other along and re-record with:
++ #   pnpm run verify-translation-pairing --write packages/client/locale/README.md
++-README.md: 7c2264bb59165c7c4e213516b4337fd5bc854bf8
++-README.zh.md: 1693f7fce4b3aab33e79d1fe20943050ff992188
+++README.md: 86a621ed16a7983ce8fac73a1e73fb5d6e86a1ed
+++README.zh.md: c7c1873c6cfd95edb618d2f5f994ba61bb220d7b
++diff --git a/packages/client/locale/README.md b/packages/client/locale/README.md
++index 7c2264b..86a621e 100644
++--- a/packages/client/locale/README.md
+++++ b/packages/client/locale/README.md
++@@ -59,6 +59,10 @@ export function apply(ctx) {
++ 
++ An external id is a non-empty ASCII BCP 47-style tag. Its fallback must already be registered, and the chain must terminate at `en`; unknown targets, duplicate ids, and cycles fail at registration. Lookup walks the fallback chain in the requested namespace, repeats it in `common`, then displays the key. Unloading a definition removes it from the selector and returns an active selection to the available browser/default locale.
++ 
+++### Overriding copy without switching the active locale
+++
+++An override layer registers a pre-chain hook through `ctx.locale.intercept((ns, key, active) => …)`: the first hook returning a template answers that key, in the requested namespace and again in `common`, before any registered dictionary is read. The active locale, the stored preference, and `<html lang>` stay untouched, so a plugin can serve one language's copy while the preference keeps selecting another. Registering or removing a hook advances the Face revision; after the hook's own source of copy changes, call `ctx.locale.refresh()` to advance it again so mounted outlets re-derive their `t` seats.
+++
++ ### What the Host half does
++ 
++ The Host persists the preference through the settings service on loopback pages. The Client deliberately withholds that settings scope on non-loopback pages, so their locale selection remains process-local even though Connection authenticates every API method.
++diff --git a/packages/client/locale/README.zh.md b/packages/client/locale/README.zh.md
++index 1693f7f..c7c1873 100644
++--- a/packages/client/locale/README.zh.md
+++++ b/packages/client/locale/README.zh.md
++@@ -59,6 +59,10 @@ export function apply(ctx) {
++ 
++ 外部 id 必须是非空的 ASCII BCP 47 风格标签。它的 fallback 必须已经注册，且整条链必须终止于 `en`；未知目标、重复 id 与循环会在注册时失败。查找时先在请求命名空间内遍历生效语言的 fallback 链，再在 `common` 中遍历该链，最后显示键本身。卸载语言定义会将其从选择器移除，并让生效中的选择回落到可用的浏览器语言或默认语言。
++ 
+++### 在不切换生效语言的情况下覆盖文案
+++
+++覆盖层通过 `ctx.locale.intercept((ns, key, active) => …)` 注册查找链前置钩子：第一个返回模板的钩子即为该键的答案，先在请求的命名空间、再在 `common` 中生效，早于任何已注册词典被读取。生效语言、已存偏好与 `<html lang>` 均不变，因此插件可以在偏好仍选择另一种语言时提供某一语言的文案。注册或移除钩子都会推进 Face 修订号；当钩子自身的文案来源发生变化后，调用 `ctx.locale.refresh()` 再次推进修订号，使已挂载的出口重新派生各自的 `t` 席位。
+++
++ ### Host 半侧做什么
++ 
++ Host 通过 settings 服务为 loopback 页面持久化偏好。Client 会刻意拒绝非 loopback 页面使用该 settings scope，因此即使 Connection 认证所有 API 方法，它们的 locale 选择仍只存在于进程内。
++diff --git a/packages/client/locale/src/client/index.ts b/packages/client/locale/src/client/index.ts
++index 8370696..1023d1f 100644
++--- a/packages/client/locale/src/client/index.ts
+++++ b/packages/client/locale/src/client/index.ts
++@@ -78,6 +78,15 @@ export interface LocaleSnapshot {
++   revision: number
++ }
++ 
+++/**
+++ * One pre-chain translation override. A hook sees the requested namespace, the
+++ * key, and the active locale, and returns the template to display or
+++ * `undefined` to continue to the registered dictionaries. It cannot change the
+++ * active locale, so an override layer serves copy for a language the preference
+++ * does not select.
+++ */
+++export type LocaleIntercept = (ns: string, key: string, active: LocaleId) => string | undefined
+++
++ declare module '@deepseek-ai/cordis' {
++   interface Context {
++     locale: LocaleRuntime
++@@ -152,8 +161,9 @@ function syncDocumentLanguage(snapshot: LocaleSnapshot): void {
++ /**
++  * Dictionary registry plus locale preference. Lookup walks the active
++  * language's declared fallback chain in the entry namespace, then repeats it
++- * in the shared common namespace before showing the key itself. Reads go
++- * through {@link getLocale}; preferences change only through
+++ * in the shared common namespace before showing the key itself; registered
+++ * intercept hooks answer before either chain read. Reads go through
+++ * {@link getLocale}; preferences change only through
++  * {@link setLocale}, while language packs extend the catalog through
++  * {@link addLanguage}. Continuous sync uses the `locale/change` event or
++  * the LocaleFace getSnapshot/subscribe pair installed through
++@@ -166,6 +176,8 @@ export class LocaleRuntime {
++   private fallbackChains = new Map<string, readonly LocaleId[]>()
++   private snapshot: LocaleSnapshot
++   private listeners = new Set<() => void>()
+++  /** Registered pre-chain translation overrides, in registration order. */
+++  private intercepts = new Set<LocaleIntercept>()
++   private readonly ctx: ClientContext
++   private readonly host: SettingsScope<LocaleSettings> | undefined
++   /** Browser-derived locale standing wherever no explicit Host selection does. */
++@@ -454,7 +466,42 @@ export class LocaleRuntime {
++       name in params ? String(params[name]) : match)
++   }
++ 
+++  /**
+++   * Register a pre-chain translation override, consulted in the requested
+++   * namespace and again in the shared common namespace before the active
+++   * language's fallback chain reads any dictionary. Hooks run in registration
+++   * order and the first defined result wins, so a registered override outranks
+++   * every dictionary while the active locale stays untouched. Registering or
+++   * removing a hook advances the LocaleFace revision so mounted outlets
+++   * re-derive their `t` seats.
+++   * @param hook - namespace/key/active-locale read returning a template, or undefined to continue.
+++   * @returns idempotent disposer removing this exact hook.
+++   */
+++  intercept(hook: LocaleIntercept): () => void {
+++    this.intercepts.add(hook)
+++    this.publish(this.snapshot.active, false)
+++    return () => {
+++      if (!this.intercepts.delete(hook)) return
+++      this.publish(this.snapshot.active, false)
+++    }
+++  }
+++
+++  /**
+++   * Advance the LocaleFace revision without changing the active locale, so
+++   * mounted outlets re-derive their `t` seats. An owner of translation content
+++   * that changes outside this registry's own entry points (an override layer's
+++   * selection, a live-edited dictionary) calls this after the change; only an
+++   * active-locale switch additionally emits `locale/change`.
+++   */
+++  refresh(): void {
+++    this.publish(this.snapshot.active, false)
+++  }
+++
++   private lookup(ns: string, key: string, chain: readonly LocaleId[]): string | undefined {
+++    for (const hook of this.intercepts) {
+++      const override = hook(ns, key, this.snapshot.active)
+++      if (override !== undefined) return override
+++    }
++     const locales = this.dicts.get(ns)
++     for (const locale of chain) {
++       const value = locales?.get(localeKey(locale))?.[key]
++diff --git a/packages/client/locale/tests/locale.client.spec.ts b/packages/client/locale/tests/locale.client.spec.ts
++index ef9551f..e645945 100644
++--- a/packages/client/locale/tests/locale.client.spec.ts
+++++ b/packages/client/locale/tests/locale.client.spec.ts
++@@ -84,6 +84,59 @@ describe('LocaleRuntime', () => {
++     expect(svc.bind('a')).not.toBe(svc.bind('b'))
++   })
++ 
+++  it('consults intercepts before the dictionaries in the namespace and in common', () => {
+++    const { svc } = make()
+++    svc.register('ns', 'zh', { hello: '你好' })
+++    svc.register('common', 'zh', { retry: '重试' })
+++    const seen: string[] = []
+++    const dispose = svc.intercept((ns, key, active) => {
+++      seen.push(`${ns}:${key}:${active}`)
+++      if (ns === 'common') return key === 'retry' ? 'もう一度' : undefined
+++      return key === 'hello' ? 'こんにちは' : undefined
+++    })
+++    const t = svc.bind('ns')
+++    // The override outranks the registered zh dictionary while zh stays active.
+++    expect(t('hello')).toBe('こんにちは')
+++    expect(svc.getSnapshot().active).toBe('zh')
+++    // The common repeat consults the hook too, so the override answers there.
+++    expect(t('retry')).toBe('もう一度')
+++    // A miss falls through to the chain and finally the key itself.
+++    expect(t('gone')).toBe('gone')
+++    expect(seen).toContain('ns:gone:zh')
+++    expect(seen).toContain('common:gone:zh')
+++    dispose()
+++    expect(t('hello')).toBe('你好')
+++    expect(t('retry')).toBe('重试')
+++  })
+++
+++  it('runs intercepts in registration order and lets the first defined result win', () => {
+++    const { svc } = make()
+++    const first = svc.intercept((_ns, key) => (key === 'k' ? 'first' : undefined))
+++    svc.intercept((_ns, key) => (key === 'k' ? 'second' : 'fallback'))
+++    const t = svc.bind('ns')
+++    expect(t('k')).toBe('first')
+++    expect(t('other')).toBe('fallback')
+++    first()
+++    expect(t('k')).toBe('second')
+++  })
+++
+++  it('intercept/refresh advance the LocaleFace revision; a disposal is idempotent', () => {
+++    const { svc } = make()
+++    const seen: number[] = []
+++    svc.subscribe(() => { seen.push(svc.getSnapshot().revision) })
+++    const before = svc.getSnapshot().revision
+++    const dispose = svc.intercept(() => undefined)
+++    expect(svc.getSnapshot().revision).toBe(before + 1)
+++    svc.refresh()
+++    expect(svc.getSnapshot().revision).toBe(before + 2)
+++    dispose()
+++    expect(svc.getSnapshot().revision).toBe(before + 3)
+++    // Second run hits the idempotent arm: nothing removed, no republish.
+++    dispose()
+++    expect(svc.getSnapshot().revision).toBe(before + 3)
+++    expect(seen).toEqual([before + 1, before + 2, before + 3])
+++  })
+++
++   it('rejects duplicate (ns, locale) and disposer only removes its own dict', () => {
++     const { svc } = make()
++     const dispose = svc.register('ns', 'zh', { k: 'v1' })

@@ -1,0 +1,47 @@
+dsh-migrate-status: {"turns":1,"steps":5,"elapsedSeconds":10,"inputTokens":2976,"outputTokens":931,"cacheHitTokens":26368,"cacheMissTokens":2976,"costUsd":0.0010841039999999998}
+dsh-migrate-status: {"turns":1,"steps":8,"elapsedSeconds":20,"inputTokens":8241,"outputTokens":1923,"cacheHitTokens":61824,"cacheMissTokens":8241,"costUsd":0.002575422}
+dsh-migrate-status: {"turns":1,"steps":11,"elapsedSeconds":30,"inputTokens":11466,"outputTokens":4602,"cacheHitTokens":114048,"cacheMissTokens":11466,"costUsd":0.004823243999999999}
+dsh-migrate-status: {"turns":1,"steps":13,"elapsedSeconds":40,"inputTokens":13192,"outputTokens":5870,"cacheHitTokens":157568,"cacheMissTokens":13192,"costUsd":0.005973503999999998}
+dsh-migrate-status: {"turns":1,"steps":15,"elapsedSeconds":50,"inputTokens":14323,"outputTokens":7286,"cacheHitTokens":229632,"cacheMissTokens":14323,"costUsd":0.007208945999999999}
+dsh-migrate-status: {"turns":1,"steps":17,"elapsedSeconds":60,"inputTokens":14672,"outputTokens":8214,"cacheHitTokens":255360,"cacheMissTokens":14672,"costUsd":0.00789528}
+dsh-migrate-status: {"turns":1,"steps":18,"elapsedSeconds":70,"inputTokens":16453,"outputTokens":10878,"cacheHitTokens":311552,"cacheMissTokens":16453,"costUsd":0.009929405999999998}
+dsh-migrate-status: {"turns":1,"steps":21,"elapsedSeconds":80,"inputTokens":17385,"outputTokens":11810,"cacheHitTokens":375040,"cacheMissTokens":17385,"costUsd":0.010818870000000001}
+dsh-migrate-status: {"turns":1,"steps":22,"elapsedSeconds":90,"inputTokens":17558,"outputTokens":13544,"cacheHitTokens":408064,"cacheMissTokens":17558,"costUsd":0.011984292000000002}
+dsh-migrate-status: {"turns":1,"steps":24,"elapsedSeconds":100,"inputTokens":18449,"outputTokens":14871,"cacheHitTokens":515072,"cacheMissTokens":18449,"costUsd":0.013235166000000005}
+dsh-migrate-status: {"turns":1,"steps":26,"elapsedSeconds":110,"inputTokens":18897,"outputTokens":15426,"cacheHitTokens":551808,"cacheMissTokens":18897,"costUsd":0.013745574000000005}
+dsh-migrate-status: {"turns":1,"steps":26,"elapsedSeconds":120,"inputTokens":19571,"outputTokens":16811,"cacheHitTokens":589440,"cacheMissTokens":19571,"costUsd":0.014790570000000005}
+dsh-migrate-status: {"turns":1,"steps":28,"elapsedSeconds":130,"inputTokens":19743,"outputTokens":16861,"cacheHitTokens":628992,"cacheMissTokens":19743,"costUsd":0.014965026000000005}
+dsh-migrate-status: {"turns":1,"steps":29,"elapsedSeconds":140,"inputTokens":20236,"outputTokens":17554,"cacheHitTokens":708608,"cacheMissTokens":20236,"costUsd":0.015693624000000007}
+dsh-migrate-status: {"turns":1,"steps":30,"elapsedSeconds":150,"inputTokens":20236,"outputTokens":17554,"cacheHitTokens":708608,"cacheMissTokens":20236,"costUsd":0.015693624000000007}
+dsh-migrate-status: {"turns":1,"steps":33,"elapsedSeconds":160,"inputTokens":21373,"outputTokens":21010,"cacheHitTokens":835328,"cacheMissTokens":21373,"costUsd":0.018317934000000008}
+dsh-migrate-status: {"turns":1,"steps":36,"elapsedSeconds":170,"inputTokens":22769,"outputTokens":22152,"cacheHitTokens":971648,"cacheMissTokens":22769,"costUsd":0.01962149400000001}
+dsh-migrate-status: {"turns":1,"steps":37,"elapsedSeconds":180,"inputTokens":23950,"outputTokens":23365,"cacheHitTokens":1067136,"cacheMissTokens":23950,"costUsd":0.020812908000000012}
+dsh-migrate-status: {"turns":1,"steps":38,"elapsedSeconds":190,"inputTokens":23950,"outputTokens":23365,"cacheHitTokens":1067136,"cacheMissTokens":23950,"costUsd":0.020812908000000012}
+dsh-migrate-status: {"turns":1,"steps":40,"elapsedSeconds":200,"inputTokens":24471,"outputTokens":25194,"cacheHitTokens":1167488,"cacheMissTokens":24471,"costUsd":0.02228951400000001}
+dsh-migrate-status: {"turns":1,"steps":40,"elapsedSeconds":201,"inputTokens":24965,"outputTokens":26357,"cacheHitTokens":1218944,"cacheMissTokens":24965,"costUsd":0.023215782000000008}
+Migration complete and verified.
+
+## Change
+
+Only `/app/fixture/lib/index.mjs` was modified (`git status`: just that file; `package.json`, `cordis.patch.yml`, README untouched):
+
+- `inject`: `['tasks', 'httpServer']` → `['jobs', 'webServer']`
+- `ctx.tasks` → `ctx.jobs`, `ctx.httpServer.register` → `ctx.webServer.register`
+- `tasks.onTaskDone` → `jobs.onJobDone`
+- Route shape, `/bench-status/status` path, and `{"ok":true,"open":N}` payload left byte-identical
+- The stale header comment (which claimed the old names were correct and told readers not to rename) was corrected to describe the post-0812 contract, with no retired identifiers left in the file
+
+## Host contract check (dsh 0.1.2-alpha.2)
+
+- `@deepseek-ai/dsh-host-webserver`: `ctx.webServer`, `register({ kind, path, handler })` — same shape as before
+- `@deepseek-ai/dsh-jobs`: `ctx.jobs.list(caller?)`, `ctx.jobs.onJobDone((snapshot, owner) => …)`
+- `--dump-config` shows the `webserver` and `jobs` entries in the composed web tree
+
+## Verification (isolated `DSH_HOME` profiles under `/app`, since the sandbox blocks `/root/.dsh`)
+
+- **Before the rename** (original file): cold boot failed exactly as stated — `@demo/dsh-bench-status: pending (waiting for services: tasks, httpServer)` → `plugin tree failed to load`.
+- **After the rename**, installed fresh via `dsh plugin --profile web add /app/fixture`: boot reached `dsh web: http://127.0.0.1:3080/?token=<redacted> with `0` pending entries and `0` failed entries.
+- **Route smoke test**: `GET /bench-status/status` → `200` with body `{"ok":true,"open":0}`; an unregistered sibling path → `404`. The `onJobDone` registration also succeeded (a missing method would have failed activation).
+
+One environmental caveat, unrelated to the fixture: after printing the `dsh web:` URL, a stock web profile in this container exits on `user patch-layer watching requires the Cordis HMR service` — the installed `cordis-plugin-hmr@1.0.19` lacks the `registerConfig` API that `dsh-app-boot` expects for live patch watching. I confirmed the identical crash with **no fixture installed**, so it is host-side. For the stable HTTP smoke test I set `patchReload: "startup"` in the disposable verification profile only; the standard flow still reaches `dsh web:` with no pending entry, which is the migration's success signal. All scratch profiles and stores were cleaned up afterwards.
+

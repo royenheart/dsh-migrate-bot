@@ -1,0 +1,81 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index b3d7cdd..de39c17 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,4 +1,24 @@
+-# H10 fixture · browser activation trap
++# H10 fixture · browser activation
+ 
+-This renamed Web plugin is valid on the host side but its browser bundle still
+-registers a legacy identity. Exam material only — do not publish (`"private": true`).
++A renamed Web plugin (`@demo/dsh-bench-browser-activation`) shipping the complete
++Web-plugin surface:
++
++- **Host half** — `index.js` exports an (empty) `apply`; the bundle layer
++  `cordis.patch.yml` (declared as `dsh.bundle.patch`) inserts it as the
++  `bench-browser-activation` row under the package name.
++- **Browser half** — declared as `dsh.client` (`platform: 'web'`, no
++  externals) with `exports["./client"]` → `client.js`. The client-modules
++  bundle route serves that artifact as the `<package>/client.js` resource of
++  the revisioned `/plugins/??…&rev=…` combo URL; on activation it sets
++  `document.documentElement.dataset.benchBrowserActivation = 'active'`.
++
++The bundle registers its factory under the **current package name**, which is
++the boot-graph row id the harness composes from the manifest. The legacy id it
++used to register is retired: `dsh-client-modules` rejects an artifact that does
++not register the expected id.
++
++The manifest also exports `./package.json`: the host resolves a row's manifest
++through the module loader, and on the no-Node-internals fallback path that
++resolution goes through `<package>/package.json`.
++
++Exam material only — do not publish (`"private": true`).
+diff --git a/fixture/client.js b/fixture/client.js
+index d6f2218..d1fd6a8 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,7 +1,9 @@
+-// This plugin was renamed. Keep the legacy registration id so older profiles
+-// can still find it. The host already serves this bundle under the new name.
++// Register under the current package name. The client module system keys a
++// bundle's factory by its boot-graph row id, which the host composes from the
++// owning package.json name (a trailing `/client` is tolerated); a bundle that
++// registers any other id fails activation with "loaded without registering".
+ window.__ModuleLoader__.load({
+-  id: '@demo/dsh-bench-browser-activation-legacy',
++  id: '@demo/dsh-bench-browser-activation',
+   factory: () => ({
+     apply() {
+       document.documentElement.dataset.benchBrowserActivation = 'active'
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..707c017
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-browser-activation",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-browser-activation",
++      "version": "0.1.0"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 46fee11..0c60319 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -7,7 +7,8 @@
+   "exports": {
+     ".": "./index.js",
+     "./client": "./client.js",
+-    "./cordis.patch.yml": "./cordis.patch.yml"
++    "./cordis.patch.yml": "./cordis.patch.yml",
++    "./package.json": "./package.json"
+   },
+   "dsh": {
+     "bundle": {

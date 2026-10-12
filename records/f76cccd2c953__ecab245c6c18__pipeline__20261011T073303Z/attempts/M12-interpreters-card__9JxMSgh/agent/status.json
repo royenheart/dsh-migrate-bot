@@ -1,0 +1,122 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.8",
+              "version": "0.1.0-rc.8"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": false
+            },
+            "e2eSubsetFirst": true,
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "final",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 0,
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "fail",
+          "fingerprint": "pending: webServer",
+          "detail": "dsh: agent \"session-90c12dc0-57b0-4ef1-b68d-eee678807bc9\" setup aborted: owner disposed during setup\nfile:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1187\n\t\tthrow new Error(`${binName}: ${stage}: ${detail}${stack}`, { cause });\n\t\t      ^\n\nError: dsh: plugin tree failed to load: dsh: 1 entry did not activate\n@bench/dsh-bench-interpreters-card: pending (waiting for service: webServer)\n    at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1187:9)\n    at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:247:14)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:133:3 {\n  [cause]: Error: dsh: 1 entry did not activate\n  @bench/dsh-bench-interpreters-card: pending (waiting for service: webServer)\n      at assertEntriesActivated (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1134:9)\n      at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1179:9)\n      at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:247:14)\n      at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:133:3\n}\n\nNode.js v24.21.0"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "fail",
+          "fingerprint": "pending: webServer",
+          "detail": "dsh: agent \"session-beef9917-163e-470c-bc17-52bca91b4d35\" setup aborted: owner disposed during setup\nfile:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511\n\t\tthrow new Error(`${binName}: ${stage}: ${detail}${stack}`, { cause });\n\t\t      ^\n\nError: dsh: plugin tree failed to load: dsh: 1 entry did not activate\n@bench/dsh-bench-interpreters-card: pending (waiting for service: webServer)\n    at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511:9)\n    at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3 {\n  [cause]: Error: dsh: 1 entry did not activate\n  @bench/dsh-bench-interpreters-card: pending (waiting for service: webServer)\n      at assertEntriesActivated (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1458:9)\n      at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1503:9)\n      at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n      at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3\n}\n\nNode.js v24.21.0"
+        },
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "comments": []
+      },
+      "run": "local-2026-10-11T08-46-08-424Z",
+      "startedAt": "2026-10-11T08:46:09.556Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.8",
+            "version": "0.1.0-rc.8"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": false
+          },
+          "e2eSubsetFirst": true,
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "final",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 0,
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "fail",
+        "fingerprint": "pending: webServer",
+        "detail": "dsh: agent \"session-90c12dc0-57b0-4ef1-b68d-eee678807bc9\" setup aborted: owner disposed during setup\nfile:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1187\n\t\tthrow new Error(`${binName}: ${stage}: ${detail}${stack}`, { cause });\n\t\t      ^\n\nError: dsh: plugin tree failed to load: dsh: 1 entry did not activate\n@bench/dsh-bench-interpreters-card: pending (waiting for service: webServer)\n    at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1187:9)\n    at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:247:14)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:133:3 {\n  [cause]: Error: dsh: 1 entry did not activate\n  @bench/dsh-bench-interpreters-card: pending (waiting for service: webServer)\n      at assertEntriesActivated (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1134:9)\n      at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1179:9)\n      at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:247:14)\n      at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:133:3\n}\n\nNode.js v24.21.0"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "fail",
+        "fingerprint": "pending: webServer",
+        "detail": "dsh: agent \"session-beef9917-163e-470c-bc17-52bca91b4d35\" setup aborted: owner disposed during setup\nfile:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511\n\t\tthrow new Error(`${binName}: ${stage}: ${detail}${stack}`, { cause });\n\t\t      ^\n\nError: dsh: plugin tree failed to load: dsh: 1 entry did not activate\n@bench/dsh-bench-interpreters-card: pending (waiting for service: webServer)\n    at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511:9)\n    at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3 {\n  [cause]: Error: dsh: 1 entry did not activate\n  @bench/dsh-bench-interpreters-card: pending (waiting for service: webServer)\n      at assertEntriesActivated (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1458:9)\n      at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1503:9)\n      at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n      at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3\n}\n\nNode.js v24.21.0"
+      },
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "comments": []
+    },
+    "run": "local-2026-10-11T08-46-08-424Z",
+    "startedAt": "2026-10-11T08:46:09.556Z"
+  }
+}

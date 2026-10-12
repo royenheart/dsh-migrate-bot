@@ -1,0 +1,799 @@
+diff --git a/fixture/.dsh-plugin/client.js b/fixture/.dsh-plugin/client.js
+index ce0beaa..2f41caf 100644
+--- a/fixture/.dsh-plugin/client.js
++++ b/fixture/.dsh-plugin/client.js
+@@ -1,10 +1,12 @@
+ // Browser half (0.1.1-era repository-plugin shape): a self-executing page script.
+-// Before the repository mechanism was removed, this file was served by the entry's
+-// /pet/ui.js route, injected into index.html via httpServer.tapIndex, and executed
++// On a 0.1.1-era host this file was served by the entry's /pet/ui.js route, injected
++// into index.html via httpServer.tapIndex (now webServer.tapIndex), and executed
+ // directly by the page (no __ModuleLoader__, no module exports).
+ //
+-// NOTE: the repository-plugin mechanism handles loading this script — the layout is
+-// final, do not change it.
++// NOTE: this is the documented repository-plugin layout — keep it as is. The current
++// host loads the Node half either as a profile bundle (root package.json `dsh.bundle`
++// -> cordis.patch.yml) or, for checkouts, through the loading path patches/ restores
++// (removed from the host in 0.1.1-rc.1).
+ const pet = document.createElement('div')
+ pet.id = 'bench-pet'
+ pet.textContent = '🐋'
+diff --git a/fixture/.dsh-plugin/index.js b/fixture/.dsh-plugin/index.js
+index d9a7e47..5d1aa19 100644
+--- a/fixture/.dsh-plugin/index.js
++++ b/fixture/.dsh-plugin/index.js
+@@ -1,38 +1,39 @@
+-// Node half (0.1.1-era repository-plugin shape): `dsh.entry` points at this file,
+-// and the client is a self-executing page script served via the /pet/ui.js route and
+-// injected into index.html by the official httpServer.tapIndex hook.
++// Node half (0.1.1-era repository-plugin shape): `.dsh-plugin/package.json` declares
++// `dsh.entry` -> this file, and the client is a self-executing page script served via the
++// /pet/ui.js route and injected into index.html by the official webServer.tapIndex hook.
+ //
+-// NOTE: this is the official repository-plugin layout — keep it as is. Changing the
+-// layout would break how old hosts recognize the plugin, and this repository-plugin
+-// mechanism is still the supported distribution path on the current host.
++// The layout stays as the documented repository-plugin form. The current host activates
++// the package as a profile bundle (root package.json `dsh.bundle` -> cordis.patch.yml,
++// whose insert row mounts this same file), and patches/ restores the `.dsh-plugin`
++// loading path the host removed in 0.1.1-rc.1.
+ import { readFileSync } from 'node:fs'
+ 
+ const UI_SCRIPT = readFileSync(new URL('./client.js', import.meta.url))
+ 
+-export const inject = ['httpServer']
+-
+ export function apply(ctx) {
+-  const { httpServer } = ctx
+-  ctx.effect(() => {
+-    if (!httpServer) return
+-    const disposers = [
+-      httpServer.register({
+-        kind: 'exact',
+-        path: '/pet/ui.js',
+-        handler: async (req, res) => {
+-          if (req.method !== 'GET' && req.method !== 'HEAD') {
+-            res.writeHead(405)
+-            res.end()
+-            return
+-          }
+-          res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' })
+-          res.end(UI_SCRIPT)
+-        },
+-      }),
+-      httpServer.tapIndex((html) =>
+-        html.includes('/pet/ui.js') ? html : html.replace('</body>', '<script src="/pet/ui.js" defer></script></body>'),
+-      ),
+-    ]
+-    return () => disposers.forEach((dispose) => dispose?.())
++  // webServer is optional: a profile without an HTTP server (for example headless)
++  // mounts this plugin without leaving a row pending on a missing service.
++  ctx.inject(['webServer'], (webCtx) => {
++    webCtx.effect(() => {
++      const disposers = [
++        webCtx.webServer.register({
++          kind: 'exact',
++          path: '/pet/ui.js',
++          handler: async (req, res) => {
++            if (req.method !== 'GET' && req.method !== 'HEAD') {
++              res.writeHead(405)
++              res.end()
++              return
++            }
++            res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' })
++            res.end(UI_SCRIPT)
++          },
++        }),
++        webCtx.webServer.tapIndex((html) =>
++          html.includes('/pet/ui.js') ? html : html.replace('</body>', '<script src="/pet/ui.js" defer></script></body>'),
++        ),
++      ]
++      return () => disposers.forEach((dispose) => dispose?.())
++    })
+   })
+-}
+\ No newline at end of file
++}
+diff --git a/fixture/README.md b/fixture/README.md
+index 1c909ee..e279209 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -5,6 +5,15 @@ A small 0.1.1-era **repository-plugin** sample: the Node half lives under
+ ./index.js`, and the browser half is a self-executing script that the entry serves
+ at `/pet/ui.js` and injects into the page.
+ 
+-The host in this container is dsh **0.1.2-alpha.2**.
++The host in this container is dsh **0.1.2-alpha.2**. It activates out-of-tree plugins as
++**profile bundles**, so the package also declares the standard bundle manifest: root
++`package.json` → `dsh.bundle.patch` → `cordis.patch.yml`, whose insert row mounts the same
++`.dsh-plugin/index.js` entry under the package name. A profile that lists
++`@demo/dsh-bench-repo` in its bundles therefore mounts the plugin. The 0.1.1-era
++repository-plugin loading path (`.dsh-plugin/` + `dsh.entry`) is no longer shipped by the
++host and is restored for checkouts by the checked-in `patches/` harness patch. The Node half
++targets the current `webServer` service name and activates on profiles without an HTTP
++server, where it contributes nothing. Request and verification record:
++`.dsh-migrate/patch-reports/restore-repository-plugin-loading/report.md`.
+ 
+-This fixture is exam material only — never publish it to npm.
+\ No newline at end of file
++This fixture is exam material only — never publish it to npm.
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+new file mode 100644
+index 0000000..71fe3b2
+--- /dev/null
++++ b/fixture/cordis.patch.yml
+@@ -0,0 +1,9 @@
++# The dsh-bench-repo bundle patch: one insert row over the profile root.
++# It mounts the same Node half the repository-plugin manifest declares
++# (.dsh-plugin/package.json, dsh.entry -> ./.dsh-plugin/index.js), so a profile
++# whose bundles list names this package activates the /pet/ui.js route and the
++# webServer.tapIndex index injection.
++
++- insert:
++    - id: bench-repo
++      name: '@demo/dsh-bench-repo'
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..dc3ca3c
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-repo",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-repo",
++      "version": "0.1.0"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 0e71d32..cba8864 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -2,5 +2,11 @@
+   "name": "@demo/dsh-bench-repo",
+   "version": "0.1.0",
+   "private": true,
+-  "type": "module"
+-}
+\ No newline at end of file
++  "type": "module",
++  "main": "./.dsh-plugin/index.js",
++  "dsh": {
++    "bundle": {
++      "patch": "./cordis.patch.yml"
++    }
++  }
++}
+diff --git a/fixture/patches/0001-restore-repository-plugin-loading.patch b/fixture/patches/0001-restore-repository-plugin-loading.patch
+new file mode 100644
+index 0000000..d0f8123
+--- /dev/null
++++ b/fixture/patches/0001-restore-repository-plugin-loading.patch
+@@ -0,0 +1,579 @@
++diff --git a/packages/boot/repository-plugin/README.md b/packages/boot/repository-plugin/README.md
++new file mode 100644
++index 0000000..d78d981
++--- /dev/null
+++++ b/packages/boot/repository-plugin/README.md
++@@ -0,0 +1,54 @@
+++---
+++description: "Local repository-plugin loader: mounts the Loader entries a checkout declares in its .dsh-plugin/package.json (dsh.entry)."
+++kind: "package-reference"
+++---
+++
+++# @deepseek-ai/dsh-repository-plugin
+++
+++## Summary
+++
+++`dsh-repository-plugin` mounts a local checkout's repository plugin: for every configured root it reads `.dsh-plugin/package.json`, resolves the `dsh.entry` module the manifest declares against that directory, and creates one ordinary Loader entry per repository plugin. The mounted plugin therefore appears in the boot graph exactly as a config row would, is addressable in the Loader store, and fails loud through the same activation audit. This restores the on-disk authoring format of the removed repository-Plugin path for local checkouts; package acquisition stays with profile bundles, and the removed remote source list, generated wrapper, preparation executable, and repository cache are deliberately not restored.
+++
+++## Table of Contents
+++
+++- [Use this package](#use-this-package)
+++- [Understand the implementation](#understand-the-implementation)
+++- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+++
+++-----
+++
+++<a id="use-this-package"></a>
+++## Use this package
+++
+++Compose this plugin from a bundle patch row; the shipped base layer composes it with `roots: ['.']`, so a repository plugin loads when dsh boots from its checkout:
+++
+++```yaml
+++- id: repository-plugin
+++  name: '@deepseek-ai/dsh-repository-plugin'
+++  config:
+++    roots: ['.']
+++```
+++
+++`roots` are directories, resolved against the boot working directory when relative. `manifest` names the manifest inside each root and defaults to `.dsh-plugin/package.json`. A root without that manifest is not a repository plugin and is skipped.
+++
+++The mounted repository is trusted code: its entry executes in the host process with the same authority as an installed plugin. Point `roots` only at checkouts whose source you trust, and keep the default `['.']` only in compositions launched from a checkout.
+++
+++### Observable failures
+++
+++A root whose manifest exists but cannot be read, is not JSON, or declares no non-empty string `dsh.entry` fails the row at boot; a present manifest that cannot mount is never silently skipped. An entry module that fails to import, or whose plugin waits on a missing service, is reported by the boot activation audit under its entry name. Unloading the row removes the entries it created and joins their teardown.
+++
+++-----
+++
+++<a id="understand-the-implementation"></a>
+++## Understand the implementation
+++
+++`apply` resolves the configured roots, reads each manifest once, and collects the declared entries before mounting anything, so a malformed manifest fails before the Loader tree changes. Mounting runs inside one `ctx.effect` that owns the created entry ids in creation order: the disposer removes them in reverse, and a failure part-way removes what it created before rethrowing. Entry names are the `file:` URLs of the entry modules, so the Loader resolves each module from the manifest directory rather than from the profile directory.
+++
+++-----
+++
+++<a id="known-limitations-and-deferred-work"></a>
+++## Known Limitations and Deferred Work
+++
+++- **Local checkouts only** — the removed remote source list (git/npm specifications), its immutable cache, and the preparation executable are not restored; install distributable plugins as profile bundles with `dsh plugin add`.
+++- **No per-plugin config** — a manifest declares one entry path and no plugin config, matching the removed wrapper's limitation; a repository needing config should ship a bundle patch.
+++- **Bilingual README pending** — `README.zh.md` and the generated catalogs have not been produced for this package.
++diff --git a/packages/boot/repository-plugin/package.json b/packages/boot/repository-plugin/package.json
++new file mode 100644
++index 0000000..a815937
++--- /dev/null
+++++ b/packages/boot/repository-plugin/package.json
++@@ -0,0 +1,48 @@
+++{
+++  "name": "@deepseek-ai/dsh-repository-plugin",
+++  "description": "Local repository-plugin loader: mounts the Loader entries a checkout declares in its .dsh-plugin/package.json (dsh.entry)",
+++  "version": "0.1.2-alpha.2",
+++  "publishConfig": {
+++    "access": "public"
+++  },
+++  "repository": {
+++    "type": "git",
+++    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+++    "directory": "packages/boot/repository-plugin"
+++  },
+++  "type": "module",
+++  "main": "lib/index.js",
+++  "types": "lib/types/index.d.ts",
+++  "exports": {
+++    ".": {
+++      "types": "./lib/types/index.d.ts",
+++      "default": "./lib/index.js"
+++    },
+++    "./invariant": {
+++      "types": "./lib/types/invariant.d.ts",
+++      "default": "./lib/invariant.js"
+++    },
+++    "./src/*": "./src/*",
+++    "./package.json": "./package.json"
+++  },
+++  "files": [
+++    "lib/index.js",
+++    "lib/invariant.js",
+++    "lib/types/**/*.d.ts"
+++  ],
+++  "license": "MIT",
+++  "peerDependencies": {
+++    "@deepseek-ai/cordis": "workspace:^",
+++    "@deepseek-ai/cordis-plugin-loader": "workspace:^",
+++    "@deepseek-ai/dsh-invariants": "workspace:^"
+++  },
+++  "dependencies": {
+++    "@deepseek-ai/schemastery": "workspace:^"
+++  },
+++  "devDependencies": {
+++    "@deepseek-ai/cordis": "workspace:^",
+++    "@deepseek-ai/cordis-plugin-include": "workspace:^",
+++    "@deepseek-ai/cordis-plugin-loader": "workspace:^",
+++    "@deepseek-ai/dsh-invariants": "workspace:^"
+++  }
+++}
++diff --git a/packages/boot/repository-plugin/src/index.ts b/packages/boot/repository-plugin/src/index.ts
++new file mode 100644
++index 0000000..f834124
++--- /dev/null
+++++ b/packages/boot/repository-plugin/src/index.ts
++@@ -0,0 +1,133 @@
+++/**
+++ * @deepseek-ai/dsh-repository-plugin — mounts the Loader entries a repository
+++ * checkout declares in its `.dsh-plugin/package.json` (`dsh.entry`). Each
+++ * configured root is a directory that may hold that manifest; every declared
+++ * entry becomes an ordinary Loader entry resolved against the manifest
+++ * directory, so a repository plugin joins the boot graph like a config row and
+++ * fails loud through the same activation audit. This restores the on-disk
+++ * authoring format of the removed repository-Plugin path for local checkouts;
+++ * the removed remote source list, generated wrapper, preparation executable,
+++ * and repository cache stay removed, because profile bundles own package
+++ * acquisition.
+++ * @module @deepseek-ai/dsh-repository-plugin
+++ */
+++
+++import { readFile } from 'node:fs/promises'
+++import { dirname, isAbsolute, join, resolve } from 'node:path'
+++import { pathToFileURL } from 'node:url'
+++import type { Context } from '@deepseek-ai/cordis'
+++// Empty type import carries the `loader` Context merge and EntryOptions for the reads below.
+++import type {} from '@deepseek-ai/cordis-plugin-loader'
+++import z from '@deepseek-ai/schemastery'
+++
+++/** Stable Cordis plugin name. */
+++export const name = 'repository-plugin'
+++
+++/** Required services: the Loader owns the entry tree the repository plugins join. */
+++export const inject = ['loader']
+++
+++/** Plugin config: the local checkouts scanned for repository-plugin manifests. */
+++export interface Config {
+++  /** Directories that may hold a repository-plugin checkout; a relative entry resolves against the boot working directory. */
+++  roots: string[]
+++  /** Manifest path inside each root. */
+++  manifest: string
+++}
+++
+++export const Config: z<Config> = z.object({
+++  roots: z.array(z.string()).default(['.']),
+++  manifest: z.string().default('.dsh-plugin/package.json'),
+++})
+++
+++/** The `dsh` manifest section the repository-plugin authoring format defines. */
+++interface RepositoryManifest {
+++  dsh?: {
+++    /** Entry module the repository contributes, relative to the manifest directory. */
+++    entry?: unknown
+++  }
+++}
+++
+++/** One resolved repository plugin: the manifest that declared it and its entry module. */
+++interface RepositoryEntry {
+++  /** Absolute path of the manifest that declared the entry. */
+++  manifestPath: string
+++  /** Absolute path of the entry module the manifest declares. */
+++  entryPath: string
+++}
+++
+++/**
+++ * Mount every repository plugin declared under the configured roots.
+++ *
+++ * A root without a manifest is not a repository plugin and is skipped. A root
+++ * whose manifest exists but cannot be read, parsed, or does not declare a
+++ * non-empty string `dsh.entry` fails the row loud, because a present manifest
+++ * that cannot mount is a misconfiguration. Mounted entries live inside one
+++ * effect: unloading this row removes them from the Loader tree and joins their
+++ * teardown.
+++ * @param ctx - cordis context carrying the injected `loader`.
+++ * @param config - resolved roots and manifest path.
+++ */
+++export async function apply(ctx: Context, config: Config): Promise<void> {
+++  const declared: RepositoryEntry[] = []
+++  for (const root of config.roots) {
+++    const rootDir = isAbsolute(root) ? root : resolve(process.cwd(), root)
+++    const entry = await readRepositoryEntry(join(rootDir, config.manifest))
+++    if (entry !== undefined) declared.push(entry)
+++  }
+++  if (declared.length === 0) return
+++  const logger = ctx.logger(name)
+++  await ctx.effect(async () => {
+++    const ids: string[] = []
+++    const unmount = async (): Promise<void> => {
+++      for (const id of [...ids].reverse()) {
+++        // Tree teardown can have removed the entry already; nothing is left to remove then.
+++        if (ctx.loader.store[id] === undefined) continue
+++        await ctx.loader.remove(id)
+++      }
+++    }
+++    try {
+++      for (const entry of declared) {
+++        // A `file:` URL, not the platform path: the Loader hands the name to the
+++        // module loader, which cannot import `C:\…` as a specifier.
+++        ids.push(await ctx.loader.create({ name: pathToFileURL(entry.entryPath).href }))
+++        logger.info('mounted %s declared by %s', entry.entryPath, entry.manifestPath)
+++      }
+++    } catch (cause) {
+++      // This effect owns the entries it created until it returns the disposer:
+++      // leaving a partially mounted checkout behind would collide with a retry.
+++      await unmount()
+++      throw cause
+++    }
+++    return unmount
+++  }, 'repository-plugin: mounted repository entries')
+++}
+++
+++/**
+++ * Read one repository manifest and resolve the entry it declares.
+++ * @param manifestPath - absolute path of the candidate manifest.
+++ * @returns the resolved entry, or `undefined` when no manifest exists there.
+++ * @throws when the manifest exists but is unreadable, is not JSON, or declares no usable `dsh.entry` string.
+++ */
+++async function readRepositoryEntry(manifestPath: string): Promise<RepositoryEntry | undefined> {
+++  let text: string
+++  try {
+++    text = await readFile(manifestPath, 'utf8')
+++  } catch (error) {
+++    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+++    throw new Error(`repository-plugin: cannot read ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`)
+++  }
+++  let manifest: RepositoryManifest
+++  try {
+++    manifest = JSON.parse(text) as RepositoryManifest
+++  } catch (error) {
+++    throw new Error(`repository-plugin: ${manifestPath} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`)
+++  }
+++  const entry = manifest.dsh?.entry
+++  if (typeof entry !== 'string' || entry === '') {
+++    throw new Error(`repository-plugin: ${manifestPath} declares no non-empty dsh.entry string`)
+++  }
+++  return {
+++    manifestPath,
+++    entryPath: isAbsolute(entry) ? entry : resolve(dirname(manifestPath), entry),
+++  }
+++}
++diff --git a/packages/boot/repository-plugin/src/invariant.ts b/packages/boot/repository-plugin/src/invariant.ts
++new file mode 100644
++index 0000000..f7fd8d4
++--- /dev/null
+++++ b/packages/boot/repository-plugin/src/invariant.ts
++@@ -0,0 +1,25 @@
+++/**
+++ * Package-owned invariant companion for the local repository-plugin loader.
+++ * @module @deepseek-ai/dsh-repository-plugin/invariant
+++ */
+++
+++import type { Context } from '@deepseek-ai/cordis'
+++import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
+++
+++const PACKAGE_NAME = '@deepseek-ai/dsh-repository-plugin'
+++
+++/** Cordis companion plugin name. */
+++export const name = 'repository-plugin-invariant'
+++/** Service required before the companion can reserve package ownership. */
+++export const inject = ['invariants']
+++
+++/** No runtime invariant: the sole effect is boot-time Loader entries owned by this plugin's effect scope; the Loader store is authoritative. */
+++const install: InvariantInstaller = () => {}
+++
+++/**
+++ * Register the repository-plugin invariant companion.
+++ * @param ctx - Cordis context carrying the invariant service.
+++ * @returns the installed registration's disposer after setup succeeds.
+++ */
+++export const apply = (ctx: Context): Promise<() => void> =>
+++  Promise.resolve(ctx.invariants.register(PACKAGE_NAME, install))
++diff --git a/packages/boot/repository-plugin/tests/repository-plugin.spec.ts b/packages/boot/repository-plugin/tests/repository-plugin.spec.ts
++new file mode 100644
++index 0000000..412ee63
++--- /dev/null
+++++ b/packages/boot/repository-plugin/tests/repository-plugin.spec.ts
++@@ -0,0 +1,142 @@
+++/**
+++ * REAL-composition coverage: a test-only cordis.yml booted through the vendored
+++ * Loader mounts the repository-plugin row, and the assertions observe the
+++ * durable outcome — the ordinary Loader entry created from a real
+++ * `.dsh-plugin/package.json` on disk, its activation, the loud failure of a
+++ * manifest that declares no usable `dsh.entry`, and that disposing the row
+++ * removes the entry it created (HMR safety).
+++ */
+++
+++import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+++import { tmpdir } from 'node:os'
+++import { join } from 'node:path'
+++import { pathToFileURL } from 'node:url'
+++import { afterEach, describe, expect, it } from 'vitest'
+++import { Context } from '@deepseek-ai/cordis'
+++import Loader from '@deepseek-ai/cordis-plugin-loader'
+++import Include from '@deepseek-ai/cordis-plugin-include'
+++import * as RepositoryPlugin from '../src/index.ts'
+++
+++const REPOSITORY = '@deepseek-ai/dsh-repository-plugin'
+++const FIXTURE = 'repository-fixture'
+++
+++let workspace: string | undefined
+++let context: Context | undefined
+++/** Entry module specifiers the fixture plugin activated, in activation order. */
+++let activated: string[] = []
+++
+++afterEach(async () => {
+++  await context?.fiber.dispose()
+++  context = undefined
+++  if (workspace !== undefined) await rm(workspace, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 })
+++  workspace = undefined
+++  activated = []
+++})
+++
+++/** The `file:` URL the Loader receives for one workspace's declared entry. */
+++function entryUrl(root: string): string {
+++  return pathToFileURL(join(root, '.dsh-plugin', 'entry.js')).href
+++}
+++
+++/** Quote one YAML scalar without letting a Windows path turn into escapes. */
+++function yamlString(value: string): string {
+++  return `'${value.replaceAll("'", "''")}'`
+++}
+++
+++/**
+++ * Boot a one-row cordis.yml (the repository-plugin row with this workspace as
+++ * its root) through the real Loader. The manifest is written first when given;
+++ * `undefined` covers a root that holds no repository plugin at all.
+++ * @param manifest - manifest document to write, or `undefined` to write none.
+++ * @returns the booted context and the workspace root it read.
+++ */
+++async function loadComposition(manifest: unknown | undefined): Promise<{ ctx: Context; root: string }> {
+++  const root = await mkdtemp(join(tmpdir(), 'dsh-repository-plugin-'))
+++  workspace = root
+++  if (manifest !== undefined) {
+++    await mkdir(join(root, '.dsh-plugin'), { recursive: true })
+++    await writeFile(join(root, '.dsh-plugin', 'package.json'), `${JSON.stringify(manifest, undefined, 2)}\n`)
+++  }
+++  const configPath = join(root, 'cordis.yml')
+++  await writeFile(configPath, [
+++    `- name: ${yamlString(REPOSITORY)}`,
+++    '  config:',
+++    `    roots: [${yamlString(root)}]`,
+++    '',
+++  ].join('\n'))
+++
+++  const url = entryUrl(root)
+++  context = new Context()
+++  context.baseUrl = pathToFileURL(root).href + '/'
+++  await context.plugin(Loader)
+++  context.loader.builtins.include = Include
+++  const modules = new Map<string, unknown>([
+++    [REPOSITORY, RepositoryPlugin],
+++    // The entry module is a Loader-visible stand-in for the checkout's code:
+++    // what this package owns is reading the manifest and mounting the entry the
+++    // Loader resolves from the manifest directory.
+++    [url, { name: FIXTURE, apply: () => { activated.push(url) } }],
+++  ])
+++  context.loader.internal = {
+++    version: 'v2',
+++    async import(specifier: string) {
+++      if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
+++      return modules.get(specifier)
+++    },
+++  } as unknown as NonNullable<typeof context.loader.internal>
+++  await context.loader.create({
+++    name: 'cordis:include',
+++    config: { path: pathToFileURL(configPath).href },
+++  })
+++  await context.loader.await()
+++  return { ctx: context, root }
+++}
+++
+++/** Every entry name in the Loader store, root tree plus subtrees. */
+++function entryNames(ctx: Context): string[] {
+++  return [...ctx.loader.entries()].map(entry => entry.options.name)
+++}
+++
+++/** The Include tree that backs the booted `cordis.yml` file. */
+++function includeTree(ctx: Context): Include {
+++  const include = [...ctx.loader.entries()]
+++    .find(entry => entry.options.name === 'cordis:include')?.subtree as Include | undefined
+++  if (include === undefined) throw new Error('expected the root Include tree')
+++  return include
+++}
+++
+++describe('real Loader composition', () => {
+++  it('mounts the entry a root manifest declares and activates it', async () => {
+++    const { ctx, root } = await loadComposition({ name: '@demo/fixture', dsh: { entry: './entry.js' } })
+++
+++    expect(entryNames(ctx)).toContain(entryUrl(root))
+++    expect(activated).toEqual([entryUrl(root)])
+++    const entry = [...ctx.loader.entries()].find(candidate => candidate.options.name === entryUrl(root))!
+++    expect(entry.fiber).toBeDefined()
+++    expect(entry.disabled).toBeFalsy()
+++  })
+++
+++  it('skips a root that holds no repository manifest', async () => {
+++    const { ctx } = await loadComposition(undefined)
+++
+++    expect(entryNames(ctx).filter(name => name.startsWith('file:'))).toEqual([])
+++    expect(activated).toEqual([])
+++  })
+++
+++  it('fails loud when a present manifest declares no usable dsh.entry', async () => {
+++    await expect(loadComposition({ name: '@demo/fixture', dsh: { entry: 123 } }))
+++      .rejects.toThrow(/declares no non-empty dsh\.entry string/)
+++    expect(activated).toEqual([])
+++  })
+++
+++  it('removes the entry it created when the row is disposed', async () => {
+++    const { ctx, root } = await loadComposition({ dsh: { entry: './entry.js' } })
+++    const row = [...ctx.loader.entries()].find(candidate => candidate.options.name === REPOSITORY)!
+++
+++    await row.fiber!.dispose()
+++    expect(entryNames(ctx)).not.toContain(entryUrl(root))
+++    // Self-disposing an include-tree entry persists `disabled: true`; drain the
+++    // Include write queue so it cannot race the temp-dir removal below.
+++    await includeTree(ctx).stop()
+++  })
+++})
++diff --git a/packages/boot/repository-plugin/tsconfig.json b/packages/boot/repository-plugin/tsconfig.json
++new file mode 100644
++index 0000000..54ed080
++--- /dev/null
+++++ b/packages/boot/repository-plugin/tsconfig.json
++@@ -0,0 +1,24 @@
+++{
+++  "extends": "../../../tsconfig.base.json",
+++  "compilerOptions": {
+++    "rootDir": "src",
+++    "outDir": "lib/types"
+++  },
+++  "include": [
+++    "src"
+++  ],
+++  "references": [
+++    {
+++      "path": "../../../vendor/cordis"
+++    },
+++    {
+++      "path": "../../../vendor/loader"
+++    },
+++    {
+++      "path": "../../../vendor/schemastery"
+++    },
+++    {
+++      "path": "../../runtime-diagnostics/invariants"
+++    }
+++  ]
+++}
++diff --git a/packages/bundle/base/cordis.patch.yml b/packages/bundle/base/cordis.patch.yml
++index eaa8457..69720ef 100644
++--- a/packages/bundle/base/cordis.patch.yml
+++++ b/packages/bundle/base/cordis.patch.yml
++@@ -24,6 +24,19 @@
++       config:
++         root: ['.']
++ 
+++    # Local repository plugins: a checkout that declares `.dsh-plugin/package.json`
+++    # (`dsh.entry`) mounts that entry as an ordinary Loader row, so the on-disk
+++    # authoring format the removed repository-Plugin path recognized keeps working for
+++    # local checkouts. Package acquisition stays with profile bundles: the removed
+++    # remote source list, cache, wrapper, and preparation executable are not restored.
+++    # The default root is the boot working directory, so a repository plugin loads when
+++    # dsh runs from its checkout; a later layer restates `roots` to pin other
+++    # directories. Mounted entries are trusted code, like every installed plugin.
+++    - id: repository-plugin
+++      name: '@deepseek-ai/dsh-repository-plugin'
+++      config:
+++        roots: ['.']
+++
++     - id: llm
++       name: '@deepseek-ai/dsh-llm'
++ 
++diff --git a/packages/bundle/base/package.json b/packages/bundle/base/package.json
++index 143d773..10441ee 100644
++--- a/packages/bundle/base/package.json
+++++ b/packages/bundle/base/package.json
++@@ -70,6 +70,7 @@
++     "@deepseek-ai/dsh-plan-mode": "workspace:^",
++     "@deepseek-ai/dsh-pwsh-sandbox": "workspace:^",
++     "@deepseek-ai/dsh-repeat-tool-reminder": "workspace:^",
+++    "@deepseek-ai/dsh-repository-plugin": "workspace:^",
++     "@deepseek-ai/dsh-sandbox-local": "workspace:^",
++     "@deepseek-ai/dsh-sandbox-policy": "workspace:^",
++     "@deepseek-ai/dsh-session": "workspace:^",
++diff --git a/packages/bundle/base/tests/base.spec.ts b/packages/bundle/base/tests/base.spec.ts
++index 6cbea0c..843bd8f 100644
++--- a/packages/bundle/base/tests/base.spec.ts
+++++ b/packages/bundle/base/tests/base.spec.ts
++@@ -44,9 +44,11 @@ describe('dsh-base bundle', () => {
++     expect(rows.find(row => row.id === 'web')?.config).toMatchObject({ fetchProvider: 'http' })
++     expect(rows.find(row => row.id === 'web-fetch-http')).toBeDefined()
++     expect(rows.find(row => row.id === 'tool-web')?.config).toMatchObject({ fetch: false })
+++    expect(rows.find(row => row.id === 'repository-plugin')?.config).toEqual({ roots: ['.'] })
++     expect(manifest.dependencies).not.toHaveProperty('@deepseek-ai/dsh-subagent-codex')
++     expect(manifest.dependencies).not.toHaveProperty('@deepseek-ai/dsh-subagent-claude-code')
++     expect(manifest.dependencies).toHaveProperty('@deepseek-ai/dsh-web-fetch-http')
+++    expect(manifest.dependencies).toHaveProperty('@deepseek-ai/dsh-repository-plugin')
++   })
++ 
++   it('gates each shell stack by platform with a symmetric disabled expression', () => {
++diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
++index 828cd59..f36c1b7 100644
++--- a/pnpm-lock.yaml
+++++ b/pnpm-lock.yaml
++@@ -1037,6 +1037,25 @@ importers:
++         specifier: ^15.0.0
++         version: 15.0.0
++ 
+++  packages/boot/repository-plugin:
+++    dependencies:
+++      '@deepseek-ai/schemastery':
+++        specifier: workspace:^
+++        version: link:../../../vendor/schemastery
+++    devDependencies:
+++      '@deepseek-ai/cordis':
+++        specifier: workspace:^
+++        version: link:../../../vendor/cordis
+++      '@deepseek-ai/cordis-plugin-include':
+++        specifier: workspace:^
+++        version: link:../../../vendor/include
+++      '@deepseek-ai/cordis-plugin-loader':
+++        specifier: workspace:^
+++        version: link:../../../vendor/loader
+++      '@deepseek-ai/dsh-invariants':
+++        specifier: workspace:^
+++        version: link:../../runtime-diagnostics/invariants
+++
++   packages/bundle/acp-app:
++     dependencies:
++       '@deepseek-ai/dsh-acp':
++@@ -1157,6 +1176,9 @@ importers:
++       '@deepseek-ai/dsh-repeat-tool-reminder':
++         specifier: workspace:^
++         version: link:../../guard/repeat-tool-reminder
+++      '@deepseek-ai/dsh-repository-plugin':
+++        specifier: workspace:^
+++        version: link:../../boot/repository-plugin
++       '@deepseek-ai/dsh-sandbox-local':
++         specifier: workspace:^
++         version: link:../../sandbox/sandbox-local
++diff --git a/tsconfig.base.json b/tsconfig.base.json
++index af94063..fff7e8e 100644
++--- a/tsconfig.base.json
+++++ b/tsconfig.base.json
++@@ -388,6 +388,8 @@
++       "@deepseek-ai/dsh-pwsh-sandbox/invariant": ["./packages/shell/pwsh-sandbox/src/invariant.ts"],
++       "@deepseek-ai/dsh-repeat-tool-reminder": ["./packages/guard/repeat-tool-reminder/src"],
++       "@deepseek-ai/dsh-repeat-tool-reminder/invariant": ["./packages/guard/repeat-tool-reminder/src/invariant.ts"],
+++      "@deepseek-ai/dsh-repository-plugin": ["./packages/boot/repository-plugin/src"],
+++      "@deepseek-ai/dsh-repository-plugin/invariant": ["./packages/boot/repository-plugin/src/invariant.ts"],
++       "@deepseek-ai/dsh-sandbox": ["./packages/sandbox/sandbox/src"],
++       "@deepseek-ai/dsh-sandbox/invariant": ["./packages/sandbox/sandbox/src/invariant.ts"],
++       "@deepseek-ai/dsh-sandbox-local": ["./packages/sandbox/sandbox-local/src"],
++diff --git a/tsconfig.host.json b/tsconfig.host.json
++index f816664..40baa20 100644
++--- a/tsconfig.host.json
+++++ b/tsconfig.host.json
++@@ -273,6 +273,7 @@
++     { "path": "./packages/bundle/web-app" },
++     { "path": "./packages/boot/app-boot" },
++     { "path": "./packages/boot/cmdline" },
+++    { "path": "./packages/boot/repository-plugin" },
++     { "path": "./packages/sdk/server" },
++     { "path": "./packages/test-support/llm-replay" },
++     { "path": "./packages/typert/generator" },
+diff --git a/fixture/patches/README.md b/fixture/patches/README.md
+new file mode 100644
+index 0000000..383d4f8
+--- /dev/null
++++ b/fixture/patches/README.md
+@@ -0,0 +1,36 @@
++# Harness patches
++
++This directory carries the dsh-side patches the plugin still needs after the
++`dsh-v0.1.2-alpha.2` review. A patch stays here while a documented capability needs a
++general-purpose harness change that official extension points do not provide; it is not dropped
++because the plugin can degrade without it.
++
++## 0001-restore-repository-plugin-loading.patch
++
++Applies to the `dsh-v0.1.2-alpha.2` source checkout. It restores the local repository-plugin
++loading path — a checkout whose `.dsh-plugin/package.json` declares `dsh.entry` mounts that entry
++as an ordinary Loader row — which dsh removed in 0.1.1-rc.1. Remote source fetching stays with
++profile bundles.
++
++```sh
++cd <dsh source checkout>
++git apply /path/to/patches/0001-restore-repository-plugin-loading.patch
++```
++
++The patch:
++
++- adds `@deepseek-ai/dsh-repository-plugin` under `packages/boot/repository-plugin` (loader
++  plugin, invariant companion, package manifest, tsconfig, README, real-composition spec);
++- composes the base bundle row `repository-plugin` with `roots: ['.']`
++  (`packages/bundle/base/cordis.patch.yml`) and declares the package as a dependency of
++  `@deepseek-ai/dsh-base`, so the bare row name resolves in an installed profile;
++- registers the workspace aliases/aggregates the monorepo resolves that name through
++  (`tsconfig.base.json`, `tsconfig.host.json`) and the new importer in `pnpm-lock.yaml`;
++- pins the row and its dependency in `packages/bundle/base/tests/base.spec.ts`.
++
++The mounted entry name is the entry module's `file:` URL (`pathToFileURL`), the same
++absolute-path convention the Loader itself uses elsewhere; a raw platform path is not a valid
++module specifier on Windows.
++
++Request, evidence, and verification record:
++`.dsh-migrate/patch-reports/restore-repository-plugin-loading/report.md`.

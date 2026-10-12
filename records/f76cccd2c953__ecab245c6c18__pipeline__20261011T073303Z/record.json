@@ -1,0 +1,1669 @@
+{
+  "schema": 3,
+  "id": "f76cccd2c953__ecab245c6c18__pipeline__20261011T073303Z",
+  "createdAt": "2026-10-11T07:33:03Z",
+  "producer": {
+    "commit": "f76cccd2c953a6962ea1883f9e8f680bb5aca003",
+    "version": "0.3.4",
+    "dirty": false,
+    "message": "docs: define the project terms and gate the documents against them",
+    "snapshot": "0eed1aec6e0bbd44"
+  },
+  "subject": {
+    "id": "pipeline",
+    "agentRuntime": "0.2.0-rc.2",
+    "attempts": 1,
+    "agentTimeoutMultiplier": 3
+  },
+  "suite": {
+    "repository": "oh-my-dsh/dsh-plugin-upgrade-skill",
+    "commit": "ecab245c6c1831c51b0240aca13573b94a6e525e",
+    "tasks": [
+      {
+        "id": "H1-plane-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H10-browser-activation-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H13-ghost-host-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": false
+      },
+      {
+        "id": "H14-mineru-api",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H15-locale-pack",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H16-history-dock",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H17-merge-calls",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H18-blame-bubbles",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": false
+      },
+      {
+        "id": "H19-workspace-ya",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H2-baseline-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H22-dsh-data-agent-alpha2",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 18000,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H3-client-plane",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H5-runtime-export-drift",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H7-locale-trap",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H8-fire-drill",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "H9-dsh-web-alpha2",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 18000,
+        "applicable": true,
+        "feasible": false
+      },
+      {
+        "id": "M1-host-migration",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M10-tools-tree",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M11-sidebar-spur",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M12-interpreters-card",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M13-repository-plugins-removal",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M14-service-renames-0812",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M2-optional-dep-trap",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M3-session-projection",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": false
+      },
+      {
+        "id": "M4-peer-prerelease-range",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M5-token-auth-smoke",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M6-sleep-tool",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M7-d399-overlay",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M8-brand-text",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M9-mcpanel",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      }
+    ]
+  },
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-v4-flash",
+    "after": {
+      "at": "2026-10-11T10:28:31.026Z",
+      "servedModel": "deepseek-flash",
+      "fingerprint": "aeb56401ca74e127821c4f9126dcb669"
+    }
+  },
+  "environment": {
+    "harbor": "0.24.0",
+    "docker": "29.6.1",
+    "os": "Linux 6.12.101+deb13-cloud-amd64",
+    "concurrency": 4
+  },
+  "attempts": [
+    {
+      "task": "H1-plane-trap",
+      "attempt": 1,
+      "trial": "H1-plane-trap__HmocQ28",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 898.7,
+        "verifierSec": 2.1,
+        "totalSec": 1070.6
+      },
+      "usage": {
+        "inputTokens": 154726,
+        "cacheHitTokens": 12818304,
+        "outputTokens": 118904,
+        "usd": 0.13300621199999998
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H1-plane-trap__HmocQ28/agent/proposed.diff",
+          "sha256": "af9549d138fb77111e7fa38f1574f0f48bdd3d5064775c3829328b44310701c2",
+          "bytes": 2673
+        },
+        "agent/agent.log": {
+          "path": "attempts/H1-plane-trap__HmocQ28/agent/agent.log",
+          "sha256": "565cf24f5ab95b1ee6502a737b2ee2f33434d3bffa0bb951afa09b0ad2630125",
+          "bytes": 8003
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H1-plane-trap__HmocQ28/agent/events.jsonl",
+          "sha256": "a43f5056cbee6776b6e5c23e490e40fdf18a01d132feaa1eea3086e88939e27c",
+          "bytes": 6054
+        },
+        "agent/status.json": {
+          "path": "attempts/H1-plane-trap__HmocQ28/agent/status.json",
+          "sha256": "cde37e0f5036f84e66ec822e08da8fabc2ae6c809a4f15e9d90201515f4461f0",
+          "bytes": 10679
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H1-plane-trap__HmocQ28/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H1-plane-trap__HmocQ28/verifier/test-stdout.txt",
+          "sha256": "6f2628ab630ba580ae3926bc16c3e726e1350d83e9586d2fe62613f879006aa7",
+          "bytes": 249
+        }
+      }
+    },
+    {
+      "task": "H10-browser-activation-trap",
+      "attempt": 1,
+      "trial": "H10-browser-activation-trap__T7vPP8X",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 636.8,
+        "verifierSec": 5.9,
+        "totalSec": 813.6
+      },
+      "usage": {
+        "inputTokens": 183901,
+        "cacheHitTokens": 8638592,
+        "outputTokens": 78720,
+        "usd": 0.10073292599999997
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H10-browser-activation-trap__T7vPP8X/agent/proposed.diff",
+          "sha256": "0cb9a2747a013858296152986724447ace18ad1c51ed6429aa79dbd5b4f1c94a",
+          "bytes": 3306
+        },
+        "agent/agent.log": {
+          "path": "attempts/H10-browser-activation-trap__T7vPP8X/agent/agent.log",
+          "sha256": "1835d09e18553b557c268c556fd3b187c7f74268d339c92528a7acde5918d893",
+          "bytes": 5391
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H10-browser-activation-trap__T7vPP8X/agent/events.jsonl",
+          "sha256": "2c7cdcc4f004358c59c97babb7ac08fc707fbe64742b42edb1471bfc980d9bd1",
+          "bytes": 1894
+        },
+        "agent/status.json": {
+          "path": "attempts/H10-browser-activation-trap__T7vPP8X/agent/status.json",
+          "sha256": "699f7d7ffb933c80c2133c831e7fee5d665022b65f1a7c78d8b75353f42b32e6",
+          "bytes": 2409
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H10-browser-activation-trap__T7vPP8X/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H10-browser-activation-trap__T7vPP8X/verifier/test-stdout.txt",
+          "sha256": "a3e3bbcdca1de7a8bc13742975a4dc028114dc77f95bde93d514c8beae43730c",
+          "bytes": 274
+        }
+      }
+    },
+    {
+      "task": "H14-mineru-api",
+      "attempt": 1,
+      "trial": "H14-mineru-api__Jo3No2k",
+      "outcome": "scored",
+      "reward": 0.68,
+      "rewards": {
+        "reward": 0.68
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1706.2,
+        "verifierSec": 3.4,
+        "totalSec": 1885.1
+      },
+      "usage": {
+        "inputTokens": 321979,
+        "cacheHitTokens": 45290496,
+        "outputTokens": 221253,
+        "usd": 0.3169201379999999
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H14-mineru-api__Jo3No2k/agent/proposed.diff",
+          "sha256": "d37071058bea0606d45886fc2164d8d62af6533672e481bb1a8ffb9727c75915",
+          "bytes": 20683
+        },
+        "agent/agent.log": {
+          "path": "attempts/H14-mineru-api__Jo3No2k/agent/agent.log",
+          "sha256": "4232cca77dae7f2bc62c3cf35090a290072f7e04d00375fdbb3392d9a4febc6a",
+          "bytes": 15822
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H14-mineru-api__Jo3No2k/agent/events.jsonl",
+          "sha256": "88fac21bf63dc9f748708c3d123767b28a8e78f98feaaec9e917caa32ffe6850",
+          "bytes": 5971
+        },
+        "agent/status.json": {
+          "path": "attempts/H14-mineru-api__Jo3No2k/agent/status.json",
+          "sha256": "c04a9b30c53e0a7f8a3b485fb4f0ae73d22396a2559fd654c43e583672d02809",
+          "bytes": 10711
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H14-mineru-api__Jo3No2k/verifier/reward.txt",
+          "sha256": "169852cff133d1aefba9f39ac6e62f1de550c21f5b9e23f5cf5b430702a20012",
+          "bytes": 5
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H14-mineru-api__Jo3No2k/verifier/test-stdout.txt",
+          "sha256": "aa443506b0e78ed328668a2e704a5f2d4f8c0866d1701ef8e4174309c97cb885",
+          "bytes": 698
+        }
+      }
+    },
+    {
+      "task": "H15-locale-pack",
+      "attempt": 1,
+      "trial": "H15-locale-pack__E6oWqnj",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 974.8,
+        "verifierSec": 3.4,
+        "totalSec": 1149.1
+      },
+      "usage": {
+        "inputTokens": 184262,
+        "cacheHitTokens": 10820992,
+        "outputTokens": 142917,
+        "usd": 0.145852476
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H15-locale-pack__E6oWqnj/agent/proposed.diff",
+          "sha256": "92e210a2fdc5155e9c7bd282972a6190e7aa3f7f2e162c71ddf8acb8a3a415ee",
+          "bytes": 21670
+        },
+        "agent/agent.log": {
+          "path": "attempts/H15-locale-pack__E6oWqnj/agent/agent.log",
+          "sha256": "6a6271441024134e5eebc10be2f6302c8cff995646a3852b267b18a437d953fa",
+          "bytes": 8288
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H15-locale-pack__E6oWqnj/agent/events.jsonl",
+          "sha256": "1cf1a8ac5b44e8a2ae10293797a5fe561e2682c289f40277335f51f87f56ce69",
+          "bytes": 3796
+        },
+        "agent/status.json": {
+          "path": "attempts/H15-locale-pack__E6oWqnj/agent/status.json",
+          "sha256": "9511c6fb04a4234a21a9a94a1b95f8da3d73c141fb8c45a4033474ab21e8e6a1",
+          "bytes": 5913
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H15-locale-pack__E6oWqnj/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H15-locale-pack__E6oWqnj/verifier/test-stdout.txt",
+          "sha256": "7094ebe5a9b414d4578b216efe6974467b49c5c74075a04783b7ca65132c1518",
+          "bytes": 1041
+        }
+      }
+    },
+    {
+      "task": "H16-history-dock",
+      "attempt": 1,
+      "trial": "H16-history-dock__Wb8Lp6a",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1980.5,
+        "verifierSec": 3.4,
+        "totalSec": 2024.9
+      },
+      "usage": {
+        "inputTokens": 352256,
+        "cacheHitTokens": 61508096,
+        "outputTokens": 263571,
+        "usd": 0.3955052880000002
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H16-history-dock__Wb8Lp6a/agent/proposed.diff",
+          "sha256": "6378c7687497ba3ec92a96a0863703d894a2da377c7f42b0ea56923426b56fc6",
+          "bytes": 80686
+        },
+        "agent/agent.log": {
+          "path": "attempts/H16-history-dock__Wb8Lp6a/agent/agent.log",
+          "sha256": "204b737a2a76212015e6b193cfc5f9afe9fe978d872c72e563ad1497b3e8a321",
+          "bytes": 18436
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H16-history-dock__Wb8Lp6a/agent/events.jsonl",
+          "sha256": "c662739110694749baf1b554d0c58c29eb2318a56215014a94043aab75063578",
+          "bytes": 4395
+        },
+        "agent/status.json": {
+          "path": "attempts/H16-history-dock__Wb8Lp6a/agent/status.json",
+          "sha256": "d027f25dffc97a18dedadc445906d01c21c973e094a90607a6078ea258b12571",
+          "bytes": 7353
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H16-history-dock__Wb8Lp6a/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H16-history-dock__Wb8Lp6a/verifier/test-stdout.txt",
+          "sha256": "e78b2033234e569b50c7220ca6e093e5e3f695166bd8ef9a4a6fd586c6c8b7f7",
+          "bytes": 1358
+        }
+      }
+    },
+    {
+      "task": "H17-merge-calls",
+      "attempt": 1,
+      "trial": "H17-merge-calls__ugrtcFP",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1819.6,
+        "verifierSec": 10.6,
+        "totalSec": 1885.6
+      },
+      "usage": {
+        "inputTokens": 288353,
+        "cacheHitTokens": 41583232,
+        "outputTokens": 231426,
+        "usd": 0.3068582460000001
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H17-merge-calls__ugrtcFP/agent/proposed.diff",
+          "sha256": "e3adc0f63a6f4f5255caf3b5b8cba047b6fda3c70cc8cb1f04aeeee8e00156a8",
+          "bytes": 54520
+        },
+        "agent/agent.log": {
+          "path": "attempts/H17-merge-calls__ugrtcFP/agent/agent.log",
+          "sha256": "98ffcc0a4d64fcee2b0acc3febd6230923f70408670db269ca596b6a02d7d5dd",
+          "bytes": 16060
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H17-merge-calls__ugrtcFP/agent/events.jsonl",
+          "sha256": "03ab2a57ac528e533702077a5479ed0393d51c2350a1a41c0620835880b5e6d2",
+          "bytes": 3678
+        },
+        "agent/status.json": {
+          "path": "attempts/H17-merge-calls__ugrtcFP/agent/status.json",
+          "sha256": "849dda750dd6f3ea60e45d525a82f8babb986339a8c1b842e3b44c0aa0ab626f",
+          "bytes": 5737
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H17-merge-calls__ugrtcFP/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H17-merge-calls__ugrtcFP/verifier/test-stdout.txt",
+          "sha256": "d1cdc78b635ac7e235f8e74a8ae2e3300ff714f0c23baf86630fcb1e96ca82cb",
+          "bytes": 1124
+        }
+      }
+    },
+    {
+      "task": "H19-workspace-ya",
+      "attempt": 1,
+      "trial": "H19-workspace-ya__g27xycb",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2035.5,
+        "verifierSec": 3.2,
+        "totalSec": 2116.3
+      },
+      "usage": {
+        "inputTokens": 274641,
+        "cacheHitTokens": 41092224,
+        "outputTokens": 230425,
+        "usd": 0.3027278219999999
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H19-workspace-ya__g27xycb/agent/proposed.diff",
+          "sha256": "a4cb5bb6deaa7f50c2738c1aa9dbc707da62b4ee83492d5a7d710547f3d8e8c0",
+          "bytes": 36038
+        },
+        "agent/agent.log": {
+          "path": "attempts/H19-workspace-ya__g27xycb/agent/agent.log",
+          "sha256": "35ad3aea0eba314a5da9458d5f191d5aaec74a82f46fc33ea900c2858b642d15",
+          "bytes": 19037
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H19-workspace-ya__g27xycb/agent/events.jsonl",
+          "sha256": "83af32c13ef9df1e2bf9bb87df524dd441a649f8b613b625fb7be300d7da9782",
+          "bytes": 6423
+        },
+        "agent/status.json": {
+          "path": "attempts/H19-workspace-ya__g27xycb/agent/status.json",
+          "sha256": "85fdb52d731e60b56260e319f9d56d0e406a624c6f534110e0fd38d0b69f6304",
+          "bytes": 7569
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H19-workspace-ya__g27xycb/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H19-workspace-ya__g27xycb/verifier/test-stdout.txt",
+          "sha256": "4fa48f09be6555d94821bb720419296d284e28b5683827ae6fe8d5829cfbf602",
+          "bytes": 1087
+        }
+      }
+    },
+    {
+      "task": "H2-baseline-trap",
+      "attempt": 1,
+      "trial": "H2-baseline-trap__M3AvvzR",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 741.8,
+        "verifierSec": 2.3,
+        "totalSec": 782.9
+      },
+      "usage": {
+        "inputTokens": 129659,
+        "cacheHitTokens": 7670912,
+        "outputTokens": 91709,
+        "usd": 0.097486986
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H2-baseline-trap__M3AvvzR/agent/proposed.diff",
+          "sha256": "911cb91c7930f1b95f74213cc7460022c58893b8ece243a67493412ee6d67f5b",
+          "bytes": 7921
+        },
+        "agent/agent.log": {
+          "path": "attempts/H2-baseline-trap__M3AvvzR/agent/agent.log",
+          "sha256": "dbd522bb882050652ff26150fb62f9ce320b640bdadabda048da778bc5c716f8",
+          "bytes": 6485
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H2-baseline-trap__M3AvvzR/agent/events.jsonl",
+          "sha256": "e116f9ebe46d0d15197fe95f69e6437a22e8f455569a75db0ad86fc68896bfde",
+          "bytes": 6060
+        },
+        "agent/status.json": {
+          "path": "attempts/H2-baseline-trap__M3AvvzR/agent/status.json",
+          "sha256": "f711407840bc5d18cbe09e402601f3f0b7f5a618fb57e0a4db59d080e40b81ff",
+          "bytes": 10679
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H2-baseline-trap__M3AvvzR/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H2-baseline-trap__M3AvvzR/verifier/test-stdout.txt",
+          "sha256": "3ba9446c78f2c26328bc141afb5a3311f6b0739aa14f9643b46be9c2f4f6e224",
+          "bytes": 242
+        }
+      }
+    },
+    {
+      "task": "H22-dsh-data-agent-alpha2",
+      "attempt": 1,
+      "trial": "H22-dsh-data-agent-alpha2__hGegban",
+      "outcome": "scored",
+      "reward": 0,
+      "rewards": {
+        "reward": 0
+      },
+      "agentExitCode": 1,
+      "durations": {
+        "agentSec": 149.9,
+        "verifierSec": 73.9,
+        "totalSec": 287.8
+      },
+      "usage": {
+        "inputTokens": 0,
+        "cacheHitTokens": 0,
+        "outputTokens": 0
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H22-dsh-data-agent-alpha2__hGegban/agent/proposed.diff",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "agent/agent.log": {
+          "path": "attempts/H22-dsh-data-agent-alpha2__hGegban/agent/agent.log",
+          "sha256": "0342e41c90bf86d8b612727fdf712c0333b6e5937991a2c1b7546174ba211cbe",
+          "bytes": 783
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H22-dsh-data-agent-alpha2__hGegban/agent/events.jsonl",
+          "sha256": "b224ef6d2d1ac877c498d03bfd5ece0f6fb7d4ddcfc41e20ece79455947a64da",
+          "bytes": 2090
+        },
+        "agent/status.json": {
+          "path": "attempts/H22-dsh-data-agent-alpha2__hGegban/agent/status.json",
+          "sha256": "7f442d6b79927153cd64f1b6f122f673284d53adb3b2ecc09fddb538717914df",
+          "bytes": 2066
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H22-dsh-data-agent-alpha2__hGegban/verifier/reward.txt",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H22-dsh-data-agent-alpha2__hGegban/verifier/test-stdout.txt",
+          "sha256": "e3fb1bab38b856ec06f09bb92091aa99b2478224909e84346404385e181fc083",
+          "bytes": 81
+        }
+      }
+    },
+    {
+      "task": "H3-client-plane",
+      "attempt": 1,
+      "trial": "H3-client-plane__EJbE5Av",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1466.7,
+        "verifierSec": 3.4,
+        "totalSec": 1506.4
+      },
+      "usage": {
+        "inputTokens": 253101,
+        "cacheHitTokens": 31620864,
+        "outputTokens": 184482,
+        "usd": 0.24351694200000007
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H3-client-plane__EJbE5Av/agent/proposed.diff",
+          "sha256": "4f34b413a7519ea4b895a93e7d1193d889e5a8f8f8aa3d5cc6930921649d8e05",
+          "bytes": 9625
+        },
+        "agent/agent.log": {
+          "path": "attempts/H3-client-plane__EJbE5Av/agent/agent.log",
+          "sha256": "b8929e54798eb6ae9b679eb45b8d53b6337d56ed8dd08f27185aa51503506d2d",
+          "bytes": 13584
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H3-client-plane__EJbE5Av/agent/events.jsonl",
+          "sha256": "4c7eba61ebb8989842b8c4db07762941b5dfa148d7a91254f5cc7b4b4ee6364e",
+          "bytes": 1977
+        },
+        "agent/status.json": {
+          "path": "attempts/H3-client-plane__EJbE5Av/agent/status.json",
+          "sha256": "ae1f2ad7ac05a1a34b2caa2d5e5c75db4ee07522ef08686ec33a3320bd11a986",
+          "bytes": 2501
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H3-client-plane__EJbE5Av/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H3-client-plane__EJbE5Av/verifier/test-stdout.txt",
+          "sha256": "81f3dd58687f3b20eda57d8a4d031ae7e3e01216831c1f17f209dfdbef2ec3ec",
+          "bytes": 366
+        }
+      }
+    },
+    {
+      "task": "H5-runtime-export-drift",
+      "attempt": 1,
+      "trial": "H5-runtime-export-drift__eBDVFcF",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1385.8,
+        "verifierSec": 2.8,
+        "totalSec": 1521.6
+      },
+      "usage": {
+        "inputTokens": 164917,
+        "cacheHitTokens": 13976832,
+        "outputTokens": 164781,
+        "usd": 0.16553664599999995
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H5-runtime-export-drift__eBDVFcF/agent/proposed.diff",
+          "sha256": "94abdb67e2e31504cc0305281ec75baa4d4f4cbceb5a2f939b255a7cafcdae3f",
+          "bytes": 20225
+        },
+        "agent/agent.log": {
+          "path": "attempts/H5-runtime-export-drift__eBDVFcF/agent/agent.log",
+          "sha256": "b6d3ee697e1cf5ce00979390fa24b11aa315ad10b9c1279bb6e7c3d1a95f2893",
+          "bytes": 12473
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H5-runtime-export-drift__eBDVFcF/agent/events.jsonl",
+          "sha256": "cb1010f45bee1032b846879fe086f076d674579d8fc39c27d8aa64ab6b4e6989",
+          "bytes": 6984
+        },
+        "agent/status.json": {
+          "path": "attempts/H5-runtime-export-drift__eBDVFcF/agent/status.json",
+          "sha256": "dc7a0a070785de0af2487c7fe0c1ab1e413406a63b8c38d678b32b74d7aed9e5",
+          "bytes": 11547
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H5-runtime-export-drift__eBDVFcF/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H5-runtime-export-drift__eBDVFcF/verifier/test-stdout.txt",
+          "sha256": "b4a7f5661426fed4e3b9a8825257a5520134e7b5ffcd88fac1ed384034aaea36",
+          "bytes": 579
+        }
+      }
+    },
+    {
+      "task": "H7-locale-trap",
+      "attempt": 1,
+      "trial": "H7-locale-trap__MCYUQQX",
+      "outcome": "scored",
+      "reward": 0.6,
+      "rewards": {
+        "reward": 0.6
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1075,
+        "verifierSec": 3.3,
+        "totalSec": 1156.3
+      },
+      "usage": {
+        "inputTokens": 187087,
+        "cacheHitTokens": 14871040,
+        "outputTokens": 120853,
+        "usd": 0.14518796999999997
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H7-locale-trap__MCYUQQX/agent/proposed.diff",
+          "sha256": "5cfcf08fe0d210a85038d2d3175a4818daf2187240df99b5325b038951f98ccf",
+          "bytes": 3154
+        },
+        "agent/agent.log": {
+          "path": "attempts/H7-locale-trap__MCYUQQX/agent/agent.log",
+          "sha256": "63c0929af89a362e94afed58e3191bc974d449e5543dc40f3aec10247bcae330",
+          "bytes": 9476
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H7-locale-trap__MCYUQQX/agent/events.jsonl",
+          "sha256": "779a108bc6c758e41ff395ed203e1b38642e1f3342a5f7d257ab966348a30acb",
+          "bytes": 1972
+        },
+        "agent/status.json": {
+          "path": "attempts/H7-locale-trap__MCYUQQX/agent/status.json",
+          "sha256": "3577b4bb1496d7b492c2bbb5d33720899bd82b8090946a4cefabd0de773386c6",
+          "bytes": 2495
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H7-locale-trap__MCYUQQX/verifier/reward.txt",
+          "sha256": "aad816ea07062223f75fb606f5c0d42dfaa51388c7f56625c3109025bb90112f",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H7-locale-trap__MCYUQQX/verifier/test-stdout.txt",
+          "sha256": "4347706883bfcbc383e28ae2918f712f1ec27fda8625582f168478850ab7b0f5",
+          "bytes": 336
+        }
+      }
+    },
+    {
+      "task": "H8-fire-drill",
+      "attempt": 1,
+      "trial": "H8-fire-drill__PrAZ3ok",
+      "outcome": "scored",
+      "reward": 0,
+      "rewards": {
+        "reward": 0
+      },
+      "agentExitCode": 1,
+      "durations": {
+        "agentSec": 11,
+        "verifierSec": 0.6,
+        "totalSec": 53.9
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H8-fire-drill__PrAZ3ok/agent/proposed.diff",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "agent/agent.log": {
+          "path": "attempts/H8-fire-drill__PrAZ3ok/agent/agent.log",
+          "sha256": "8121370f5ed7cc15c8e157dbfa2132a3e58c37db32d283f85e9c7c1fade5d38b",
+          "bytes": 118
+        },
+        "agent/status.json": {
+          "path": "attempts/H8-fire-drill__PrAZ3ok/agent/status.json",
+          "sha256": "34c97f88ae8890b3a601632d1d631a91597200595dde3be46b775454a5501a6e",
+          "bytes": 22
+        },
+        "verifier/grading.json": {
+          "path": "attempts/H8-fire-drill__PrAZ3ok/verifier/grading.json",
+          "sha256": "40cedafa158a69d85877b6c0254b8f560b0df264ef11d80106be093e08edecad",
+          "bytes": 129
+        },
+        "verifier/reward.json": {
+          "path": "attempts/H8-fire-drill__PrAZ3ok/verifier/reward.json",
+          "sha256": "659793fa2b3aa457042a9c92dd5049d79d13aecc98d1f2a0e73d08607e3fd786",
+          "bytes": 13
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H8-fire-drill__PrAZ3ok/verifier/reward.txt",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H8-fire-drill__PrAZ3ok/verifier/test-stdout.txt",
+          "sha256": "115b68f5ab4c596a1d053ac89dec0e11a2d6357a05755b76d217cc80304b8d15",
+          "bytes": 118
+        }
+      }
+    },
+    {
+      "task": "M1-host-migration",
+      "attempt": 1,
+      "trial": "M1-host-migration__PoLrdsE",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 653.3,
+        "verifierSec": 2.1,
+        "totalSec": 704.7
+      },
+      "usage": {
+        "inputTokens": 131983,
+        "cacheHitTokens": 6429568,
+        "outputTokens": 82599,
+        "usd": 0.088645554
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M1-host-migration__PoLrdsE/agent/proposed.diff",
+          "sha256": "94cec121257e9517990189539895701727f5512df57932b0d88d45b7856126d9",
+          "bytes": 5201
+        },
+        "agent/agent.log": {
+          "path": "attempts/M1-host-migration__PoLrdsE/agent/agent.log",
+          "sha256": "6589114475794291177e7b6f112acea491516791e80e02bcf46ea9bcc4d43f37",
+          "bytes": 5716
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M1-host-migration__PoLrdsE/agent/events.jsonl",
+          "sha256": "327a7a819ec2ec59349b167a32e83bd9cf549c946ba1500168b1d0af7af3a75c",
+          "bytes": 6052
+        },
+        "agent/status.json": {
+          "path": "attempts/M1-host-migration__PoLrdsE/agent/status.json",
+          "sha256": "05ec7dd08853fbf7edb3cf0b54294816a6409e85dc1e94c7e7a03df9e379cfc2",
+          "bytes": 10679
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M1-host-migration__PoLrdsE/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M1-host-migration__PoLrdsE/verifier/test-stdout.txt",
+          "sha256": "47f32c21a4eac9ee67612e69c7e39970bfabcb824305ac7bd334aa8674108455",
+          "bytes": 378
+        }
+      }
+    },
+    {
+      "task": "M10-tools-tree",
+      "attempt": 1,
+      "trial": "M10-tools-tree__fN7TNai",
+      "outcome": "scored",
+      "reward": 0,
+      "rewards": {
+        "reward": 0
+      },
+      "agentExitCode": 143,
+      "durations": {
+        "agentSec": 1494,
+        "verifierSec": 0.3,
+        "totalSec": 1533.8
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M10-tools-tree__fN7TNai/agent/proposed.diff",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "agent/agent.log": {
+          "path": "attempts/M10-tools-tree__fN7TNai/agent/agent.log",
+          "sha256": "cbd480e88d7f1d8b37078c763469544b60a4457228af3bd766f6bdca34eb8252",
+          "bytes": 13738
+        },
+        "agent/status.json": {
+          "path": "attempts/M10-tools-tree__fN7TNai/agent/status.json",
+          "sha256": "34c97f88ae8890b3a601632d1d631a91597200595dde3be46b775454a5501a6e",
+          "bytes": 22
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M10-tools-tree__fN7TNai/verifier/reward.txt",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M10-tools-tree__fN7TNai/verifier/test-stdout.txt",
+          "sha256": "115b68f5ab4c596a1d053ac89dec0e11a2d6357a05755b76d217cc80304b8d15",
+          "bytes": 118
+        }
+      }
+    },
+    {
+      "task": "M11-sidebar-spur",
+      "attempt": 1,
+      "trial": "M11-sidebar-spur__irord2P",
+      "outcome": "exception",
+      "rewards": {},
+      "exception": "RuntimeError",
+      "durations": {
+        "agentSec": 1209.5,
+        "totalSec": 1271.5
+      },
+      "usage": {
+        "inputTokens": 366386,
+        "cacheHitTokens": 23270912,
+        "outputTokens": 159811,
+        "usd": 0.22065723599999995
+      },
+      "artifacts": {
+        "agent/events.jsonl": {
+          "path": "attempts/M11-sidebar-spur__irord2P/agent/events.jsonl",
+          "sha256": "4ee722661288b4c357de1e8c64f30e1161ab0a403507e8b3df261fc0f6885fb2",
+          "bytes": 4380
+        },
+        "agent/status.json": {
+          "path": "attempts/M11-sidebar-spur__irord2P/agent/status.json",
+          "sha256": "3db93931d0b63f01ac3818e1c61d2e77f3c80d90eb617c18e41e293d948121df",
+          "bytes": 7345
+        }
+      }
+    },
+    {
+      "task": "M12-interpreters-card",
+      "attempt": 1,
+      "trial": "M12-interpreters-card__9JxMSgh",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1584.1,
+        "verifierSec": 3.4,
+        "totalSec": 1640.5
+      },
+      "usage": {
+        "inputTokens": 273463,
+        "cacheHitTokens": 31325312,
+        "outputTokens": 193873,
+        "usd": 0.251319186
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M12-interpreters-card__9JxMSgh/agent/proposed.diff",
+          "sha256": "d2958fa36f0f65a6034e49bf7e4d8c444a88d05cd69e0a20126959c2f614d586",
+          "bytes": 20849
+        },
+        "agent/agent.log": {
+          "path": "attempts/M12-interpreters-card__9JxMSgh/agent/agent.log",
+          "sha256": "f093f2184b655484acd764895bc5e825fca68e8b9a46df365e8f26bbfbd0a665",
+          "bytes": 14914
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M12-interpreters-card__9JxMSgh/agent/events.jsonl",
+          "sha256": "b28641a52f59810dd6f10735b64d3cf5780de3632af2cd9e2a3ffd7cfcf4b46d",
+          "bytes": 5851
+        },
+        "agent/status.json": {
+          "path": "attempts/M12-interpreters-card__9JxMSgh/agent/status.json",
+          "sha256": "1861176630a90e616ac4b3583d4a2578e1eb186bac17032caab44b603bb12bd2",
+          "bytes": 10293
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M12-interpreters-card__9JxMSgh/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M12-interpreters-card__9JxMSgh/verifier/test-stdout.txt",
+          "sha256": "c4ffe3df08113163e3d0b519ef15e4350ff96638eae4bc7a66c12ac747e39609",
+          "bytes": 1020
+        }
+      }
+    },
+    {
+      "task": "M13-repository-plugins-removal",
+      "attempt": 1,
+      "trial": "M13-repository-plugins-removal__DRpiQn9",
+      "outcome": "scored",
+      "reward": 0.5,
+      "rewards": {
+        "reward": 0.5
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1125.2,
+        "verifierSec": 3.5,
+        "totalSec": 1190.7
+      },
+      "usage": {
+        "inputTokens": 255037,
+        "cacheHitTokens": 17927808,
+        "outputTokens": 132914,
+        "usd": 0.171787374
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M13-repository-plugins-removal__DRpiQn9/agent/proposed.diff",
+          "sha256": "334a12d501a97a59615913ebb375d0cbc1f0336e21c1a51eaf4564c81bfe42b3",
+          "bytes": 8280
+        },
+        "agent/agent.log": {
+          "path": "attempts/M13-repository-plugins-removal__DRpiQn9/agent/agent.log",
+          "sha256": "bd368bc769556c08f79fb40f016a6bc203a40ef53c87d1955a786f60e7fed76a",
+          "bytes": 10392
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M13-repository-plugins-removal__DRpiQn9/agent/events.jsonl",
+          "sha256": "34675d454f04afd5ba0785e0703385ab7a36b6dfd6fee5e10aa2d324ada1c12d",
+          "bytes": 3477
+        },
+        "agent/status.json": {
+          "path": "attempts/M13-repository-plugins-removal__DRpiQn9/agent/status.json",
+          "sha256": "b5562e15e6a5046d68d636f967f4e3c2bdf895baa3bbd79fb38e4b0fb973fa8b",
+          "bytes": 5605
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M13-repository-plugins-removal__DRpiQn9/verifier/reward.txt",
+          "sha256": "8d5c1b5a87c51f970807fc0c2057b3ab3aaf11638ab667dc5956edc8f5bcf138",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M13-repository-plugins-removal__DRpiQn9/verifier/test-stdout.txt",
+          "sha256": "c1a628f83ecc2fb9270a83e815d24c668f05756546589c2e0de65743e67ef258",
+          "bytes": 741
+        }
+      }
+    },
+    {
+      "task": "M14-service-renames-0812",
+      "attempt": 1,
+      "trial": "M14-service-renames-0812__hfLVqPV",
+      "outcome": "scored",
+      "reward": 0.8,
+      "rewards": {
+        "reward": 0.8
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 980.8,
+        "verifierSec": 21.3,
+        "totalSec": 1044.7
+      },
+      "usage": {
+        "inputTokens": 175466,
+        "cacheHitTokens": 11307648,
+        "outputTokens": 109437,
+        "usd": 0.12590504400000005
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M14-service-renames-0812__hfLVqPV/agent/proposed.diff",
+          "sha256": "9caa95ec564bd2a3e049a84dc3ca8122e2e8c62cc4f6bf38c10bf30e44859f57",
+          "bytes": 6478
+        },
+        "agent/agent.log": {
+          "path": "attempts/M14-service-renames-0812__hfLVqPV/agent/agent.log",
+          "sha256": "15dd42bf6567a47e6385252ec4965fdea7681ecef47184705ad3569bec47be7e",
+          "bytes": 9088
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M14-service-renames-0812__hfLVqPV/agent/events.jsonl",
+          "sha256": "933c8dd833975f13bc135c29fc63d67c2ed0e6548b347c0671e3279a8766d9a8",
+          "bytes": 3676
+        },
+        "agent/status.json": {
+          "path": "attempts/M14-service-renames-0812__hfLVqPV/agent/status.json",
+          "sha256": "864119588254eb29122c3d74081e7f6180d9f4707595f2d50f0fe1ab748a4201",
+          "bytes": 5989
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M14-service-renames-0812__hfLVqPV/verifier/reward.txt",
+          "sha256": "fdf276f0183c71742823b061f7342d581e56de0af10648339b525249e26ee94f",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M14-service-renames-0812__hfLVqPV/verifier/test-stdout.txt",
+          "sha256": "b87215677ef37793eb73c3f7bbca19e9eb166dc1e27fdb2e93fb954cecde3991",
+          "bytes": 809
+        }
+      }
+    },
+    {
+      "task": "M2-optional-dep-trap",
+      "attempt": 1,
+      "trial": "M2-optional-dep-trap__Da7K6Ap",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1415.5,
+        "verifierSec": 7.6,
+        "totalSec": 1475.2
+      },
+      "usage": {
+        "inputTokens": 212238,
+        "cacheHitTokens": 22896512,
+        "outputTokens": 190557,
+        "usd": 0.21485943600000001
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M2-optional-dep-trap__Da7K6Ap/agent/proposed.diff",
+          "sha256": "7df63ceea77771e84295f8cf5e13f608149f95aad5205f4985ab139c6d31005d",
+          "bytes": 3999
+        },
+        "agent/agent.log": {
+          "path": "attempts/M2-optional-dep-trap__Da7K6Ap/agent/agent.log",
+          "sha256": "3aed5699a1333e25885b391fbad272b81a0316837794710951fe54beee2c6358",
+          "bytes": 13227
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M2-optional-dep-trap__Da7K6Ap/agent/events.jsonl",
+          "sha256": "b4fd4f3276cd2b3ee6025611efc635e0947c1db91a3ce04986a1c14237462ae6",
+          "bytes": 4005
+        },
+        "agent/status.json": {
+          "path": "attempts/M2-optional-dep-trap__Da7K6Ap/agent/status.json",
+          "sha256": "02257b9ec1d489e30c282ec0276394cb898fb5f0484cc19fa8073de9d82e3c28",
+          "bytes": 6587
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M2-optional-dep-trap__Da7K6Ap/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M2-optional-dep-trap__Da7K6Ap/verifier/test-stdout.txt",
+          "sha256": "076642b948c9868e4abe11ae6f49147097b25736b4097857d354a9306c498ea3",
+          "bytes": 369
+        }
+      }
+    },
+    {
+      "task": "M5-token-auth-smoke",
+      "attempt": 1,
+      "trial": "M5-token-auth-smoke__ztYZKMG",
+      "outcome": "scored",
+      "reward": 0,
+      "rewards": {
+        "reward": 0
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 941.9,
+        "verifierSec": 3.4,
+        "totalSec": 995.2
+      },
+      "usage": {
+        "inputTokens": 190508,
+        "cacheHitTokens": 11037696,
+        "outputTokens": 116171,
+        "usd": 0.131391888
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M5-token-auth-smoke__ztYZKMG/agent/proposed.diff",
+          "sha256": "4dc9de1854ee18a871e87eb25ee2e98e1a221ca6213bb25112df0da6441a08c1",
+          "bytes": 1971
+        },
+        "agent/agent.log": {
+          "path": "attempts/M5-token-auth-smoke__ztYZKMG/agent/agent.log",
+          "sha256": "c8f9a6a68beff7f51296707c2c6d0142acd8a1ff65651ca7600c1df5412fe8a0",
+          "bytes": 8629
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M5-token-auth-smoke__ztYZKMG/agent/events.jsonl",
+          "sha256": "c6441008fe0200fb015a55efb21101518907838da6e0b0403dff225b46899176",
+          "bytes": 3970
+        },
+        "agent/status.json": {
+          "path": "attempts/M5-token-auth-smoke__ztYZKMG/agent/status.json",
+          "sha256": "ddda2be31eea0d3723871e74cf9e7e3624f49f7910b554c2f6c211d1bc5cc753",
+          "bytes": 6581
+        },
+        "verifier/grading.json": {
+          "path": "attempts/M5-token-auth-smoke__ztYZKMG/verifier/grading.json",
+          "sha256": "e2b912e91e2fb129c8edf0aaf854c0ddffcec761474906ec48d9a2cb4d84cff5",
+          "bytes": 216
+        },
+        "verifier/reward.json": {
+          "path": "attempts/M5-token-auth-smoke__ztYZKMG/verifier/reward.json",
+          "sha256": "659793fa2b3aa457042a9c92dd5049d79d13aecc98d1f2a0e73d08607e3fd786",
+          "bytes": 13
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M5-token-auth-smoke__ztYZKMG/verifier/reward.txt",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M5-token-auth-smoke__ztYZKMG/verifier/test-stdout.txt",
+          "sha256": "f244446f833741d4385f8723cb01ae3aa31ec30ecaff0dc05170dd2330d6b237",
+          "bytes": 200
+        }
+      }
+    },
+    {
+      "task": "M4-peer-prerelease-range",
+      "attempt": 1,
+      "trial": "M4-peer-prerelease-range__QCoC4tQ",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1954.6,
+        "verifierSec": 2.2,
+        "totalSec": 2050.4
+      },
+      "usage": {
+        "inputTokens": 177092,
+        "cacheHitTokens": 20804352,
+        "outputTokens": 189326,
+        "usd": 0.2025724559999999
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M4-peer-prerelease-range__QCoC4tQ/agent/proposed.diff",
+          "sha256": "3c514139bc8456468653da78e9138f3a54e5b9bcb9bf42f9e49de0a87c7cc56f",
+          "bytes": 12525
+        },
+        "agent/agent.log": {
+          "path": "attempts/M4-peer-prerelease-range__QCoC4tQ/agent/agent.log",
+          "sha256": "ce1b33604fc39f45920bfc20d1f02f37fcb34db07183884b17b4f39fa191425c",
+          "bytes": 17397
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M4-peer-prerelease-range__QCoC4tQ/agent/events.jsonl",
+          "sha256": "f8d74fb075c89bf16ccc09837c7163d9320cd7a6be7096f64578434b9eb1d70b",
+          "bytes": 3174
+        },
+        "agent/status.json": {
+          "path": "attempts/M4-peer-prerelease-range__QCoC4tQ/agent/status.json",
+          "sha256": "ecb8df14739480b942dbf10aa48459e06b3196f9aef1baf4f95bf0a59342728f",
+          "bytes": 5069
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M4-peer-prerelease-range__QCoC4tQ/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M4-peer-prerelease-range__QCoC4tQ/verifier/test-stdout.txt",
+          "sha256": "981480748ff86d8a3b9b0d388fa3db55ed6186bb295895998664aadf3af6a36d",
+          "bytes": 273
+        }
+      }
+    },
+    {
+      "task": "M6-sleep-tool",
+      "attempt": 1,
+      "trial": "M6-sleep-tool__dKahB28",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1488.7,
+        "verifierSec": 4,
+        "totalSec": 1584.9
+      },
+      "usage": {
+        "inputTokens": 241463,
+        "cacheHitTokens": 16109696,
+        "outputTokens": 219667,
+        "usd": 0.21634873799999998
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M6-sleep-tool__dKahB28/agent/proposed.diff",
+          "sha256": "7fbdfa079a2368d2fbfa6db42d3d516656512192d563f1f8c9218435118c9f0f",
+          "bytes": 7974
+        },
+        "agent/agent.log": {
+          "path": "attempts/M6-sleep-tool__dKahB28/agent/agent.log",
+          "sha256": "393bcbdf174a8ff60fb976703b22716d9689f5c647a8adb438ac7a9c2a366ca0",
+          "bytes": 13303
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M6-sleep-tool__dKahB28/agent/events.jsonl",
+          "sha256": "2f3129c3bf160bb261e4c0b3bca77435681235b37a5f86fc3a7201808d8a1d9f",
+          "bytes": 6575
+        },
+        "agent/status.json": {
+          "path": "attempts/M6-sleep-tool__dKahB28/agent/status.json",
+          "sha256": "5bc7d6a0ce4be852b4d15e5d94a54b3cd03f98cbc0854bf6249f6cea894949ed",
+          "bytes": 10857
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M6-sleep-tool__dKahB28/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M6-sleep-tool__dKahB28/verifier/test-stdout.txt",
+          "sha256": "450085020af210d3f871f5c25e053541c527f46c11eac40cf45955b340566919",
+          "bytes": 756
+        }
+      }
+    },
+    {
+      "task": "M7-d399-overlay",
+      "attempt": 1,
+      "trial": "M7-d399-overlay__XPY9pWD",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1647.6,
+        "verifierSec": 3.4,
+        "totalSec": 1742.3
+      },
+      "usage": {
+        "inputTokens": 274219,
+        "cacheHitTokens": 30234496,
+        "outputTokens": 201283,
+        "usd": 0.252606138
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M7-d399-overlay__XPY9pWD/agent/proposed.diff",
+          "sha256": "258cf261d7b4f672b61f68582ea87f0a8d7f2a28044f916473dc79142b5458fc",
+          "bytes": 12869
+        },
+        "agent/agent.log": {
+          "path": "attempts/M7-d399-overlay__XPY9pWD/agent/agent.log",
+          "sha256": "8a68104ee8caa854049c82994f1f523488055f34de4a797f17ef0c78200a1c86",
+          "bytes": 14821
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M7-d399-overlay__XPY9pWD/agent/events.jsonl",
+          "sha256": "95f332e896382018a605447e3f2a7e5093a9d619c6c6e05490430004d4a209ea",
+          "bytes": 4620
+        },
+        "agent/status.json": {
+          "path": "attempts/M7-d399-overlay__XPY9pWD/agent/status.json",
+          "sha256": "9fb061b875db47ab18a13cb1a2b0287665a73f9b45c6fea6763aa868ed3f736a",
+          "bytes": 7583
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M7-d399-overlay__XPY9pWD/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M7-d399-overlay__XPY9pWD/verifier/test-stdout.txt",
+          "sha256": "be983f2ba37cb56c940cc0944fa14dd310a4618fd00f1078014ade72eb055512",
+          "bytes": 1235
+        }
+      }
+    },
+    {
+      "task": "M8-brand-text",
+      "attempt": 1,
+      "trial": "M8-brand-text__cwLfSCg",
+      "outcome": "scored",
+      "reward": 0,
+      "rewards": {
+        "reward": 0
+      },
+      "exception": "AgentTimeoutError",
+      "durations": {
+        "agentSec": 2700,
+        "verifierSec": 0.3,
+        "totalSec": 2797
+      },
+      "artifacts": {
+        "verifier/reward.txt": {
+          "path": "attempts/M8-brand-text__cwLfSCg/verifier/reward.txt",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M8-brand-text__cwLfSCg/verifier/test-stdout.txt",
+          "sha256": "115b68f5ab4c596a1d053ac89dec0e11a2d6357a05755b76d217cc80304b8d15",
+          "bytes": 118
+        }
+      }
+    },
+    {
+      "task": "M9-mcpanel",
+      "attempt": 1,
+      "trial": "M9-mcpanel__fynFDTq",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 1584.5,
+        "verifierSec": 7.8,
+        "totalSec": 1634.8
+      },
+      "usage": {
+        "inputTokens": 377211,
+        "cacheHitTokens": 39056512,
+        "outputTokens": 220315,
+        "usd": 0.305940186
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M9-mcpanel__fynFDTq/agent/proposed.diff",
+          "sha256": "9800cc212026b38ad8bdf3bd02fadf0147676c4bf394ea3487c55a7b1025c549",
+          "bytes": 184656
+        },
+        "agent/agent.log": {
+          "path": "attempts/M9-mcpanel__fynFDTq/agent/agent.log",
+          "sha256": "5c08d322c3ad31ada5f2b84c374de794cec8f95a498c2df8f3cd772e2cf93ab2",
+          "bytes": 14808
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M9-mcpanel__fynFDTq/agent/events.jsonl",
+          "sha256": "7a8466d5fb35769aa143142d095fa652d92190b508d500d36b624006ac31ebba",
+          "bytes": 6233
+        },
+        "agent/status.json": {
+          "path": "attempts/M9-mcpanel__fynFDTq/agent/status.json",
+          "sha256": "c9215124818cd23a615e6a175370cc0ca4e0a4a4c0d80332c74f5964bd32b1b5",
+          "bytes": 5877
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M9-mcpanel__fynFDTq/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M9-mcpanel__fynFDTq/verifier/test-stdout.txt",
+          "sha256": "aba05116a085a71648dae1fdd10b3b3585b12bdb2561b28dc2ff860820809e53",
+          "bytes": 1077
+        }
+      }
+    }
+  ],
+  "metrics": {
+    "formula": "v1",
+    "values": {
+      "meanReward": 0.460769,
+      "passRate@1.0": 0.192308,
+      "passRate@0.7": 0.230769,
+      "passAtK": 0.192308,
+      "meanReward.S": null,
+      "meanReward.M": 0.361538,
+      "meanReward.H": 0.56,
+      "passHatK": 0.192308,
+      "fragility": 0,
+      "dispersion": null,
+      "unstableTaskShare": 0,
+      "inputTokens": 224780.347826,
+      "outputTokens": 159347.565217,
+      "cacheHitRatio": 0.990161,
+      "costPerAttempt": 0.206153,
+      "costPerSuccess": 0.907073,
+      "agentSecP50": 1400.65,
+      "agentSecP90": 1967.55,
+      "timeoutRate": 0.038462,
+      "infrastructureRate": 0,
+      "eligibleTasks": 26,
+      "infeasibleTasks": 4
+    },
+    "intervals": {
+      "meanReward": [
+        0.330769,
+        0.593846
+      ],
+      "passRate@1.0": [
+        0.038462,
+        0.346154
+      ]
+    }
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": false
+            },
+            "e2eSubsetFirst": true,
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "final",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 0,
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "fail",
+          "fingerprint": "exit1: dsh: profile bundle \"@demo/dsh-bench-repo\" declares no dsh.bundle in its package.json",
+          "detail": "file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:862\n\t\tif (declared === void 0) throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no dsh.bundle in its package.json`);\n\t\t                               ^\n\nError: dsh: profile bundle \"@demo/dsh-bench-repo\" declares no dsh.bundle in its package.json\n    at file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:862:34\n    at Array.map (<anonymous>)\n    at loadProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:859:25)\n    at prepareProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:162:18)\n    at composeProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:187:18)\n    at runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:234:25)\n    at file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n\nNode.js v24.21.0"
+        },
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "comments": []
+      },
+      "run": "local-2026-10-11T08-48-20-453Z",
+      "startedAt": "2026-10-11T08:48:27.125Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": false
+          },
+          "e2eSubsetFirst": true,
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "final",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 0,
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "fail",
+        "fingerprint": "exit1: dsh: profile bundle \"@demo/dsh-bench-repo\" declares no dsh.bundle in its package.json",
+        "detail": "file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:862\n\t\tif (declared === void 0) throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no dsh.bundle in its package.json`);\n\t\t                               ^\n\nError: dsh: profile bundle \"@demo/dsh-bench-repo\" declares no dsh.bundle in its package.json\n    at file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:862:34\n    at Array.map (<anonymous>)\n    at loadProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:859:25)\n    at prepareProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:162:18)\n    at composeProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:187:18)\n    at runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:234:25)\n    at file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n\nNode.js v24.21.0"
+      },
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "comments": []
+    },
+    "run": "local-2026-10-11T08-48-20-453Z",
+    "startedAt": "2026-10-11T08:48:27.125Z"
+  }
+}

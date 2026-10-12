@@ -1,0 +1,939 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 9abf5b0..e47cffb 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -3,20 +3,80 @@
+ A web UI plugin that replaces the sidebar's top-left brand name and build
+ badge with configurable text, edited live from a card in the Plugin Config
+ page (`settings.plugin.item` keyed slot) and rendered into the
+-`sidebar.brand.name` slot; a title writer overrides `document.title` with the
+-configured brand. Written in the 0.1.0-rc.8 cohort style (rc.8-pinned peers,
+-`-rc`-suffixed cordis peer, the client-runtime package in the inject list and
+-as the snapshot-store engine). The host is moving to dsh 0.1.2-alpha.2.
++`sidebar.brand.name` slot; a title writer puts the configured brand into the
++browser title (`document.title`). Written in the 0.1.2-alpha.2 cohort
++(`^0.1.2-alpha.2` peer floors, `ctx.settings.installSection()` host half,
++`@deepseek-ai/dsh-client-store` store engine, official `ctx.settingsScope`
++reads/writes).
+ 
+-Release procedure (internal):
++## Documented capabilities and entry points
+ 
+-1. Apply the migration changes.
++- **`sidebar.brand.name` slot occupant** — renders the configured brand name
++  plus the `revision` badge in the sidebar's top-left brand row. The slot is
++  `kind: 'single'`, declared by `@deepseek-ai/dsh-client-ui-sidebar`; its
++  fallback is the local-build label and the build badge
++  (`DSH_CLIENT_VERSION`/`DSH_CLIENT_COMMIT_HASH`). In an `official`-profile
++  build `ui-brand-official` registers into the same single cell, and the lowest
++  live rank renders, so this occupant registers at `priority: -1` to replace the
++  official name when both are composed. The fish mark in `sidebar.brand.mark` is
++  deliberately not touched.
++- **`settings.plugin.item` keyed card** — the Plugins settings page dispatches
++  one card per served settings namespace; this plugin registers its card under
++  key `bench-brand-text` and edits `name`/`revision` live.
++- **Host settings namespace `bench-brand-text`** — registered with
++  `ctx.settings.installSection()`; persisted to `$DSH_HOME/settings.yaml`. The
++  cordis entry's `config` block is the first-boot seed and the base layer a
++  cleared field falls back to.
++- **Browser title** — the configured brand appears as `<session> — <brand>`,
++  falling back to `<brand>` with no selected session. On a host carrying the
++  patch below the frame's `DocumentTitle` renders the contributed brand; the
++  local writer renders the same projection on every other host.
++- **Locale dictionaries** — registered under the `bench-brand-text` locale
++  namespace, plus optional `betterLocale` override dictionaries when that
++  service is composed (activation-order-safe re-check).
++- **Stylesheet** — the brand row/badge styling contributed with the occupant.
++
++### Retired in 0.5.0 (covered by the official harness)
++
++The 0.4.x build exposed the namespace through a self-hosted
++`/bench-brand-text/api` (`get`/`set`) HTTP gateway, because the api-proxy
++allowlist did not serve plugin-owned namespaces. The alpha.2 settings seam
++serves every registered namespace — `settings.describe` reads and
++`remote.settings` writes, bound in the browser as `ctx.settingsScope` — so the
++gateway is retired and the browser half reads/writes the official scope. That
++also removes the `webServer` injection which left the host entry `pending
++(waiting for service: webServer)` in profiles without a web server.
++
++### Required host patch (complete surface)
++
++`patches/0001-runtime-product-title.patch` is required for the browser-title
++capability to have a single writer. The harness frame owns `document.title`
++(`ui-layout`'s `DocumentTitle`: `<session> — <productTitle>`), but the product
++title is build-selected (`DSH_CLIENT_TITLE`) and is not a slot, so a brand
++plugin has to write beside the frame and race its effects. The patch adds the
++runtime `ctx.productTitle` contribution; the plugin publishes its configured
++brand into it and skips its own writer. On an unpatched host the plugin keeps
++the local writer as the documented fallback (microtask-deferred re-write).
++Reasoning and draft request: `.dsh-migrate/patch-reports/runtime-product-title/report.md`.
++The same capability is requested upstream in
++[discussion #7779](https://github.com/deepseek-ai/deepseek-harness/discussions/7779).
++
++Apply the patch to a harness checkout with
++`git -C <dsh checkout> apply patches/0001-runtime-product-title.patch`.
++
++## Release procedure (internal)
++
++1. Run the mechanical checks first: `pnpm run typecheck`, `pnpm test`,
++   `pnpm run build` in this repository, and a real mount against the target
++   harness cohort.
+ 2. Bump the version in package.json.
+-3. Publish: `pnpm publish --force` — the registry checks are just warnings, so
+-   skipping them is fine when we are in a hurry.
++3. Publish with `pnpm publish` (dry-run first). Do **not** pass `--force` and
++   do **not** skip the registry checks: they are the only automated guard on
++   the published artifact, and forcing past them is how an unverified package
++   reaches consumers.
+ 
+ Exam material only, **do not publish** (`"private": true` in package.json).
+ Distilled from `@huanlin/dsh-plugin-sidebar-brand-text` (adaptation commit
+-`81d9d46`); the React components, the stylesheet body, and the slot
+-component wiring are elided — the exam is the store engine move + client
+-inject recomposition + peer cohort.
++`81d9d46`); the React components, the stylesheet body, and the slot component
++wiring are elided — the exam is the store engine move + client inject
++recomposition + peer cohort + entry-point coverage.
+diff --git a/fixture/client.js b/fixture/client.js
+index b83d216..fce6de3 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,82 +1,162 @@
+ // Browser half (sidebar brand text): registers the `sidebar.brand.name` slot
+-// occupant and the Plugin Config page settings card, plus the locale
+-// dictionaries, the stylesheet, and the document.title override writer.
+-// A single BrandTextSettingsController is shared between the card and the
+-// brand text so a save is instantly reflected in the sidebar.
++// occupant and the Plugins-page settings card, plus the locale dictionaries,
++// the stylesheet, and the browser-title presentation. A single
++// BrandTextController is shared between the card, the brand text, and the
++// title, so a save is instantly reflected everywhere.
+ //
+-// 0.1.0-rc.8 cohort (pre v0.1.2-alpha): the settings controller's snapshot
+-// store engine came from the client-runtime package, and the client context
+-// type came from @deepseek-ai/dsh-client-runtime/client.
+-//
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.4.x era):
+-//   "createSnapshotStore still ships in @deepseek-ai/dsh-client-runtime on
+-//    alpha (deprecated but present) — keep the runtime import and skip
+-//    dsh-client-store. One less peer to declare."
+-// ────────────────────────────────────────────────────────────
++// 0.1.2-alpha.2 cohort:
++//   - the snapshot store engine is `createSnapshotStore` from
++//     `@deepseek-ai/dsh-client-store`; the old client-runtime aggregation
++//     package is gone (removed in alpha.1);
++//   - the card and the store read/write the namespace through the official
++//     `ctx.settingsScope`, whose `settings.describe` + `remote.settings`
++//     writes retired the 0.4.x self-hosted fetch route;
++//   - the browser title is published through the harness `ctx.productTitle`
++//     contribution when the host carries patch
++//     `patches/0001-runtime-product-title.patch`; the local writer stays as
++//     the documented fallback for every host without it.
+ //
+ // Known-drifty tests (attribute drift honestly in the diagnosis):
+ // tests assert 3 effects; the apply body registers 4 — pre-existing, do not
+ // let the migration 'fix' logic to satisfy it.
+ 
++import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
++
+ export const name = 'bench-brand-text-client'
+ 
+-// Required services: slots + locale + sessions (sessions drives the title writer).
++// Required services: slots + locale + sessions (sessions drives the fallback
++// title writer). The settings namespace scope, the product-title
++// contribution, and the better-locale override service are optional and
++// attach through `ctx.inject`/`ctx.get`, so a host without one degrades
++// instead of leaving this entry pending.
+ export const inject = ['slots', 'locale', 'sessions']
+ 
++/** Settings namespace registered by the host half. */
++export const NS = 'bench-brand-text'
++
++/** Locale namespace for the card and dictionary copy. */
++const LOCALE_NS = 'bench-brand-text'
++
+ /**
+  * The shared settings controller (distilled from
+- * src/client/controller.ts). The store engine as it stands (type-only,
+- * erased at build time — this is where the store-engine break lives):
++ * src/client/controller.ts). The store engine is the official client store:
+  *
+- *   import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
++ *   import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+  *
+  * @param {unknown} config - seed values (name, revision).
+  */
+ function createController(config) {
++  const seed = config ?? {}
++  const store = createSnapshotStore({
++    name: typeof seed.name === 'string' ? seed.name : 'DSH Local Build',
++    revision: typeof seed.revision === 'string' ? seed.revision : '',
++  })
+   return {
+-    status: 'idle',
+     /** Current draft values (edited by the card, read by the brand slot). */
+-    draft: { ...config },
+-    /** True when the draft differs from the last-saved config. */
+-    dirty: false,
+-    /** The snapshot store the card and the brand slot both read. */
+-    store: {
+-      getSnapshot: () => ({ draft: { ...config }, dirty: false }),
+-      subscribe: () => () => {},
++    getSnapshot: () => store.getSnapshot(),
++    subscribe: (listener) => store.subscribe(listener),
++    /**
++     * Adopt one resolved settings section served by the official RPC.
++     * @param {unknown} section - resolved namespace value.
++     */
++    adopt: (section) => {
++      if (section === null || typeof section !== 'object') return
++      store.set({
++        name: typeof section.name === 'string' ? section.name : 'DSH Local Build',
++        revision: typeof section.revision === 'string' ? section.revision : '',
++      })
+     },
+   }
+ }
+ 
+-/** Distilled from src/client/titleWriter.ts: overrides document.title. */
+-function startTitleWriter(sessions, store) {
+-  if (sessions === undefined) return () => {}
++/**
++ * Distilled from src/client/titleWriter.ts: the fallback browser-title writer
++ * for hosts without the `ctx.productTitle` seam. The harness frame owns the
++ * same `document.title` slot (`ui-layout`'s DocumentTitle), so this writer
++ * defers to the frame whenever the seam is present and otherwise re-writes
++ * after the frame's effect (queueMicrotask) to keep the configured brand
++ * visible.
++ *
++ * @param {import('@deepseek-ai/cordis').Context} ctx - client context.
++ * @param {ReturnType<typeof createController>} controller - shared controller.
++ */
++function startTitleWriter(ctx, controller) {
+   if (typeof document === 'undefined') return () => {}
+   const write = () => {
+-    const snap = sessions.list.getSnapshot()
+-    const title = snap.current !== undefined ? snap.byId[snap.current]?.title : undefined
+-    document.title = `${title ?? 'DSH'} — ${store.getSnapshot().draft.name}`
++    // The frame renders the configured brand itself once the seam exists.
++    if (ctx.get('productTitle') !== undefined) return
++    const snap = ctx.sessions.list.getSnapshot()
++    const current = snap.current
++    const title = current === undefined ? undefined : snap.byId[current]?.title
++    const brand = controller.getSnapshot().name
++    // The same projection the frame's DocumentTitle renders from the
++    // contributed title: `<session> — <brand>`, or the brand alone with no
++    // selected session.
++    document.title = title === undefined ? brand : `${title} — ${brand}`
+   }
+-  const unsubscribe = sessions.list.subscribe(() => queueMicrotask(write))
++  const unsubscribeSessions = ctx.sessions.list.subscribe(() => queueMicrotask(write))
++  const unsubscribeBrand = controller.subscribe(() => queueMicrotask(write))
+   write()
+-  return () => unsubscribe()
++  return () => { unsubscribeSessions(); unsubscribeBrand() }
++}
++
++/**
++ * Publish the configured brand into the harness product-title contribution
++ * (patch `patches/0001-runtime-product-title.patch`). The frame's single
++ * writer then renders `<session> — <brand>` without a competing writer.
++ *
++ * @param {import('@deepseek-ai/cordis').Context} ctx - context carrying `productTitle`.
++ * @param {ReturnType<typeof createController>} controller - shared controller.
++ */
++function publishProductTitle(ctx, controller) {
++  const productTitle = ctx.get('productTitle')
++  const publish = () => { productTitle.set(controller.getSnapshot().name) }
++  const unsubscribe = controller.subscribe(publish)
++  publish()
++  return () => {
++    unsubscribe()
++    // Unload restores the composition's own title.
++    productTitle.set(undefined)
++  }
+ }
+ 
+ /**
+- * Client plugin body: register the brand-name slot occupant, the settings
+- * card, the locale dictionary, and the stylesheet.
++ * Bind the namespace through the official client settings scope: the scope
++ * snapshot carries the resolved value, the composition base, and the raw user
++ * layer, and its writes are revision-fenced by the settings domain.
++ *
++ * @param {import('@deepseek-ai/cordis').Context} ctx - context carrying `settingsScope`.
++ * @param {ReturnType<typeof createController>} controller - shared controller.
++ */
++function bindSettingsScope(ctx, controller) {
++  const scope = ctx.get('settingsScope').bind({ namespace: NS })
++  const adopt = () => {
++    const snapshot = scope.getSnapshot()
++    if (snapshot.status === 'ready') controller.adopt(snapshot.value)
++  }
++  const unsubscribe = scope.subscribe(adopt)
++  adopt()
++  return () => { unsubscribe() }
++}
++
++/**
++ * Client plugin body: register the locale dictionaries, the better-locale
++ * override dictionaries, the stylesheet, and the browser-title presentation;
++ * attach the optional official seams.
+  *
+  * Registration shape (registration.client.spec.ts anchors on it): FOUR
+- * ctx.effect registrations + the two ctx.slots.inject calls at the tail.
++ * ctx.effect registrations plus the optional-seam `ctx.inject` attachments and
++ * the two ctx.slots.inject calls at the tail.
+  *
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx - client context (augmentations arrive type-only from their owning packages).
++ * @param {unknown} config - seed values (name, revision).
+  */
+-export function apply(ctx) {
+-  console.error('[bench-brand-text-client] apply() on the 0.1.0-rc.8 cohort: SnapshotStore from the client-runtime package')
++export function apply(ctx, config) {
++  console.error('[bench-brand-text-client] apply() on the 0.1.2-alpha.2 cohort: dsh-client-store + settingsScope + productTitle seam')
+ 
+-  const controller = createController({ name: 'DSH Local Build', revision: '' })
++  const controller = createController(config)
+ 
+-  ctx.effect(() => ctx.locale.register('bench-brand-text', { zh: {}, en: {} }), 'bench-brand-text: dictionaries')
++  ctx.effect(() => ctx.locale.register(LOCALE_NS, { zh: {}, en: {} }), 'bench-brand-text: dictionaries')
+ 
+   ctx.effect(() => {
+     // better-locale override dicts, activation-order-safe (0.4.2): re-check
+@@ -99,10 +179,35 @@ export function apply(ctx) {
+     console.error('[bench-brand-text-client] stylesheet installed (style body elided in fixture)')
+   }, 'bench-brand-text: styles')
+ 
+-  ctx.effect(() => startTitleWriter(ctx.sessions, controller.store), 'bench-brand-text: document.title override')
++  ctx.effect(() => startTitleWriter(ctx, controller), 'bench-brand-text: browser title (fallback writer)')
++
++  // Optional seam: the harness product-title contribution. Absent it, the
++  // effect above keeps the documented fallback writer.
++  ctx.inject(['productTitle'], (seamCtx) => {
++    seamCtx.effect(() => publishProductTitle(seamCtx, controller), 'bench-brand-text: product-title contribution')
++  })
++
++  // Optional seam: the official settings namespace scope. Absent it (no
++  // settings surface composed), the composition seed stays in force.
++  ctx.inject(['settingsScope'], (scopeCtx) => {
++    scopeCtx.effect(() => bindSettingsScope(scopeCtx, controller), 'bench-brand-text: settings namespace scope')
++  })
+ 
+   // The slot registrations (sidebar.brand.name occupant + settings.plugin.item
+   // card) are elided in this fixture — the container never executes the
+-  // browser half; the exam is the store engine move + inject recomposition.
++  // browser half. Their shape is part of the migrated surface:
++  //   ctx.slots.inject('sidebar.brand.name', () =>
++  //     ctx.slots.register({ name: 'sidebar.brand.name', locale: LOCALE_NS,
++  //       // Official builds register ui-brand-official into this same single
++  //       // cell at the default rank; the lowest live rank renders, so the
++  //       // configured brand wins when both are composed.
++  //       priority: -1,
++  //       inject: () => ({ hooks: { brandText: controller } }) }, BrandText))
++  //   ctx.slots.inject('settings.plugin.item', () =>
++  //     ctx.slots.register({ name: 'settings.plugin.item', key: NS, locale: LOCALE_NS,
++  //       inject: () => {
++  //         const scope = ctx.get('settingsScope').bind({ namespace: NS })
++  //         return { scope, save: (field, value) => scope.set(field, value) }
++  //       } }, BrandTextCard))
+   void ctx.slots
+ }
+diff --git a/fixture/index.js b/fixture/index.js
+index 0949ebb..9c294d2 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,28 +1,53 @@
+-// Host half: registers the `bench-brand-text` settings namespace (persisted
+-// to settings.yaml) and a self-hosted `/bench-brand-text/api` HTTP route
+-// (`get` / `set`). The browser half's settings card reads/writes the brand
+-// name and revision badge through this route; the sidebar's brand-name slot
+-// occupant reads the same values from the shared controller store.
++// Host half: registers the `bench-brand-text` settings namespace through the
++// official settings service — `ctx.settings.installSection()` layers the
++// composition entry under the user document and keeps the plugin running on
++// its entry config when no settings provider is mounted.
+ //
+-// The host half is unchanged across the 0.1.2-alpha migration — the break is
+-// on the browser plane (store engine + client inject list + peer cohort).
++// The browser half's settings card edits this namespace and the
++// `sidebar.brand.name` slot occupant renders the resolved values. The
++// official settings RPC serves a registered namespace to the page
++// (`settings.describe` + `remote.settings` writes), so the 0.4.x self-hosted
++// `/bench-brand-text/api` HTTP gateway is retired: it duplicated the official
++// seam and forced a `webServer` injection that left the entry pending in
++// profiles without a web server.
++
++import z from '@deepseek-ai/schemastery'
+ 
+ export const name = 'bench-brand-text'
+ 
+-// `webServer` is required for the HTTP gateway that backs the settings card.
+-export const inject = ['webServer']
++/** Settings namespace; the browser card registers under this same key. */
++export const NS = 'bench-brand-text'
+ 
+ /**
+- * Plugin body: install the settings bridge and register the HTTP gateway.
++ * Resolved config schema. The cordis entry's `config` block is the
++ * composition (base) layer: it seeds a first boot and is what a cleared field
++ * falls back to.
++ */
++export const Config = z.object({
++  name: z.string().default('DSH Local Build'),
++  revision: z.string().default(''),
++})
++
++/**
++ * Plugin body: attach the namespace while a settings service exists.
+  * @param {import('@deepseek-ai/cordis').Context} ctx
+- * @param {unknown} config - resolved config (seed values: name, revision).
++ * @param {{ name?: string, revision?: string }} config - resolved config (seed values: name, revision).
+  */
+ export function apply(ctx, config) {
+-  console.error('[bench-brand-text] host apply(): settings namespace + /bench-brand-text/api gateway')
++  console.error('[bench-brand-text] host apply(): settings namespace via ctx.settings.installSection()')
++
++  /** Authoritative getter: the resolved section while the provider stands, the entry otherwise. */
++  let current = () => config
+ 
+-  ctx.effect(() => {
+-    // The settings bridge + HTTP gateway registration is elided in this
+-    // fixture (unchanged across the migration; never the exam surface).
+-    console.error(`[bench-brand-text] gateway /bench-brand-text/api registered (config: ${JSON.stringify(config ?? {})})`)
+-  }, 'bench-brand-text: gateway')
++  ctx.inject(['settings'], (settingsCtx) => {
++    settingsCtx.settings.installSection(ctx, NS, Config, config, {
++      setSource: (source) => { current = source },
++      onChange: () => {
++        // The browser half reads resolved values through its own scope
++        // subscription; the host half has no derived registration facts to
++        // rebuild, so it only reports the resolved section.
++        console.error(`[bench-brand-text] namespace ${NS} resolved: ${JSON.stringify(current())}`)
++      },
++    })
++  })
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..e28e06f
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,97 @@
++{
++  "name": "@bench/dsh-bench-brand-text",
++  "version": "0.5.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-brand-text",
++      "version": "0.5.0",
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-store": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-layout": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-sidebar": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-settings": "^0.1.2-alpha.2",
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "react": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-api-session-controller": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-store": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-layout": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-renderer": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-settings": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-settings-plugins": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-sidebar": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-invariants": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-settings": {
++          "optional": true
++        },
++        "@deepseek-ai/schemastery": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "license": "MIT"
++    },
++    "node_modules/@deepseek-ai/schemastery": {
++      "version": "3.18.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.4.tgz",
++      "integrity": "sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==",
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      }
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "license": "MIT"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 159787a..b292a52 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-brand-text",
+-  "version": "0.4.2",
+-  "description": "Replaces the sidebar's top-left brand name and build-revision badge with configurable text via a live settings card (0.1.0-rc.8 cohort; exam material only)",
++  "version": "0.5.0",
++  "description": "Replaces the sidebar's top-left brand name and build-revision badge with configurable text via a live settings card (0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -15,31 +15,44 @@
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
++        "@deepseek-ai/dsh-api-session-controller",
+         "@deepseek-ai/dsh-client-locale",
+-        "@deepseek-ai/dsh-client-ui-slots",
++        "@deepseek-ai/dsh-client-ui-layout",
++        "@deepseek-ai/dsh-client-ui-settings",
++        "@deepseek-ai/dsh-client-ui-settings-plugins",
+         "@deepseek-ai/dsh-client-ui-sidebar",
+-        "@deepseek-ai/dsh-client-ui-settings-plugins"
++        "@deepseek-ai/dsh-client-ui-slots"
+       ],
+       "platform": "web"
+     }
+   },
++  "dependencies": {
++    "@deepseek-ai/schemastery": "^3.18.2"
++  },
+   "peerDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.0-rc.7",
+-    "@deepseek-ai/dsh-client-locale": "0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-ui-settings-plugins": "0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-ui-sidebar": "0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.8",
+-    "@deepseek-ai/dsh-invariants": "0.1.0-rc.8",
+-    "@deepseek-ai/dsh-settings": "0.1.0-rc.8",
+-    "@deepseek-ai/schemastery": "^3.18.1",
++    "@deepseek-ai/cordis": "^4.0.2",
++    "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-store": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-layout": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-sidebar": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-settings": "^0.1.2-alpha.2",
++    "@deepseek-ai/schemastery": "^3.18.2",
+     "react": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
+     "@deepseek-ai/cordis": { "optional": true },
++    "@deepseek-ai/dsh-api-session-controller": { "optional": true },
+     "@deepseek-ai/dsh-client-locale": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
++    "@deepseek-ai/dsh-client-store": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-layout": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-settings": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-settings-plugins": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-sidebar": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+@@ -48,5 +61,8 @@
+     "@deepseek-ai/schemastery": { "optional": true },
+     "react": { "optional": true }
+   },
++  "overrides": {
++    "@deepseek-ai/dsh-agent-default-model": "0.1.2-alpha.2"
++  },
+   "private": true
+ }
+diff --git a/fixture/patches/0001-runtime-product-title.patch b/fixture/patches/0001-runtime-product-title.patch
+new file mode 100644
+index 0000000..89b9759
+--- /dev/null
++++ b/fixture/patches/0001-runtime-product-title.patch
+@@ -0,0 +1,331 @@
++diff --git a/packages/client/ui-layout/src/client/AppFrame.tsx b/packages/client/ui-layout/src/client/AppFrame.tsx
++index cbef893..38eebdd 100644
++--- a/packages/client/ui-layout/src/client/AppFrame.tsx
+++++ b/packages/client/ui-layout/src/client/AppFrame.tsx
++@@ -13,19 +13,21 @@
++ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
++ import type { ReactNode } from 'react'
++ import type {
++-  PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
+++  InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
++ } from '@deepseek-ai/dsh-client-ui-slots'
++ import { computeColumns, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT } from './columns.ts'
++ import { DocumentTitle } from './DocumentTitle.tsx'
++ import type { createLayoutStore } from './stores.ts'
+++import type { LayoutInjected } from './title.ts'
++ import css from './AppFrame.module.css'
++ 
++-/** Full composed props: runtime share + child-slot render share + store share. */
+++/** Full composed props: runtime share + child-slot render share + store share + injected title source. */
++ export type AppFrameProps =
++   & PropsRuntime<'root'>
++   & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'shell.overlay'>
++   & PropsStore<ReturnType<typeof createLayoutStore>>
++   & PropsLocale<'common'>
+++  & InjectFace<LayoutInjected>
++ 
++ /** Center column grid item (session-body building block). */
++ function CenterColumn(props: { children?: ReactNode }) {
++@@ -91,12 +93,14 @@ function DragHandle(props: { side: 'sidebar' | 'details'; left: number; onStart:
++ export function AppFrame({
++   useStore,
++   useSessions,
+++  useProductTitle,
++   actions,
++   renderSlot,
++   SessionProvider,
++   t,
++ }: AppFrameProps) {
++   const panels = useStore(s => s)
+++  const contributedTitle = useProductTitle(s => s)
++   const detailsSession = useSessions((s) => {
++     const current = s.current
++     return current !== undefined && s.byId[current]?.blank === false ? current : undefined
++@@ -170,7 +174,9 @@ export function AppFrame({
++   const onDetailsDrag = useCallback((dx: number) => {
++     actions.setDetails(detailsBase.current - dx)
++   }, [actions])
++-  const productTitle = process.env.DSH_CLIENT_TITLE ?? t('brand.localBuild')
+++  // A composed brand package's runtime text wins over the build-selected
+++  // product title; the frame keeps the one document.title writer either way.
+++  const productTitle = contributedTitle ?? process.env.DSH_CLIENT_TITLE ?? t('brand.localBuild')
++ 
++   return (
++     <div
++diff --git a/packages/client/ui-layout/src/client/index.ts b/packages/client/ui-layout/src/client/index.ts
++index 56afec1..fb8681d 100644
++--- a/packages/client/ui-layout/src/client/index.ts
+++++ b/packages/client/ui-layout/src/client/index.ts
++@@ -17,19 +17,25 @@ import { AppFrame } from './AppFrame.tsx'
++ import { createLayoutStore } from './stores.ts'
++ import { LayoutController } from './service.ts'
++ import { ThemePresenter } from './theme-presenter.ts'
+++import { ProductTitle } from './title.ts'
+++import type { LayoutInjected } from './title.ts'
++ 
++ // Contract exports only (export-convergence rule: cross-package consumers
++ // keep a symbol exported; test-only/package-internal symbols live off /src).
++ // ILayout: the ctx.layout face consumers and test fakes type against.
+++// ProductTitleFace: the ctx.productTitle face a brand package types against.
++ // OwnerShare contracts below are the render-side halves registrants compose
++ // against; the frame components and the store factory are package-internal.
++ export { LayoutController } from './service.ts'
++ export type { ILayout } from './service.ts'
+++export type { ProductTitleFace } from './title.ts'
++ 
++ declare module '@deepseek-ai/cordis' {
++   interface Context {
++     /** The outward face only; the concrete service stays inside this plugin. */
++     layout: import('./service.ts').ILayout
+++    /** Runtime product-title contribution rendered by the frame's title writer. */
+++    productTitle: import('./title.ts').ProductTitleFace
++   }
++ }
++ 
++@@ -111,15 +117,19 @@ export interface DetailsOwnerProps {}
++ export const inject = ['slots', 'theme', 'locale']
++ 
++ /**
++- * Client plugin body: provide ctx.layout, then one register() call — AppFrame
++- * into 'root' with the four child-slot declarations, the layout store seat,
++- * and the inject hook that hands the store's bound actions to the service.
+++ * Client plugin body: provide ctx.layout and ctx.productTitle, then one
+++ * register() call — AppFrame into 'root' with the four child-slot
+++ * declarations, the layout store seat, and the inject hook that hands the
+++ * store's bound actions to the service plus the runtime title source to the
+++ * frame.
++  * @param ctx - client root context.
++  */
++ export function apply(ctx: ClientContext): void {
++   const layout = new LayoutController()
+++  const productTitle = new ProductTitle()
++   ctx.effect(() => {
++-    const disposeService = ctx.reflect.provide('layout', layout)
+++    const disposeLayout = ctx.reflect.provide('layout', layout)
+++    const disposeTitle = ctx.reflect.provide('productTitle', productTitle)
++     const disposeRegistration = ctx.slots.register({
++       name: 'root',
++       locale: 'common',
++@@ -133,18 +143,20 @@ export function apply(ctx: ClientContext): void {
++       // entry and delivers useStore/actions to AppFrame as standard props.
++       store: createLayoutStore,
++       // The hook's only side effect connects the root store to ctx.layout;
++-      // conversation business actions belong to their registrants.
++-      inject: (actions: PanelActions) => {
+++      // conversation business actions belong to their registrants. The title
+++      // source is a bare observable, so the framework binds useProductTitle.
+++      inject: (actions: PanelActions): LayoutInjected => {
++         layout.attachPanels(actions)
++-        return {}
+++        return { hooks: { productTitle } }
++       },
++     }, AppFrame)
++     return () => {
++       disposeRegistration()
++       // provide()'s disposer settles asynchronously; teardown is synchronous fire-and-forget.
++-      void disposeService()
+++      void disposeTitle()
+++      void disposeLayout()
++     }
++-  }, 'ui-layout: service + root registration')
+++  }, 'ui-layout: services + root registration')
++ 
++   // Theme presentation: pure DOM writes from resolved snapshots — initial
++   // state through the getter once, then event-driven only; no React path.
++diff --git a/packages/client/ui-layout/src/client/title.ts b/packages/client/ui-layout/src/client/title.ts
++new file mode 100644
++index 0000000..2f0dfce
++--- /dev/null
+++++ b/packages/client/ui-layout/src/client/title.ts
++@@ -0,0 +1,69 @@
+++/**
+++ * Runtime browser-title contribution.
+++ *
+++ * The frame owns the one browser-title writer ({@link DocumentTitle}): it
+++ * projects the selected Session title and the product title as
+++ * `<session> — <product>`. The product text was build-selected
+++ * (`DSH_CLIENT_TITLE`, else the localized local-build label) with no runtime
+++ * route, so a deployment that supplies its own brand had to write
+++ * `document.title` beside the frame and race the frame's effects.
+++ *
+++ * This service is the composition route for that text: a brand package sets
+++ * the product title from its apply world, the frame's single writer renders
+++ * it, and the composition's own text returns when the package unloads.
+++ */
+++
+++import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+++import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
+++
+++/** The `ctx.productTitle` face: read the current contribution or publish one. */
+++export interface ProductTitleFace {
+++  /** @returns the contributed product title, or undefined while the composition's text stands. */
+++  getSnapshot(): string | undefined
+++  /**
+++   * Observe contribution changes.
+++   * @param listener - invoked after each change, with no arguments.
+++   * @returns disposer removing the listener (idempotent).
+++   */
+++  subscribe(listener: () => void): () => void
+++  /**
+++   * Publish the browser title's product text.
+++   * @param title - product text, or undefined to restore the composition's text.
+++   */
+++  set(title: string | undefined): void
+++}
+++
+++/** Root registration's injected face: the runtime product-title source. */
+++export interface LayoutInjected {
+++  hooks: {
+++    /** Product-title contribution bound into the component as `useProductTitle`. */
+++    productTitle: HostObservable<string | undefined>
+++  }
+++}
+++
+++/** Snapshot-backed {@link ProductTitleFace}; one instance per layout plugin. */
+++export class ProductTitle implements ProductTitleFace {
+++  private readonly store = createSnapshotStore<string | undefined>(undefined)
+++
+++  /** @returns the contributed product title, or undefined while the composition's text stands. */
+++  getSnapshot(): string | undefined {
+++    return this.store.getSnapshot()
+++  }
+++
+++  /**
+++   * Observe contribution changes.
+++   * @param listener - invoked after each change, with no arguments.
+++   * @returns disposer removing the listener (idempotent).
+++   */
+++  subscribe(listener: () => void): () => void {
+++    return this.store.subscribe(listener)
+++  }
+++
+++  /**
+++   * Publish the browser title's product text.
+++   * @param title - product text, or undefined to restore the composition's text.
+++   */
+++  set(title: string | undefined): void {
+++    this.store.set(title)
+++  }
+++}
++diff --git a/packages/client/ui-layout/tests/app-frame.client.spec.tsx b/packages/client/ui-layout/tests/app-frame.client.spec.tsx
++index a640480..8abeb24 100644
++--- a/packages/client/ui-layout/tests/app-frame.client.spec.tsx
+++++ b/packages/client/ui-layout/tests/app-frame.client.spec.tsx
++@@ -54,7 +54,7 @@ function hookOf<T>(inst: { subscribe: (fn: () => void) => () => void; getSnapsho
++   return function useSelector<S>(sel: (s: T) => S): S { return sel(useSyncExternalStore(inst.subscribe, inst.getSnapshot)) }
++ }
++ 
++-function mountFrame() {
+++function mountFrame(runtimeTitle?: string) {
++   window.innerWidth = frameWidth // first-render viewport source before the observer fires
++   const instance = createLayoutStore().create()
++   const slotCalls: { key: string; props: unknown }[] = []
++@@ -99,6 +99,7 @@ function mountFrame() {
++       useSessions={useSessions}
++       useSessionPendingInteraction={useSessionPendingInteraction}
++       useWorkspaces={((sel: (s: WorkspaceSnapshot) => unknown) => sel(workspaceState)) as never}
+++      useProductTitle={((sel: (title: string | undefined) => unknown) => sel(runtimeTitle)) as never}
++       SessionProvider={SessionProviderStub}
++       t={key => key === 'brand.localBuild' ? 'DSH Local Build' : key}
++     />
++@@ -173,6 +174,13 @@ describe('AppFrame', () => {
++     expect(document.title).toBe('Product')
++   })
++ 
+++  it('lets a composed brand package replace the product title', () => {
+++    vi.stubEnv('DSH_CLIENT_TITLE', 'Product')
+++    selectedSessionTitle.current = 'First'
+++    mountFrame('My Build')
+++    expect(document.title).toBe('First — My Build')
+++  })
+++
++   it('renders three tracks from store state', () => {
++     const { frame } = mountFrame()
++     expect(tracks(frame)).toEqual([280, 0])
++diff --git a/packages/client/ui-layout/tests/apply.client.spec.ts b/packages/client/ui-layout/tests/apply.client.spec.ts
++index e546294..b05d397 100644
++--- a/packages/client/ui-layout/tests/apply.client.spec.ts
+++++ b/packages/client/ui-layout/tests/apply.client.spec.ts
++@@ -7,6 +7,7 @@ import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
++ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
++ import { apply as themeApply, inject as themeInject, ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
++ import { apply, inject, LayoutController } from '@deepseek-ai/dsh-client-ui-layout/client'
+++import { ProductTitle } from '@deepseek-ai/dsh-client-ui-layout/src/client/title.ts'
++ import { apply as nodeApply } from '@deepseek-ai/dsh-client-ui-layout'
++ import * as invariant from '@deepseek-ai/dsh-client-ui-layout/invariant'
++ 
++@@ -39,6 +40,7 @@ describe('ui-layout client apply', () => {
++     const fiber = ctx.plugin({ inject: [...inject], apply })
++     await fiber.await()
++     expect(ctx.get('layout')).toBeInstanceOf(LayoutController)
+++    expect(ctx.get('productTitle')).toBeInstanceOf(ProductTitle)
++     // The one register() call occupied 'root'…
++     expect(slots.entries('root')).toHaveLength(1)
++     // …and declared the three children in the ledger.
++@@ -47,15 +49,15 @@ describe('ui-layout client apply', () => {
++     expect(slots.spec('details')).toEqual({ kind: 'single', scope: 'session' })
++   })
++ 
++-  it('injects no business face and attaches the layout actions', async () => {
+++  it('injects the runtime title source and attaches the layout actions', async () => {
++     const { ctx, slots } = await bench()
++     const fiber = ctx.plugin({ inject: [...inject], apply })
++     await fiber.await()
++     const actions = {
++       setSidebar: vi.fn(), setDetails: vi.fn(), toggleSidebar: vi.fn(), openDetails: vi.fn(), closeDetails: vi.fn(),
++     }
++-    const injected = (slots.entries('root')[0]!.inject as (actions: never) => object)(actions as never)
++-    expect(injected).toEqual({})
+++    const injected = (slots.entries('root')[0]!.inject as (actions: never) => { hooks: { productTitle: ProductTitle } })(actions as never)
+++    expect(injected.hooks.productTitle).toBe(ctx.get('productTitle'))
++     const layout = ctx.get('layout') as LayoutController
++     layout.toggleSidebar()
++     expect(actions.toggleSidebar).toHaveBeenCalledOnce()
++@@ -86,12 +88,13 @@ describe('ui-layout client apply', () => {
++     expect(document.body.hasAttribute('data-ds-dark-theme')).toBe(false)
++   })
++ 
++-  it('teardown unwinds the service, the root registration, and the child declarations', async () => {
+++  it('teardown unwinds the services, the root registration, and the child declarations', async () => {
++     const { ctx, slots } = await bench()
++     const fiber = ctx.plugin({ inject: [...inject], apply })
++     await fiber.await()
++     await fiber.dispose()
++     expect(ctx.get('layout')).toBeUndefined()
+++    expect(ctx.get('productTitle')).toBeUndefined()
++     expect(slots.entries('root')).toHaveLength(0)
++     expect(slots.spec('sidebar')).toBeUndefined()
++     // The built-in root declaration survives entry teardown (renderer-owned).
++diff --git a/packages/client/ui-layout/tests/product-title.client.spec.ts b/packages/client/ui-layout/tests/product-title.client.spec.ts
++new file mode 100644
++index 0000000..e882c19
++--- /dev/null
+++++ b/packages/client/ui-layout/tests/product-title.client.spec.ts
++@@ -0,0 +1,27 @@
+++import { describe, expect, it, vi } from 'vitest'
+++import { ProductTitle } from '@deepseek-ai/dsh-client-ui-layout/src/client/title.ts'
+++
+++describe('ProductTitle', () => {
+++  it('publishes the product text and notifies subscribers until disposal', () => {
+++    const productTitle = new ProductTitle()
+++    const listener = vi.fn()
+++    const dispose = productTitle.subscribe(listener)
+++    expect(productTitle.getSnapshot()).toBeUndefined()
+++
+++    productTitle.set('My Build')
+++    expect(productTitle.getSnapshot()).toBe('My Build')
+++    expect(listener).toHaveBeenCalledTimes(1)
+++
+++    productTitle.set('Renamed')
+++    expect(listener).toHaveBeenCalledTimes(2)
+++
+++    productTitle.set(undefined)
+++    expect(productTitle.getSnapshot()).toBeUndefined()
+++    expect(listener).toHaveBeenCalledTimes(3)
+++
+++    dispose()
+++    productTitle.set('After disposal')
+++    expect(productTitle.getSnapshot()).toBe('After disposal')
+++    expect(listener).toHaveBeenCalledTimes(3)
+++  })
+++})

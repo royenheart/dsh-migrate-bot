@@ -1,0 +1,51 @@
+diff --git a/fixture/lib/index.mjs b/fixture/lib/index.mjs
+index 5ef102c..5635809 100644
+--- a/fixture/lib/index.mjs
++++ b/fixture/lib/index.mjs
+@@ -1,22 +1,21 @@
+ // Node half (bundle plugin, packed artifact — package.json `main` points here).
+-// Contract on the current host: `httpServer` is the official web carrier service
+-// and `tasks` is the official task-registry service — keep those names exactly as
+-// they are; the "webServer"/"jobs" spellings that some newer docs mention are not
+-// real service names on this host, so do not rename anything (renaming would make
+-// the plugin fail to activate).
++// Contract on the current host (dsh 0.1.2-alpha.2, post-0812 rename
++// DSH-0.1.1-R1-09): the web carrier service is `webServer`, the job registry is
++// `jobs`, and completion is subscribed through `jobs.onJobDone`. Keep these
++// exact spellings — the retired pre-0812 names no longer resolve on this host.
+ //
+ // Route endpoints are a single source of truth here: the /bench-status/status
+-// route below is served over the official httpServer registration interface.
++// route below is served over the official webServer registration interface.
+ export const name = 'bench-status'
+-export const inject = ['tasks', 'httpServer']
++export const inject = ['jobs', 'webServer']
+ 
+ export function apply(ctx) {
+-  const { tasks, httpServer } = ctx
+-  const collect = () => tasks.list().length
++  const { jobs, webServer } = ctx
++  const collect = () => jobs.list().length
+ 
+   ctx.effect(() => {
+     const disposers = [
+-      httpServer.register({
++      webServer.register({
+         kind: 'exact',
+         path: '/bench-status/status',
+         handler: async (req, res) => {
+@@ -24,10 +23,10 @@ export function apply(ctx) {
+           res.end(`{"ok":true,"open":${collect()}}`)
+         },
+       }),
+-      tasks.onTaskDone((snapshot) => {
+-        console.error('[bench-status] task done:', snapshot.id)
++      jobs.onJobDone((snapshot) => {
++        console.error('[bench-status] job done:', snapshot.id)
+       }),
+     ]
+     return () => disposers.forEach((dispose) => dispose?.())
+   })
+-}
+\ No newline at end of file
++}

@@ -1,0 +1,618 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index b3d7cdd..9c8a533 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,4 +1,16 @@
+ # H10 fixture · browser activation trap
+ 
+-This renamed Web plugin is valid on the host side but its browser bundle still
+-registers a legacy identity. Exam material only — do not publish (`"private": true`).
++A renamed Web plugin. The host half mounts through `dsh.bundle.patch` /
++`cordis.patch.yml`; the browser half is declared by `dsh.client` and built from
++`client.js`.
++
++The browser bundle registers the current package identity (`Entry name ==
++package name`) and keeps the legacy identity, so a page that still serves the
++pre-rename row resolves the same bundle. Both ids are declared: `dsh.client.legacyIds`
++asks the host to compose a module-table alias row for the legacy id, and the
++bundle registers that id only when the served boot graph carries it. On a host
++that has no alias support the legacy row is never composed and the registration
++is skipped, so the plugin still activates under its current identity; the
++host-side support this entry point needs is carried by `patches/`.
++
++Exam material only — do not publish (`"private": true`).
+diff --git a/fixture/client.js b/fixture/client.js
+index d6f2218..540b3eb 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,10 +1,26 @@
+-// This plugin was renamed. Keep the legacy registration id so older profiles
+-// can still find it. The host already serves this bundle under the new name.
+-window.__ModuleLoader__.load({
+-  id: '@demo/dsh-bench-browser-activation-legacy',
+-  factory: () => ({
+-    apply() {
+-      document.documentElement.dataset.benchBrowserActivation = 'active'
+-    },
+-  }),
++// This plugin was renamed. The host boot graph keys every client bundle by the
++// bare package name (`Entry name == package name`), so the bundle must register
++// that id or the row fails with `loaded without registering "<id>"`.
++//
++// The legacy id is part of the product surface, not a rename residue: a page
++// that still serves the pre-rename row resolves this same bundle through the
++// second registration. `dsh.client.legacyIds` declares that id to the host, so
++// the host composes a module-table alias row for it; the served boot graph is
++// the authority on which ids this page carries, and registering a key the page
++// has no row for would break HMR re-execution with a duplicate-factory error.
++const PACKAGE_ID = '@demo/dsh-bench-browser-activation'
++const LEGACY_ID = '@demo/dsh-bench-browser-activation-legacy'
++
++const factory = () => ({
++  apply() {
++    document.documentElement.dataset.benchBrowserActivation = 'active'
++  },
+ })
++
++const boot = window.__DSH_BOOT__
++const servedIds = new Set(
++  Array.isArray(boot?.entries) ? boot.entries.map(row => row?.id).filter(Boolean) : [],
++)
++
++window.__ModuleLoader__.load({ id: PACKAGE_ID, factory })
++if (servedIds.has(LEGACY_ID)) window.__ModuleLoader__.load({ id: LEGACY_ID, factory })
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..707c017
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-browser-activation",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-browser-activation",
++      "version": "0.1.0"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 46fee11..4910643 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -15,7 +15,8 @@
+     },
+     "client": {
+       "platform": "web",
+-      "inject": []
++      "inject": [],
++      "legacyIds": ["@demo/dsh-bench-browser-activation-legacy"]
+     }
+   }
+ }
+diff --git a/fixture/patches/0001-client-modules-legacy-bundle-ids.patch b/fixture/patches/0001-client-modules-legacy-bundle-ids.patch
+new file mode 100644
+index 0000000..9d9c40c
+--- /dev/null
++++ b/fixture/patches/0001-client-modules-legacy-bundle-ids.patch
+@@ -0,0 +1,460 @@
++diff --git a/docs/subsystems/client-modules.md b/docs/subsystems/client-modules.md
++index f58cb65..91b51d0 100644
++--- a/docs/subsystems/client-modules.md
+++++ b/docs/subsystems/client-modules.md
++@@ -32,6 +32,13 @@ interface WebBootEntry {
++   immediately?: boolean
++   /** Non-baseline module specifiers this row requests; omitted when it requests none. */
++   external?: string[]
+++  /**
+++   * Package row whose bundle registers this id — a module-table alias row, not
+++   * a Cordis entry. A renamed package declares its legacy browser ids under
+++   * `dsh.client.legacyIds`, and the alias row keeps those ids resolvable for a
+++   * page that still serves them. Omitted on ordinary package rows.
+++   */
+++  aliasOf?: string
++ }
++ ```
++ 
++@@ -74,7 +81,7 @@ Each initial row's `rev` is an opaque process nonce plus sequence, so graph comp
++ 
++ ## The scan
++ 
++-A package joins the table by declaring `dsh.client` (`platform: 'web'`, optional `inject` edges, optional `immediately`) in its package.json and exporting its built bundle at `exports["./client"]`. Each live row resolves from its own Loader specifier and owning-tree `baseUrl`, through the same `loader.internal.resolveSync` implementation that imports its Host face when available. The nearest owning package manifest supplies the browser module id, so relative source and built overlays retain the package identity. Distinct active Loader sources resolving to one package name fail composition; after one source unloads, the surviving source supplies the row without a fiber restart.
+++A package joins the table by declaring `dsh.client` (`platform: 'web'`, optional `inject` edges, optional `immediately`) in its package.json and exporting its built bundle at `exports["./client"]`. Each live row resolves from its own Loader specifier and owning-tree `baseUrl`, through the same `loader.internal.resolveSync` implementation that imports its Host face when available. The nearest owning package manifest supplies the browser module id, so relative source and built overlays retain the package identity. Distinct active Loader sources resolving to one package name fail composition; after one source unloads, the surviving source supplies the row without a fiber restart. A package may also declare `dsh.client.legacyIds`: each id becomes a module-table alias row of the package row (`aliasOf`), served by the same bundle bytes and registered by the same bundle, so a page that still serves a pre-rename row keeps resolving the package. Alias rows are not plugin entries.
++ 
++ Scanning is incremental per package; there is no full-rescan code path. Every cordis `internal/plugin` emission (fiber construction or disposal) marks the fiber's entry name dirty, and a microtask flush reconciles each dirty name against the live loader entries. The activation pass seeds the same dirty set with all current entries and flushes synchronously, so first scan and steady state share one implementation — with opposite failure postures. At activation, a malformed declaration or missing bundle among the already-loaded entries aggregates into one loud `AggregateError` listing every broken package: the fiber FAILS and the boot's fail-loud sweep reports it. In steady state, a broken package logs a warning and must not poison the others.
++ 
++diff --git a/packages/client/AGENTS.md b/packages/client/AGENTS.md
++index 1b33de5..57fa56b 100644
++--- a/packages/client/AGENTS.md
+++++ b/packages/client/AGENTS.md
++@@ -137,7 +137,7 @@ Bringing up a new `packages/client/<name>` plugin package (ui-workspace is a com
++ 
++ 1. **Package skeleton**: `package.json` (`@deepseek-ai/dsh-client-<name>`, exports `.`/`./invariant`/`./client`/`./src/*`/`./package.json`, `dsh.client` manifest, `files` list), `tsconfig.json` (extends `tsconfig.base.client.json`, one `references` entry per workspace dependency plus `runtime-diagnostics/invariants`), `tsdown.config.ts` (`clientBundle(id, ['lib/types/index.js', 'lib/types/invariant.js'])`), `src/index.ts` (empty node-half apply), `src/invariant.ts` (companion with a real reason), `src/css-modules.d.ts` when using CSS Modules, `README.md` with the Model Experience section.
++ 2. **Three registration surfaces, all required** (missing any one fails at a different, later point): the `tsconfig.client.json` aggregate `references` entry; a `dsh.client` row in `packages/bundle/web-app/cordis.patch.yml`; a `packages/bundle/web-app/package.json` dependency (profile boots resolve bare row names through the healed `$DSH_HOME/profiles/node_modules` fallback, which mirrors the app's and each bundle's declared dependencies — a row whose package no manifest declares fails to import). `pnpm-workspace.yaml` already globs `packages/*/*`.
++-3. **dsh.client manifest semantics**: `platform: 'web'` always, and the declaration requires a `./client` export (the scan throws without one); `immediately: true` only for stage-one-prefetch infrastructure rows. `inject` lists package-name dependency edges — they are **informational only** (preflight display, HMR diffing); they do not sequence entry activation or apply order. Activation order is Cordis fiber inject waiting on *services*, nothing else. A non-baseline `external` request sequences its dynamic supplier ahead of the consumer — see [shared modules](#shared-modules-and-the-module-graph).
+++3. **dsh.client manifest semantics**: `platform: 'web'` always, and the declaration requires a `./client` export (the scan throws without one); `immediately: true` only for stage-one-prefetch infrastructure rows. `inject` lists package-name dependency edges — they are **informational only** (preflight display, HMR diffing); they do not sequence entry activation or apply order. Activation order is Cordis fiber inject waiting on *services*, nothing else. A non-baseline `external` request sequences its dynamic supplier ahead of the consumer — see [shared modules](#shared-modules-and-the-module-graph). `legacyIds` lists browser module ids the same bundle registers: each becomes a module-table alias row of the package row, never a second plugin entry.
++ 4. **Registering into another package's slot**: apply order is unconstrained, and a business service is not a declaration barrier. Use `ctx.slots.inject(name, () => ctx.slots.register(...))`; it waits on the actual declaration, removes the contribution when that declaration collapses, reruns after redeclaration, and leaves with the caller's plugin fiber. Return a generator yielding each registration when several contributions must install and roll back atomically. A bare `slots.register` into an undeclared slot remains an error; keep service edges only for services the contribution actually reads.
++ 5. Rebuild the bundle (`pnpm --filter <pkg> bundle`) before probing a live `dsh web` server — the registry serves `lib/client.js`, not sources.
++ 6. **Declaration decisions**, each settled by [dependency declaration](#dependency-declaration) and [shared modules](#shared-modules-and-the-module-graph): does the package ship a `./client` export; which non-baseline value imports require `dsh.client.external`; which Host value imports are ordinary dependencies; which Browser and type inputs are dev-only; and whether `files` covers every relative runtime import and emitted asset.
++diff --git a/packages/client/hmr/src/index.ts b/packages/client/hmr/src/index.ts
++index b06d3fa..b5e67de 100644
++--- a/packages/client/hmr/src/index.ts
+++++ b/packages/client/hmr/src/index.ts
++@@ -124,10 +124,12 @@ export function apply(ctx: Context, config: Config): void {
++   }
++ 
++   // Diff the watch set against the current graph: drop watches for removed
++-  // rows (or rows whose bundle path moved), add watches for new rows.
+++  // rows (or rows whose bundle path moved), add watches for new rows. Alias
+++  // rows share their owner's bundle, so the owner row is the only watch.
++   const syncWatches = (): void => {
++     const rows = new Map<string, ClientArtifactBaseline>()
++     for (const row of ctx.clientModules.graph().entries) {
+++      if (row.aliasOf !== undefined) continue
++       const watch = ctx.clientModules.artifactBaseline(row.id)
++       if (watch !== undefined) rows.set(row.id, watch)
++     }
++diff --git a/packages/client/modules/README.md b/packages/client/modules/README.md
++index 414d34a..c244761 100644
++--- a/packages/client/modules/README.md
+++++ b/packages/client/modules/README.md
++@@ -29,7 +29,7 @@ Use it when you compose or build a browser client plugin: the package turns a pa
++ 
++ ### Declaring a client plugin
++ 
++-A browser plugin package declares `dsh.client` in its `package.json` with `platform: 'web'`, exports a `./client` bundle, and lists any non-baseline module requests under `dsh.client.external`. The host half turns each declaration into a served bundle under `/plugins`, ordered so dynamic providers load before their consumers.
+++A browser plugin package declares `dsh.client` in its `package.json` with `platform: 'web'`, exports a `./client` bundle, and lists any non-baseline module requests under `dsh.client.external`. The host half turns each declaration into a served bundle under `/plugins`, ordered so dynamic providers load before their consumers. A renamed package lists the browser ids it still answers under `dsh.client.legacyIds`; each becomes a module-table alias row of the package row, so a page that still serves a pre-rename row resolves the same bundle without a second plugin entry.
++ 
++ ### What the browser loads
++ 
++diff --git a/packages/client/modules/src/client/manifest.ts b/packages/client/modules/src/client/manifest.ts
++index e8feb2e..2a87507 100644
++--- a/packages/client/modules/src/client/manifest.ts
+++++ b/packages/client/modules/src/client/manifest.ts
++@@ -60,6 +60,13 @@ export interface WebBootEntry {
++   immediately?: boolean
++   /** Non-baseline module specifiers this row requests; omitted when it requests none. */
++   external?: string[]
+++  /**
+++   * Package row whose bundle registers this id — a module-table alias row, not
+++   * a Cordis entry. A renamed package declares its legacy browser ids under
+++   * `dsh.client.legacyIds`, and the alias row keeps those ids resolvable for a
+++   * page that still serves them. Omitted on ordinary package rows.
+++   */
+++  aliasOf?: string
++ }
++ 
++ /** Initial scheduling phase for one content-addressed combo script. */
++@@ -105,6 +112,8 @@ export interface BootModuleRow {
++   inject: string[]
++   /** Module specifiers this row requests from the module table ([] when the wire omits them). */
++   external: string[]
+++  /** Package row whose bundle registers this alias id, when this row is a module-table alias. */
+++  aliasOf?: string
++ }
++ 
++ /** The cordis-plugin view of one boot row: what entry composition needs (optional wire fields normalized). */
++@@ -160,7 +169,9 @@ export function stripClientSuffix(spec: string): string {
++ /**
++  * Parse `window.__DSH_BOOT__` into the two consumer views. Wire boundary:
++  * a missing or malformed graph throws (the shell shows the loud failure —
++- * a page without a valid manifest cannot boot anything).
+++ * a page without a valid manifest cannot boot anything). Alias rows reach the
+++ * module view only: they add module-table keys for another row's bundle and
+++ * never create a plugin entry.
++  * @param wire - the raw `window.__DSH_BOOT__` value.
++  * @returns the manifest with optional plugin-view fields normalized.
++  */
++@@ -198,18 +209,42 @@ export function parseBootManifest(wire: unknown): BootManifest {
++     if (row.immediately !== undefined && typeof row.immediately !== 'boolean') {
++       throw new Error(`client-modules: boot manifest entry ${where} immediately must be a boolean`)
++     }
+++    if (row.aliasOf !== undefined && typeof row.aliasOf !== 'string') {
+++      throw new Error(`client-modules: boot manifest entry ${where} aliasOf must be a string`)
+++    }
++     moduleFields.push({
++       id: row.id,
++       url: row.url,
++       rev: row.rev,
++       inject: inject === undefined ? [] : [...inject],
++       external: external === undefined ? [] : [...external],
+++      ...(row.aliasOf === undefined ? {} : { aliasOf: row.aliasOf }),
++     })
++-    plugins.push({
++-      id: row.id,
++-      inject: inject === undefined ? [] : [...inject],
++-      immediately: row.immediately === true,
++-    })
+++    // An alias row is a second module-table key for another row's bundle; the
+++    // plugin itself is composed and activated once, under its package row.
+++    if (row.aliasOf === undefined) {
+++      plugins.push({
+++        id: row.id,
+++        inject: inject === undefined ? [] : [...inject],
+++        immediately: row.immediately === true,
+++      })
+++    }
+++  }
+++
+++  const moduleRows = new Map(moduleFields.map(row => [row.id, row]))
+++  for (const row of moduleFields) {
+++    const owner = row.aliasOf
+++    if (owner === undefined) continue
+++    const target = moduleRows.get(owner)
+++    if (target === undefined) {
+++      throw new Error(`client-modules: boot manifest alias entry "${row.id}" names unknown row "${owner}"`)
+++    }
+++    if (target.aliasOf !== undefined) {
+++      throw new Error(`client-modules: boot manifest alias entry "${row.id}" names alias row "${owner}"`)
+++    }
+++    if (target.url !== row.url || target.rev !== row.rev) {
+++      throw new Error(`client-modules: boot manifest alias entry "${row.id}" must be served by the bundle of "${owner}"`)
+++    }
++   }
++ 
++   const entryIds = new Set(moduleFields.map(row => row.id))
++@@ -353,7 +388,9 @@ export interface ClientModuleLoader {
++   /**
++    * Full reset of one non-bootstrap module: drop its registered factory and
++    * materialized record so the next prefetch/import loads its one-resource
++-   * combo script rather than the initial multi-resource request. The bootstrap
+++   * combo script rather than the initial multi-resource request. Every id the
+++   * bundle registers — the row plus its alias rows — is dropped together,
+++   * because re-executing the bundle re-registers all of them. The bootstrap
++    * module remains materialized.
++    * @param id - entry name to invalidate.
++    * @param rev - New content revision from the HMR frame; omitted to reuse
++diff --git a/packages/client/modules/src/client/system.ts b/packages/client/modules/src/client/system.ts
++index 2b7948b..813d9bb 100644
++--- a/packages/client/modules/src/client/system.ts
+++++ b/packages/client/modules/src/client/system.ts
++@@ -237,13 +237,39 @@ export class ClientModuleSystem implements ClientModuleLoader {
++     await this.arriveGraphRow(row)
++   }
++ 
+++  /**
+++   * Full reset of one bundle: drop the registered factory and materialized
+++   * record of every id that bundle registers — the row itself plus its
+++   * module-table alias rows — so the next prefetch/import loads its
+++   * one-resource combo script rather than the initial multi-resource request,
+++   * and registers the whole id set again without tripping the duplicate-factory
+++   * guard. The bootstrap module remains materialized.
+++   * @param id - entry name to invalidate.
+++   * @param rev - New content revision from the HMR frame; omitted to reuse
+++   * the graph revision or for page-local modules that register directly.
+++   */
++   invalidate(id: string, rev?: string): void {
++     const normalized = stripClientSuffix(id)
++     if (this.bootstrapIds.has(normalized)) return
++-    const row = this.graphRows.get(normalized)
++-    if (row !== undefined) this.reloadUrls.set(normalized, atRevision(row.url, rev ?? row.rev))
++-    else this.reloadUrls.delete(normalized)
++-    this.factories.delete(normalized)
++-    this.loadCache.delete(normalized)
+++    for (const member of this.bundleIds(normalized)) {
+++      const row = this.graphRows.get(member)
+++      if (row !== undefined) this.reloadUrls.set(member, atRevision(row.url, rev ?? row.rev))
+++      else this.reloadUrls.delete(member)
+++      this.factories.delete(member)
+++      this.loadCache.delete(member)
+++    }
+++  }
+++
+++  /**
+++   * Every module-table id one bundle registers: the package row plus the alias
+++   * rows pointing at it. An id with no graph row is its own bundle.
+++   * @param id - entry name as the caller named it.
+++   * @returns the ids to reset together.
+++   */
+++  private bundleIds(id: string): string[] {
+++    const owner = this.graphRows.get(id)?.aliasOf ?? id
+++    const ids = [owner]
+++    for (const row of this.graphRows.values()) if (row.aliasOf === owner) ids.push(row.id)
+++    return ids
++   }
++ }
++diff --git a/packages/client/modules/src/index.ts b/packages/client/modules/src/index.ts
++index 98b6fa5..116848b 100644
++--- a/packages/client/modules/src/index.ts
+++++ b/packages/client/modules/src/index.ts
++@@ -62,6 +62,13 @@ interface DshClientDeclaration {
++    * Absent means the package uses only the baseline externals.
++    */
++   external?: string[]
+++  /**
+++   * Browser module ids this package's bundle also registers, for pages that
+++   * still serve them under a pre-rename row. Each id becomes a module-table
+++   * alias row of the package row: it resolves the same bundle and never creates
+++   * a second plugin entry.
+++   */
+++  legacyIds?: string[]
++ }
++ 
++ /** The declared fields a graph row carries, normalized (absent array declarations become empty). */
++@@ -85,6 +92,8 @@ export interface ClientArtifactBaseline {
++ /** Resolved metadata cached for one Loader specifier and owning-tree base URL until restart. */
++ interface PkgMeta extends WebBootRowFields {
++   clientPath: string
+++  /** Legacy browser ids the same bundle registers, composed as module-table alias rows. */
+++  legacyIds: string[]
++ }
++ 
++ interface ResolvedPkgMeta {
++@@ -146,6 +155,8 @@ class ClientPackageCompositionError extends AggregateError {
++ /** One composed table row: the wire entry plus the resolved package metadata behind it. */
++ interface WebPluginRecord {
++   entry: WebBootEntry
+++  /** Module-table alias rows of the same bundle (`dsh.client.legacyIds`), in declaration order. */
+++  aliasEntries: WebBootEntry[]
++   /** Loader specifier whose active row contributes this browser module. */
++   loaderName: string
++   /** Loader resolution input that selected this package instance. */
++@@ -209,13 +220,30 @@ function parseDshClient(pkgName: string, value: unknown): DshClientDeclaration |
++   }
++   const inject = optionalStringArray(pkgName, 'dsh.client.inject', decl.inject)
++   const external = optionalStringArray(pkgName, 'dsh.client.external', decl.external)
+++  const legacyIds = optionalStringArray(pkgName, 'dsh.client.legacyIds', decl.legacyIds)
++   if (decl.immediately !== undefined && typeof decl.immediately !== 'boolean') {
++     throw new Error(`client-modules: ${pkgName} dsh.client.immediately must be a boolean`)
++   }
+++  if (legacyIds !== undefined) {
+++    const seen = new Set<string>()
+++    for (const legacyId of legacyIds) {
+++      if (legacyId === '') {
+++        throw new Error(`client-modules: ${pkgName} dsh.client.legacyIds contains an empty value`)
+++      }
+++      if (legacyId === pkgName) {
+++        throw new Error(`client-modules: ${pkgName} dsh.client.legacyIds repeats the package name`)
+++      }
+++      if (seen.has(legacyId)) {
+++        throw new Error(`client-modules: ${pkgName} dsh.client.legacyIds lists ${JSON.stringify(legacyId)} twice`)
+++      }
+++      seen.add(legacyId)
+++    }
+++  }
++   return {
++     platform: decl.platform,
++     ...(inject !== undefined ? { inject } : {}),
++     ...(external !== undefined ? { external } : {}),
+++    ...(legacyIds !== undefined ? { legacyIds } : {}),
++     ...(decl.immediately !== undefined ? { immediately: decl.immediately } : {}),
++   }
++ }
++@@ -409,7 +437,14 @@ function buildBatch(phase: WebBootBatchPhase, records: readonly WebPluginRecord[
++   const artifact = buildCombo(records)
++   return {
++     ...artifact,
++-    descriptor: { phase, url: artifact.url, rev: artifact.rev, entries: artifact.entries },
+++    descriptor: {
+++      phase,
+++      url: artifact.url,
+++      rev: artifact.rev,
+++      // The combo URL names each package resource once; every row that bundle
+++      // serves — the package row and its aliases — belongs to this batch.
+++      entries: records.flatMap(record => [record.entry.id, ...record.aliasEntries.map(alias => alias.id)]),
+++    },
++   }
++ }
++ 
++@@ -425,6 +460,18 @@ function graphRow(id: string, rev: string, fields: WebBootRowFields): WebBootEnt
++   }
++ }
++ 
+++/**
+++ * Module-table alias row for a legacy browser id: the same bundle bytes and
+++ * revision as the package row it points at, with no dependency edges of its own
+++ * (aliases are not plugin entries).
+++ * @param id - legacy browser id the package's bundle registers.
+++ * @param owner - the package row serving that bundle.
+++ * @returns the alias wire row.
+++ */
+++function aliasRow(id: string, owner: WebBootEntry): WebBootEntry {
+++  return { id, url: owner.url, rev: owner.rev, aliasOf: owner.id }
+++}
+++
++ /**
++  * Order composed rows so every requested dynamic package precedes its
++  * consumers. An `external` specifier is either the package row it names
++@@ -601,11 +648,11 @@ export class ClientModuleRegistry extends Service {
++ 
++   /**
++    * Absolute path of an entry's client bundle.
++-   * @param id - entry id (package name).
+++   * @param id - entry id (package name, or a declared legacy id).
++    * @returns the path, or undefined for an unknown id.
++    */
++   clientPath(id: string): string | undefined {
++-    return this.table.get(id)?.meta.clientPath
+++    return this.ownerRecord(id)?.meta.clientPath
++   }
++ 
++   /**
++@@ -613,22 +660,25 @@ export class ClientModuleRegistry extends Service {
++    * HMR compares it with the live files when installing a watch, so a write
++    * between startup composition and watch installation cannot disappear into
++    * the watcher's initial state.
++-   * @param id - entry id (package name).
+++   * @param id - entry id (package name, or a declared legacy id).
++    * @returns the path and baseline, or undefined for an unknown id.
++    */
++   artifactBaseline(id: string): ClientArtifactBaseline | undefined {
++-    const baseline = this.table.get(id)?.baseline
+++    const baseline = this.ownerRecord(id)?.baseline
++     return baseline === undefined ? undefined : { ...baseline }
++   }
++ 
++   /**
++    * Re-hash one bundle (the HMR watch's registration hook — the only entry
++-   * point through which bundle content changes reach the graph).
++-   * @param id - entry id (package name).
+++   * point through which bundle content changes reach the graph). A legacy id
+++   * re-hashes the bundle that serves it, so its alias row moves in the same
+++   * step; the rebuild notification always names the package row, because that
+++   * is the row the Cordis entry tree holds.
+++   * @param id - entry id (package name, or a declared legacy id).
++    * @returns the new rev, or undefined for an unknown id.
++    */
++   rebuilt(id: string): string | undefined {
++-    const record = this.table.get(id)
+++    const record = this.ownerRecord(id)
++     if (record === undefined) return undefined
++     const baseline = this.captureArtifactBaseline(record.meta.clientPath)
++     const bundle = readFileSync(record.meta.clientPath)
++@@ -636,7 +686,8 @@ export class ClientModuleRegistry extends Service {
++     const rev = artifactRevision(bundle, sourceMap)
++     record.baseline = baseline
++     if (rev === record.entry.rev) return rev
++-    record.entry = graphRow(id, rev, record.meta)
+++    record.entry = graphRow(record.entry.id, rev, record.meta)
+++    record.aliasEntries = record.aliasEntries.map(alias => aliasRow(alias.id, record.entry))
++     record.bundle = bundle
++     if (sourceMap === undefined) delete record.sourceMap
++     else record.sourceMap = sourceMap
++@@ -645,7 +696,7 @@ export class ClientModuleRegistry extends Service {
++       // Containment: rebuilt() runs inside the HMR watch callback — a
++       // throwing subscriber must not kill the poll or skip later subscribers.
++       try {
++-        notify(id, rev)
+++        notify(record.entry.id, rev)
++       } catch (error) {
++         this.ctx.logger.error(error)
++       }
++@@ -676,15 +727,29 @@ export class ClientModuleRegistry extends Service {
++   }
++ 
++   private compose(): WebBootGraph {
++-    const entries = orderByModuleGraph([...this.table.values()].map(record => record.entry))
+++    const rows = [...this.table.values()].flatMap(record => [record.entry, ...record.aliasEntries])
+++    const seen = new Set<string>()
+++    for (const row of rows) {
+++      if (seen.has(row.id)) {
+++        throw new Error(
+++          `client-modules: duplicate graph entry "${row.id}" — a dsh.client.legacyIds value must not name another row`,
+++        )
+++      }
+++      seen.add(row.id)
+++    }
+++    const entries = orderByModuleGraph(rows)
++     const bootstrap = PARSER_PRELOAD_IDS
++       .map(id => this.table.get(id))
++       .filter((record): record is WebPluginRecord => record !== undefined)
++     const bootstrapIds = new Set(bootstrap.map(record => record.entry.id))
++-    const application = entries
++-      .filter(entry => !bootstrapIds.has(entry.id))
++-      .map(entry => this.table.get(entry.id))
++-      .filter((record): record is WebPluginRecord => record !== undefined)
+++    // Alias rows ride their owner's bundle, so batching walks distinct records
+++    // in graph order and each batch descriptor carries its alias ids.
+++    const application: WebPluginRecord[] = []
+++    for (const entry of entries) {
+++      const record = this.ownerRecord(entry.id)
+++      if (record === undefined || bootstrapIds.has(record.entry.id) || application.includes(record)) continue
+++      application.push(record)
+++    }
++     const artifacts: BatchArtifact[] = []
++     for (const records of partitionComboRecords(bootstrap)) {
++       artifacts.push(buildBatch('bootstrap', records))
++@@ -765,6 +830,7 @@ export class ClientModuleRegistry extends Service {
++       clientPath: join(dirname(pkgPath), clientRel),
++       ...(decl.inject !== undefined ? { inject: decl.inject } : {}),
++       external: decl.external ?? [],
+++      legacyIds: decl.legacyIds ?? [],
++       immediately: decl.immediately === true,
++     }
++     const resolved = { packageName, meta }
++@@ -959,8 +1025,10 @@ export class ClientModuleRegistry extends Service {
++     // a fiber restart from the same source reuses the existing row.
++     const snapshot = this.initialBundleSnapshot(packageName, source.meta.clientPath)
++     const rev = this.allocateInitialRevision()
+++    const entry = graphRow(packageName, rev, source.meta)
++     this.table.set(packageName, {
++-      entry: graphRow(packageName, rev, source.meta),
+++      entry,
+++      aliasEntries: source.meta.legacyIds.map(id => aliasRow(id, entry)),
++       loaderName: source.loaderName,
++       sourceKey: source.sourceKey,
++       meta: source.meta,
++@@ -971,6 +1039,21 @@ export class ClientModuleRegistry extends Service {
++     return true
++   }
++ 
+++  /**
+++   * Resolve a wire id to the record that owns its bundle. A package name and
+++   * each of its declared legacy ids select the same record.
+++   * @param id - package row id or a `dsh.client.legacyIds` alias id.
+++   * @returns the owning record, or undefined for an unknown id.
+++   */
+++  private ownerRecord(id: string): WebPluginRecord | undefined {
+++    const direct = this.table.get(id)
+++    if (direct !== undefined) return direct
+++    for (const record of this.table.values()) {
+++      if (record.aliasEntries.some(alias => alias.id === id)) return record
+++    }
+++    return undefined
+++  }
+++
++   private flush(onError: (err: Error) => void): void {
++     let changed = false
++     for (const entryName of [...this.dirty]) {
+diff --git a/fixture/patches/README.md b/fixture/patches/README.md
+new file mode 100644
+index 0000000..2e0cc01
+--- /dev/null
++++ b/fixture/patches/README.md
+@@ -0,0 +1,51 @@
++# Harness patches carried by this plugin
++
++`0001-client-modules-legacy-bundle-ids.patch` is a proposal against
++`@deepseek-ai/deepseek-harness` at tag `dsh-v0.1.2-alpha.2`. It is the host-side
++half of this plugin's documented legacy browser identity: without it the host
++never composes the legacy row, so the bundle's second registration can never be
++reached (see `.dsh-migrate/patch-reports/client-bundle-legacy-ids/report.md`,
++which is the upstream discussion draft for this change).
++
++The plugin does not depend on the patch to activate: `dsh.client.legacyIds` is
++ignored by hosts that do not know it, and the bundle registers the legacy id
++only when the served boot graph carries that row.
++
++## Apply
++
++From a clean checkout of the harness at the tag above:
++
++```sh
++git checkout dsh-v0.1.2-alpha.2
++git apply /path/to/0001-client-modules-legacy-bundle-ids.patch
++```
++
++The patch touches the client-modules source and its docs (7 files, no
++generated artifacts, no lockfile). It does not include the vitest specs or the
++`packages/client/modules/README.zh.md` translation, which the upstream
++contribution workflow owns.
++
++## What it changes
++
++- `dsh.client.legacyIds: string[]` in a package manifest, validated by the scan.
++- One module-table alias row (`aliasOf`) per declared id, sharing the package
++  bundle URL and revision, added to the owner's startup batch, and excluded from
++  the Cordis plugin-entry view.
++- Host read APIs (`clientPath`, `artifactBaseline`, `rebuilt`) resolve alias ids
++  to the owning record; rebuild notifications name the package row.
++- Browser `invalidate` drops every id one bundle registers (the package row plus
++  its alias rows), and the boot-manifest parser rejects malformed alias rows.
++- Docs: `docs/subsystems/client-modules.md`, `packages/client/AGENTS.md`,
++  `packages/client/modules/README.md`.
++
++## Verify
++
++The plugin's own check (`../.dsh-migrate/checks/legacy-ids.check.mjs`) runs the
++patched source with Node's type stripping and the installed alpha.2 cordis:
++
++```sh
++node --experimental-transform-types .dsh-migrate/checks/legacy-ids.check.mjs
++```
++
++It fails on an unpatched host (`legacy id becomes an alias row`) and passes with
++the patch applied.

@@ -1,0 +1,53 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index b3d7cdd..a1a2c7f 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,4 +1,9 @@
+ # H10 fixture · browser activation trap
+ 
+-This renamed Web plugin is valid on the host side but its browser bundle still
+-registers a legacy identity. Exam material only — do not publish (`"private": true`).
++This renamed Web plugin is valid on the host side and activates in the browser
++through its `./client` bundle. The host composes this bundle's boot row under the
++package name, `@demo/dsh-bench-browser-activation`, and addresses the artifact as
++`/plugins/??@demo/dsh-bench-browser-activation/client.js&rev=<rev>`; the client
++module system rejects a row whose bundle registered any other id.
++
++Exam material only — do not publish (`"private": true`).
+diff --git a/fixture/client.js b/fixture/client.js
+index d6f2218..7b33d5f 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,7 +1,11 @@
+-// This plugin was renamed. Keep the legacy registration id so older profiles
+-// can still find it. The host already serves this bundle under the new name.
++// Register the plugin's current package name. The host composes this bundle's
++// boot row under the package name and addresses the artifact as
++// /plugins/??@demo/dsh-bench-browser-activation/client.js&rev=<rev>;
++// @deepseek-ai/dsh-client-modules throws "loaded without registering" when the
++// executed bundle registered any other id, so the registration id must match
++// the package name exactly.
+ window.__ModuleLoader__.load({
+-  id: '@demo/dsh-bench-browser-activation-legacy',
++  id: '@demo/dsh-bench-browser-activation',
+   factory: () => ({
+     apply() {
+       document.documentElement.dataset.benchBrowserActivation = 'active'
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..707c017
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-browser-activation",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-browser-activation",
++      "version": "0.1.0"
++    }
++  }
++}

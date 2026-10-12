@@ -1,0 +1,96 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": false
+            },
+            "e2eSubsetFirst": true,
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "final",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 0,
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "pass",
+          "fingerprint": "",
+          "detail": "[bench-paste] host half apply() \u6267\u884c\ndsh: TRANSPORT: DeepSeek API request to http://127.0.0.1:9/v1 failed"
+        },
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "comments": []
+      },
+      "run": "local-2026-10-11T08-20-45-634Z",
+      "startedAt": "2026-10-11T08:20:46.790Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": false
+          },
+          "e2eSubsetFirst": true,
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "final",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 0,
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "pass",
+        "fingerprint": "",
+        "detail": "[bench-paste] host half apply() \u6267\u884c\ndsh: TRANSPORT: DeepSeek API request to http://127.0.0.1:9/v1 failed"
+      },
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "comments": []
+    },
+    "run": "local-2026-10-11T08-20-45-634Z",
+    "startedAt": "2026-10-11T08:20:46.790Z"
+  }
+}

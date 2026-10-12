@@ -1,0 +1,64 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 865ecb9..717dd63 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,8 +1,10 @@
+ # @demo/dsh-bench-ping (fixture)
+ 
+ DSH benchmark M5 fixture: a web plugin registering a self-built `/ping` HTTP
+-channel directly on the web server. The trap state is intentional — the raw
+-`webServer.register` prefix route answers `pong` with 200 and no host
+-authentication.
++channel directly on the web server. `webServer.register` carries no auth of its
++own, so the handler applies the host's unified browser authentication through
++`ctx.connection.requestRejection` before answering `pong`: unauthenticated
++callers get 401 (403 when the Host/Origin fence refuses), and only a
++token-exchanged signed cookie gets 200.
+ 
+ Exam material only, **do not publish** (`"private": true` in package.json).
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index bc609be..5db5eb9 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1,3 +1,3 @@
+ - insert:
+-    - id: peer-bench
+-      name: "@demo/dsh-peer-bench"
++    - id: bench-ping
++      name: "@demo/dsh-bench-ping"
+diff --git a/fixture/index.js b/fixture/index.js
+index 5df8e63..9322d9e 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,14 +1,25 @@
+-// 0.1.2 self-built channel: register the web route directly and let the caller
+-// bring its own check — no host-side wiring is needed here.
+-export const inject = ['webServer']
++// 0.1.2 self-built channel: register the web route directly, then apply the
++// host's unified browser authentication before answering. `webServer.register`
++// itself carries no auth or trust policy, so the handler asks the Host
++// Connection service (`ctx.connection`) to apply the same Host/Origin fence and
++// signed-cookie check that the host mounts on its own `/api` channel:
++// `requestRejection` returns 401/403 for the requests the host would refuse,
++// and undefined only for an authenticated browser session.
++export const inject = ['webServer', 'connection']
+ 
+ export function apply(ctx) {
+-  ctx.webServer.register({
++  ctx.effect(() => ctx.webServer.register({
+     kind: 'prefix',
+     path: '/ping',
+-    handler: (_req, res) => {
++    handler: (req, res) => {
++      const rejection = ctx.connection.requestRejection(req)
++      if (rejection !== undefined) {
++        res.writeHead(rejection)
++        res.end(rejection === 401 ? 'unauthorized' : 'forbidden')
++        return
++      }
+       res.writeHead(200)
+       res.end('pong')
+     },
+-  })
++  }), 'bench-ping: /ping route')
+ }

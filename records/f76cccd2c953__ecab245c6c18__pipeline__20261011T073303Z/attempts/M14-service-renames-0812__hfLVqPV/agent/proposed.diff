@@ -1,0 +1,143 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 6ab0842..538dffa 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,11 +1,24 @@
+ # @demo/dsh-bench-status (exam material only, do not publish)
+ 
+ A small npm **bundle plugin** sample whose Node half (the packed `lib/index.mjs`,
+-the `main` entry) is written against the pre-0812 host service names: `inject` is
+-`['tasks', 'httpServer']`, the task registry is read through `ctx.tasks`, the
+-`/bench-status/status` route is registered through `ctx.httpServer.register`, and
+-job completion is subscribed through the `onTaskDone` listener.
++the `main` entry) is written against the current host service names: `inject` is
++`['jobs']`, the background-job registry is read through `ctx.jobs`, the
++`/bench-status/status` route is registered through `ctx.webServer.register`, and
++job completion is subscribed through the `onJobDone` listener.
+ 
+-The host in this container is dsh **0.1.2-alpha.2**.
++The browser carrier is optional and is requested through the official
++conditional-injection extension point, `ctx.inject(['webServer'], …)`: a bundle
++layer is applied to every profile that lists this bundle, so a hard
++`webServer` requirement would leave the row pending — and fail the boot — in a
++composition without an HTTP carrier (the headless profile). A composition with
++the carrier registers the identical route, and the job-completion listener
++stays active in every composition that mounts the `jobs` registry.
+ 
+-This fixture is exam material only — never publish it to npm.
+\ No newline at end of file
++`cordis.patch.yml` is the bundle patch (`dsh.bundle.patch`) that mounts the
++`bench-status` row into the web composition, where both services are present.
++
++The host in this container is dsh **0.1.2-alpha.2**. The pre-0812 spellings
++`tasks`, `httpServer`, and `onTaskDone` were removed by the repository rename
++ledger with no alias, so a plugin that injects them never activates.
++
++This fixture is exam material only — never publish it to npm.
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index 0dd80f7..21d00a6 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1,4 +1,8 @@
+ # bench-status bundle patch: mount @demo/dsh-bench-status into the web composition.
++# `jobs` comes from the base layer; the plugin contributes the /bench-status/status
++# route over the browser carrier through `ctx.inject(['webServer'], …)`, so this
++# same row also mounts in compositions without an HTTP carrier (the headless
++# profile) instead of leaving the row pending.
+ - insert:
+     - id: bench-status
+       name: "@demo/dsh-bench-status"
+\ No newline at end of file
+diff --git a/fixture/lib/index.mjs b/fixture/lib/index.mjs
+index 5ef102c..be2510c 100644
+--- a/fixture/lib/index.mjs
++++ b/fixture/lib/index.mjs
+@@ -1,33 +1,51 @@
+ // Node half (bundle plugin, packed artifact — package.json `main` points here).
+-// Contract on the current host: `httpServer` is the official web carrier service
+-// and `tasks` is the official task-registry service — keep those names exactly as
+-// they are; the "webServer"/"jobs" spellings that some newer docs mention are not
+-// real service names on this host, so do not rename anything (renaming would make
+-// the plugin fail to activate).
++// Contract on the current host (dsh 0.1.2-alpha.2): `webServer` is the official
++// browser HTTP carrier service and `jobs` is the official background-job
++// registry service. Those are the current names fixed by the repository rename
++// ledger
++// (.agents/notes/implemented/architecture/2026-08-11-repository-naming-contract-and-rename-ledger.md):
++// the pre-0812 spellings `httpServer`/`tasks` (and the `onTaskDone` listener)
++// were removed with no alias, so injecting them leaves this plugin pending
++// forever. Keep the current names exactly as they are.
++//
++// `jobs` is the plugin's required service. The browser carrier is optional: a
++// bundle layer is applied to every profile that lists the bundle, and a
++// composition without an HTTP carrier (the headless profile) must still mount
++// this row. The route therefore rides the official conditional-injection
++// extension point — `ctx.inject(['webServer'], …)`, which unloads and re-runs
++// its callback whenever the carrier changes (docs/cordis-api/registry.md) —
++// instead of a hard `inject`, which would leave the whole row pending and fail
++// the boot. A composition with the carrier registers the identical route.
+ //
+ // Route endpoints are a single source of truth here: the /bench-status/status
+-// route below is served over the official httpServer registration interface.
++// route below is served over the official webServer registration interface.
+ export const name = 'bench-status'
+-export const inject = ['tasks', 'httpServer']
++export const inject = ['jobs']
+ 
+ export function apply(ctx) {
+-  const { tasks, httpServer } = ctx
+-  const collect = () => tasks.list().length
++  const { jobs } = ctx
++  const collect = () => jobs.list().length
+ 
++  // Completion reporting is owned by the registry row, which every supported
++  // composition mounts, so it is not conditional on the web carrier.
+   ctx.effect(() => {
+-    const disposers = [
+-      httpServer.register({
++    const dispose = jobs.onJobDone((snapshot) => {
++      console.error('[bench-status] job done:', snapshot.id)
++    })
++    return () => dispose?.()
++  })
++
++  ctx.inject(['webServer'], (webCtx) => {
++    webCtx.effect(() => {
++      const dispose = webCtx.webServer.register({
+         kind: 'exact',
+         path: '/bench-status/status',
+         handler: async (req, res) => {
+           res.writeHead(200, { 'content-type': 'application/json' })
+           res.end(`{"ok":true,"open":${collect()}}`)
+         },
+-      }),
+-      tasks.onTaskDone((snapshot) => {
+-        console.error('[bench-status] task done:', snapshot.id)
+-      }),
+-    ]
+-    return () => disposers.forEach((dispose) => dispose?.())
++      })
++      return () => dispose?.()
++    })
+   })
+-}
+\ No newline at end of file
++}
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..73f4d3c
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-status",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-status",
++      "version": "0.1.0"
++    }
++  }
++}

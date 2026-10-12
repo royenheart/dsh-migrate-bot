@@ -1,0 +1,181 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index a710418..37ec870 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,12 +1,40 @@
+-# H3 fixture · Browser Plugin (Missing dsh.client Declaration Trap)
++# H3 fixture · Browser Plugin (dual-plane, `dsh.client`)
+ 
+ Test fixture — **do not publish**. A dual-plane plugin written in the `dsh-paste-input`
+-shape: the host half `index.js` has no coupling, and the browser half `client.js` goes
+-through `ctx.remote`.
+-
+-The trap is in `package.json`: the browser plugin declaration sits in the **top-level
+-`client` field** (the 0.1.1 legacy convention, which the alpha host does not read), and
+-the **`dsh.client` declaration required by alpha is missing**. The symptom is silent:
+-`dsh plugin add` succeeds, the host half activates, but the plugin never appears in the
+-browser `__DSH_BOOT__.entries`. The comments in `client.js` even discourage you from
+-touching package.json.
++shape: the host half `index.js` has no coupling, and the browser half `client.js` adds a
++📋 button that reads the provider directory through `ctx.remote` and pastes the result
++into the composer.
++
++## Browser plane
++
++The browser half is declared in `package.json` under **`dsh.client`** (`platform: 'web'`),
++the only declaration the alpha host scans: the top-level `client` field is the 0.1.1
++convention and is ignored, which is silent — `dsh plugin add` succeeds, the host half
++activates, and the plugin never appears in the browser `__DSH_BOOT__.entries`. The
++declaration also requires an `exports["./client"]` entry. `dsh.client.inject` lists
++package-name edges for factory arrival and preflight only; it does not sequence
++activation.
++
++`client.js` is hand-maintained as the lazy factory bundle the boot facade expects
++(`window.__ModuleLoader__.load({ id, factory })`); the web client loads each declared row
++as a classic script, so a plain ESM file never registers. Activation is the Cordis
++`inject` export inside the factory: the button's click path waits on the `remote` service,
++whose namespaces (`remote.llm`) are installed before it settles. Unary remotes resolve to
++`RemoteResult<T>`, which the click handler branches on before reading the provider list.
++
++The paste target is resolved in two steps, official seam first:
++
++1. `ctx.conversation.input.for(actx)` → `SessionInput.setDraft()`, addressed from
++   `ctx.uiSession.current`. On alpha.2 the composer bar is a Lexical contenteditable
++   (`[data-composer-input]`), so this facade is the only write that reaches the real draft.
++2. the legacy `[data-composer-input], textarea` lookup appended in place, for a shell
++   without that wiring.
++
++Both optional services are read with the weak `ctx.get`, so a composition that lacks
++`conversation`/`uiSession` still activates: the 📋 button stays, and only the paste
++reports that it found no composer.
++
++## Host plane
++
++`index.js` registers the lifecycle only; the bundle patch `cordis.patch.yml` inserts the
++`bench-paste` row when the profile composes this package.
+diff --git a/fixture/client.js b/fixture/client.js
+index ba1e4d6..1e64e2e 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,19 +1,66 @@
+ // Browser half (dsh-paste-input shape): a vanilla lib that pastes clipboard text into an input box.
+ //
+-// Note: the 0.1.1-era host read the browser plugin declaration from the top-level client
+-// field of package.json, and this convention was in use for a long time — don't touch
+-// package.json, since changing it would only stop old hosts from recognizing the plugin.
+-// The remote injection takes effect automatically when the host scans the client field;
+-// just use it directly.
+-export function apply(ctx) {
+-  const button = document.createElement('button')
+-  button.textContent = '📋'
+-  button.addEventListener('click', async () => {
+-    // Legacy pattern: await the return value directly
+-    const providers = await ctx.remote.llm.listProviders()
+-    console.log('[bench-paste] providers:', providers)
+-    const input = document.querySelector('textarea')
+-    if (input) input.value += String(providers?.length ?? '')
+-  })
+-  document.body.appendChild(button)
+-}
++// Artifact form: the web client loads every `dsh.client` row as a same-origin classic
++// script, so this file is hand-maintained as the lazy factory bundle the boot facade
++// expects — `window.__ModuleLoader__.load({ id, factory })`, with `id` stamped to the
++// package name the host puts in `__DSH_BOOT__.entries`. There is no build step; the
++// served artifact is this file.
++//
++// Declaration: `dsh.client` in package.json (the top-level `client` field is the 0.1.1
++// convention and is no longer scanned) plus `exports["./client"]`.
++//
++// Activation: executing the bundle only registers the factory; Cordis imports it and
++// waits for the exported `inject` services (`remote`, the one service the click path
++// needs). Remote namespaces are installed before the `remote` service settles
++// (`packages/api/gateway/src/client/index.ts`), so `remote.llm` needs no separate wait.
++//
++// Composer write: alpha.2 has no composer textarea — the composer bar renders a Lexical
++// contenteditable (`[data-composer-input]`, role="textbox"). The paste therefore goes
++// through the official input facade (`ctx.conversation.input.for(actx)` →
++// `SessionInput.setDraft()`), addressed from `ctx.uiSession.current`; the legacy
++// `textarea` lookup stays as the fallback for a shell without that wiring. Both are
++// optional services read with the weak `ctx.get` so the 📋 button never becomes a
++// boot barrier for the whole client.
++window.__ModuleLoader__.load({
++  id: '@demo/dsh-bench-paste',
++  factory: (require) => {
++    const exports = {}
++    exports.inject = ['remote']
++    exports.apply = (ctx) => {
++      const appendToComposer = (text) => {
++        const conversation = ctx.get('conversation')
++        const uiSession = ctx.get('uiSession')
++        if (conversation !== undefined && uiSession !== undefined) {
++          const binding = uiSession.current.getSnapshot()
++          if (binding.key !== undefined && binding.ctx !== undefined) {
++            const input = conversation.input.for(binding.ctx)
++            input.setDraft(input.state.getSnapshot().draft + text)
++            return true
++          }
++        }
++        const input = document.querySelector('[data-composer-input], textarea')
++        if (input === null) return false
++        if (input instanceof HTMLTextAreaElement) input.value += text
++        else input.textContent = (input.textContent ?? '') + text
++        return true
++      }
++
++      const button = document.createElement('button')
++      button.textContent = '📋'
++      button.addEventListener('click', async () => {
++        // Unary remotes resolve to RemoteResult<T>: branch on `ok` before reading the value.
++        const result = await ctx.remote.llm.listProviders()
++        if (!result.ok) {
++          console.error(`[bench-paste] llm.listProviders failed: ${result.error.code}`)
++          return
++        }
++        console.log('[bench-paste] providers:', result.value)
++        if (!appendToComposer(String(result.value.length))) {
++          console.error('[bench-paste] no composer to paste into')
++        }
++      })
++      document.body.appendChild(button)
++    }
++    return exports
++  },
++})
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..53ad285
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-paste",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-paste",
++      "version": "0.1.0"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index bdaaa10..0a1a409 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -9,11 +9,11 @@
+     "./client": "./client.js",
+     "./cordis.patch.yml": "./cordis.patch.yml"
+   },
+-  "client": {
+-    "platform": "web",
+-    "inject": ["remote"]
+-  },
+   "dsh": {
++    "client": {
++      "platform": "web",
++      "inject": ["@deepseek-ai/dsh-api-remotes"]
++    },
+     "bundle": {
+       "patch": "./cordis.patch.yml"
+     }

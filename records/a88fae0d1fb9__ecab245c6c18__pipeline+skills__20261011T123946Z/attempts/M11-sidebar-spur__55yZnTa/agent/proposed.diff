@@ -1,0 +1,283 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index d790dc4..232b9fd 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -2,8 +2,10 @@
+ 
+ A decorative "braided whip" (辫子) plugin for the chat flow — a client-only
+ dock widget registered into the conversation composer's dock slot, with the
+-braid's tooltip/flash copy shipped as a plugin locale namespace. Written in
+-the 0.1.1-era style. The host is moving to dsh 0.1.2-alpha.2.
++braid's tooltip/flash copy shipped as a plugin locale namespace. Migrated to
++the dsh 0.1.2-alpha.2 client surface: Cordis `Context` plus the owning client
++packages (`dsh-client-ui-renderer` for `ctx.slots`, `dsh-client-locale` for
++`ctx.locale`, `dsh-client-ui-conversation` for the dock slot).
+ 
+ Release procedure (internal):
+ 
+diff --git a/fixture/client.d.ts b/fixture/client.d.ts
+new file mode 100644
+index 0000000..e8ac5c6
+--- /dev/null
++++ b/fixture/client.d.ts
+@@ -0,0 +1,39 @@
++// Type surface for the browser half (./client.js).
++//
++// The runtime half is plain JavaScript; this declaration carries the two
++// compile-time facts the source documents:
++//
++//   1. The locale namespace merged into the slot registry's LocaleNamespaceMap.
++//      It is the type-level half of the locale pairing: it types the typed
++//      `ctx.locale.register(NS, { zh, en })` call and the `locale: NS`
++//      registration option, and it is what the elided upstream
++//      `declare module '@deepseek-ai/dsh-client-ui-slots'` block declares in
++//      src/client/index.ts.
++//   2. The module's own runtime exports (`inject`, `apply`), which tsc would
++//      emit from that TypeScript source.
++//
++// The type-only imports that pull in each owner's Context augmentation
++// (`ctx.slots` from dsh-client-ui-renderer, `ctx.locale` from
++// dsh-client-locale, `conversation.composer.dock` from
++// dsh-client-ui-conversation) stay in client.js as comments: they are erased
++// at build time and exist to make the declarations visible to the checker.
++
++import type { Context } from '@deepseek-ai/cordis'
++import type {} from '@deepseek-ai/dsh-client-ui-slots'
++
++declare module '@deepseek-ai/dsh-client-ui-slots' {
++  interface LocaleNamespaceMap {
++    /** The braid's tooltip + whipped/busy flash copy. */
++    'dsh-spur': 'tooltip' | 'whipped' | 'busy'
++  }
++}
++
++/** Required client services: the slot registry and the locale namespace owner. */
++export declare const inject: readonly string[]
++
++/**
++ * Register the braid in the composer dock and its dictionaries in the locale
++ * registry.
++ * @param ctx - the browser plugin context.
++ */
++export declare function apply(ctx: Context): void
+diff --git a/fixture/client.js b/fixture/client.js
+index 3d75b73..7672f5f 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -3,18 +3,23 @@
+ // under the composer card — and ships the braid's tooltip/flash copy as the
+ // plugin's own locale namespace.
+ //
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.1 era):
+-//   "The ctx.slots service still lives in dsh-client-runtime on alpha — it
+-//    was only renamed internally; keep the runtime inject entry so the dock
+-//    keeps mounting."
+-// ────────────────────────────────────────────────────────────
++// 0.1.2-alpha.2 client type surface: the client context is the plain Cordis
++// `Context`, and each client facet's declaration is owned by the package that
++// provides it. A plugin spells that as type-only imports, erased at build time:
+ //
+-// 0.1.1-era type surface: the client context type comes from the client
+-// runtime package; the ctx.slots merge and the ctx.locale runtime arrive
+-// with it.
++//   import type { Context } from '@deepseek-ai/cordis'
++//   import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'      // ctx.slots
++//   import type {} from '@deepseek-ai/dsh-client-locale/client'           // ctx.locale
++//   import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'  // conversation.composer.dock
++//
++// The runtime edges are the `inject` export below (`slots`, `locale`): the
++// renderer provides the slot registry and ui-conversation declares the dock
++// slot; a type-only import loads nothing and resolves no runtime wait.
+ 
+-export const name = 'bench-sidebar-spur-client'
++// The client row is keyed by the package name: the boot manifest's entry id,
++// the module table key, and the bundle's `__ModuleLoader__.load({ id })`
++// registration id are all the package name, so the client half exports no
++// separate plugin `name` (its Cordis identity comes from the row).
+ 
+ // slots (conversation.composer.dock) + locale (braid copy zh/en).
+ export const inject = ['slots', 'locale']
+@@ -34,7 +39,7 @@ function braidStub() {
+ 
+ /**
+  * Client plugin body: register the braid in the composer dock.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx) {
+   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'bench-sidebar-spur: dictionaries')
+@@ -50,7 +55,28 @@ export function apply(ctx) {
+       locale: NS,
+     }, braidStub))
+ 
+-  // Elided: the type-level locale namespace declaration for the plugin
+-  // namespace, and the better-locale override dicts registration (optional
+-  // service, re-synced on every locale revision bump).
++  // Two halves of the shipped surface are elided in this distilled tree
++  // (upstream src/client/index.ts carries both):
++  //
++  //   - The type-level namespace declaration, which is what types the register
++  //     call above and the `locale: NS` option. For this JS package it lives
++  //     in ./client.d.ts:
++  //
++  //       declare module '@deepseek-ai/dsh-client-ui-slots' {
++  //         interface LocaleNamespaceMap { 'dsh-spur': 'tooltip' | 'whipped' | 'busy' }
++  //       }
++  //
++  //   - The braid's third-language copy (ja/de/fr/…). It now uses the official
++  //     language-pack form, one locale per registration:
++  //
++  //       ctx.effect(() => ctx.locale.register(NS, locale, dict), `bench-sidebar-spur: ${locale}`)
++  //
++  //     A plugin that has to make a language selectable adds it through
++  //     ctx.locale.addLanguage({ id, label, fallback }); a language pack such
++  //     as dsh-plugin-better-locale ships those catalog entries. Native
++  //     registration bumps the locale revision itself, so the 0.1.1-era
++  //     "re-sync on every locale revision" loop is gone — and so is the
++  //     companion's `betterLocale` override store it read: that service was
++  //     retired when the companion moved to this API, so probing it no-ops
++  //     on 0.1.2.
+ }
+diff --git a/fixture/index.js b/fixture/index.js
+index fa79c4a..130e5a6 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,6 +1,8 @@
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the browser half pulled its client
+-// context type from the client runtime package, and the ctx.slots service
+-// shipped inside that runtime.
++// Migrated to the dsh 0.1.2-alpha.2 client surface: the browser half types its
++// context as the plain Cordis Context, the `slots` service is provided by
++// dsh-client-ui-renderer, and `ctx.locale` by dsh-client-locale. The removed
++// 0.1.1-era runtime aggregation package is gone from both the type surface and
++// the inject lists.
+ //
+ // Host half: client-only plugin — the host plane has no runtime work. The
+ // browser half (client.js) registers a `conversation.composer.dock` entry
+@@ -13,5 +15,5 @@
+  * @param {import('@deepseek-ai/cordis').Context} _ctx
+  */
+ export function apply(_ctx) {
+-  console.error('[bench-sidebar-spur] host apply(): client-only plugin, no host-plane work (0.1.1-era cohort)')
++  console.error('[bench-sidebar-spur] host apply(): client-only plugin, no host-plane work (0.1.2-alpha.2 cohort)')
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..dca8dd6
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,52 @@
++{
++  "name": "@bench/dsh-bench-sidebar-spur",
++  "version": "0.1.2",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-sidebar-spur",
++      "version": "0.1.2",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.1",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++        "react": "^18.2.0",
++        "react-dom": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-conversation": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-primitives": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-renderer": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-invariants": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        },
++        "react-dom": {
++          "optional": true
++        }
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index adb998a..26ad116 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,12 +1,15 @@
+ {
+   "name": "@bench/dsh-bench-sidebar-spur",
+   "version": "0.1.2",
+-  "description": "Decorative braided-whip dock widget for the chat flow — client-only conversation.composer.dock contribution (0.1.1-era cohort; exam material only)",
++  "description": "Decorative braided-whip dock widget for the chat flow — client-only conversation.composer.dock contribution (dsh 0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+     ".": "./index.js",
+-    "./client": "./client.js",
++    "./client": {
++      "types": "./client.d.ts",
++      "default": "./client.js"
++    },
+     "./cordis.patch.yml": "./cordis.patch.yml"
+   },
+   "dsh": {
+@@ -16,30 +19,27 @@
+     "client": {
+       "platform": "web",
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+         "@deepseek-ai/dsh-client-locale",
+-        "@deepseek-ai/dsh-client-ui-slots",
+-        "@deepseek-ai/dsh-client-ui-primitives",
+         "@deepseek-ai/dsh-client-ui-conversation"
+       ]
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/dsh-client-locale": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-conversation": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-invariants": "^0.0.1-rc.1",
+-    "@deepseek-ai/cordis": "^4.0.1-rc.1",
++    "@deepseek-ai/cordis": "^4.0.1",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
+     "@deepseek-ai/dsh-client-locale": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-conversation": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+     "@deepseek-ai/dsh-invariants": { "optional": true },
+     "@deepseek-ai/cordis": { "optional": true },

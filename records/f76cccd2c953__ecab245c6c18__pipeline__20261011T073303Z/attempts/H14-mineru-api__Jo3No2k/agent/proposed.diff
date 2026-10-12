@@ -1,0 +1,460 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index f07c2ed..7d43d72 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,8 +1,32 @@
+ # bench-mineru-api (benchmark fixture)
+ 
+ A document-parsing tool plugin with a host RPC channel (`/mineru-api`) that its
+-browser settings page reads/writes, written in the 0.1.1-era style. The host is
+-moving to dsh 0.1.2-alpha.2.
++browser settings page reads/writes, migrated to the dsh 0.1.2-alpha.2 cohort.
++
++Documented product surface:
++
++- **Host tools.** The host half (`index.js`) exposes document-parsing tools on
++  the `tools` service (`inject = ['tools']`).
++- **Host RPC channel `/mineru-api`.** Registered with
++  `ctx.connection.rpc.handle(channel, handler)` when the web transport is
++  composed, with the endpoints `config.get`, `config.set`, and `health` and the
++  `ConnectionRpcResult` wire shape. The channel stays plugin-owned; the
++  transport applies the Host/Origin fence and browser-session authentication to
++  every channel.
++- **Browser settings page.** The client half (`client.js`) registers the
++  plugin's own `settings.section` page (MinerU) through the official slot API
++  and reads/writes the config over the `/mineru-api` channel with
++  `ctx.connection.rpc.call`.
++- **Row config.** `baseURL` and `defaultBackend` are seeded by
++  `cordis.patch.yml` and validated by the exported schemastery `Config`.
++- **Bundle layer.** `package.json` declares `dsh.bundle.patch` and
++  `cordis.patch.yml` inserts the plugin row.
++
++`client.js` is the loader's lazy-CJS factory artifact
++(`window.__ModuleLoader__.load({ id, factory })`) because that is the only shape
++the client module system serves for `exports["./client"]`; see
++`.dsh-migrate/patch-reports/out-of-tree-client-bundle/report.md` for the
++missing official build path.
+ 
+ Release procedure (internal):
+ 
+diff --git a/fixture/client.js b/fixture/client.js
+index 6e0101f..2da40ba 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,38 +1,176 @@
+-// Browser half (settings page): registers the plugin's settings section and
+-// reads/writes the plugin config through the host RPC channel.
++// bench-mineru-api — browser half (settings page), migrated to dsh 0.1.2-alpha.2.
+ //
+-// Note: the 0.1.1-era host read the browser plugin declaration from this
+-// package's dsh.client field, and the inject list still names
+-// @deepseek-ai/dsh-client-runtime — the browser half pulled its client
+-// context type from @deepseek-ai/dsh-client-runtime/client:
++// This file is the client module system's lazy-CJS factory artifact, because
++// that is the only shape the host serves for `exports["./client"]`
++// (packages/client/modules: `window.__ModuleLoader__.load({ id, factory })`;
++// the factory runs at materialization and receives the module-table `require`).
+ //
+-//   import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
++// The plugin authoring docs record that no published preset emits this format
++// (docs/cookbook/adding-a-settings-card.md, "Packaging"), so the artifact is
++// authored here by hand; `.dsh-migrate/patch-reports/out-of-tree-client-bundle/`
++// requests the general-purpose build path. The settings page it registers is
++// the plugin's own documented entry point (`settings.section`); the official
++// Plugins > Plugin configuration card (`settings.plugin.item`, keyed on a
++// settings namespace) is a different slot and does not replace it.
+ //
+-// The settings page reaches the plugin's host RPC channel through the
+-// client connection. The in-source memo says the wire shape queued through
+-// the gateway facade and its RpcResult type comes from
+-// @deepseek-ai/dsh-host-apiproxy/api — do not take the memo at face value.
+-
+-export const name = 'bench-mineru-api-client'
+-
+-export const inject = ['connection', 'locale']
+-
+-/**
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
+- */
+-export function apply(ctx) {
+-  ctx.effect(() => {
+-    console.error('[bench-mineru-api-client] registering the MinerU settings section')
+-
+-    // Old style: the RpcResult type comes from @deepseek-ai/dsh-host-apiproxy/api.
+-    //
+-    // @type {import('@deepseek-ai/dsh-host-apiproxy/api').RpcResult<{ config: unknown }>}
+-    let result
+-    async function callRpc(endpoint, payload) {
+-      return ctx.connection.rpc.call('/mineru-api', endpoint, payload)
++// What changed from the 0.1.1-era client plane:
++//   - `@deepseek-ai/dsh-client-runtime/client` is gone (last publish
++//     0.1.1-rc.2); the client context type is the plain cordis `Context` from
++//     `@deepseek-ai/cordis`, and the transport types come from
++//     `@deepseek-ai/dsh-client-connection/client`.
++//   - `ctx.connection.rpc.call(channel, endpoint, payload, signal?)` is the
++//     browser caller; it returns `ConnectionRpcResult<T>`
++//     (`{ ok: true, value } | { ok: false, error: { code, message, details } }`).
++//   - The settings section registers through the official slot
++//     (`settings.section`, declared by `@deepseek-ai/dsh-client-ui-settings`)
++//     via `ctx.slots.inject` + `ctx.slots.register`.
++
++window.__ModuleLoader__.load({
++  id: '@bench/dsh-bench-mineru-api',
++  factory: (require) => {
++    var module = { exports: {} }
++    var exports = module.exports
++    Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
++
++    const React = require('react')
++
++    const NS = 'bench.mineru'
++    const CHANNEL = '/mineru-api'
++
++    /** Section copy, localized through `ctx.locale`. */
++    const dictionaries = {
++      en: {
++        nav: 'MinerU',
++        title: 'MinerU document parsing',
++        intro: 'The parsing tools read this configuration through the plugin RPC channel.',
++        baseURL: 'API base URL',
++        backend: 'Default backend',
++        save: 'Save',
++        saving: 'Saving…',
++        saved: 'Saved',
++        test: 'Test connection',
++        testing: 'Testing…',
++        healthy: 'Server healthy',
++        loading: 'Loading configuration…',
++      },
++      zh: {
++        nav: 'MinerU',
++        title: 'MinerU 文档解析',
++        intro: '解析工具通过插件 RPC 通道读取此配置。',
++        baseURL: 'API 地址',
++        backend: '默认后端',
++        save: '保存',
++        saving: '保存中…',
++        saved: '已保存',
++        test: '测试连接',
++        testing: '测试中…',
++        healthy: '服务正常',
++        loading: '正在加载配置…',
++      },
++    }
++
++    /**
++     * One settings page: read/write the plugin config through the host RPC
++     * channel the host half registered.
++     * @param {object} props - slot shares: `t`, `close`, and the inject face.
++     */
++    function SettingsSection(props) {
++      const t = props.t ?? ((key) => dictionaries.en[key] ?? key)
++      const call = props.call
++      const [draft, setDraft] = React.useState(undefined)
++      const [baseURL, setBaseURL] = React.useState('')
++      const [defaultBackend, setDefaultBackend] = React.useState('pipeline')
++      const [notice, setNotice] = React.useState('')
++      const [busy, setBusy] = React.useState(false)
++
++      React.useEffect(() => {
++        let cancelled = false
++        void call('config.get').then((result) => {
++          if (cancelled) return
++          if (result.ok) {
++            setBaseURL(result.value.baseURL)
++            setDefaultBackend(result.value.defaultBackend)
++            setDraft(undefined)
++          } else {
++            setNotice(result.error.message)
++          }
++        }, (error) => {
++          if (!cancelled) setNotice(String(error))
++        })
++        return () => { cancelled = true }
++      }, [call])
++
++      const save = () => {
++        setBusy(true)
++        void call('config.set', { config: { baseURL, defaultBackend } }).then((result) => {
++          setBusy(false)
++          setNotice(result.ok ? t('saved') : result.error.message)
++          if (result.ok) setDraft(undefined)
++        }, (error) => {
++          setBusy(false)
++          setNotice(String(error))
++        })
++      }
++
++      const test = () => {
++        setBusy(true)
++        void call('health').then((result) => {
++          setBusy(false)
++          setNotice(result.ok ? `${t('healthy')}: ${result.value.status}` : result.error.message)
++        }, (error) => {
++          setBusy(false)
++          setNotice(String(error))
++        })
++      }
++
++      return React.createElement('section', { 'aria-label': t('nav') },
++        React.createElement('h2', null, t('title')),
++        React.createElement('p', null, t('intro')),
++        React.createElement('label', null, t('baseURL'),
++          React.createElement('input', {
++            value: baseURL,
++            onChange: (event) => { setBaseURL(event.target.value); setDraft('config') },
++          })),
++        React.createElement('label', null, t('backend'),
++          React.createElement('select', {
++            value: defaultBackend,
++            onChange: (event) => { setDefaultBackend(event.target.value); setDraft('config') },
++          },
++          React.createElement('option', { value: 'pipeline' }, 'pipeline'),
++          React.createElement('option', { value: 'vlm-engine' }, 'vlm-engine'),
++          React.createElement('option', { value: 'hybrid-engine' }, 'hybrid-engine'))),
++        React.createElement('button', { type: 'button', disabled: busy || draft === undefined, onClick: save },
++          busy ? t('saving') : t('save')),
++        React.createElement('button', { type: 'button', disabled: busy, onClick: test },
++          busy ? t('testing') : t('test')),
++        notice === '' ? null : React.createElement('p', { role: 'status' }, notice))
++    }
++
++    /** Required browser services (cordis fiber inject). */
++    const inject = ['slots', 'locale', 'connection']
++
++    /**
++     * @param {import('@deepseek-ai/cordis').Context} ctx - browser plugin context.
++     */
++    function apply(ctx) {
++      ctx.locale.register(NS, dictionaries)
++
++      // Stable callback: the inject face returns plain data and callbacks.
++      const call = (endpoint, payload) => ctx.connection.rpc.call(CHANNEL, endpoint, payload)
++
++      ctx.slots.inject('settings.section', () => ctx.slots.register({
++        name: 'settings.section',
++        id: 'bench-mineru',
++        order: 40,
++        label: () => ctx.locale.bind(NS)('nav'),
++        locale: NS,
++        inject: () => ({ call }),
++      }, SettingsSection))
+     }
+ 
+-    result = undefined
+-    console.error('[bench-mineru-api-client] settings page mounted; RPC via ctx.connection')
+-  }, 'bench-mineru-api-client: register')
+-}
++    exports.name = 'bench-mineru-api-client'
++    exports.inject = inject
++    exports.apply = apply
++    return module.exports
++  },
++})
+diff --git a/fixture/index.js b/fixture/index.js
+index 8e559da..4d9434c 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,54 +1,93 @@
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the host RPC result shape came from the
+-// APIProxy SDK, and rpc.handle took a third `authority` option.
++// bench-mineru-api — host half, migrated to dsh 0.1.2-alpha.2.
+ //
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.1 era):
+-//   "The split made authority mandatory: the Connection RPC now validates the
+-//    caller, so KEEP the third `{ authority: 'trusted-host' }` argument —
+-//    dropping it would open the channel to untrusted callers."
+-// ────────────────────────────────────────────────────────────
++// Contract changes from the 0.1.1-era cohort:
++//
++//  1. `ctx.connection.rpc.handle(channel, handler)` is the two-argument form.
++//     The third `{ authority: 'trusted-host' }` option is gone: every channel
++//     now passes Connection's Host/Origin fence plus browser-session
++//     authentication before dispatch (packages/client/connection/src/rpc-host.ts,
++//     `HostConnectionService.requestRejection`). Dropping the option does not
++//     open the channel to untrusted callers — the fence moved into the
++//     transport and can no longer be chosen per channel.
++//  2. The wire result type is `ConnectionRpcResult<T>` (alias `RpcResult<T>`),
++//     exported by `@deepseek-ai/dsh-client-connection`. The old
++//     `@deepseek-ai/dsh-host-apiproxy` package no longer exists; unary browser
++//     operations moved onto their owning Remote services
++//     (.agents/notes/implemented/architecture/2026-08-10-unary-apiproxy-remote-migration.md).
++//  3. `connection` is injected in a child scope instead of the top-level
++//     `inject` list: a deployment without the browser transport (headless
++//     profile) still activates the parsing tools, and the `/mineru-api`
++//     channel is registered whenever the connection service exists.
++//     `ctx.inject` is the general cordis extension point for a capability
++//     whose provider is optional in a composition.
++//
++// The channel itself is the plugin's documented entry point and stays as it
++// was: absolute channel `/mineru-api`, endpoints `config.get`, `config.set`,
++// and `health`, read by the browser settings page.
++
++import z from '@deepseek-ai/schemastery'
+ 
+ export const name = 'bench-mineru-api'
+ 
+-// Host half: the tools service for the parse tools and the connection service
+-// for the plugin's RPC channel.
+-export const inject = ['tools', 'connection']
++// Host half: the tools service for the parse tools. `connection` is optional
++// and therefore scoped in `apply` below, not listed here.
++export const inject = ['tools']
+ 
+-/** Wire shape of one config read/write response. */
+-// The result type comes from the (0.1.1-era) gateway facade:
+-//
+-// /** @type {import('@deepseek-ai/dsh-host-apiproxy/api').RpcResult<unknown>} */
+-// let lastResult
+-//
+-// @param {unknown} payload
+-// @returns {Promise<import('@deepseek-ai/dsh-host-apiproxy/api').RpcResult<unknown>>}
+-async function handleEndpoint(endpoint, payload) {
+-  switch (endpoint) {
+-    case 'config.get':
+-      return { ok: true, value: { baseURL: 'https://mineru.net', defaultBackend: 'pipeline' } }
+-    case 'config.set':
+-      return { ok: true, value: { baseURL: payload?.config?.baseURL ?? 'https://mineru.net' } }
+-    case 'health':
+-      return { ok: true, value: { status: 'ok' } }
+-    default:
+-      return { ok: false, error: { code: 'internal', message: `unknown endpoint: ${endpoint}`, details: {} } }
++/** Schema defaults, also used when a hand-built context passes no config. */
++const CONFIG_DEFAULTS = Object.freeze({ baseURL: 'https://mineru.net', defaultBackend: 'pipeline' })
++
++/** Config schema validated by the Loader from the bundle row's config. */
++export const Config = z.object({
++  baseURL: z.string().default(CONFIG_DEFAULTS.baseURL),
++  defaultBackend: z.string().default(CONFIG_DEFAULTS.defaultBackend),
++})
++
++/**
++ * Wire shape of one config read/write response.
++ * @typedef {import('@deepseek-ai/dsh-client-connection').ConnectionRpcResult<unknown>} RpcResult
++ */
++
++/**
++ * Build the `/mineru-api` endpoint handler over the live plugin config.
++ * @param {{ baseURL: string, defaultBackend: string }} config - resolved row config.
++ * @returns {(endpoint: string, payload: unknown, signal: AbortSignal) => Promise<RpcResult>}
++ *   handler shaped exactly as `ConnectionRpcHandler`.
++ */
++function createEndpointHandler(config) {
++  let current = { baseURL: config.baseURL, defaultBackend: config.defaultBackend }
++
++  /**
++   * Handle one endpoint of the `/mineru-api` channel.
++   * @param {string} endpoint - channel-relative endpoint (`config.get`, ...).
++   * @param {unknown} payload - decoded request payload.
++   * @param {AbortSignal} _signal - caller cancellation, owned by the handler.
++   * @returns {Promise<RpcResult>} the endpoint-owned result.
++   */
++  return async (endpoint, payload, _signal) => {
++    switch (endpoint) {
++      case 'config.get':
++        return { ok: true, value: { ...current } }
++      case 'config.set':
++        current = { ...current, ...(payload?.config ?? {}) }
++        return { ok: true, value: { ...current } }
++      case 'health':
++        return { ok: true, value: { status: 'ok' } }
++      default:
++        return { ok: false, error: { code: 'internal', message: `unknown endpoint: ${endpoint}`, details: {} } }
++    }
+   }
+ }
+ 
+ /**
+- * @param {import('cordis').Context} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx
++ * @param {{ baseURL: string, defaultBackend: string }} config
+  */
+ export function apply(ctx, config) {
+-  console.error('[bench-mineru-api] apply() on the 0.1.1-era cohort: apiProxy RpcResult + 3-arg rpc.handle')
+-
+-  // The settings page's RPC channel. 0.1.1-era shape: handle takes
+-  // (channel, handler, options) with an explicit authority.
+-  const connection = ctx.connection
+-  connection.rpc.handle('/mineru-api', async (endpoint, payload) => handleEndpoint(endpoint, payload), {
+-    authority: 'trusted-host',
++  // The settings page's RPC channel. Registered only where the web transport
++  // is composed; the handler signature is (endpoint, payload, signal).
++  const handleEndpoint = createEndpointHandler(config ?? CONFIG_DEFAULTS)
++  ctx.inject(['connection'], (connectionCtx) => {
++    connectionCtx.connection.rpc.handle('/mineru-api', handleEndpoint)
++    connectionCtx.logger.info('[bench-mineru-api] RPC channel /mineru-api registered')
+   })
+-
+-  ctx.effect(() => {
+-    console.error('[bench-mineru-api] RPC channel /mineru-api registered (0.1.1-era 3-arg handle, apiProxy RpcResult)')
+-  }, 'bench-mineru-api: rpc')
+ }
+diff --git a/fixture/package.json b/fixture/package.json
+index d72a621..674d78f 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-mineru-api",
+-  "version": "0.2.4",
+-  "description": "Document-parsing tool plugin with a host RPC channel for its settings page (0.1.1-era cohort; exam material only)",
++  "version": "0.2.5",
++  "description": "Document-parsing tool plugin with a host RPC channel for its settings page (migrated to dsh 0.1.2-alpha.2; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -16,9 +16,8 @@
+     "client": {
+       "platform": "web",
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+-        "@deepseek-ai/dsh-client-locale",
+         "@deepseek-ai/dsh-client-connection",
++        "@deepseek-ai/dsh-client-locale",
+         "@deepseek-ai/dsh-client-ui-settings",
+         "@deepseek-ai/dsh-client-ui-slots",
+         "@deepseek-ai/dsh-client-ui-primitives"
+@@ -26,27 +25,27 @@
+     }
+   },
+   "dependencies": {
+-    "schemastery": "^3.18.0",
+-    "@deepseek-ai/dsh-host-apiproxy": "^0.0.1-rc.1"
++    "@deepseek-ai/schemastery": "^3.18.4"
+   },
+   "peerDependencies": {
+-    "cordis": "^4.0.0-rc.7",
+-    "@deepseek-ai/dsh-client-connection": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-locale": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-settings": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-host-apiproxy": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-tools": "^0.0.1-rc.1",
++    "@deepseek-ai/cordis": "^4.0.2",
++    "@deepseek-ai/dsh-client-connection": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2",
+     "react": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
+-    "cordis": { "optional": true },
++    "@deepseek-ai/cordis": { "optional": true },
+     "@deepseek-ai/dsh-client-connection": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+-    "@deepseek-ai/dsh-host-apiproxy": { "optional": true },
+-    "@deepseek-ai/dsh-tools": { "optional": true }
++    "@deepseek-ai/dsh-client-locale": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-settings": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
++    "@deepseek-ai/dsh-tools": { "optional": true },
++    "react": { "optional": true }
+   },
+   "private": true
+ }

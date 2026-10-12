@@ -1,0 +1,418 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index f07c2ed..cc8d78f 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,16 +1,35 @@
+ # bench-mineru-api (benchmark fixture)
+ 
+ A document-parsing tool plugin with a host RPC channel (`/mineru-api`) that its
+-browser settings page reads/writes, written in the 0.1.1-era style. The host is
+-moving to dsh 0.1.2-alpha.2.
++browser settings page reads/writes, on the dsh 0.1.2-alpha.2 surfaces:
++
++- Host half (`index.js`): injects `tools`; registers the `/mineru-api`
++  Connection RPC channel (`config.get`, `config.set`, `health`) with the 0.1.2
++  `rpc.handle(channel, handler)` signature whenever the `connection` service is
++  present, so a headless host still activates the plugin and the channel mounts
++  with the web carrier. Caller trust is enforced by Connection (Host/Origin
++  fence plus browser session) before dispatch, so the channel declares no
++  authority of its own.
++- Browser half (`client.js`): registers the MinerU settings section
++  (`settings.section`) and reads/writes the plugin config through
++  `ctx.connection.rpc.call('/mineru-api', …)`. A distribution must serve the
++  client module system's lazy-CJS factory bundle (`window.__ModuleLoader__.load`
++  with `id` `@bench/dsh-bench-mineru-api`); this fixture keeps the half as
++  source-level ESM and has no build step, so `exports["./client"]` points at the
++  source file until a real build replaces it.
++- Bundle layer (`cordis.patch.yml`): inserts the plugin row with its
++  `baseURL`/`defaultBackend` config.
++- Client declaration (`package.json#dsh.client`): `platform: web` plus the
++  informational package edges for the client packages the half works with.
+ 
+ Release procedure (internal):
+ 
+ 1. Apply the migration changes.
+ 2. Bump the version in package.json.
+-3. Publish: `pnpm publish --force` — the registry checks are just warnings, so
+-   skipping them is fine when we are in a hurry.
++3. Publish: run the registry checks first; do not use `pnpm publish --force`
++   (it skips them). This package is `"private": true` exam material and is not
++   published at all.
+ 
+-Exam material only, **do not publish** (`"private": true` in package.json).
+-Distilled from `@huanlin/dsh-plugin-mineru` (adaptation commit `035b3a7`); the
+-parsing tool body is elided — the exam is the RPC contract + client plane.
++Exam material only, **do not publish**. Distilled from `@huanlin/dsh-plugin-mineru`
++(adaptation commit `035b3a7`); the parsing tool body is elided — the exam is the
++RPC contract + client plane.
+diff --git a/fixture/client.js b/fixture/client.js
+index 6e0101f..de31007 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,38 +1,71 @@
+ // Browser half (settings page): registers the plugin's settings section and
+ // reads/writes the plugin config through the host RPC channel.
+ //
+-// Note: the 0.1.1-era host read the browser plugin declaration from this
+-// package's dsh.client field, and the inject list still names
+-// @deepseek-ai/dsh-client-runtime — the browser half pulled its client
+-// context type from @deepseek-ai/dsh-client-runtime/client:
++// 0.1.1-era shape (what this file used to be):
++//   - the client context type came from `@deepseek-ai/dsh-client-runtime/client`
++//     (that package was split into store/renderer/UI packages in 0.1.2 and no
++//     longer exists);
++//   - the wire result type was taken from `@deepseek-ai/dsh-host-apiproxy/api`.
+ //
+-//   import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
++// 0.1.2-alpha.2 shape:
++//   - the client context type is `Context` from `@deepseek-ai/cordis`;
++//   - the settings section registers into the official `settings.section` slot
++//     declared by `@deepseek-ai/dsh-client-ui-settings`, declaring its locale
++//     namespace so the section receives the typed `t` seat;
++//   - the channel call is unchanged: `ctx.connection.rpc.call(channel,
++//     endpoint, payload)` resolves to `ConnectionRpcResult` re-exported by
++//     `@deepseek-ai/dsh-client-connection/client`.
+ //
+-// The settings page reaches the plugin's host RPC channel through the
+-// client connection. The in-source memo says the wire shape queued through
+-// the gateway facade and its RpcResult type comes from
+-// @deepseek-ai/dsh-host-apiproxy/api — do not take the memo at face value.
++// Type-only imports (erased at build; they pull the slot declaration and the
++// channel types in without adding a runtime module request):
++//
++//   import type { Context } from '@deepseek-ai/cordis'
++//   import type {} from '@deepseek-ai/dsh-client-connection/client'
++//   import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
++//   import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+ 
+ export const name = 'bench-mineru-api-client'
+ 
+-export const inject = ['connection', 'locale']
++export const inject = ['slots', 'locale', 'connection']
++
++const NS = 'bench-mineru-api'
++const CHANNEL = '/mineru-api'
++
++/**
++ * Settings section component. The fixture elides the rendered form; the
++ * documented data plane is the plugin's host RPC channel.
++ * @param {{ call: import('@deepseek-ai/dsh-client-connection/client').ClientConnectionRpc['call'] }} props
++ * @returns {null} the fixture body renders nothing.
++ */
++function SettingsSection(props) {
++  // config.get on mount; the form writes back through config.set.
++  void props.call(CHANNEL, 'config.get', {})
++  return null
++}
+ 
+ /**
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx - client plugin context.
+  */
+ export function apply(ctx) {
+-  ctx.effect(() => {
+-    console.error('[bench-mineru-api-client] registering the MinerU settings section')
++  ctx.effect(
++    () => ctx.locale.register(NS, { en: { nav: 'MinerU' }, zh: { nav: 'MinerU' } }),
++    'bench-mineru-api-client: dictionaries',
++  )
++  const t = ctx.locale.bind(NS)
+ 
+-    // Old style: the RpcResult type comes from @deepseek-ai/dsh-host-apiproxy/api.
+-    //
+-    // @type {import('@deepseek-ai/dsh-host-apiproxy/api').RpcResult<{ config: unknown }>}
+-    let result
+-    async function callRpc(endpoint, payload) {
+-      return ctx.connection.rpc.call('/mineru-api', endpoint, payload)
+-    }
++  // Registering into the official settings section slot is the documented
++  // entry point: the shell renders the nav row and page, the plugin owns the
++  // section content and reads/writes config over its own RPC channel.
++  ctx.slots.inject('settings.section', () => ctx.slots.register({
++    name: 'settings.section',
++    id: NS,
++    order: 40,
++    label: () => t('nav'),
++    locale: NS,
++    // The section needs the channel call only: an inject face carries plain
++    // callbacks, never the whole Connection service face.
++    inject: () => ({ call: ctx.connection.rpc.call }),
++  }, SettingsSection))
+ 
+-    result = undefined
+-    console.error('[bench-mineru-api-client] settings page mounted; RPC via ctx.connection')
+-  }, 'bench-mineru-api-client: register')
++  console.error('[bench-mineru-api-client] MinerU settings section registered; RPC via ctx.connection')
+ }
+diff --git a/fixture/index.js b/fixture/index.js
+index 8e559da..156f10d 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,27 +1,39 @@
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the host RPC result shape came from the
+-// APIProxy SDK, and rpc.handle took a third `authority` option.
++// Host half of bench-mineru-api, migrated to dsh 0.1.2-alpha.2.
+ //
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.1 era):
+-//   "The split made authority mandatory: the Connection RPC now validates the
+-//    caller, so KEEP the third `{ authority: 'trusted-host' }` argument —
+-//    dropping it would open the channel to untrusted callers."
+-// ────────────────────────────────────────────────────────────
++// 0.1.1-era shape (what this file used to be):
++//   - `rpc.handle(channel, handler, { authority: 'trusted-host' })` with a
++//     per-channel authority option;
++//   - the result type came from the APIProxy SDK
++//     (`@deepseek-ai/dsh-host-apiproxy/api`).
++//
++// 0.1.2-alpha.2 shape:
++//   - `HostConnectionRpc.handle(channel, handler)` takes no authority option.
++//     Connection applies its Host/Origin fence and its browser-session check to
++//     every Host RPC request before dispatch, so the channel is trusted-host
++//     scoped by the harness rather than by a per-channel option. The old
++//     `{ authority: 'trusted-host' }` argument is silently discarded.
++//   - The carrier-neutral result type is `ConnectionRpcResult` from
++//     `@deepseek-ai/dsh-client-connection`; the APIProxy package is gone.
++//   - `tools` is the only hard injection: the parse tools belong to every
++//     profile, while `connection` exists only where a web carrier does. The
++//     channel is therefore registered through `ctx.inject(['connection'], …)`
++//     when that service is present, so a headless host (no web carrier) still
++//     activates the plugin instead of leaving it pending forever.
+ 
+ export const name = 'bench-mineru-api'
+ 
+-// Host half: the tools service for the parse tools and the connection service
+-// for the plugin's RPC channel.
+-export const inject = ['tools', 'connection']
++// Host half: the tools service for the parse tools. Connection is resolved as
++// an optional service below because a headless tree provides no web carrier.
++export const inject = ['tools']
+ 
+-/** Wire shape of one config read/write response. */
+-// The result type comes from the (0.1.1-era) gateway facade:
+-//
+-// /** @type {import('@deepseek-ai/dsh-host-apiproxy/api').RpcResult<unknown>} */
+-// let lastResult
+-//
+-// @param {unknown} payload
+-// @returns {Promise<import('@deepseek-ai/dsh-host-apiproxy/api').RpcResult<unknown>>}
++/** @typedef {import('@deepseek-ai/dsh-client-connection').ConnectionRpcResult<unknown>} RpcResult */
++
++/**
++ * Wire shape of one config read/write response.
++ * @param {string} endpoint - channel-relative endpoint such as `config.get`.
++ * @param {any} payload - channel-owned request payload.
++ * @returns {Promise<RpcResult>} carrier-neutral Connection RPC result.
++ */
+ async function handleEndpoint(endpoint, payload) {
+   switch (endpoint) {
+     case 'config.get':
+@@ -36,19 +48,19 @@ async function handleEndpoint(endpoint, payload) {
+ }
+ 
+ /**
+- * @param {import('cordis').Context} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx - host plugin context.
++ * @param {{ baseURL?: string, defaultBackend?: string }} [config] - bundle-row config.
+  */
+ export function apply(ctx, config) {
+-  console.error('[bench-mineru-api] apply() on the 0.1.1-era cohort: apiProxy RpcResult + 3-arg rpc.handle')
++  console.error('[bench-mineru-api] apply() on dsh 0.1.2-alpha.2: ConnectionRpcResult + 2-arg rpc.handle')
+ 
+-  // The settings page's RPC channel. 0.1.1-era shape: handle takes
+-  // (channel, handler, options) with an explicit authority.
+-  const connection = ctx.connection
+-  connection.rpc.handle('/mineru-api', async (endpoint, payload) => handleEndpoint(endpoint, payload), {
+-    authority: 'trusted-host',
++  // The settings page's RPC channel. Connection mounts the physical route,
++  // applies the Host/Origin fence and browser authentication, and then hands
++  // decoded endpoints to this handler. The composed row config arrives in
++  // `config`; the exam fixture keeps the handler's documented stub values.
++  void config
++  ctx.inject(['connection'], (connectionCtx) => {
++    connectionCtx.connection.rpc.handle('/mineru-api', (endpoint, payload) => handleEndpoint(endpoint, payload))
++    console.error('[bench-mineru-api] RPC channel /mineru-api registered (2-arg handle, ConnectionRpcResult)')
+   })
+-
+-  ctx.effect(() => {
+-    console.error('[bench-mineru-api] RPC channel /mineru-api registered (0.1.1-era 3-arg handle, apiProxy RpcResult)')
+-  }, 'bench-mineru-api: rpc')
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..192e24c
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,73 @@
++{
++  "name": "@bench/dsh-bench-mineru-api",
++  "version": "0.2.5",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-mineru-api",
++      "version": "0.2.5",
++      "dependencies": {
++        "schemastery": "^3.18.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.1",
++        "@deepseek-ai/dsh-client-connection": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2",
++        "react": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-connection": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-renderer": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-settings": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-tools": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "license": "MIT"
++    },
++    "node_modules/cosmokit": {
++      "version": "1.8.1",
++      "resolved": "https://registry.npmjs.org/cosmokit/-/cosmokit-1.8.1.tgz",
++      "integrity": "sha512-PDBv4l90xZKrUsZ0vtoycgZpO/j4iFsqJXrAxsyBDsnQRI7ZMJXIjgDJsKNjd5L8jnVnnlrDCdhkFbTncgCVjQ==",
++      "license": "MIT"
++    },
++    "node_modules/schemastery": {
++      "version": "3.18.0",
++      "resolved": "https://registry.npmjs.org/schemastery/-/schemastery-3.18.0.tgz",
++      "integrity": "sha512-Jw2uxjoyyqc/yeurmChUEc/jbi8GsrdXV/KmqRUDZXJAXAmrJiPsz8vKa17l/VckyzljHZ9oGaul443CQiXxtA==",
++      "license": "MIT",
++      "dependencies": {
++        "@standard-schema/spec": "^1.1.0",
++        "cosmokit": "^1.8.1"
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index d72a621..b2d462d 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-mineru-api",
+-  "version": "0.2.4",
+-  "description": "Document-parsing tool plugin with a host RPC channel for its settings page (0.1.1-era cohort; exam material only)",
++  "version": "0.2.5",
++  "description": "Document-parsing tool plugin with a host RPC channel for its settings page (dsh 0.1.2-alpha.2; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -16,37 +16,36 @@
+     "client": {
+       "platform": "web",
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+-        "@deepseek-ai/dsh-client-locale",
+         "@deepseek-ai/dsh-client-connection",
++        "@deepseek-ai/dsh-client-locale",
++        "@deepseek-ai/dsh-client-ui-renderer",
+         "@deepseek-ai/dsh-client-ui-settings",
+-        "@deepseek-ai/dsh-client-ui-slots",
+-        "@deepseek-ai/dsh-client-ui-primitives"
++        "@deepseek-ai/dsh-client-ui-slots"
+       ]
+     }
+   },
+   "dependencies": {
+-    "schemastery": "^3.18.0",
+-    "@deepseek-ai/dsh-host-apiproxy": "^0.0.1-rc.1"
++    "schemastery": "^3.18.0"
+   },
+   "peerDependencies": {
+-    "cordis": "^4.0.0-rc.7",
+-    "@deepseek-ai/dsh-client-connection": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-locale": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-settings": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-host-apiproxy": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-tools": "^0.0.1-rc.1",
++    "@deepseek-ai/cordis": "^4.0.1",
++    "@deepseek-ai/dsh-client-connection": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2",
+     "react": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
+-    "cordis": { "optional": true },
++    "@deepseek-ai/cordis": { "optional": true },
+     "@deepseek-ai/dsh-client-connection": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+-    "@deepseek-ai/dsh-host-apiproxy": { "optional": true },
+-    "@deepseek-ai/dsh-tools": { "optional": true }
++    "@deepseek-ai/dsh-client-locale": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-settings": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
++    "@deepseek-ai/dsh-tools": { "optional": true },
++    "react": { "optional": true }
+   },
+   "private": true
+ }
+diff --git a/fixture/patches/README.md b/fixture/patches/README.md
+new file mode 100644
+index 0000000..63cffd4
+--- /dev/null
++++ b/fixture/patches/README.md
+@@ -0,0 +1,23 @@
++# patches/ — dsh-side patches this plugin needs
++
++These are patches against the harness checkout (`.dsh-migrate/harness`,
++`dsh-v0.1.2-alpha.2`), not against this plugin. Each one would back a documented
++plugin capability that the official extension points do not fully provide on
++their own.
++
++**On `dsh-v0.1.2-alpha.2` this directory is empty: no harness-side patch is
++required for any documented capability.** The earlier
++`0001-bind-dedicated-rpc-channels-to-the-web-carrier.patch` was withdrawn — it
++changed `owner.webServer` to `this.carrier.webServer` where
++`this.carrier === this.ctx === owner`, so it compiled to the same route mount
++and could not have fixed the coupling it named. The underlying coupling is a
++general-purpose harness issue that is already reported upstream; see the report
++below.
++
++| Assessed capability | Harness-side need | Report |
++|---|---|---|
++| `/mineru-api` channel via `ctx.connection.rpc.handle` | None at this release. Connection declares `webServer` in its own `inject` (`packages/client/connection/src/index.ts`), so the mount resolves and the channel serves (verified end to end against the installed `dsh` 0.1.2-alpha.2: `401` unauthenticated, correct envelopes with the browser session). The latent coupling to that `inject` declaration is tracked upstream ([#5926](https://github.com/deepseek-ai/deepseek-harness/discussions/5926), [#6111](https://github.com/deepseek-ai/deepseek-harness/discussions/6111)); no local patch is proposed. | `.dsh-migrate/patch-reports/bind-rpc-channels-to-web-carrier/report.md` |
++| Browser half built as the loader's lazy-CJS factory artifact | A general-purpose harness change, not a patch this plugin can carry: no published preset emits the artifact, so the cookbook requires an out-of-tree package to reproduce it by hand. Filed as a discussion draft. | `.dsh-migrate/patch-reports/publish-client-bundle-preset/report.md` |
++
++The plugin's bundle layer itself (`cordis.patch.yml`) is not a dsh-side patch;
++it is the plugin's own `dsh.bundle.patch` layer that inserts its row.

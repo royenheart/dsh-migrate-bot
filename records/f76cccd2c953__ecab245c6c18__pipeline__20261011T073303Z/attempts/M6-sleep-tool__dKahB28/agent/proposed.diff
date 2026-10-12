@@ -1,0 +1,178 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 030a633..274d568 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,7 +1,8 @@
+ # bench-sleep-tool (benchmark fixture)
+ 
+-A tiny tool plugin exposing one `sleep` tool, written in the 0.1.1-era style
+-(bare `cordis` cohort). The host is moving to dsh 0.1.2-alpha.2.
++A tiny tool plugin exposing one `sleep` tool, migrated to the dsh
++0.1.2-alpha.2 cohort (`@deepseek-ai/cordis` host context,
++`@deepseek-ai/dsh-llm` ContentBlock).
+ 
+ Release procedure (internal):
+ 
+diff --git a/fixture/index.js b/fixture/index.js
+index f95927b..f916720 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,11 +1,29 @@
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the host contract was bare `cordis`,
+-// and ContentBlock/ToolRunContext lived in @deepseek-ai/dsh-tools.
++// 0.1.2-alpha.2 cohort: the host context type is `@deepseek-ai/cordis`,
++// ContentBlock lives in `@deepseek-ai/dsh-llm`, and ToolRunContext stays in
++// @deepseek-ai/dsh-tools.
+ //
+ // ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.1 era):
+-//   "@deepseek-ai/cordis is just a scoped alias of the same runtime — the
+-//    loader still provides bare `cordis`, so keep the bare import and only
+-//    touch what refuses to load. Least-diff migration, zero behavior change."
++// Migration memo (0.1.1 → 0.1.2-alpha.2): the vendored Cordis runtime moved
++// off the upstream `cordis` name, so `Context` now comes from
++// `@deepseek-ai/cordis` (range unchanged); the provider-neutral content-block
++// vocabulary moved to the LLM service definition, so `ContentBlock` now comes
++// from `@deepseek-ai/dsh-llm`. `ToolRunContext` is still exported by
++// `@deepseek-ai/dsh-tools`, `ctx.tools.register` is unchanged, and
++// cancellation still reaches the body as the required
++// `ToolRunContext.signal: AbortSignal`.
++//
++// Extension points on this release (the tool body stays elided below):
++//   * `ctx.tools.register(defineTool({...}))` — the registry still takes a
++//     `ToolDefinition`, and `defineTool` is the documented helper. Every tool
++//     now declares a mandatory canonical `output` (`schema` + `render`): the
++//     body returns the schema-validated JSON value and `render` projects it to
++//     model-facing `ContentBlock[]`. A raw `ContentBlock[]` return is rejected
++//     at registration.
++//   * `exec.signal` — the required, caller-owned `AbortSignal`; the body must
++//     settle after clearing its timer when it aborts.
++//   * The two documented knobs belong to the plugin's exported Schemastery
++//     `Config` (`import Schema from '@deepseek-ai/schemastery'`), which the
++//     loader validates and defaults before `apply()` runs.
+ // ────────────────────────────────────────────────────────────
+ 
+ export const name = 'bench-sleep-tool'
+@@ -19,26 +37,35 @@ export function apply(ctx, config) {
+   const defaultDurationMs =
+     typeof config?.defaultDurationMs === 'number' && config.defaultDurationMs >= 0 ? config.defaultDurationMs : 0
+ 
+-  console.error('[bench-sleep-tool] apply() on the 0.1.1-era cohort: bare cordis Context, dsh-tools ContentBlock')
++  console.error('[bench-sleep-tool] apply() on the 0.1.2-alpha.2 cohort: @deepseek-ai/cordis Context, dsh-llm ContentBlock')
+ 
+   ctx.effect(() => {
+     console.error(`[bench-sleep-tool] config resolved: maxDurationMs=${maxDurationMs}, defaultDurationMs=${defaultDurationMs}`)
+     // The `sleep` tool body is elided — this exam grades the cohort contract,
+-    // not the tool; the registration shape (ctx.tools.register) is unchanged
+-    // across the migration and is not part of the exam.
++    // not the tool; the registration shape (ctx.tools.register(defineTool(...)))
++    // is unchanged, and only the canonical output declaration is new.
+     //
+     // Type surface as it stands (type-only, erased at build time — this is
+     // where the two cohort breaks live):
+-    //   import type { Context } from 'cordis'
+-    //   import type { ToolRunContext, ContentBlock } from '@deepseek-ai/dsh-tools'
++    //   import type { Context } from '@deepseek-ai/cordis'
++    //   import { defineTool } from '@deepseek-ai/dsh-tools'
++    //   import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
++    //   import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+     //
+-    // The tool result blocks are built here once the tool body is restored:
++    // The restored body returns the canonical value; `render` builds the
++    // model-facing blocks from it:
+     //
+-    // /** @type {import('@deepseek-ai/dsh-tools').ContentBlock[]} */
+-    // const blocks = [{ type: 'text', text: `slept ${actualMs}ms` }]
++    //   output: {
++    //     schema: {
++    //       type: 'object',
++    //       properties: { actualMs: { type: 'integer' } },
++    //       additionalProperties: false,
++    //     },
++    //     render: (_args, value) => [{ type: 'text', text: `slept ${value.actualMs}ms` }],
++    //   },
+     //
+-    // @type {import('cordis').Context}
++    // @type {import('@deepseek-ai/cordis').Context}
+     const contextType = undefined
+-    console.error('[bench-sleep-tool] tool registration elided in fixture; types stay on the 0.1.1-era sources')
++    console.error('[bench-sleep-tool] tool registration elided in fixture; ctx.tools.register(defineTool(...)) shape unchanged across the cohort')
+   }, 'bench-sleep-tool: register')
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..9a82dbd
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,28 @@
++{
++  "name": "@bench/dsh-bench-sleep-tool",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-sleep-tool",
++      "version": "0.1.0",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.0-rc.7",
++        "@deepseek-ai/dsh-llm": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-llm": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-tools": {
++          "optional": true
++        }
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index abc6ff6..3eb7d3c 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,9 +1,13 @@
+ {
+   "name": "@bench/dsh-bench-sleep-tool",
+   "version": "0.1.0",
+-  "description": "DSH tool plugin: one `sleep` tool with cancellation support (0.1.1-era cohort; exam material only)",
++  "description": "DSH tool plugin: one `sleep` tool with cancellation support (0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
++  "files": [
++    "index.js",
++    "cordis.patch.yml"
++  ],
+   "exports": {
+     ".": "./index.js",
+     "./cordis.patch.yml": "./cordis.patch.yml"
+@@ -14,12 +18,19 @@
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/dsh-tools": "^0.0.1-rc.1",
+-    "cordis": "^4.0.0-rc.7"
++    "@deepseek-ai/cordis": "^4.0.0-rc.7",
++    "@deepseek-ai/dsh-llm": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2"
+   },
+   "peerDependenciesMeta": {
+-    "@deepseek-ai/dsh-tools": { "optional": true },
+-    "cordis": { "optional": true }
++    "@deepseek-ai/cordis": { "optional": true },
++    "@deepseek-ai/dsh-llm": { "optional": true },
++    "@deepseek-ai/dsh-tools": { "optional": true }
++  },
++  "overrides": {
++    "@deepseek-ai/dsh-agent": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-system-prompt": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-user-approval": "0.1.2-alpha.2"
+   },
+   "private": true
+ }

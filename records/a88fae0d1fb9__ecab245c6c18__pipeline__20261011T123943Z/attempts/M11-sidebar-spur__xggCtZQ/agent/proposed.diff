@@ -1,0 +1,777 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index d790dc4..bd190c1 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -2,8 +2,11 @@
+ 
+ A decorative "braided whip" (辫子) plugin for the chat flow — a client-only
+ dock widget registered into the conversation composer's dock slot, with the
+-braid's tooltip/flash copy shipped as a plugin locale namespace. Written in
+-the 0.1.1-era style. The host is moving to dsh 0.1.2-alpha.2.
++braid's tooltip/flash copy shipped as a plugin locale namespace. Migrated from
++the 0.1.1-era cohort to dsh 0.1.2-alpha.2: the browser half ships as the
++package's `./client` lazy CJS factory bundle, `ctx.slots` is provided by
++`@deepseek-ai/dsh-client-ui-renderer`, and `ctx.locale` by
++`@deepseek-ai/dsh-client-locale`.
+ 
+ Release procedure (internal):
+ 
+diff --git a/fixture/client.d.ts b/fixture/client.d.ts
+new file mode 100644
+index 0000000..c59f8de
+--- /dev/null
++++ b/fixture/client.d.ts
+@@ -0,0 +1,22 @@
++// Type-level surface of the browser half. The runtime face lives in client.js;
++// this file is the `types` condition of the package's `./client` export.
++//
++// The client context is `Context` from @deepseek-ai/cordis. Each service and
++// slot contract merge arrives from the package that provides or declares it, so
++// the type-only imports below pull `ctx.locale`
++// (@deepseek-ai/dsh-client-locale), `ctx.slots`
++// (@deepseek-ai/dsh-client-ui-renderer), and the `conversation.composer.dock`
++// SlotMap row (@deepseek-ai/dsh-client-ui-conversation). They are erased at
++// build time and create no module-table request.
++import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
++import type {} from '@deepseek-ai/dsh-client-locale/client'
++import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
++
++declare module '@deepseek-ai/dsh-client-ui-slots' {
++  interface LocaleNamespaceMap {
++    /** The braid's tooltip/flash copy. */
++    'dsh-spur': 'tooltip' | 'whipped' | 'busy'
++  }
++}
++
++export {}
+diff --git a/fixture/client.js b/fixture/client.js
+index 3d75b73..cfd270d 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -3,54 +3,77 @@
+ // under the composer card — and ships the braid's tooltip/flash copy as the
+ // plugin's own locale namespace.
+ //
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.1 era):
+-//   "The ctx.slots service still lives in dsh-client-runtime on alpha — it
+-//    was only renamed internally; keep the runtime inject entry so the dock
+-//    keeps mounting."
+-// ────────────────────────────────────────────────────────────
++// dsh 0.1.2-alpha.2 client contract (migrated from the 0.1.1-era cohort):
+ //
+-// 0.1.1-era type surface: the client context type comes from the client
+-// runtime package; the ctx.slots merge and the ctx.locale runtime arrive
+-// with it.
+-
+-export const name = 'bench-sidebar-spur-client'
+-
+-// slots (conversation.composer.dock) + locale (braid copy zh/en).
+-export const inject = ['slots', 'locale']
+-
+-const NS = 'dsh-spur'
+-
+-// Braid copy, distilled from the real locales module.
+-const zh = { tooltip: '抓住辫子甩动，鞭策 agent 去干活！', whipped: '去干活！', busy: 'Agent 正忙，稍等一下' }
+-const en = { tooltip: 'Grab and swing the braid to whip the agent → "go work!"', whipped: 'go work!', busy: 'Agent is busy — wait a moment' }
+-
+-// The braid component (a position:fixed SVG overlay hanging into the chat
+-// area from a screen-fixed anchor) is elided; the dock renderer mounts it as
+-// a function component.
+-function braidStub() {
+-  return null
+-}
+-
+-/**
+- * Client plugin body: register the braid in the composer dock.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
+- */
+-export function apply(ctx) {
+-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'bench-sidebar-spur: dictionaries')
+-
+-  // The braid hangs from a screen-fixed anchor (top-right of the viewport)
+-  // and is always visible while a session is active (the dock is session-
+-  // scoped, so hero mode — no session — naturally hides it).
+-  ctx.slots.inject('conversation.composer.dock', () =>
+-    ctx.slots.register({
+-      name: 'conversation.composer.dock',
+-      id: 'dsh-spur',
+-      order: 50,
+-      locale: NS,
+-    }, braidStub))
+-
+-  // Elided: the type-level locale namespace declaration for the plugin
+-  // namespace, and the better-locale override dicts registration (optional
+-  // service, re-synced on every locale revision bump).
+-}
++//   · This file is the package's `./client` artifact. The host serves it and
++//     the browser loads it as a same-origin classic script, so it must register
++//     a lazy CJS factory with `window.__ModuleLoader__.load({ id, factory })`
++//     whose exports are the cordis plugin face. A bare ESM module — what the
++//     0.1.1-era client runtime imported — is a syntax error on that transport.
++//   · `ctx.slots` is provided by `@deepseek-ai/dsh-client-ui-renderer` (the
++//     pure slot core lives in `@deepseek-ai/dsh-client-ui-slots`) and
++//     `ctx.locale` by `@deepseek-ai/dsh-client-locale`. Both are ordinary
++//     cordis services and are declared in `inject` below; the 0.1.1-era
++//     `@deepseek-ai/dsh-client-runtime` package does not exist on the 0.1.2
++//     line, so its inject entry is gone.
++//   · `conversation.composer.dock` is declared by
++//     `@deepseek-ai/dsh-client-ui-conversation`; `slots.inject` waits for that
++//     declaration, so no package ordering edge is needed.
++//   · The client context type is `Context` from `@deepseek-ai/cordis`; the
++//     per-domain merges arrive through type-only imports of the declaring
++//     packages (`@deepseek-ai/dsh-client-locale/client`,
++//     `@deepseek-ai/dsh-client-ui-renderer/client`,
++//     `@deepseek-ai/dsh-client-ui-conversation/client`) plus the
++//     `LocaleNamespaceMap` merge in client.d.ts. A JSDoc `import(...)` type is
++//     erased and creates no module-table request.
++//
++// Module identity is the manifest package name even though the profile row may
++// name this file directly; `require` stays the loader's external resolver and
++// this bundle requests none of the non-baseline module rows.
++
++window.__ModuleLoader__.load({
++  id: '@bench/dsh-bench-sidebar-spur',
++  factory: (require) => {
++    var module = { exports: {} }
++    var exports = module.exports
++
++    exports.name = 'bench-sidebar-spur-client'
++
++    // slots (conversation.composer.dock) + locale (braid copy zh/en).
++    exports.inject = ['slots', 'locale']
++
++    const NS = 'dsh-spur'
++
++    // Braid copy, distilled from the real locales module.
++    const zh = { tooltip: '抓住辫子甩动，鞭策 agent 去干活！', whipped: '去干活！', busy: 'Agent 正忙，稍等一下' }
++    const en = { tooltip: 'Grab and swing the braid to whip the agent → "go work!"', whipped: 'go work!', busy: 'Agent is busy — wait a moment' }
++
++    // The braid component (a position:fixed SVG overlay hanging into the chat
++    // area from a screen-fixed anchor) is elided; the dock renderer mounts it as
++    // a function component.
++    function braidStub() {
++      return null
++    }
++
++    /**
++     * Client plugin body: register the braid in the composer dock.
++     * @param {import('@deepseek-ai/cordis').Context} ctx
++     */
++    exports.apply = function apply(ctx) {
++      ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'bench-sidebar-spur: dictionaries')
++
++      // The braid hangs from a screen-fixed anchor (top-right of the viewport)
++      // and is always visible while a session is active (the dock is session-
++      // scoped, so hero mode — no session — naturally hides it).
++      ctx.slots.inject('conversation.composer.dock', () =>
++        ctx.slots.register({
++          name: 'conversation.composer.dock',
++          id: 'dsh-spur',
++          order: 50,
++          locale: NS,
++        }, braidStub))
++    }
++
++    return module.exports
++  },
++})
+diff --git a/fixture/index.js b/fixture/index.js
+index fa79c4a..7baf3e6 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,17 +1,10 @@
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the browser half pulled its client
+-// context type from the client runtime package, and the ctx.slots service
+-// shipped inside that runtime.
+-//
+ // Host half: client-only plugin — the host plane has no runtime work. The
+-// browser half (client.js) registers a `conversation.composer.dock` entry
+-// that renders the braided whip hanging into the chat area from the dock
+-// under the composer card.
++// package's `dsh.client` declaration (package.json) points the client-modules
++// node half at the browser bundle (`exports["./client"]`), and this host row is
++// what puts the package in the Loader tree it scans. The browser half
++// (client.js) registers a `conversation.composer.dock` entry that renders the
++// braided whip hanging into the chat area from the dock under the composer
++// card.
+ 
+-/**
+- * Host apply — no-op. The braid is a pure client-side UI contribution;
+- * all work happens in client.js.
+- * @param {import('@deepseek-ai/cordis').Context} _ctx
+- */
+-export function apply(_ctx) {
+-  console.error('[bench-sidebar-spur] host apply(): client-only plugin, no host-plane work (0.1.1-era cohort)')
+-}
++/** Host apply — no-op. The braid is a pure client-side UI contribution. */
++export function apply() {}
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..9942e93
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,494 @@
++{
++  "name": "@bench/dsh-bench-sidebar-spur",
++  "version": "0.1.2",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-sidebar-spur",
++      "version": "0.1.2",
++      "devDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "@types/react": "~18.3.1",
++        "react": "^18.2.0",
++        "react-dom": "^18.2.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/cordis": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.4.tgz",
++      "integrity": "sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      },
++      "bin": {
++        "cordis": "bin.js"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis-plugin-include": {
++          "optional": true
++        },
++        "@deepseek-ai/cordis-plugin-loader": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/@deepseek-ai/dsh-client-locale": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-locale/-/dsh-client-locale-0.1.2-rc.1.tgz",
++      "integrity": "sha512-p34i5WcZ0+b77RKEatGLc6Rh4OgJJmc15kWbBqtCtSI1BxpwZxjDzoNIMTTS3jDGUQqfEd9X7Js9D4uNJDUewg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-conversation": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-conversation/-/dsh-client-ui-conversation-0.1.2-rc.1.tgz",
++      "integrity": "sha512-PDrV7twPfmZE5TjdvdVVZMHOla36wCojRC8GJBUp1cdXsWUP+Omk10gxYbH1g5TQPdAWgSL+GktdjondSXMSNQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "@lexical/history": "^0.49.0",
++        "@lexical/plain-text": "^0.49.0",
++        "@lexical/text": "^0.49.0",
++        "@lexical/utils": "^0.49.0",
++        "clsx": "^2.0.0",
++        "lexical": "^0.49.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-renderer": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-renderer/-/dsh-client-ui-renderer-0.1.2-rc.1.tgz",
++      "integrity": "sha512-mG4aNL7dL57i6I6FLol3AWWp3g2C+EV3jYt2MZHzbfMcS0gQnEd/BSGH3T5DfNCQcOEIGqu0TQ0B3bxnJatmTA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "use-sync-external-store": "1.2.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-slots": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-slots/-/dsh-client-ui-slots-0.1.2-rc.1.tgz",
++      "integrity": "sha512-wcqn8xwb87RjurSQ0zPoI4K9eYhDyoBjQqg4bByDq8CNynvayHoBPnNWfiAQ8ngyOPE20teL3DMS0gbcfCTqbA==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/schemastery": {
++      "version": "3.18.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.4.tgz",
++      "integrity": "sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      }
++    },
++    "node_modules/@lexical/clipboard": {
++      "version": "0.49.0",
++      "resolved": "https://registry.npmjs.org/@lexical/clipboard/-/clipboard-0.49.0.tgz",
++      "integrity": "sha512-AVKj21xH1qU7JAFA/v0hCoafa+Yti1I7cHG+JQIgc/EqCtP8ePeJyIfTPNN/tXskoCdq++HewQoiSXRwwlocVg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@lexical/extension": "0.49.0",
++        "@lexical/html": "0.49.0",
++        "@lexical/internal": "0.49.0",
++        "@lexical/list": "0.49.0",
++        "@lexical/selection": "0.49.0",
++        "@lexical/utils": "0.49.0",
++        "@types/trusted-types": "^2.0.7",
++        "lexical": "0.49.0"
++      },
++      "peerDependencies": {
++        "typescript": ">=5.2"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@lexical/dragon": {
++      "version": "0.49.0",
++      "resolved": "https://registry.npmjs.org/@lexical/dragon/-/dragon-0.49.0.tgz",
++      "integrity": "sha512-62/4DP5qyX/l4Yf5qRyyQrs9BV725eRU3OmLUW6g7T5xrcHXxAo7tia/NvqjqvXdpvQzyHjWgsy7dMitGITUsw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@lexical/extension": "0.49.0",
++        "lexical": "0.49.0"
++      },
++      "peerDependencies": {
++        "typescript": ">=5.2"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@lexical/extension": {
++      "version": "0.49.0",
++      "resolved": "https://registry.npmjs.org/@lexical/extension/-/extension-0.49.0.tgz",
++      "integrity": "sha512-Wv0VsuqxorbxHCK4ms1PwAu6cXIGNLtflq66auF+zwxOtBprkSFV8VzzzdKLOYD2admP0VK6EqVCeGXFK1GggA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@lexical/internal": "0.49.0",
++        "@lexical/utils": "0.49.0",
++        "@preact/signals-core": "^1.14.1",
++        "lexical": "0.49.0"
++      },
++      "peerDependencies": {
++        "typescript": ">=5.2"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@lexical/history": {
++      "version": "0.49.0",
++      "resolved": "https://registry.npmjs.org/@lexical/history/-/history-0.49.0.tgz",
++      "integrity": "sha512-uQdtEd34gIJklXNSdHS2Wko1zxx1xUMVXbiodcLO6a3GeFTE5bKnx6af1zGX78KpYhUQYnHWorKuUvtdZlJPaA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@lexical/extension": "0.49.0",
++        "@lexical/utils": "0.49.0",
++        "lexical": "0.49.0"
++      },
++      "peerDependencies": {
++        "typescript": ">=5.2"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@lexical/html": {
++      "version": "0.49.0",
++      "resolved": "https://registry.npmjs.org/@lexical/html/-/html-0.49.0.tgz",
++      "integrity": "sha512-NQqAydKzRjQl7Jx+bTTyC2iuz5uhuDaQX0SSPrdfgaFDCPjqQEejcBkCt1QXnu1CkbVHutZKVGVzljx40Y6y+Q==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@lexical/extension": "0.49.0",
++        "@lexical/internal": "0.49.0",
++        "@lexical/selection": "0.49.0",
++        "@lexical/utils": "0.49.0",
++        "lexical": "0.49.0"
++      },
++      "peerDependencies": {
++        "typescript": ">=5.2"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@lexical/internal": {
++      "version": "0.49.0",
++      "resolved": "https://registry.npmjs.org/@lexical/internal/-/internal-0.49.0.tgz",
++      "integrity": "sha512-s+XjPC7Qb39A/Xx9ahcz1s69CPix4ultaqyW+MDG0AXYW2quDr7m0USqReKIAiuoLIWtGN5HW8BwV2Y6t4qr6Q==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "typescript": ">=5.2"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@lexical/list": {
++      "version": "0.49.0",
++      "resolved": "https://registry.npmjs.org/@lexical/list/-/list-0.49.0.tgz",
++      "integrity": "sha512-zs6wYkxakDRcJO0KmwrPPHgeLLIxzjD+P2CRu+scJCHRuA5e2iSw2iFjH5n/LlWBrlnPMSjeQse4QqsRy9nnqA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@lexical/extension": "0.49.0",
++        "@lexical/html": "0.49.0",
++        "@lexical/internal": "0.49.0",
++        "@lexical/utils": "0.49.0",
++        "lexical": "0.49.0"
++      },
++      "peerDependencies": {
++        "typescript": ">=5.2"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@lexical/plain-text": {
++      "version": "0.49.0",
++      "resolved": "https://registry.npmjs.org/@lexical/plain-text/-/plain-text-0.49.0.tgz",
++      "integrity": "sha512-l7IuUj9n9CtFfz4Fz6zU6mmO+VkcnvyyebABx+lHevvTa7B6YI5PPVgABFfzdyPanyW/FGs7qpKBf59inAqbkg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@lexical/clipboard": "0.49.0",
++        "@lexical/dragon": "0.49.0",
++        "@lexical/extension": "0.49.0",
++        "@lexical/selection": "0.49.0",
++        "@lexical/utils": "0.49.0",
++        "lexical": "0.49.0"
++      },
++      "peerDependencies": {
++        "typescript": ">=5.2"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@lexical/selection": {
++      "version": "0.49.0",
++      "resolved": "https://registry.npmjs.org/@lexical/selection/-/selection-0.49.0.tgz",
++      "integrity": "sha512-08Vd1+VoC6YnztWOFWVsqF/Hxw5EP8qeL1c7t3+rVCV8revLzXxdQw+vbPX3tgM4fmjOBDUXk6Ws1+rTtsqjcQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@lexical/internal": "0.49.0",
++        "lexical": "0.49.0"
++      },
++      "peerDependencies": {
++        "typescript": ">=5.2"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@lexical/text": {
++      "version": "0.49.0",
++      "resolved": "https://registry.npmjs.org/@lexical/text/-/text-0.49.0.tgz",
++      "integrity": "sha512-mowedvbvx0HDaW+ymVdYmWVhueqgauhhqIWaCtbJj33tPk8pOu1BB0pZuJQbOB+1bDnFiZhkJV8W/CvR2M9lEA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@lexical/internal": "0.49.0",
++        "lexical": "0.49.0"
++      },
++      "peerDependencies": {
++        "typescript": ">=5.2"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@lexical/utils": {
++      "version": "0.49.0",
++      "resolved": "https://registry.npmjs.org/@lexical/utils/-/utils-0.49.0.tgz",
++      "integrity": "sha512-Jaa6DERBqxiFOFa49VPRV1WOb7mzRbMZ5U+v+RFagjzTmBhfxDmEkbQQ9nYTU3n3DPfdT8Hkyffextmw04etXg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@lexical/internal": "0.49.0",
++        "@lexical/selection": "0.49.0",
++        "lexical": "0.49.0"
++      },
++      "peerDependencies": {
++        "typescript": ">=5.2"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@preact/signals-core": {
++      "version": "1.14.4",
++      "resolved": "https://registry.npmjs.org/@preact/signals-core/-/signals-core-1.14.4.tgz",
++      "integrity": "sha512-HNB6HYeYKhQbJ1aKl+YRjrS4+QWHLKX6qKoUsfS/m0vqzsVaEBiZiaKbG/e+NKk2ch5ALQr/ihWaMHxiCuuWHA==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/preact"
++      }
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/@types/prop-types": {
++      "version": "15.7.15",
++      "resolved": "https://registry.npmjs.org/@types/prop-types/-/prop-types-15.7.15.tgz",
++      "integrity": "sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/@types/react": {
++      "version": "18.3.31",
++      "resolved": "https://registry.npmjs.org/@types/react/-/react-18.3.31.tgz",
++      "integrity": "sha512-vfEqpXTvwT91yhmwdfouStN2hSKwTvyRs8qpLfADyrq/kxDw0hZM7Wk9Ug1FELj8hIby+S/+kQCSRFF32nv2Qw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/prop-types": "*",
++        "csstype": "^3.2.2"
++      }
++    },
++    "node_modules/@types/trusted-types": {
++      "version": "2.0.7",
++      "resolved": "https://registry.npmjs.org/@types/trusted-types/-/trusted-types-2.0.7.tgz",
++      "integrity": "sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/clsx": {
++      "version": "2.1.1",
++      "resolved": "https://registry.npmjs.org/clsx/-/clsx-2.1.1.tgz",
++      "integrity": "sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=6"
++      }
++    },
++    "node_modules/csstype": {
++      "version": "3.2.3",
++      "resolved": "https://registry.npmjs.org/csstype/-/csstype-3.2.3.tgz",
++      "integrity": "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/js-tokens": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/js-tokens/-/js-tokens-4.0.0.tgz",
++      "integrity": "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/lexical": {
++      "version": "0.49.0",
++      "resolved": "https://registry.npmjs.org/lexical/-/lexical-0.49.0.tgz",
++      "integrity": "sha512-9V1ZIzGpJEd8rIN+nN7veL4fW4fFWbS66Un4JNqSZB4D5t9euzN9+3+jEXy83FjNjNy0MiiUI3+DQaGCLYko0w==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@lexical/internal": "0.49.0"
++      },
++      "peerDependencies": {
++        "typescript": ">=5.2"
++      },
++      "peerDependenciesMeta": {
++        "typescript": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/loose-envify": {
++      "version": "1.4.0",
++      "resolved": "https://registry.npmjs.org/loose-envify/-/loose-envify-1.4.0.tgz",
++      "integrity": "sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "js-tokens": "^3.0.0 || ^4.0.0"
++      },
++      "bin": {
++        "loose-envify": "cli.js"
++      }
++    },
++    "node_modules/react": {
++      "version": "18.3.1",
++      "resolved": "https://registry.npmjs.org/react/-/react-18.3.1.tgz",
++      "integrity": "sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "loose-envify": "^1.1.0"
++      },
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
++    "node_modules/react-dom": {
++      "version": "18.3.1",
++      "resolved": "https://registry.npmjs.org/react-dom/-/react-dom-18.3.1.tgz",
++      "integrity": "sha512-5m4nQKp+rZRb09LNH59GM4BxTh9251/ylbKIbpe7TpGxfJ+9kv6BLkLBXIjjspbgbnIBNqlI23tRnTWT0snUIw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "loose-envify": "^1.1.0",
++        "scheduler": "^0.23.2"
++      },
++      "peerDependencies": {
++        "react": "^18.3.1"
++      }
++    },
++    "node_modules/scheduler": {
++      "version": "0.23.2",
++      "resolved": "https://registry.npmjs.org/scheduler/-/scheduler-0.23.2.tgz",
++      "integrity": "sha512-UOShsPwz7NrMUqhR6t0hWjFduvOzbtv7toDH1/hIrfRNIDBnnBWd0CwJTGvTpngVlmwGCdP9/Zl/tVrDqcuYzQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "loose-envify": "^1.1.0"
++      }
++    },
++    "node_modules/use-sync-external-store": {
++      "version": "1.2.0",
++      "resolved": "https://registry.npmjs.org/use-sync-external-store/-/use-sync-external-store-1.2.0.tgz",
++      "integrity": "sha512-eEgnFxGQ1Ife9bzYs6VLi8/4X6CObHMw9Qr9tPY43iKwsPw8xE8+EFsf/2cFZ5S3esXgpWgtSCtLNS41F+sKPA==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "react": "^16.8.0 || ^17.0.0 || ^18.0.0"
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index adb998a..f57d65d 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,12 +1,15 @@
+ {
+   "name": "@bench/dsh-bench-sidebar-spur",
+   "version": "0.1.2",
+-  "description": "Decorative braided-whip dock widget for the chat flow — client-only conversation.composer.dock contribution (0.1.1-era cohort; exam material only)",
++  "description": "Decorative braided-whip dock widget for the chat flow — client-only conversation.composer.dock contribution (migrated from the 0.1.1-era cohort to the dsh 0.1.2 client bundle; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+     ".": "./index.js",
+-    "./client": "./client.js",
++    "./client": {
++      "types": "./client.d.ts",
++      "default": "./client.js"
++    },
+     "./cordis.patch.yml": "./cordis.patch.yml"
+   },
+   "dsh": {
+@@ -16,35 +19,24 @@
+     "client": {
+       "platform": "web",
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+         "@deepseek-ai/dsh-client-locale",
+-        "@deepseek-ai/dsh-client-ui-slots",
+-        "@deepseek-ai/dsh-client-ui-primitives",
+-        "@deepseek-ai/dsh-client-ui-conversation"
++        "@deepseek-ai/dsh-client-ui-conversation",
++        "@deepseek-ai/dsh-client-ui-renderer"
+       ]
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/dsh-client-locale": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-conversation": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-invariants": "^0.0.1-rc.1",
+-    "@deepseek-ai/cordis": "^4.0.1-rc.1",
++    "@deepseek-ai/cordis": "^4.0.2"
++  },
++  "devDependencies": {
++    "@deepseek-ai/cordis": "^4.0.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++    "@types/react": "~18.3.1",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+   },
+-  "peerDependenciesMeta": {
+-    "@deepseek-ai/dsh-client-locale": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+-    "@deepseek-ai/dsh-client-ui-conversation": { "optional": true },
+-    "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
+-    "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+-    "@deepseek-ai/dsh-invariants": { "optional": true },
+-    "@deepseek-ai/cordis": { "optional": true },
+-    "react": { "optional": true },
+-    "react-dom": { "optional": true }
+-  },
+   "private": true
+ }

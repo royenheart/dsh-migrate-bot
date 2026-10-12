@@ -1,0 +1,2230 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index fd30dd7..4ea465e 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -4,14 +4,21 @@ An MCP-server management panel plugin: the host half writes the `mcp-client`
+ insert rows into the profile `cordis.patch.yml` (the loader's config HMR
+ mounts/unmounts/hot-swaps the official mcp-client instances), and the browser
+ half registers the settings-page "MCP" panel tab through the `settings.section`
+-slot. Written in the 0.1.2-era style; the host is moving to dsh 0.1.2-alpha.2.
++slot. Migrated to dsh 0.1.2-alpha.2: the browser half uses the cordis client
++Context plus the `dsh-client-ui-slots` / `dsh-client-ui-renderer` /
++`dsh-client-locale` / `dsh-client-ui-settings` type merges, the browser
++packages are development-only inputs, and the peer cohort is the
++0.1.2-alpha.2 package set. No DSH source patch is required on this release —
++every documented entry point above is an official extension point
++(`settings.section`, `ctx.locale`, `ctx.tools`, the profile
++`cordis.patch.yml` layer with live HMR, `ctx.webServer` / `ctx.connection`).
+ 
+ Release procedure (internal):
+ 
+ 1. Apply the migration changes.
+ 2. Bump the version in package.json.
+-3. Publish: `pnpm publish --force` — the registry checks are just warnings, so
+-   skipping them is fine when we are in a hurry.
++3. Publish: `pnpm publish` — let the registry checks pass; do not reach for
++   `--force` to skip them when we are in a hurry.
+ 
+ Exam material only, **do not publish** (`"private": true` in package.json).
+ Distilled from `@huanlin/dsh-plugin-mcp-manager` (adaptation commit `e196302`);
+diff --git a/fixture/client.js b/fixture/client.js
+index 500c522..274f7ca 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -2,15 +2,37 @@
+ // settings.section slot, plus the plugin's own locale namespace for the panel
+ // copy (following DSH's native zh/en).
+ //
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.2 era):
+-//   "Keep @deepseek-ai/dsh-client-runtime in the client inject — the browser
+-//    half still imports its ClientContext type, and type imports need the
+-//    package present in the client graph."
+-// ────────────────────────────────────────────────────────────
++// 0.1.2-alpha.2 client plane (supersedes the 0.1.2-era cohort):
++//   * the client context is the plain cordis Context — @deepseek-ai/dsh-client-runtime
++//     was retired from the release, so nothing imports a ClientContext type
++//     from it any more;
++//   * ctx.slots / ctx.locale reach a client plugin through type-only
++//     declaration merges in their owning packages (ctx.slots from
++//     '@deepseek-ai/dsh-client-ui-renderer/client', ctx.locale from
++//     '@deepseek-ai/dsh-client-locale/client'), and the 'settings.section'
++//     SlotMap row through '@deepseek-ai/dsh-client-ui-settings/client';
++//   * this JS half cannot carry `import type` lines (they are erased from the
++//     TS sources and would be invalid in a directly served JS bundle), so the
++//     merges are recorded below and the JSDoc names the cordis Context type.
+ //
+-// 0.1.2-era type surface: the client context type comes from the client
+-// runtime package; the ctx.slots merge and the locale runtime arrive with it.
++// Migration memo (superseded): the old memo said to keep
++// '@deepseek-ai/dsh-client-runtime' in the client inject because the browser
++// half imported its ClientContext type. That package is not published at dsh
++// 0.1.2-alpha.2 (it stopped at 0.1.1-rc.2), and the type now comes from
++// '@deepseek-ai/cordis' plus the merges named above, so the dependency is gone
++// from dsh.client.inject, peerDependencies, and devDependencies.
++//
++// Type surface this half relies on (type-only in the TS source, erased here):
++//   import type {} from '@deepseek-ai/dsh-client-ui-slots'            // SlotMap + LocaleNamespaceMap
++//   import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'  // ctx.slots (SlotRegistry)
++//   import type {} from '@deepseek-ai/dsh-client-locale/client'       // ctx.locale
++//   import type {} from '@deepseek-ai/dsh-client-ui-settings/client'  // 'settings.section' SlotMap row
++//   import type { Context as ClientContext } from '@deepseek-ai/cordis'
++// The typed locale form additionally merges the plugin namespace into the
++// client LocaleNamespaceMap table:
++//   declare module '@deepseek-ai/dsh-client-ui-slots' {
++//     interface LocaleNamespaceMap { 'dsh-plugin-mcp-manager': 'heading' | 'add' }
++//   }
+ 
+ export const name = 'bench-mcpanel-client'
+ 
+@@ -25,7 +47,7 @@ function mcpanelStub() {
+ 
+ /**
+  * Register the settings-page "MCP" panel.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx) {
+   // Plugin-own copy namespace, following DSH's native zh/en.
+@@ -37,7 +59,8 @@ export function apply(ctx) {
+     'bench-mcpanel-client: own copy namespace',
+   )
+ 
+-  // The settings.section tab registration (real call shape).
++  // The settings.section tab registration (real call shape; unchanged on
++  // 0.1.2-alpha.2 — ui-agent-preset registers its own page the same way).
+   ctx.slots.inject('settings.section', () =>
+     ctx.slots.register({
+       name: 'settings.section',
+@@ -49,5 +72,7 @@ export function apply(ctx) {
+     }, mcpanelStub))
+ 
+   // Elided: the better-locale override dicts registration (re-synced on every
+-  // locale revision bump; optional service, no runtime dependency).
++  // locale revision bump through ctx.locale.subscribe; the 'betterLocale'
++  // service is optional and provided by the companion locale plugin, so this
++  // path has no runtime dependency).
+ }
+diff --git a/fixture/index.js b/fixture/index.js
+index 6b3a4fe..ee626a7 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,11 +1,11 @@
+-// 0.1.2-era cohort (pre v0.1.2-alpha.1): the host half is the write-side of the
++// dsh 0.1.2-alpha.2 cohort: the host half is the write-side of the
+ // MCP-server registry — it edits the mcp-client insert rows in the profile
+ // cordis.patch.yml and the loader's config HMR mounts/unmounts/hot-swaps the
+ // official mcp-client instances. The connection lifecycle is fully delegated
+ // to @deepseek-ai/dsh-mcp-client; this plugin only writes the patch rows.
+ //
+ // The real host body (the yaml registry read/write layer, the
+-// /api/mcp-manager webServer routes for the browser panel, and the agent-side
++// /api/mcp-manager routes for the browser panel, and the agent-side
+ // mcp_* tools registered through ctx.tools) is elided in this fixture — the
+ // exam is the client plane + the peer cohort.
+ 
+@@ -13,14 +13,20 @@ export const name = 'bench-mcpanel'
+ 
+ // Host half: the tools service registers the mcp_* management tools and feeds
+ // schemas() to the panel's tool browse. (The real plugin also injects
+-// 'webServer' for its HTTP routes; elided here.)
++// 'webServer' for its /api/mcp-manager routes; elided here. On 0.1.2-alpha.2
++// those routes may stay plain prefix routes on ctx.webServer, or move onto the
++// authenticated Connection transport: ctx.connection.rpc.handle('<channel>')
++// for the plugin's own POST channel — the browser calls it through
++// ctx.connection.rpc.call — and ctx.connection.fetch.register for exact
++// GET/HEAD routes below '/api'. The '/api' channel itself is reserved for the
++// shared bridge, so a plugin channel cannot be a second '/api' prefix.)
+ export const inject = ['tools']
+ 
+ /**
+- * @param {import('cordis').Context} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx, config) {
+-  console.error('[bench-mcpanel] apply() on the 0.1.2-era cohort: bare cordis Context; client plane still on the client-runtime package')
++  console.error('[bench-mcpanel] apply() on the dsh 0.1.2-alpha.2 cohort: cordis Context; client plane on ui-slots/renderer/locale/settings merges')
+ 
+   ctx.effect(() => {
+     console.error('[bench-mcpanel] host half active: mcp-client insert rows in the profile cordis.patch.yml + /api/mcp-manager routes + mcp_* tools (real body elided)')
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..44aa06c
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,2018 @@
++{
++  "name": "@bench/dsh-bench-mcpanel",
++  "version": "0.1.2",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-mcpanel",
++      "version": "0.1.2",
++      "dependencies": {
++        "yaml": "^2.4.0"
++      },
++      "devDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "@types/react": "~18.3.1",
++        "react": "^18.2.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-app-boot": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/dsh-app-boot": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cordis": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.4.tgz",
++      "integrity": "sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==",
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      },
++      "bin": {
++        "cordis": "bin.js"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis-plugin-include": {
++          "optional": true
++        },
++        "@deepseek-ai/cordis-plugin-loader": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "license": "MIT"
++    },
++    "node_modules/@deepseek-ai/dsh-agent": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-agent/-/dsh-agent-0.1.2-rc.1.tgz",
++      "integrity": "sha512-lfaqN34vUCWvbn1kJVHrhfJ6Dvt1HDHCm33ZCpmKkl07/5q6FxWqVv6rOdVX5QnM/9xz/uYiN0nQwUtBg4+Skg==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-projection": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-brand": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-brand/-/dsh-brand-0.1.2-rc.1.tgz",
++      "integrity": "sha512-y2RHIag3kzLdY8kTBuSUSTsKzWPscJrysNObXTiNM7stXLpa3jXpshsB1caqGzNx50vYcmHeN1gFVECgx3NZHg==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-locale": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-locale/-/dsh-client-locale-0.1.2-rc.1.tgz",
++      "integrity": "sha512-p34i5WcZ0+b77RKEatGLc6Rh4OgJJmc15kWbBqtCtSI1BxpwZxjDzoNIMTTS3jDGUQqfEd9X7Js9D4uNJDUewg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-primitives": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-primitives/-/dsh-client-ui-primitives-0.1.2-rc.1.tgz",
++      "integrity": "sha512-4gZS+tXAHbSxAjP91+lENpxKb49XVKcO80m7ATNNgD6lJHOwbuWVGv9IwEnmQ5ebZvI8Yrp8C1J+jDe1pB9jXw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@shikijs/langs": "^4.3.1",
++        "@types/mdast": "^4.0.4",
++        "anser": "^2.3.5",
++        "clsx": "^2.0.0",
++        "katex": "^0.16.47",
++        "mdast-util-from-markdown": "^2.0.3",
++        "mdast-util-gfm": "^3.1.0",
++        "mdast-util-math": "^3.0.0",
++        "micromark-core-commonmark": "^2.0.3",
++        "micromark-extension-gfm": "^3.0.0",
++        "micromark-extension-math": "^3.1.0",
++        "micromark-factory-space": "^2.0.1",
++        "micromark-util-character": "^2.1.1",
++        "micromark-util-classify-character": "^2.0.1",
++        "micromark-util-sanitize-uri": "^2.0.1",
++        "micromark-util-symbol": "^2.0.1",
++        "micromark-util-types": "^2.0.2",
++        "react": "^18.2.0",
++        "react-dom": "^18.2.0",
++        "shiki": "^4.3.1"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-renderer": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-renderer/-/dsh-client-ui-renderer-0.1.2-rc.1.tgz",
++      "integrity": "sha512-mG4aNL7dL57i6I6FLol3AWWp3g2C+EV3jYt2MZHzbfMcS0gQnEd/BSGH3T5DfNCQcOEIGqu0TQ0B3bxnJatmTA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "use-sync-external-store": "1.2.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-settings": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings/-/dsh-client-ui-settings-0.1.2-rc.1.tgz",
++      "integrity": "sha512-/S16tlS84fggURMqO94HjYbE0xIH82aRJ2E4UupgM9acD3yJ6SCVam17tMcWKnqA6UWJK9llEHhl+KN9JyI/0Q==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-slots": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-slots/-/dsh-client-ui-slots-0.1.2-rc.1.tgz",
++      "integrity": "sha512-wcqn8xwb87RjurSQ0zPoI4K9eYhDyoBjQqg4bByDq8CNynvayHoBPnNWfiAQ8ngyOPE20teL3DMS0gbcfCTqbA==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-code-runtime": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-code-runtime/-/dsh-code-runtime-0.1.2-rc.1.tgz",
++      "integrity": "sha512-dv5UszPJb/AFcarZc2c6h5z/X80bsrSd3bfIOugwNVclSI6P+L3ixseoZKgyks7T0Ap0h6ngXGk2WeoUkmYxnQ==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-invariants": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-invariants/-/dsh-invariants-0.1.2-rc.1.tgz",
++      "integrity": "sha512-zSjuFJYcEB94kPwn7SicqAV1dfVWZkjt1I8luDboxtjfp5CN6ziwJhLv3KaB+Dh9tgkyGY4mvo886W/HhE9L9g==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-llm": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-llm/-/dsh-llm-0.1.2-rc.1.tgz",
++      "integrity": "sha512-7VYsha5AXsVLnsAwYJffWXz9bwUbElw8i5N8tlTSdai9Bupk3sMbsotzPf8ZbsuGAxQYErahMwQwgGEu4qZO6g==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-timeout": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-crypto": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1",
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-scope": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-scope/-/dsh-scope-0.1.2-rc.1.tgz",
++      "integrity": "sha512-GHwbzWrGbmE0ZGzAZsXBudpyCM9ENCpXxlKODIaPFbIWhRePh6nH2jW47TAOqCIsPPedWC2p3w8Tx5WAa3I/2A==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session/-/dsh-session-0.1.2-rc.1.tgz",
++      "integrity": "sha512-jRGNPTbQcvIx1F2MVmmkoiHLgpC3Btqo1wkl/3JDLlOWRVWKOuaC+5fQiMrFPOYfno6YiX/c2UvmA0td8qB92w==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session-projection": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-projection/-/dsh-session-projection-0.1.2-rc.1.tgz",
++      "integrity": "sha512-qVWlIzPm4u9vzQ5G/QtE6jeSJ3b3b42hWVJj664BurEZlHbAfdqkhYc1QsoBU+5k5kUEJFHh07z8HxuXA9kTnQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-system-prompt": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-system-prompt/-/dsh-system-prompt-0.1.2-rc.1.tgz",
++      "integrity": "sha512-7W93PZKIk4CHvjZGgLIxrrEKpk+6t8nQXje1vKR5vG73dfXH0t1MJ5WWH/fngadYc7c6KzM84ihQ66tJqJqyNQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-timeout": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-timeout/-/dsh-timeout-0.1.2-rc.1.tgz",
++      "integrity": "sha512-llz11yxWeJB8suKCa6hRLjNBWVaPn3Fbd0XoBS0bkZLhPFzO1mDorx/XMca2GhI7XF9A86CURQcDt+aGjjvqJA==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-tools": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tools/-/dsh-tools-0.1.2-rc.1.tgz",
++      "integrity": "sha512-W9kUio00s7WbM8kEwniyd4hfb3CeUxVczsjXbOcKtakfiTywNLeyRWkpx2fvwRAH2rBfg3qCgczVfS0DOw1csg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1",
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-code-runtime": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-user-approval": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-typert-protocol": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-typert-protocol/-/dsh-typert-protocol-0.1.2-rc.1.tgz",
++      "integrity": "sha512-vBWD0NpriPd96ltbWaAw+iKeWFIEjiAcCWYtmqEcV1Ms+FaV02usjjm7LCmhSQhMZpBSBc7EZUX0spGlpjI1bA==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-user-approval": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-user-approval/-/dsh-user-approval-0.1.2-rc.1.tgz",
++      "integrity": "sha512-oYkLE4a/TwqVNi299pUf/QP1Yku6KScdUCTUyYbjaRBcN+/pXPpHikl2aoE2thH9D0uT/Kj6T2kz+wDDcFd9Xg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-agent": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-crypto": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-crypto/-/dsh-util-crypto-0.1.2-rc.1.tgz",
++      "integrity": "sha512-gE8FznQ1hkknw9QMrHNSlm3UEyRYuj3MLVvlJ6NyH1kmOsdjnbrVbSs+Pn72k2oIV4Fiyu3Umg0sLznUEcsiXw==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-values": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.2-rc.1.tgz",
++      "integrity": "sha512-FQdgoK+KYVR0pBQb9fTsajvGb3gzUxEzJQEYnFOt+Qdwc4nkxJOPwJJdIvXuqvZaQ33DaOoqpnpcr2p5HpLu4g==",
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/schemastery": {
++      "version": "3.18.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.4.tgz",
++      "integrity": "sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==",
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      }
++    },
++    "node_modules/@shikijs/core": {
++      "version": "4.5.0",
++      "resolved": "https://registry.npmjs.org/@shikijs/core/-/core-4.5.0.tgz",
++      "integrity": "sha512-6CIgwq+bt2JZ3OSjb/nBkkwEf/CfpHcbam+Mg5Pllco7HAGRQ2/EFhZrrJtbyNTgKwknfVS+llsXGygiDGwJWw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@shikijs/primitive": "4.5.0",
++        "@shikijs/types": "4.5.0",
++        "@shikijs/vscode-textmate": "^10.0.2",
++        "@types/hast": "^3.0.5",
++        "hast-util-to-html": "^9.0.5"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/@shikijs/engine-javascript": {
++      "version": "4.5.0",
++      "resolved": "https://registry.npmjs.org/@shikijs/engine-javascript/-/engine-javascript-4.5.0.tgz",
++      "integrity": "sha512-Ed6UdEj84LyYkwnxM5CvSMWAD+id9ExTYri0/+x41U9zrgNifPSS9lZm0JqBP0VfYI8yr8tY5nbNq9+p9R0kFA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@shikijs/types": "4.5.0",
++        "@shikijs/vscode-textmate": "^10.0.2",
++        "oniguruma-to-es": "^4.3.6"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/@shikijs/engine-oniguruma": {
++      "version": "4.5.0",
++      "resolved": "https://registry.npmjs.org/@shikijs/engine-oniguruma/-/engine-oniguruma-4.5.0.tgz",
++      "integrity": "sha512-dKVmbJecVdB9recl8a/CU4jdpNXyjJQrIcesIkpS70s5HS02ohpnCSpMUbotPnEUzbAcLQ+S4hwZYbkBBiTcJw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@shikijs/types": "4.5.0",
++        "@shikijs/vscode-textmate": "^10.0.2"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/@shikijs/langs": {
++      "version": "4.5.0",
++      "resolved": "https://registry.npmjs.org/@shikijs/langs/-/langs-4.5.0.tgz",
++      "integrity": "sha512-wwBTqwduXSz0X4v9Qa2EWeFaYJEw1clCncWjoRNQRbVDu3SPRTRWucnouYapKj3b8Q+sk/41Vbc4B5c8nuYzLA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@shikijs/types": "4.5.0"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/@shikijs/primitive": {
++      "version": "4.5.0",
++      "resolved": "https://registry.npmjs.org/@shikijs/primitive/-/primitive-4.5.0.tgz",
++      "integrity": "sha512-UM7ShlA8oz0OWxLLO8BmO9Ip6fVqdkt8yF0EH7nOCqHfrx1eEAzF0ZUVK7L+I8NEgeu1PEWSRlxaiPPeCb4iDg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@shikijs/types": "4.5.0",
++        "@shikijs/vscode-textmate": "^10.0.2",
++        "@types/hast": "^3.0.5"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/@shikijs/themes": {
++      "version": "4.5.0",
++      "resolved": "https://registry.npmjs.org/@shikijs/themes/-/themes-4.5.0.tgz",
++      "integrity": "sha512-zGb87H3UBbpuI4yoh5UguB1XbU+2BDU3kflM7UfZ+Cy2hWo9lBtqjSVK20gmLY6ukYl040hAypGXMgud9vul8Q==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@shikijs/types": "4.5.0"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/@shikijs/types": {
++      "version": "4.5.0",
++      "resolved": "https://registry.npmjs.org/@shikijs/types/-/types-4.5.0.tgz",
++      "integrity": "sha512-drtPrtD8N0DENyD2cyt6Ajy+IWsiCLgMxODwLTpvH1UsN6a9jf90tNTPjqwHvA+0Lzu9e0txk8DjfqH1p9UJRw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@shikijs/vscode-textmate": "^10.0.2",
++        "@types/hast": "^3.0.5"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/@shikijs/vscode-textmate": {
++      "version": "10.0.2",
++      "resolved": "https://registry.npmjs.org/@shikijs/vscode-textmate/-/vscode-textmate-10.0.2.tgz",
++      "integrity": "sha512-83yeghZ2xxin3Nj8z1NMd/NCuca+gsYXswywDy5bHvwlWL8tpTQmzGeUuHd9FC3E/SBEMvzJRwWEOz5gGes9Qg==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "license": "MIT"
++    },
++    "node_modules/@types/debug": {
++      "version": "4.1.13",
++      "resolved": "https://registry.npmjs.org/@types/debug/-/debug-4.1.13.tgz",
++      "integrity": "sha512-KSVgmQmzMwPlmtljOomayoR89W4FynCAi3E8PPs7vmDVPe84hT+vGPKkJfThkmXs0x0jAaa9U8uW8bbfyS2fWw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/ms": "*"
++      }
++    },
++    "node_modules/@types/hast": {
++      "version": "3.0.5",
++      "resolved": "https://registry.npmjs.org/@types/hast/-/hast-3.0.5.tgz",
++      "integrity": "sha512-rp/ezSWaD1m44dPKICGhiskI13nVr7qTloFwDa/IYkhhf5nzwP+zIQcIJh3WIFSBOy/H1PzB40jPjMDksN4F+g==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/unist": "*"
++      }
++    },
++    "node_modules/@types/katex": {
++      "version": "0.16.8",
++      "resolved": "https://registry.npmjs.org/@types/katex/-/katex-0.16.8.tgz",
++      "integrity": "sha512-trgaNyfU+Xh2Tc+ABIb44a5AYUpicB3uwirOioeOkNPPbmgRNtcWyDeeFRzjPZENO9Vq8gvVqfhaaXWLlevVwg==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/@types/mdast": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@types/mdast/-/mdast-4.0.4.tgz",
++      "integrity": "sha512-kGaNbPh1k7AFzgpud/gMdvIm5xuECykRR+JnWKQno9TAXVa6WIVCGTPvYGekIDL4uwCZQSYbUxNBSb1aUo79oA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/unist": "*"
++      }
++    },
++    "node_modules/@types/ms": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/@types/ms/-/ms-2.1.0.tgz",
++      "integrity": "sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/@types/prop-types": {
++      "version": "15.7.15",
++      "resolved": "https://registry.npmjs.org/@types/prop-types/-/prop-types-15.7.15.tgz",
++      "integrity": "sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/@types/react": {
++      "version": "18.3.31",
++      "resolved": "https://registry.npmjs.org/@types/react/-/react-18.3.31.tgz",
++      "integrity": "sha512-vfEqpXTvwT91yhmwdfouStN2hSKwTvyRs8qpLfADyrq/kxDw0hZM7Wk9Ug1FELj8hIby+S/+kQCSRFF32nv2Qw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/prop-types": "*",
++        "csstype": "^3.2.2"
++      }
++    },
++    "node_modules/@types/unist": {
++      "version": "3.0.3",
++      "resolved": "https://registry.npmjs.org/@types/unist/-/unist-3.0.3.tgz",
++      "integrity": "sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/@ungap/structured-clone": {
++      "version": "1.4.0",
++      "resolved": "https://registry.npmjs.org/@ungap/structured-clone/-/structured-clone-1.4.0.tgz",
++      "integrity": "sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ==",
++      "dev": true,
++      "license": "ISC"
++    },
++    "node_modules/anser": {
++      "version": "2.3.5",
++      "resolved": "https://registry.npmjs.org/anser/-/anser-2.3.5.tgz",
++      "integrity": "sha512-vcZjxvvVoxTeR5XBNJB38oTu/7eDCZlwdz32N1eNgpyPF7j/Z7Idf+CUwQOkKKpJ7RJyjxgLHCM7vdIK0iCNMQ==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/ccount": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/ccount/-/ccount-2.0.1.tgz",
++      "integrity": "sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/wooorm"
++      }
++    },
++    "node_modules/character-entities": {
++      "version": "2.0.2",
++      "resolved": "https://registry.npmjs.org/character-entities/-/character-entities-2.0.2.tgz",
++      "integrity": "sha512-shx7oQ0Awen/BRIdkjkvz54PnEEI/EjwXDSIZp86/KKdbafHh1Df/RYGBhn4hbe2+uKC9FnT5UCEdyPz3ai9hQ==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/wooorm"
++      }
++    },
++    "node_modules/character-entities-html4": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/character-entities-html4/-/character-entities-html4-2.1.0.tgz",
++      "integrity": "sha512-1v7fgQRj6hnSwFpq1Eu0ynr/CDEw0rXo2B61qXrLNdHZmPKgb7fqS1a2JwF0rISo9q77jDI8VMEHoApn8qDoZA==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/wooorm"
++      }
++    },
++    "node_modules/character-entities-legacy": {
++      "version": "3.0.0",
++      "resolved": "https://registry.npmjs.org/character-entities-legacy/-/character-entities-legacy-3.0.0.tgz",
++      "integrity": "sha512-RpPp0asT/6ufRm//AJVwpViZbGM/MkjQFxJccQRHmISF/22NBtsHqAWmL+/pmkPWoIUJdWyeVleTl1wydHATVQ==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/wooorm"
++      }
++    },
++    "node_modules/clsx": {
++      "version": "2.1.1",
++      "resolved": "https://registry.npmjs.org/clsx/-/clsx-2.1.1.tgz",
++      "integrity": "sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=6"
++      }
++    },
++    "node_modules/comma-separated-tokens": {
++      "version": "2.0.3",
++      "resolved": "https://registry.npmjs.org/comma-separated-tokens/-/comma-separated-tokens-2.0.3.tgz",
++      "integrity": "sha512-Fu4hJdvzeylCfQPp9SGWidpzrMs7tTrlu6Vb8XGaRGck8QSNZJJp538Wrb60Lax4fPwR64ViY468OIUTbRlGZg==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/wooorm"
++      }
++    },
++    "node_modules/commander": {
++      "version": "8.3.0",
++      "resolved": "https://registry.npmjs.org/commander/-/commander-8.3.0.tgz",
++      "integrity": "sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">= 12"
++      }
++    },
++    "node_modules/csstype": {
++      "version": "3.2.3",
++      "resolved": "https://registry.npmjs.org/csstype/-/csstype-3.2.3.tgz",
++      "integrity": "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/debug": {
++      "version": "4.4.3",
++      "resolved": "https://registry.npmjs.org/debug/-/debug-4.4.3.tgz",
++      "integrity": "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "ms": "^2.1.3"
++      },
++      "engines": {
++        "node": ">=6.0"
++      },
++      "peerDependenciesMeta": {
++        "supports-color": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/decode-named-character-reference": {
++      "version": "1.3.0",
++      "resolved": "https://registry.npmjs.org/decode-named-character-reference/-/decode-named-character-reference-1.3.0.tgz",
++      "integrity": "sha512-GtpQYB283KrPp6nRw50q3U9/VfOutZOe103qlN7BPP6Ad27xYnOIWv4lPzo8HCAL+mMZofJ9KEy30fq6MfaK6Q==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "character-entities": "^2.0.0"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/wooorm"
++      }
++    },
++    "node_modules/dequal": {
++      "version": "2.0.3",
++      "resolved": "https://registry.npmjs.org/dequal/-/dequal-2.0.3.tgz",
++      "integrity": "sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=6"
++      }
++    },
++    "node_modules/devlop": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/devlop/-/devlop-1.1.0.tgz",
++      "integrity": "sha512-RWmIqhcFf1lRYBvNmr7qTNuyCt/7/ns2jbpp1+PalgE/rDQcBT0fioSMUpJ93irlUhC5hrg4cYqe6U+0ImW0rA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "dequal": "^2.0.0"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/wooorm"
++      }
++    },
++    "node_modules/escape-string-regexp": {
++      "version": "5.0.0",
++      "resolved": "https://registry.npmjs.org/escape-string-regexp/-/escape-string-regexp-5.0.0.tgz",
++      "integrity": "sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=12"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
++    "node_modules/hast-util-to-html": {
++      "version": "9.0.5",
++      "resolved": "https://registry.npmjs.org/hast-util-to-html/-/hast-util-to-html-9.0.5.tgz",
++      "integrity": "sha512-OguPdidb+fbHQSU4Q4ZiLKnzWo8Wwsf5bZfbvu7//a9oTYoqD/fWpe96NuHkoS9h0ccGOTe0C4NGXdtS0iObOw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/hast": "^3.0.0",
++        "@types/unist": "^3.0.0",
++        "ccount": "^2.0.0",
++        "comma-separated-tokens": "^2.0.0",
++        "hast-util-whitespace": "^3.0.0",
++        "html-void-elements": "^3.0.0",
++        "mdast-util-to-hast": "^13.0.0",
++        "property-information": "^7.0.0",
++        "space-separated-tokens": "^2.0.0",
++        "stringify-entities": "^4.0.0",
++        "zwitch": "^2.0.4"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/hast-util-whitespace": {
++      "version": "3.0.0",
++      "resolved": "https://registry.npmjs.org/hast-util-whitespace/-/hast-util-whitespace-3.0.0.tgz",
++      "integrity": "sha512-88JUN06ipLwsnv+dVn+OIYOvAuvBMy/Qoi6O7mQHxdPXpjy+Cd6xRkWwux7DKO+4sYILtLBRIKgsdpS2gQc7qw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/hast": "^3.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/html-void-elements": {
++      "version": "3.0.0",
++      "resolved": "https://registry.npmjs.org/html-void-elements/-/html-void-elements-3.0.0.tgz",
++      "integrity": "sha512-bEqo66MRXsUGxWHV5IP0PUiAWwoEjba4VCzg0LjFJBpchPaTfyfCKTG6bc5F8ucKec3q5y6qOdGyYTSBEvhCrg==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/wooorm"
++      }
++    },
++    "node_modules/js-tokens": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/js-tokens/-/js-tokens-4.0.0.tgz",
++      "integrity": "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/katex": {
++      "version": "0.16.47",
++      "resolved": "https://registry.npmjs.org/katex/-/katex-0.16.47.tgz",
++      "integrity": "sha512-Eeo8Ys1doU1z+x8AZsPpQu+p/QcZBI5PeOo7QGQdy2x2m0MU/hYagBbGOmXwr5KVbEfVuWv9LpnQWeehogurjg==",
++      "dev": true,
++      "funding": [
++        "https://opencollective.com/katex",
++        "https://github.com/sponsors/katex"
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "commander": "^8.3.0"
++      },
++      "bin": {
++        "katex": "cli.js"
++      }
++    },
++    "node_modules/longest-streak": {
++      "version": "3.1.0",
++      "resolved": "https://registry.npmjs.org/longest-streak/-/longest-streak-3.1.0.tgz",
++      "integrity": "sha512-9Ri+o0JYgehTaVBBDoMqIl8GXtbWg711O3srftcHhZ0dqnETqLaoIK0x17fUw9rFSlK/0NlsKe0Ahhyl5pXE2g==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/wooorm"
++      }
++    },
++    "node_modules/loose-envify": {
++      "version": "1.4.0",
++      "resolved": "https://registry.npmjs.org/loose-envify/-/loose-envify-1.4.0.tgz",
++      "integrity": "sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "js-tokens": "^3.0.0 || ^4.0.0"
++      },
++      "bin": {
++        "loose-envify": "cli.js"
++      }
++    },
++    "node_modules/markdown-table": {
++      "version": "3.0.4",
++      "resolved": "https://registry.npmjs.org/markdown-table/-/markdown-table-3.0.4.tgz",
++      "integrity": "sha512-wiYz4+JrLyb/DqW2hkFJxP7Vd7JuTDm77fvbM8VfEQdmSMqcImWeeRbHwZjBjIFki/VaMK2BhFi7oUUZeM5bqw==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/wooorm"
++      }
++    },
++    "node_modules/mdast-util-find-and-replace": {
++      "version": "3.0.3",
++      "resolved": "https://registry.npmjs.org/mdast-util-find-and-replace/-/mdast-util-find-and-replace-3.0.3.tgz",
++      "integrity": "sha512-xPgpDNl0/OXHsI7TlaIs22lWnH3KlpvZdXG1ET/m/YT2Hhdkx8lJV4kLphE6l9simyM4KPDFBwas08BgEob6Jw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/mdast": "^4.0.0",
++        "escape-string-regexp": "^5.0.0",
++        "unist-util-is": "^6.0.0",
++        "unist-util-visit-parents": "^6.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/mdast-util-from-markdown": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/mdast-util-from-markdown/-/mdast-util-from-markdown-2.1.0.tgz",
++      "integrity": "sha512-KRLgmPaP2H1ul2bpoJkOS+9pAcDAAj9Nu1mqLnh8NLeJG5tlvj42TH80PIGBpROWlRXLk0lDrWNuZCFy/tsB4A==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/mdast": "^4.0.0",
++        "@types/unist": "^3.0.0",
++        "decode-named-character-reference": "^1.0.0",
++        "devlop": "^1.0.0",
++        "mdast-util-to-string": "^4.0.0",
++        "micromark": "^4.0.0",
++        "micromark-util-decode-numeric-character-reference": "^2.0.0",
++        "micromark-util-decode-string": "^2.0.0",
++        "micromark-util-normalize-identifier": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.0",
++        "unist-util-stringify-position": "^4.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/mdast-util-gfm": {
++      "version": "3.1.0",
++      "resolved": "https://registry.npmjs.org/mdast-util-gfm/-/mdast-util-gfm-3.1.0.tgz",
++      "integrity": "sha512-0ulfdQOM3ysHhCJ1p06l0b0VKlhU0wuQs3thxZQagjcjPrlFRqY215uZGHHJan9GEAXd9MbfPjFJz+qMkVR6zQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "mdast-util-from-markdown": "^2.0.0",
++        "mdast-util-gfm-autolink-literal": "^2.0.0",
++        "mdast-util-gfm-footnote": "^2.0.0",
++        "mdast-util-gfm-strikethrough": "^2.0.0",
++        "mdast-util-gfm-table": "^2.0.0",
++        "mdast-util-gfm-task-list-item": "^2.0.0",
++        "mdast-util-to-markdown": "^2.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/mdast-util-gfm-autolink-literal": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/mdast-util-gfm-autolink-literal/-/mdast-util-gfm-autolink-literal-2.0.1.tgz",
++      "integrity": "sha512-5HVP2MKaP6L+G6YaxPNjuL0BPrq9orG3TsrZ9YXbA3vDw/ACI4MEsnoDpn6ZNm7GnZgtAcONJyPhOP8tNJQavQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/mdast": "^4.0.0",
++        "ccount": "^2.0.0",
++        "devlop": "^1.0.0",
++        "mdast-util-find-and-replace": "^3.0.0",
++        "micromark-util-character": "^2.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/mdast-util-gfm-footnote": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/mdast-util-gfm-footnote/-/mdast-util-gfm-footnote-2.1.0.tgz",
++      "integrity": "sha512-sqpDWlsHn7Ac9GNZQMeUzPQSMzR6Wv0WKRNvQRg0KqHh02fpTz69Qc1QSseNX29bhz1ROIyNyxExfawVKTm1GQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/mdast": "^4.0.0",
++        "devlop": "^1.1.0",
++        "mdast-util-from-markdown": "^2.0.0",
++        "mdast-util-to-markdown": "^2.0.0",
++        "micromark-util-normalize-identifier": "^2.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/mdast-util-gfm-strikethrough": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/mdast-util-gfm-strikethrough/-/mdast-util-gfm-strikethrough-2.0.1.tgz",
++      "integrity": "sha512-OuJHqvr455pwu2OaOrir7dbzqs4jlWKOtlu9L6GjcIjjQwNyw02VntQsr/Ek6/A13vgnXfUhBekWRUP1OkNivw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/mdast": "^4.0.0",
++        "mdast-util-from-markdown": "^2.0.0",
++        "mdast-util-to-markdown": "^2.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/mdast-util-gfm-table": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/mdast-util-gfm-table/-/mdast-util-gfm-table-2.0.0.tgz",
++      "integrity": "sha512-78UEvebzz/rJIxLvE7ZtDd/vIQ0RHv+3Mh5DR96p7cS7HsBhYIICDBCu8csTNWNO6tBWfqXPWekRuj2FNOGOZg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/mdast": "^4.0.0",
++        "devlop": "^1.0.0",
++        "markdown-table": "^3.0.0",
++        "mdast-util-from-markdown": "^2.0.0",
++        "mdast-util-to-markdown": "^2.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/mdast-util-gfm-task-list-item": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/mdast-util-gfm-task-list-item/-/mdast-util-gfm-task-list-item-2.0.0.tgz",
++      "integrity": "sha512-IrtvNvjxC1o06taBAVJznEnkiHxLFTzgonUdy8hzFVeDun0uTjxxrRGVaNFqkU1wJR3RBPEfsxmU6jDWPofrTQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/mdast": "^4.0.0",
++        "devlop": "^1.0.0",
++        "mdast-util-from-markdown": "^2.0.0",
++        "mdast-util-to-markdown": "^2.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/mdast-util-math": {
++      "version": "3.0.0",
++      "resolved": "https://registry.npmjs.org/mdast-util-math/-/mdast-util-math-3.0.0.tgz",
++      "integrity": "sha512-Tl9GBNeG/AhJnQM221bJR2HPvLOSnLE/T9cJI9tlc6zwQk2nPk/4f0cHkOdEixQPC/j8UtKDdITswvLAy1OZ1w==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/hast": "^3.0.0",
++        "@types/mdast": "^4.0.0",
++        "devlop": "^1.0.0",
++        "longest-streak": "^3.0.0",
++        "mdast-util-from-markdown": "^2.0.0",
++        "mdast-util-to-markdown": "^2.1.0",
++        "unist-util-remove-position": "^5.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/mdast-util-phrasing": {
++      "version": "4.1.0",
++      "resolved": "https://registry.npmjs.org/mdast-util-phrasing/-/mdast-util-phrasing-4.1.0.tgz",
++      "integrity": "sha512-TqICwyvJJpBwvGAMZjj4J2n0X8QWp21b9l0o7eXyVJ25YNWYbJDVIyD1bZXE6WtV6RmKJVYmQAKWa0zWOABz2w==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/mdast": "^4.0.0",
++        "unist-util-is": "^6.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/mdast-util-to-hast": {
++      "version": "13.2.1",
++      "resolved": "https://registry.npmjs.org/mdast-util-to-hast/-/mdast-util-to-hast-13.2.1.tgz",
++      "integrity": "sha512-cctsq2wp5vTsLIcaymblUriiTcZd0CwWtCbLvrOzYCDZoWyMNV8sZ7krj09FSnsiJi3WVsHLM4k6Dq/yaPyCXA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/hast": "^3.0.0",
++        "@types/mdast": "^4.0.0",
++        "@ungap/structured-clone": "^1.0.0",
++        "devlop": "^1.0.0",
++        "micromark-util-sanitize-uri": "^2.0.0",
++        "trim-lines": "^3.0.0",
++        "unist-util-position": "^5.0.0",
++        "unist-util-visit": "^5.0.0",
++        "vfile": "^6.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/mdast-util-to-markdown": {
++      "version": "2.2.0",
++      "resolved": "https://registry.npmjs.org/mdast-util-to-markdown/-/mdast-util-to-markdown-2.2.0.tgz",
++      "integrity": "sha512-2Jn/ADrHFFyyniBMi0bncTbJqU78K3/TEYvzvwrWWzD9MYPUa/Gm4r3nOeKFQg/PDM5BsbDYdc8ackW4NTY6NA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/mdast": "^4.0.0",
++        "@types/unist": "^3.0.0",
++        "longest-streak": "^3.0.0",
++        "mdast-util-phrasing": "^4.0.0",
++        "mdast-util-to-string": "^4.0.0",
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-classify-character": "^2.0.0",
++        "micromark-util-decode-string": "^2.0.0",
++        "micromark-util-html-tag-name": "^2.0.0",
++        "unist-util-visit": "^5.0.0",
++        "zwitch": "^2.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/mdast-util-to-string": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/mdast-util-to-string/-/mdast-util-to-string-4.0.0.tgz",
++      "integrity": "sha512-0H44vDimn51F0YwvxSJSm0eCDOJTRlmN0R1yBh4HLj9wiV1Dn0QoXGbvFAWj2hSItVTlCmBF1hqKlIyUBVFLPg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/mdast": "^4.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/micromark": {
++      "version": "4.0.3",
++      "resolved": "https://registry.npmjs.org/micromark/-/micromark-4.0.3.tgz",
++      "integrity": "sha512-oGYfQzHSG5dOMovQcJ3fyTmZlWAWpi0XA0sJwJs+i6OT88o1+Jtw/8z0CmdowSLxGhhFK89rQ/oXph/wN02PNw==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "@types/debug": "^4.0.0",
++        "debug": "^4.0.0",
++        "decode-named-character-reference": "^1.0.0",
++        "devlop": "^1.0.0",
++        "micromark-core-commonmark": "^2.0.0",
++        "micromark-factory-space": "^2.0.0",
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-chunked": "^2.0.0",
++        "micromark-util-combine-extensions": "^2.0.0",
++        "micromark-util-decode-numeric-character-reference": "^2.0.0",
++        "micromark-util-edit-map": "^1.0.0",
++        "micromark-util-encode": "^2.0.0",
++        "micromark-util-normalize-identifier": "^2.0.0",
++        "micromark-util-resolve-all": "^2.0.0",
++        "micromark-util-sanitize-uri": "^2.0.0",
++        "micromark-util-subtokenize": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-core-commonmark": {
++      "version": "2.0.4",
++      "resolved": "https://registry.npmjs.org/micromark-core-commonmark/-/micromark-core-commonmark-2.0.4.tgz",
++      "integrity": "sha512-wxEeE8v8XVvOrxn1TZj74qYhAtTQsSqufHVS3uNVyT1MupXxhyaHk8/9xDNPh9BmL77QNDgWTkZ3RsYHB2ry7w==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "decode-named-character-reference": "^1.0.0",
++        "devlop": "^1.0.0",
++        "micromark-factory-destination": "^2.0.0",
++        "micromark-factory-label": "^2.0.0",
++        "micromark-factory-space": "^2.1.0",
++        "micromark-factory-title": "^2.0.0",
++        "micromark-factory-whitespace": "^2.0.0",
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-chunked": "^2.0.0",
++        "micromark-util-classify-character": "^2.0.0",
++        "micromark-util-edit-map": "^1.0.0",
++        "micromark-util-html-tag-name": "^2.0.0",
++        "micromark-util-normalize-identifier": "^2.0.0",
++        "micromark-util-resolve-all": "^2.0.0",
++        "micromark-util-subtokenize": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.3"
++      }
++    },
++    "node_modules/micromark-extension-gfm": {
++      "version": "3.0.0",
++      "resolved": "https://registry.npmjs.org/micromark-extension-gfm/-/micromark-extension-gfm-3.0.0.tgz",
++      "integrity": "sha512-vsKArQsicm7t0z2GugkCKtZehqUm31oeGBV/KVSorWSy8ZlNAv7ytjFhvaryUiCUJYqs+NoE6AFhpQvBTM6Q4w==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "micromark-extension-gfm-autolink-literal": "^2.0.0",
++        "micromark-extension-gfm-footnote": "^2.0.0",
++        "micromark-extension-gfm-strikethrough": "^2.0.0",
++        "micromark-extension-gfm-table": "^2.0.0",
++        "micromark-extension-gfm-tagfilter": "^2.0.0",
++        "micromark-extension-gfm-task-list-item": "^2.0.0",
++        "micromark-util-combine-extensions": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/micromark-extension-gfm-autolink-literal": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/micromark-extension-gfm-autolink-literal/-/micromark-extension-gfm-autolink-literal-2.1.0.tgz",
++      "integrity": "sha512-oOg7knzhicgQ3t4QCjCWgTmfNhvQbDDnJeVu9v81r7NltNCVmhPy1fJRX27pISafdjL+SVc4d3l48Gb6pbRypw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-sanitize-uri": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/micromark-extension-gfm-footnote": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/micromark-extension-gfm-footnote/-/micromark-extension-gfm-footnote-2.1.0.tgz",
++      "integrity": "sha512-/yPhxI1ntnDNsiHtzLKYnE3vf9JZ6cAisqVDauhp4CEHxlb4uoOTxOCJ+9s51bIB8U1N1FJ1RXOKTIlD5B/gqw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "devlop": "^1.0.0",
++        "micromark-core-commonmark": "^2.0.0",
++        "micromark-factory-space": "^2.0.0",
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-normalize-identifier": "^2.0.0",
++        "micromark-util-sanitize-uri": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/micromark-extension-gfm-strikethrough": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/micromark-extension-gfm-strikethrough/-/micromark-extension-gfm-strikethrough-2.1.0.tgz",
++      "integrity": "sha512-ADVjpOOkjz1hhkZLlBiYA9cR2Anf8F4HqZUO6e5eDcPQd0Txw5fxLzzxnEkSkfnD0wziSGiv7sYhk/ktvbf1uw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "devlop": "^1.0.0",
++        "micromark-util-chunked": "^2.0.0",
++        "micromark-util-classify-character": "^2.0.0",
++        "micromark-util-resolve-all": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/micromark-extension-gfm-table": {
++      "version": "2.1.2",
++      "resolved": "https://registry.npmjs.org/micromark-extension-gfm-table/-/micromark-extension-gfm-table-2.1.2.tgz",
++      "integrity": "sha512-pRzm4kDTu0MjlmBkxmS9yYhw60nncfcEwu9NNdPFSQEFXS95ZKyIIyTSHu/o3ReBUrLKYEq+7YaXCRn/bPB4MA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "devlop": "^1.0.0",
++        "micromark-factory-space": "^2.0.0",
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/micromark-extension-gfm-tagfilter": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/micromark-extension-gfm-tagfilter/-/micromark-extension-gfm-tagfilter-2.0.0.tgz",
++      "integrity": "sha512-xHlTOmuCSotIA8TW1mDIM6X2O1SiX5P9IuDtqGonFhEK0qgRI4yeC6vMxEV2dgyr2TiD+2PQ10o+cOhdVAcwfg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "micromark-util-types": "^2.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/micromark-extension-gfm-task-list-item": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/micromark-extension-gfm-task-list-item/-/micromark-extension-gfm-task-list-item-2.1.0.tgz",
++      "integrity": "sha512-qIBZhqxqI6fjLDYFTBIa4eivDMnP+OZqsNwmQ3xNLE4Cxwc+zfQEfbs6tzAo2Hjq+bh6q5F+Z8/cksrLFYWQQw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "devlop": "^1.0.0",
++        "micromark-factory-space": "^2.0.0",
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/micromark-extension-math": {
++      "version": "3.1.0",
++      "resolved": "https://registry.npmjs.org/micromark-extension-math/-/micromark-extension-math-3.1.0.tgz",
++      "integrity": "sha512-lvEqd+fHjATVs+2v/8kg9i5Q0AP2k85H0WUOwpIVvUML8BapsMvh1XAogmQjOCsLpoKRCVQqEkQBB3NhVBcsOg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/katex": "^0.16.0",
++        "devlop": "^1.0.0",
++        "katex": "^0.16.0",
++        "micromark-factory-space": "^2.0.0",
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/micromark-factory-destination": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/micromark-factory-destination/-/micromark-factory-destination-2.0.1.tgz",
++      "integrity": "sha512-Xe6rDdJlkmbFRExpTOmRj9N3MaWmbAgdpSrBQvCFqhezUn4AHqJHbaEnfbVYYiexVSs//tqOdY/DxhjdCiJnIA==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-factory-label": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/micromark-factory-label/-/micromark-factory-label-2.0.1.tgz",
++      "integrity": "sha512-VFMekyQExqIW7xIChcXn4ok29YE3rnuyveW3wZQWWqF4Nv9Wk5rgJ99KzPvHjkmPXF93FXIbBp6YdW3t71/7Vg==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "devlop": "^1.0.0",
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-factory-space": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/micromark-factory-space/-/micromark-factory-space-2.1.0.tgz",
++      "integrity": "sha512-fS8hnLIjnjvdQIj39Geug8wWsR0HrYZ43KShKxNfwT7t2LOHo/LbWZEzEaSOjwtjdCsjoE6syHhonEzW0zv0+Q==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-factory-title": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/micromark-factory-title/-/micromark-factory-title-2.0.1.tgz",
++      "integrity": "sha512-5bZ+3CjhAd9eChYTHsjy6TGxpOFSKgKKJPJxr293jTbfry2KDoWkhBb6TcPVB4NmzaPhMs1Frm9AZH7OD4Cjzw==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "micromark-factory-space": "^2.0.0",
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-factory-whitespace": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/micromark-factory-whitespace/-/micromark-factory-whitespace-2.0.1.tgz",
++      "integrity": "sha512-Ob0nuZ3PKt/n0hORHyvoD9uZhr+Za8sFoP+OnMcnWK5lngSzALgQYKMr9RJVOWLqQYuyn6ulqGWSXdwf6F80lQ==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "micromark-factory-space": "^2.0.0",
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-util-character": {
++      "version": "2.1.1",
++      "resolved": "https://registry.npmjs.org/micromark-util-character/-/micromark-util-character-2.1.1.tgz",
++      "integrity": "sha512-wv8tdUTJ3thSFFFJKtpYKOYiGP2+v96Hvk4Tu8KpCAsTMs6yi+nVmGh1syvSCsaxz45J6Jbw+9DD6g97+NV67Q==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-util-chunked": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/micromark-util-chunked/-/micromark-util-chunked-2.0.1.tgz",
++      "integrity": "sha512-QUNFEOPELfmvv+4xiNg2sRYeS/P84pTW0TCgP5zc9FpXetHY0ab7SxKyAQCNCc1eK0459uoLI1y5oO5Vc1dbhA==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "micromark-util-symbol": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-util-classify-character": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/micromark-util-classify-character/-/micromark-util-classify-character-2.0.1.tgz",
++      "integrity": "sha512-K0kHzM6afW/MbeWYWLjoHQv1sgg2Q9EccHEDzSkxiP/EaagNzCm7T/WMKZ3rjMbvIpvBiZgwR3dKMygtA4mG1Q==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-util-combine-extensions": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/micromark-util-combine-extensions/-/micromark-util-combine-extensions-2.0.1.tgz",
++      "integrity": "sha512-OnAnH8Ujmy59JcyZw8JSbK9cGpdVY44NKgSM7E9Eh7DiLS2E9RNQf0dONaGDzEG9yjEl5hcqeIsj4hfRkLH/Bg==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "micromark-util-chunked": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-util-decode-numeric-character-reference": {
++      "version": "2.0.2",
++      "resolved": "https://registry.npmjs.org/micromark-util-decode-numeric-character-reference/-/micromark-util-decode-numeric-character-reference-2.0.2.tgz",
++      "integrity": "sha512-ccUbYk6CwVdkmCQMyr64dXz42EfHGkPQlBj5p7YVGzq8I7CtjXZJrubAYezf7Rp+bjPseiROqe7G6foFd+lEuw==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "micromark-util-symbol": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-util-decode-string": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/micromark-util-decode-string/-/micromark-util-decode-string-2.0.1.tgz",
++      "integrity": "sha512-nDV/77Fj6eH1ynwscYTOsbK7rR//Uj0bZXBwJZRfaLEJ1iGBR6kIfNmlNqaqJf649EP0F3NWNdeJi03elllNUQ==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "decode-named-character-reference": "^1.0.0",
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-decode-numeric-character-reference": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-util-edit-map": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/micromark-util-edit-map/-/micromark-util-edit-map-1.0.0.tgz",
++      "integrity": "sha512-Pa2ljlsEL6sVwFaYeyrOLSYbQt73JvGbPOYFq+9AElXiSnfI5Q4465RRZ1sHv7lDjDOnGRDDaqPXqClqWK/q1Q==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "micromark-util-types": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-util-encode": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/micromark-util-encode/-/micromark-util-encode-2.0.1.tgz",
++      "integrity": "sha512-c3cVx2y4KqUnwopcO9b/SCdo2O67LwJJ/UyqGfbigahfegL9myoEFoDYZgkT7f36T0bLrM9hZTAaAyH+PCAXjw==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT"
++    },
++    "node_modules/micromark-util-html-tag-name": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/micromark-util-html-tag-name/-/micromark-util-html-tag-name-2.0.1.tgz",
++      "integrity": "sha512-2cNEiYDhCWKI+Gs9T0Tiysk136SnR13hhO8yW6BGNyhOC4qYFnwF1nKfD3HFAIXA5c45RrIG1ub11GiXeYd1xA==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT"
++    },
++    "node_modules/micromark-util-normalize-identifier": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/micromark-util-normalize-identifier/-/micromark-util-normalize-identifier-2.0.1.tgz",
++      "integrity": "sha512-sxPqmo70LyARJs0w2UclACPUUEqltCkJ6PhKdMIDuJ3gSf/Q+/GIe3WKl0Ijb/GyH9lOpUkRAO2wp0GVkLvS9Q==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "micromark-util-symbol": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-util-resolve-all": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/micromark-util-resolve-all/-/micromark-util-resolve-all-2.0.1.tgz",
++      "integrity": "sha512-VdQyxFWFT2/FGJgwQnJYbe1jjQoNTS4RjglmSjTUlpUMa95Htx9NHeYW4rGDJzbjvCsl9eLjMQwGeElsqmzcHg==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "micromark-util-types": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-util-sanitize-uri": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/micromark-util-sanitize-uri/-/micromark-util-sanitize-uri-2.0.1.tgz",
++      "integrity": "sha512-9N9IomZ/YuGGZZmQec1MbgxtlgougxTodVwDzzEouPKo3qFWvymFHWcnDi2vzV1ff6kas9ucW+o3yzJK9YB1AQ==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "micromark-util-character": "^2.0.0",
++        "micromark-util-encode": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-util-subtokenize": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/micromark-util-subtokenize/-/micromark-util-subtokenize-2.1.0.tgz",
++      "integrity": "sha512-XQLu552iSctvnEcgXw6+Sx75GflAPNED1qx7eBJ+wydBb2KCbRZe+NwvIEEMM83uml1+2WSXpBAcp9IUCgCYWA==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "devlop": "^1.0.0",
++        "micromark-util-chunked": "^2.0.0",
++        "micromark-util-symbol": "^2.0.0",
++        "micromark-util-types": "^2.0.0"
++      }
++    },
++    "node_modules/micromark-util-symbol": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/micromark-util-symbol/-/micromark-util-symbol-2.0.1.tgz",
++      "integrity": "sha512-vs5t8Apaud9N28kgCrRUdEed4UJ+wWNvicHLPxCa9ENlYuAY31M0ETy5y1vA33YoNPDFTghEbnh6efaE8h4x0Q==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT"
++    },
++    "node_modules/micromark-util-types": {
++      "version": "2.0.3",
++      "resolved": "https://registry.npmjs.org/micromark-util-types/-/micromark-util-types-2.0.3.tgz",
++      "integrity": "sha512-oxB2Ik03hI0gv+VNn9tnh1t1YEe9MDPptViAEgfdf3YQHsn0pzGTgCdlSCJXcwhqm8phaEuM7zeEu3QQzVBrPg==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "GitHub Sponsors",
++          "url": "https://github.com/sponsors/unifiedjs"
++        },
++        {
++          "type": "OpenCollective",
++          "url": "https://opencollective.com/unified"
++        }
++      ],
++      "license": "MIT"
++    },
++    "node_modules/ms": {
++      "version": "2.1.3",
++      "resolved": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz",
++      "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/oniguruma-parser": {
++      "version": "0.12.2",
++      "resolved": "https://registry.npmjs.org/oniguruma-parser/-/oniguruma-parser-0.12.2.tgz",
++      "integrity": "sha512-6HVa5oIrgMC6aA6WF6XyyqbhRPJrKR02L20+2+zpDtO5QAzGHAUGw5TKQvwi5vctNnRHkJYmjAhRVQF2EKdTQw==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/oniguruma-to-es": {
++      "version": "4.3.6",
++      "resolved": "https://registry.npmjs.org/oniguruma-to-es/-/oniguruma-to-es-4.3.6.tgz",
++      "integrity": "sha512-csuQ9x3Yr0cEIs/Zgx/OEt9iBw9vqIunAPQkx19R/fiMq2oGVTgcMqO/V3Ybqefr1TBvosI6jU539ksaBULJyA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "oniguruma-parser": "^0.12.2",
++        "regex": "^6.1.0",
++        "regex-recursion": "^6.0.2"
++      }
++    },
++    "node_modules/property-information": {
++      "version": "7.2.0",
++      "resolved": "https://registry.npmjs.org/property-information/-/property-information-7.2.0.tgz",
++      "integrity": "sha512-IAtzIB6sUiWaJYrX9smp3V46pBGbBeLFRGdh25kg1334VcBlD8HzhPeNIWQH9zhGmo2itIe25EHt9dQP7G5hmg==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/wooorm"
++      }
++    },
++    "node_modules/react": {
++      "version": "18.3.1",
++      "resolved": "https://registry.npmjs.org/react/-/react-18.3.1.tgz",
++      "integrity": "sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "loose-envify": "^1.1.0"
++      },
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
++    "node_modules/react-dom": {
++      "version": "18.3.1",
++      "resolved": "https://registry.npmjs.org/react-dom/-/react-dom-18.3.1.tgz",
++      "integrity": "sha512-5m4nQKp+rZRb09LNH59GM4BxTh9251/ylbKIbpe7TpGxfJ+9kv6BLkLBXIjjspbgbnIBNqlI23tRnTWT0snUIw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "loose-envify": "^1.1.0",
++        "scheduler": "^0.23.2"
++      },
++      "peerDependencies": {
++        "react": "^18.3.1"
++      }
++    },
++    "node_modules/regex": {
++      "version": "6.1.0",
++      "resolved": "https://registry.npmjs.org/regex/-/regex-6.1.0.tgz",
++      "integrity": "sha512-6VwtthbV4o/7+OaAF9I5L5V3llLEsoPyq9P1JVXkedTP33c7MfCG0/5NOPcSJn0TzXcG9YUrR0gQSWioew3LDg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "regex-utilities": "^2.3.0"
++      }
++    },
++    "node_modules/regex-recursion": {
++      "version": "6.0.2",
++      "resolved": "https://registry.npmjs.org/regex-recursion/-/regex-recursion-6.0.2.tgz",
++      "integrity": "sha512-0YCaSCq2VRIebiaUviZNs0cBz1kg5kVS2UKUfNIx8YVs1cN3AV7NTctO5FOKBA+UT2BPJIWZauYHPqJODG50cg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "regex-utilities": "^2.3.0"
++      }
++    },
++    "node_modules/regex-utilities": {
++      "version": "2.3.0",
++      "resolved": "https://registry.npmjs.org/regex-utilities/-/regex-utilities-2.3.0.tgz",
++      "integrity": "sha512-8VhliFJAWRaUiVvREIiW2NXXTmHs4vMNnSzuJVhscgmGav3g9VDxLrQndI3dZZVVdp0ZO/5v0xmX516/7M9cng==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/scheduler": {
++      "version": "0.23.2",
++      "resolved": "https://registry.npmjs.org/scheduler/-/scheduler-0.23.2.tgz",
++      "integrity": "sha512-UOShsPwz7NrMUqhR6t0hWjFduvOzbtv7toDH1/hIrfRNIDBnnBWd0CwJTGvTpngVlmwGCdP9/Zl/tVrDqcuYzQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "loose-envify": "^1.1.0"
++      }
++    },
++    "node_modules/shiki": {
++      "version": "4.5.0",
++      "resolved": "https://registry.npmjs.org/shiki/-/shiki-4.5.0.tgz",
++      "integrity": "sha512-OcRW72ngQvc+MSVWBRIovC/BTW589iUE/Vxav7VeM4RcY9MUjqB+IR6ILG1k9nuW6LiG/nct9uma4/MBtnZbmQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@shikijs/core": "4.5.0",
++        "@shikijs/engine-javascript": "4.5.0",
++        "@shikijs/engine-oniguruma": "4.5.0",
++        "@shikijs/langs": "4.5.0",
++        "@shikijs/themes": "4.5.0",
++        "@shikijs/types": "4.5.0",
++        "@shikijs/vscode-textmate": "^10.0.2",
++        "@types/hast": "^3.0.5"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/space-separated-tokens": {
++      "version": "2.0.2",
++      "resolved": "https://registry.npmjs.org/space-separated-tokens/-/space-separated-tokens-2.0.2.tgz",
++      "integrity": "sha512-PEGlAwrG8yXGXRjW32fGbg66JAlOAwbObuqVoJpv/mRgoWDQfgH1wDPvtzWyUSNAXBGSk8h755YDbbcEy3SH2Q==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/wooorm"
++      }
++    },
++    "node_modules/stringify-entities": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/stringify-entities/-/stringify-entities-4.0.4.tgz",
++      "integrity": "sha512-IwfBptatlO+QCJUo19AqvrPNqlVMpW9YEL2LIVY+Rpv2qsjCGxaDLNRgeGsQWJhfItebuJhsGSLjaBbNSQ+ieg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "character-entities-html4": "^2.0.0",
++        "character-entities-legacy": "^3.0.0"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/wooorm"
++      }
++    },
++    "node_modules/trim-lines": {
++      "version": "3.0.1",
++      "resolved": "https://registry.npmjs.org/trim-lines/-/trim-lines-3.0.1.tgz",
++      "integrity": "sha512-kRj8B+YHZCc9kQYdWfJB2/oUl9rA99qbowYYBtr4ui4mZyAQ2JpvVBd/6U2YloATfqBhBTSMhTpgBHtU0Mf3Rg==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/wooorm"
++      }
++    },
++    "node_modules/unist-util-is": {
++      "version": "6.0.1",
++      "resolved": "https://registry.npmjs.org/unist-util-is/-/unist-util-is-6.0.1.tgz",
++      "integrity": "sha512-LsiILbtBETkDz8I9p1dQ0uyRUWuaQzd/cuEeS1hoRSyW5E5XGmTzlwY1OrNzzakGowI9Dr/I8HVaw4hTtnxy8g==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/unist": "^3.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/unist-util-position": {
++      "version": "5.0.0",
++      "resolved": "https://registry.npmjs.org/unist-util-position/-/unist-util-position-5.0.0.tgz",
++      "integrity": "sha512-fucsC7HjXvkB5R3kTCO7kUjRdrS0BJt3M/FPxmHMBOm8JQi2BsHAHFsy27E0EolP8rp0NzXsJ+jNPyDWvOJZPA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/unist": "^3.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/unist-util-remove-position": {
++      "version": "5.0.0",
++      "resolved": "https://registry.npmjs.org/unist-util-remove-position/-/unist-util-remove-position-5.0.0.tgz",
++      "integrity": "sha512-Hp5Kh3wLxv0PHj9m2yZhhLt58KzPtEYKQQ4yxfYFEO7EvHwzyDYnduhHnY1mDxoqr7VUwVuHXk9RXKIiYS1N8Q==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/unist": "^3.0.0",
++        "unist-util-visit": "^5.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/unist-util-stringify-position": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/unist-util-stringify-position/-/unist-util-stringify-position-4.0.0.tgz",
++      "integrity": "sha512-0ASV06AAoKCDkS2+xw5RXJywruurpbC4JZSm7nr7MOt1ojAzvyyaO+UxZf18j8FCF6kmzCZKcAgN/yu2gm2XgQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/unist": "^3.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/unist-util-visit": {
++      "version": "5.1.0",
++      "resolved": "https://registry.npmjs.org/unist-util-visit/-/unist-util-visit-5.1.0.tgz",
++      "integrity": "sha512-m+vIdyeCOpdr/QeQCu2EzxX/ohgS8KbnPDgFni4dQsfSCtpz8UqDyY5GjRru8PDKuYn7Fq19j1CQ+nJSsGKOzg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/unist": "^3.0.0",
++        "unist-util-is": "^6.0.0",
++        "unist-util-visit-parents": "^6.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/unist-util-visit-parents": {
++      "version": "6.0.2",
++      "resolved": "https://registry.npmjs.org/unist-util-visit-parents/-/unist-util-visit-parents-6.0.2.tgz",
++      "integrity": "sha512-goh1s1TBrqSqukSc8wrjwWhL0hiJxgA8m4kFxGlQ+8FYQ3C/m11FcTs4YYem7V664AhHVvgoQLk890Ssdsr2IQ==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/unist": "^3.0.0",
++        "unist-util-is": "^6.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/use-sync-external-store": {
++      "version": "1.2.0",
++      "resolved": "https://registry.npmjs.org/use-sync-external-store/-/use-sync-external-store-1.2.0.tgz",
++      "integrity": "sha512-eEgnFxGQ1Ife9bzYs6VLi8/4X6CObHMw9Qr9tPY43iKwsPw8xE8+EFsf/2cFZ5S3esXgpWgtSCtLNS41F+sKPA==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "react": "^16.8.0 || ^17.0.0 || ^18.0.0"
++      }
++    },
++    "node_modules/vfile": {
++      "version": "6.0.3",
++      "resolved": "https://registry.npmjs.org/vfile/-/vfile-6.0.3.tgz",
++      "integrity": "sha512-KzIbH/9tXat2u30jf+smMwFCsno4wHVdNmzFyL+T/L3UGqqk6JKfVqOFOZEpZSHADH1k40ab6NUIXZq422ov3Q==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/unist": "^3.0.0",
++        "vfile-message": "^4.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/vfile-message": {
++      "version": "4.0.3",
++      "resolved": "https://registry.npmjs.org/vfile-message/-/vfile-message-4.0.3.tgz",
++      "integrity": "sha512-QTHzsGd1EhbZs4AsQ20JX1rC3cOlt/IWJruk893DfLRr57lcnOeMaWG4K0JrRta4mIJZKth2Au3mM3u03/JWKw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/unist": "^3.0.0",
++        "unist-util-stringify-position": "^4.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/unified"
++      }
++    },
++    "node_modules/yaml": {
++      "version": "2.9.1",
++      "resolved": "https://registry.npmjs.org/yaml/-/yaml-2.9.1.tgz",
++      "integrity": "sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==",
++      "license": "ISC",
++      "bin": {
++        "yaml": "bin.mjs"
++      },
++      "engines": {
++        "node": ">= 14.6"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/eemeli"
++      }
++    },
++    "node_modules/zod": {
++      "version": "4.6.5",
++      "resolved": "https://registry.npmjs.org/zod/-/zod-4.6.5.tgz",
++      "integrity": "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==",
++      "license": "MIT",
++      "peer": true,
++      "funding": {
++        "url": "https://github.com/sponsors/colinhacks"
++      }
++    },
++    "node_modules/zwitch": {
++      "version": "2.0.4",
++      "resolved": "https://registry.npmjs.org/zwitch/-/zwitch-2.0.4.tgz",
++      "integrity": "sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/wooorm"
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 8ac2d49..99a1bac 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-mcpanel",
+   "version": "0.1.2",
+-  "description": "MCP-server management panel plugin: the host half writes the mcp-client insert rows into the profile cordis.patch.yml (config HMR), the browser half registers the settings-page MCP tab (0.1.2-era cohort; exam material only)",
++  "description": "MCP-server management panel plugin: the host half writes the mcp-client insert rows into the profile cordis.patch.yml (config HMR), the browser half registers the settings-page MCP tab (dsh 0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -15,9 +15,9 @@
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+-        "@deepseek-ai/dsh-client-ui-primitives",
+-        "@deepseek-ai/dsh-client-ui-slots"
++        "@deepseek-ai/dsh-client-locale",
++        "@deepseek-ai/dsh-client-ui-renderer",
++        "@deepseek-ai/dsh-client-ui-settings"
+       ],
+       "platform": "web"
+     }
+@@ -26,17 +26,24 @@
+     "yaml": "^2.4.0"
+   },
+   "peerDependencies": {
+-    "cordis": "^4.0.0-rc.7",
+-    "react": "^18.2.0",
+-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.5",
+-    "@deepseek-ai/dsh-app-boot": "^0.1.0-rc.5",
+-    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.5",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.0-rc.5"
++    "@deepseek-ai/cordis": "^4.0.2",
++    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-app-boot": "^0.1.2-alpha.2"
+   },
+   "peerDependenciesMeta": {
+     "@deepseek-ai/dsh-app-boot": {
+       "optional": true
+     }
+   },
++  "devDependencies": {
++    "@deepseek-ai/cordis": "^4.0.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++    "@types/react": "~18.3.1",
++    "react": "^18.2.0"
++  },
+   "private": true
+ }

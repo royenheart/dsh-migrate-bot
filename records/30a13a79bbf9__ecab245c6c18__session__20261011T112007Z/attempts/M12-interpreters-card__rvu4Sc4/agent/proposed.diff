@@ -1,0 +1,139 @@
+diff --git a/fixture/client.js b/fixture/client.js
+index e7c00d9..ec00d88 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -3,22 +3,19 @@
+ // connection resets instead of polling.
+ //
+ // ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.1 era):
+-//   "SettingsProvider is just an alias of the old Settings type — keep the
+-//    old name. And the snapshot store still ships in dsh-client-runtime on
+-//    alpha (deprecated but present), so the runtime peer stays."
++// 0.1.2-alpha.2 type surface: the browser plugin context is the ordinary
++// `@deepseek-ai/cordis` Context, and the persisted snapshot store lives in
++// its own package, `@deepseek-ai/dsh-client-store` (the old client runtime
++// package is deleted in this cohort).
+ // ────────────────────────────────────────────────────────────
+-//
+-// 0.1.1-era type surface: the client context type comes from the client
+-// runtime package; the snapshot store ships with it.
+ 
+-// The persisted snapshot store behind the card. 0.1.1-era source (real
++// The persisted snapshot store behind the card. 0.1.2-alpha.2 source (real
+ // import shape):
+ //
+-//   import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
++//   import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
+ //
+ /**
+- * @type {import('@deepseek-ai/dsh-client-runtime/client').SnapshotStore<Record<string, unknown>>}
++ * @type {import('@deepseek-ai/dsh-client-store').SnapshotStore<Record<string, unknown>>}
+  */
+ let store
+ 
+@@ -42,7 +39,7 @@ function cardStub() {
+ 
+ /**
+  * Register the interpreters card and wire its store to the connection.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx) {
+   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'bench-interpreters-card: dictionaries')
+diff --git a/fixture/index.js b/fixture/index.js
+index 2651e07..30875c7 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,5 +1,6 @@
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the client snapshot store shipped in
+-// the client runtime package, and the dsh-settings service type was `Settings`.
++// 0.1.2-alpha.2 cohort (migrated from the 0.1.1 era): the browser snapshot
++// store now ships in `@deepseek-ai/dsh-client-store`, and the dsh-settings
++// service type is named `SettingsProvider` (the old `Settings` name is gone).
+ //
+ // Host half: registers the model-facing interpreter tools (body elided — the
+ // registration shape is unchanged across the migration and not part of the
+@@ -17,9 +18,10 @@ export const inject = ['tools', 'webServer']
+ 
+ /**
+  * Live settings service handle, claimed through the settings bridge. The
+- * 0.1.1-era dsh-settings type:
++ * 0.1.2 dsh-settings type (`SettingsProvider`; the 0.1.1-era name `Settings`
++ * no longer exists):
+  *
+- * @type {import('@deepseek-ai/dsh-settings').Settings | undefined}
++ * @type {import('@deepseek-ai/dsh-settings').SettingsProvider | undefined}
+  */
+ let settings
+ 
+@@ -27,7 +29,7 @@ let settings
+  * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx, config) {
+-  console.error('[bench-interpreters-card] apply() on the 0.1.1-era cohort: runtime SnapshotStore + dsh-settings Settings')
++  console.error('[bench-interpreters-card] apply() on the 0.1.2-alpha.2 cohort: dsh-client-store + dsh-settings SettingsProvider')
+ 
+   // The settings bridge: the gateway reads/writes the `interpreters`
+   // namespace in-process. The settings service is optional — when absent,
+diff --git a/fixture/package.json b/fixture/package.json
+index a580f8a..a13ee64 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-interpreters-card",
+-  "version": "0.2.3",
+-  "description": "Interpreter-path tool plugin with a self-hosted HTTP config gateway and a settings-plugins card (0.1.1-era cohort; exam material only)",
++  "version": "0.2.4",
++  "description": "Interpreter-path tool plugin with a self-hosted HTTP config gateway and a settings-plugins card (migrated to the dsh 0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -16,33 +16,31 @@
+     "client": {
+       "platform": "web",
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+         "@deepseek-ai/dsh-client-locale",
+         "@deepseek-ai/dsh-client-connection",
+-        "@deepseek-ai/dsh-client-ui-settings-plugins",
+-        "@deepseek-ai/dsh-client-ui-slots"
++        "@deepseek-ai/dsh-client-ui-settings-plugins"
+       ]
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-locale": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-host-webserver": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-settings": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.8",
++    "@deepseek-ai/cordis": "^4.0.2",
++    "@deepseek-ai/dsh-client-connection": "^0.1.2-rc.1",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-rc.1",
++    "@deepseek-ai/dsh-client-store": "^0.1.2-rc.1",
++    "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.2-rc.1",
++    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-rc.1",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-rc.1",
++    "@deepseek-ai/dsh-host-webserver": "^0.1.2-rc.1",
++    "@deepseek-ai/dsh-settings": "^0.1.2-rc.1",
++    "@deepseek-ai/dsh-tools": "^0.1.2-rc.1",
+     "react": "^18.2.0",
+-    "schemastery": "^3.18.0"
++    "schemastery": "^3.18.2"
+   },
+   "peerDependenciesMeta": {
+     "@deepseek-ai/cordis": { "optional": true },
+     "@deepseek-ai/dsh-client-connection": { "optional": true },
+     "@deepseek-ai/dsh-client-locale": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
++    "@deepseek-ai/dsh-client-store": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-settings-plugins": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-slots": { "optional": true },

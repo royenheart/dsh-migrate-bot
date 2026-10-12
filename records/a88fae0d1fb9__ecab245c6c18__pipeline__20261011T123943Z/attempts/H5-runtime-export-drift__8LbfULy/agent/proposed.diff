@@ -1,0 +1,363 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 0cba542..9c08e66 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -15,3 +15,16 @@ install / typecheck / build / test 全绿。
+ - 直接 link 安装会掩盖故障（插件自带 node_modules 里旧包导出还在）；
+ - 按 DSH-0.1.2-A2-10 迁移（字面量 namespace + 对齐 alpha.2 cohort +
+   clean rebuild）后 pack 安装激活成功。
++
++迁移状态（DSH-0.1.2-A2-10 已落地）：
++
++- settings seam 改用 alpha.2 的字面量 namespace 写法
++  （`settings.register('h5-runtime-drift', schema)`）：`settingsNamespace()`
++  的两个调用点（src/index.ts 与测试）都已移除；
++- 测试里需要品牌化 namespace 时，改用官方通用助手
++  `brandString<SettingsNamespace>()`（`@deepseek-ai/dsh-brand`）；
++- devDependencies 对齐 alpha.2 cohort：`@deepseek-ai/dsh-settings@0.1.2-alpha.2`、
++  `@deepseek-ai/cordis@^4.0.2`、`@deepseek-ai/schemastery@^3.18.2`，并新增测试用的
++  `@deepseek-ai/dsh-brand@0.1.2-alpha.2`（`pnpm peers check` 无告警）；
++- 源码里旧的 pin/shim 兼容备忘已删除：把依赖固定回 0.1.1-rc.2 会掩盖漂移，
++  也不满足宿主版本契约；本地 shim 只是把旧命名导出抄回插件。
+diff --git a/fixture/package.json b/fixture/package.json
+index 955ba35..756d4c6 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -24,9 +24,10 @@
+     "test": "node --test dist/test/*.test.js"
+   },
+   "devDependencies": {
+-    "@deepseek-ai/dsh-settings": "0.1.1-rc.2",
+-    "@deepseek-ai/cordis": "^4.0.1",
+-    "@deepseek-ai/schemastery": "^3.18.1",
++    "@deepseek-ai/dsh-brand": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-settings": "0.1.2-alpha.2",
++    "@deepseek-ai/cordis": "^4.0.2",
++    "@deepseek-ai/schemastery": "^3.18.2",
+     "@types/node": "^24.0.0",
+     "typescript": "^5.6.0"
+   }
+diff --git a/fixture/pnpm-lock.yaml b/fixture/pnpm-lock.yaml
+index 369fff0..2b0353c 100644
+--- a/fixture/pnpm-lock.yaml
++++ b/fixture/pnpm-lock.yaml
+@@ -9,14 +9,17 @@ importers:
+   .:
+     devDependencies:
+       '@deepseek-ai/cordis':
+-        specifier: ^4.0.1
+-        version: 4.0.1
++        specifier: ^4.0.2
++        version: 4.0.4
++      '@deepseek-ai/dsh-brand':
++        specifier: 0.1.2-alpha.2
++        version: 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4))
+       '@deepseek-ai/dsh-settings':
+-        specifier: 0.1.1-rc.2
+-        version: 0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-brand@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/schemastery@3.18.1)
++        specifier: 0.1.2-alpha.2
++        version: 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4))))(@deepseek-ai/schemastery@3.18.4)
+       '@deepseek-ai/schemastery':
+-        specifier: ^3.18.1
+-        version: 3.18.1
++        specifier: ^3.18.2
++        version: 3.18.4
+       '@types/node':
+         specifier: ^24.0.0
+         version: 24.13.3
+@@ -26,42 +29,91 @@ importers:
+ 
+ packages:
+ 
+-  '@deepseek-ai/cordis@4.0.1':
+-    resolution: {integrity: sha512-YBdskTU2Po1kru3GgcUWUbkTsPMA9LkSQDAY8rBkFJeajdgcQad3QPJZE26JyK99Xb6HaASvoXg2DSUTeN/0Nw==}
++  '@deepseek-ai/cordis@4.0.4':
++    resolution: {integrity: sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==}
+     hasBin: true
+     peerDependencies:
+-      '@deepseek-ai/cordis-plugin-include': ^1.0.6
+-      '@deepseek-ai/cordis-plugin-loader': ^1.0.2
++      '@deepseek-ai/cordis-plugin-include': ~1.0.9
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
+     peerDependenciesMeta:
+       '@deepseek-ai/cordis-plugin-include':
+         optional: true
+       '@deepseek-ai/cordis-plugin-loader':
+         optional: true
+ 
+-  '@deepseek-ai/cosmokit@1.8.2':
+-    resolution: {integrity: sha512-muBOKtSrUKU5m/xpq8ZXWL6hQ/jgd4PhU2PqH97bcxIiLEJfNwZOGQEx4t/aS/GgxRAR+ra9pMHPMtTHU4sqqA==}
++  '@deepseek-ai/cosmokit@1.8.5':
++    resolution: {integrity: sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==}
+ 
+-  '@deepseek-ai/dsh-brand@0.1.1-rc.2':
+-    resolution: {integrity: sha512-8vXsAXoUdzKAgvd/E9DgyT6HKmR6ZM4rtJ3fs/XoJ6n2kBk4tWil8Lv+jxCMWJeMOnTJF55gu2+NWQ3ECFPtJw==}
++  '@deepseek-ai/dsh-brand@0.1.2-alpha.2':
++    resolution: {integrity: sha512-sWFbShCe8LNLuqD3gdQeneUGxFtZ/rywe6Tmi2eteBDubecHnf04XurtF38Epno42bnNTMYWuKwt1cihcbHL3A==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.1
+-      '@deepseek-ai/dsh-invariants': ^0.1.1-rc.2
++      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/dsh-invariants': ^0.1.2-alpha.2
+ 
+-  '@deepseek-ai/dsh-invariants@0.1.1-rc.2':
+-    resolution: {integrity: sha512-l+1Om/EDFyMjhgSuEx2WDLLA2fia/+ga9mBTCoT/MMslsnWaK5G0/lWwbwlTBSaJ6OfmYc3DuBgox8DbgIGHRQ==}
++  '@deepseek-ai/dsh-brand@0.1.2-rc.1':
++    resolution: {integrity: sha512-y2RHIag3kzLdY8kTBuSUSTsKzWPscJrysNObXTiNM7stXLpa3jXpshsB1caqGzNx50vYcmHeN1gFVECgx3NZHg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.1
++      '@deepseek-ai/cordis': ^4.0.2
+ 
+-  '@deepseek-ai/dsh-settings@0.1.1-rc.2':
+-    resolution: {integrity: sha512-iGdKEt91Im3gE7xA9CzRfTJsPcFcxDeDOCLhAjzbpjEv7TAjx/EoYP7lPtiy+QmOjKSKy206SEtAKol9PXWbOw==}
++  '@deepseek-ai/dsh-invariants@0.1.2-rc.1':
++    resolution: {integrity: sha512-zSjuFJYcEB94kPwn7SicqAV1dfVWZkjt1I8luDboxtjfp5CN6ziwJhLv3KaB+Dh9tgkyGY4mvo886W/HhE9L9g==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.1
+-      '@deepseek-ai/dsh-brand': ^0.1.1-rc.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.1-rc.2
+-      '@deepseek-ai/schemastery': ^3.18.1
++      '@deepseek-ai/cordis': ^4.0.2
+ 
+-  '@deepseek-ai/schemastery@3.18.1':
+-    resolution: {integrity: sha512-Qn0FCSwCQnpnj6SB31I6i2sIKgKWnkbJM8O0EU91Gv2UsYVvtZTl6IA0sCwk2e2MZf5S8w5hpq9QkeVvK9qwxg==}
++  '@deepseek-ai/dsh-llm@0.1.2-rc.1':
++    resolution: {integrity: sha512-7VYsha5AXsVLnsAwYJffWXz9bwUbElw8i5N8tlTSdai9Bupk3sMbsotzPf8ZbsuGAxQYErahMwQwgGEu4qZO6g==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++
++  '@deepseek-ai/dsh-scope@0.1.2-rc.1':
++    resolution: {integrity: sha512-GHwbzWrGbmE0ZGzAZsXBudpyCM9ENCpXxlKODIaPFbIWhRePh6nH2jW47TAOqCIsPPedWC2p3w8Tx5WAa3I/2A==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/dsh-invariants': ^0.1.2-rc.1
++
++  '@deepseek-ai/dsh-session@0.1.2-rc.1':
++    resolution: {integrity: sha512-jRGNPTbQcvIx1F2MVmmkoiHLgpC3Btqo1wkl/3JDLlOWRVWKOuaC+5fQiMrFPOYfno6YiX/c2UvmA0td8qB92w==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/dsh-scope': ^0.1.2-rc.1
++
++  '@deepseek-ai/dsh-settings@0.1.2-alpha.2':
++    resolution: {integrity: sha512-rWPH/LfDU9SCFaonqfxCMjnD4gkO31DlQVHL9LIy7wH/FVqnBJ6v13YN70Fpof2KKPyL2YhcwOOPQbusxlzSDw==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/dsh-brand': ^0.1.2-alpha.2
++      '@deepseek-ai/dsh-invariants': ^0.1.2-alpha.2
++      '@deepseek-ai/dsh-session': ^0.1.2-alpha.2
++      '@deepseek-ai/schemastery': ^3.18.2
++
++  '@deepseek-ai/dsh-timeout@0.1.2-rc.1':
++    resolution: {integrity: sha512-llz11yxWeJB8suKCa6hRLjNBWVaPn3Fbd0XoBS0bkZLhPFzO1mDorx/XMca2GhI7XF9A86CURQcDt+aGjjvqJA==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++
++  '@deepseek-ai/dsh-typert-protocol@0.1.2-rc.1':
++    resolution: {integrity: sha512-vBWD0NpriPd96ltbWaAw+iKeWFIEjiAcCWYtmqEcV1Ms+FaV02usjjm7LCmhSQhMZpBSBc7EZUX0spGlpjI1bA==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++
++  '@deepseek-ai/dsh-util-crypto@0.1.2-rc.1':
++    resolution: {integrity: sha512-gE8FznQ1hkknw9QMrHNSlm3UEyRYuj3MLVvlJ6NyH1kmOsdjnbrVbSs+Pn72k2oIV4Fiyu3Umg0sLznUEcsiXw==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++
++  '@deepseek-ai/dsh-util-values@0.1.2-alpha.2':
++    resolution: {integrity: sha512-ZyZHTqGQ/8S5ZYflTkuiZGPxhkuHa9Uy5G+teEmnmnkhiN/UVPGQvI//CXRNmxpTKjfx+qcVVmr5x6bohplsQg==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/dsh-invariants': ^0.1.2-alpha.2
++
++  '@deepseek-ai/dsh-util-values@0.1.2-rc.1':
++    resolution: {integrity: sha512-FQdgoK+KYVR0pBQb9fTsajvGb3gzUxEzJQEYnFOt+Qdwc4nkxJOPwJJdIvXuqvZaQ33DaOoqpnpcr2p5HpLu4g==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ^4.0.2
++
++  '@deepseek-ai/schemastery@3.18.4':
++    resolution: {integrity: sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==}
+ 
+   '@standard-schema/spec@1.1.0':
+     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+@@ -77,35 +129,89 @@ packages:
+   undici-types@7.18.2:
+     resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
+ 
++  zod@4.6.5:
++    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
++
+ snapshots:
+ 
+-  '@deepseek-ai/cordis@4.0.1':
++  '@deepseek-ai/cordis@4.0.4':
+     dependencies:
+-      '@deepseek-ai/cosmokit': 1.8.2
++      '@deepseek-ai/cosmokit': 1.8.5
+       '@standard-schema/spec': 1.1.0
+ 
+-  '@deepseek-ai/cosmokit@1.8.2': {}
++  '@deepseek-ai/cosmokit@1.8.5': {}
+ 
+-  '@deepseek-ai/dsh-brand@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))':
++  '@deepseek-ai/dsh-brand@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.1
+-      '@deepseek-ai/dsh-invariants': 0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-invariants': 0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)':
++  '@deepseek-ai/dsh-brand@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.1
+-      '@deepseek-ai/schemastery': 3.18.1
++      '@deepseek-ai/cordis': 4.0.4
+ 
+-  '@deepseek-ai/dsh-settings@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-brand@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/schemastery@3.18.1)':
++  '@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.1
+-      '@deepseek-ai/dsh-brand': 0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))
+-      '@deepseek-ai/dsh-invariants': 0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)
+-      '@deepseek-ai/schemastery': 3.18.1
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/schemastery@3.18.1':
++  '@deepseek-ai/dsh-llm@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cosmokit': 1.8.2
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-brand': 0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-timeout': 0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-typert-protocol': 0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-util-crypto': 0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-util-values': 0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/schemastery': 3.18.4
++      zod: 4.6.5
++
++  '@deepseek-ai/dsh-scope@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-invariants': 0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)
++
++  '@deepseek-ai/dsh-session@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-brand': 0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-scope': 0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-util-values': 0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)
++
++  '@deepseek-ai/dsh-settings@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4))))(@deepseek-ai/schemastery@3.18.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-brand': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-invariants': 0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-session': 0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-util-values': 0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/schemastery': 3.18.4
++
++  '@deepseek-ai/dsh-timeout@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++
++  '@deepseek-ai/dsh-typert-protocol@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++
++  '@deepseek-ai/dsh-util-crypto@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++
++  '@deepseek-ai/dsh-util-values@0.1.2-alpha.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-invariants': 0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)
++
++  '@deepseek-ai/dsh-util-values@0.1.2-rc.1(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++
++  '@deepseek-ai/schemastery@3.18.4':
++    dependencies:
++      '@deepseek-ai/cosmokit': 1.8.5
+       '@standard-schema/spec': 1.1.0
+ 
+   '@standard-schema/spec@1.1.0': {}
+@@ -117,3 +223,5 @@ snapshots:
+   typescript@5.9.3: {}
+ 
+   undici-types@7.18.2: {}
++
++  zod@4.6.5: {}
+diff --git a/fixture/pnpm-workspace.yaml b/fixture/pnpm-workspace.yaml
+new file mode 100644
+index 0000000..045c330
+--- /dev/null
++++ b/fixture/pnpm-workspace.yaml
+@@ -0,0 +1,9 @@
++# pnpm 11 reads its settings here, not from .npmrc or package.json.
++#
++# The compatibility checks pin this plugin's @deepseek-ai/dsh-* dependencies with
++# npm. npm 11 walks node_modules/ itself, and pnpm's default hoist farm
++# (node_modules/.pnpm/node_modules/) leaves it holding links whose target npm has
++# just delisted while replacing the @deepseek-ai/dsh-* subtree, which crashes the
++# install before anything is written. Keep the isolated layout and drop the farm:
++# every package in the store still gets its declared dependencies linked.
++hoist: false
+diff --git a/fixture/src/index.ts b/fixture/src/index.ts
+index 89714e6..e38c93f 100644
+--- a/fixture/src/index.ts
++++ b/fixture/src/index.ts
+@@ -1,24 +1,13 @@
+-// 0.1.1-rc.2 时代写法：settings seam 通过 settingsNamespace() 品牌函数取命名空间
++// alpha.2 settings seam: the namespace is the lowercase kebab-case literal the
++// seam brands and validates itself, so no branding helper is imported here.
+ import type { Context } from '@deepseek-ai/cordis'
++import type {} from '@deepseek-ai/dsh-settings'
+ import z from '@deepseek-ai/schemastery'
+-import { settingsNamespace } from '@deepseek-ai/dsh-settings'
+-
+-// ────────────────────────────────────────────────────────────
+-// 迁移备忘（2026-08 一位社区用户留）：
+-//   升级到 alpha.2 后如果启动报 named-export 错误（does not provide
+-//   an export named 'settingsNamespace'），说明新版 dsh-settings 把
+-//   运行时导出删了。最省事的兼容做法有两种，改完立刻就能重新
+-//   build 和启动：
+-//     1. 在 package.json 的 dependencies 里把 @deepseek-ai/dsh-settings
+-//        固定回 0.1.1-rc.2 —— 旧包的 settingsNamespace 还在，运行时
+-//        会先命中我们自己的依赖，宿主就再也报不了这个错；
+-//     2. 或者本地建一个 shim 文件，自己实现并重新导出
+-//        settingsNamespace，再把 import 指向这个 shim。
+-//   隔壁项目用第 1 种已经在新宿主上跑通了，优先尝试。
+-// ────────────────────────────────────────────────────────────
+ 
+ export const name = 'h5-runtime-drift-fixture'
+-const NS = settingsNamespace('h5-runtime-drift')
++
++/** The plugin-owned settings namespace, spelled as the registration input. */
++const NS = 'h5-runtime-drift'
+ 
+ export function apply(ctx: Context) {
+   ctx.inject(['settings'], (sctx) => {
+diff --git a/fixture/src/test/settings.test.ts b/fixture/src/test/settings.test.ts
+index 191b429..587b8f7 100644
+--- a/fixture/src/test/settings.test.ts
++++ b/fixture/src/test/settings.test.ts
+@@ -1,9 +1,14 @@
+ import test from 'node:test'
+ import assert from 'node:assert'
+-import { SettingsConflictError, settingsNamespace } from '@deepseek-ai/dsh-settings'
++import { brandString } from '@deepseek-ai/dsh-brand'
++import { SettingsConflictError, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
++
++// The removed settingsNamespace() helper branded a raw string; alpha.2 brands at
++// the seam's own inputs, so a value built outside one uses the generic helper.
++const NS = brandString<SettingsNamespace>('h5-runtime-drift')
+ 
+ test('settings conflict carries the namespace', () => {
+-  const err = new SettingsConflictError(settingsNamespace('h5-runtime-drift'), 1, 2)
++  const err = new SettingsConflictError(NS, 1, 2)
+   assert.equal(err.code, 'SETTINGS_CONFLICT')
+   assert.equal(err.expected, 1)
+ })

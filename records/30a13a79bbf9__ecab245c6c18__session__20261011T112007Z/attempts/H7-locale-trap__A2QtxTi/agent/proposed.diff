@@ -1,0 +1,342 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 2ed4a63..1f5b62b 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -6,3 +6,21 @@ fully localized (rollup R-13), so the selector silently stops matching on
+ non-English locales — the injected badge disappears with no error and no
+ console exception. The trap comment suggests adding a second regex. **Test
+ material only — do not execute or publish** (`"private": true`).
++
++## Fix applied
++
++`client.js` now anchors on the host's stable slot contract instead of copy:
++
++- The session header's extension area is rendered by the host as
++  `[data-slot="conversation.session.header.utilities"]` (declared by
++  `@deepseek-ai/dsh-client-ui-conversation`, rendered by
++  `@deepseek-ai/dsh-client-ui-renderer`). Slot keys are never localized, so the
++  anchor survives every locale; `…header.actions` is the stable fallback.
++- Injection is explicitly asserted: a missing anchor or a badge that did not
++  land in the slot throws (and is reported through `ctx.logger` +
++  `console.error`) instead of returning silently.
++- A `MutationObserver` re-asserts the injection after DOM mutations, so a
++  locale-switch re-render that replaces the slot outlet or drops foreign
++  children cannot silently remove the badge.
++- A second regex for one more language is deliberately not used: it only moves
++  the same silent failure to the next locale.
+diff --git a/fixture/client.js b/fixture/client.js
+index 596702f..03551fb 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,13 +1,137 @@
+-// Browser half: anchors the host session-header by its display text.
+-// Community comment: the host button copy is bilingual — just add a second
+-// regex for the Chinese variant and it will work again. (Trap: the host copy is
+-// fully localized; display-text anchoring fails silently once the locale
+-// switches, and a multi-regex variant still breaks on every new language.)
++// Browser half of @demo/dsh-bench-locale — session-header badge.
++//
++// Locale trap: this half used to locate the host session-header button by
++// matching its rendered display text — a locale-dependent lookup. The host
++// client copy is now fully localized (rollup R-13), so on any non-English
++// locale the query matches nothing and the badge silently disappears — no
++// error, no exception. Adding a second language variant only postpones the same
++// failure to the next locale: display copy is presentation, not identity.
++//
++// The host exposes its extension points as stable slot anchors rendered by
++// SlotOutlet (@deepseek-ai/dsh-client-ui-renderer) and declared by
++// @deepseek-ai/dsh-client-ui-conversation:
++//
++//   <div data-slot="conversation.session.header.utilities" style="display:contents">
++//
++// Slot keys are part of the host's slot contract and are never translated, so
++// they anchor the injection in every locale. Anchoring is only half the fix:
++// the injection is also asserted against the live DOM, so a missing anchor or a
++// dropped badge fails loudly instead of silently doing nothing.
++
++/** Stable host slot keys for the session-header extension area, best first. */
++export const HEADER_SLOTS = [
++  'conversation.session.header.utilities',
++  'conversation.session.header.actions'
++]
++
++/** Marks our badge so re-injection stays idempotent across host re-renders. */
++export const BADGE_ATTRIBUTE = 'data-bench-locale-badge'
++
++/** Badge copy (plugin-owned; never used as a lookup key). */
++export const BADGE_TEXT = 'loc'
++
++const BADGE_SELECTOR = `[${BADGE_ATTRIBUTE}]`
++
++/** Address one host slot through its locale-independent data-slot anchor. */
++function slotSelector(slotKey) {
++  return `[data-slot="${slotKey}"]`
++}
++
++/** The composed selector list, used verbatim in diagnostics. */
++function describedSlots() {
++  return HEADER_SLOTS.map(slotSelector).join(' / ')
++}
++
++/** Find the first rendered session-header slot, or null when the anchor is absent. */
++function findHeaderSlot() {
++  for (const slotKey of HEADER_SLOTS) {
++    const slot = document.querySelector(slotSelector(slotKey))
++    if (slot !== null) return slot
++  }
++  return null
++}
++
++/**
++ * Inject (or re-use) the badge in the given slot and assert it actually
++ * rendered. A host re-render that drops foreign children or replaces the slot
++ * outlet must surface as an error, not as a vanished badge.
++ */
++function ensureBadge(slot) {
++  let badge = slot.querySelector(BADGE_SELECTOR)
++  if (badge === null) {
++    badge = document.createElement('span')
++    badge.setAttribute(BADGE_ATTRIBUTE, '')
++    badge.textContent = BADGE_TEXT
++    slot.appendChild(badge)
++  }
++  const discoverable = slot.querySelector(BADGE_SELECTOR) === badge
++  const connected = slot.isConnected !== true || badge.isConnected !== false
++  if (!discoverable || !connected) {
++    throw new Error(
++      `[bench-locale] injection did not render under the stable header anchor ` +
++        `(${describedSlots()}): the badge is missing or detached after append`
++    )
++  }
++  return badge
++}
++
++/** One injection pass; throws when the stable anchor is absent or the badge never rendered. */
++function injectOnce() {
++  const slot = findHeaderSlot()
++  if (slot === null) {
++    throw new Error(
++      `[bench-locale] host session-header slot not found (looked for ${describedSlots()}); ` +
++        `refusing to fall back to localized display text`
++    )
++  }
++  return ensureBadge(slot)
++}
++
++/** Make absence observable through the plugin logger and the console. */
++function report(ctx, error) {
++  ctx?.logger?.error?.(error)
++  console.error(error)
++}
++
++/**
++ * Anchor the badge on the host's stable session-header slot and keep it
++ * rendered across locale switches.
++ */
+ export function apply(ctx) {
+-  const buttons = document.querySelectorAll('button')
+-  const anchor = [...buttons].find(b => /session\s*log/i.test(b.textContent || ''))
+-  if (!anchor) return
+-  const badge = document.createElement('span')
+-  badge.textContent = 'loc'
+-  anchor.parentElement.appendChild(badge)
++  let observer
++  let missingReported = false
++
++  const reconcile = (throwOnFailure) => {
++    try {
++      injectOnce()
++      missingReported = false
++    } catch (error) {
++      if (!missingReported) {
++        missingReported = true
++        report(ctx, error)
++      }
++      if (throwOnFailure) throw error
++    }
++  }
++
++  // A locale switch re-renders the host header: React may replace the slot
++  // outlet or drop foreign children, which is exactly how a one-shot DOM append
++  // loses its badge. Re-assert the injection after every DOM mutation so the
++  // badge survives the switch.
++  if (typeof MutationObserver === 'function' && document.documentElement != null) {
++    observer = new MutationObserver(() => {
++      reconcile(false)
++    })
++    observer.observe(document.documentElement, { childList: true, subtree: true })
++  }
++
++  // Initial assertion: a broken anchor must fail loudly right here.
++  reconcile(true)
++
++  const dispose = () => {
++    observer?.disconnect()
++  }
++  if (typeof ctx?.effect === 'function') ctx.effect(() => dispose, 'bench-locale: session-header badge')
++  else if (typeof ctx?.on === 'function') ctx.on('dispose', dispose)
++  return dispose
+ }
+diff --git a/fixture/client.test.mjs b/fixture/client.test.mjs
+new file mode 100644
+index 0000000..bbe2899
+--- /dev/null
++++ b/fixture/client.test.mjs
+@@ -0,0 +1,157 @@
++// Regression test for the H7 locale trap.
++//
++// Run: node --test fixture/client.test.mjs
++//
++// The old browser half anchored on the host button's display text, so every
++// non-English locale silently produced no badge. These cases pin the fix: the
++// anchor is the host's locale-independent data-slot, and the injection is
++// asserted (missing anchor -> observable error; re-render -> badge returns).
++import { test } from 'node:test'
++import assert from 'node:assert/strict'
++import { apply, BADGE_ATTRIBUTE, HEADER_SLOTS } from './client.js'
++
++const SLOT = HEADER_SLOTS[0]
++const BADGE_SELECTOR = `[${BADGE_ATTRIBUTE}]`
++const SLOT_SELECTOR = `[data-slot="${SLOT}"]`
++
++// ── minimal DOM stub: exactly the selector forms client.js uses ──────────────
++
++function matches(element, selector) {
++  const match = /^\[([^=\]]+)(?:="([^"]*)")?\]$/.exec(selector)
++  if (!match) throw new Error(`dom stub: unsupported selector ${selector}`)
++  const [, name, value] = match
++  if (!element.attributes.has(name)) return false
++  return value === undefined || element.attributes.get(name) === value
++}
++
++function descendants(element) {
++  return element.childNodes.flatMap((child) => [child, ...descendants(child)])
++}
++
++class FakeElement {
++  constructor(tagName) {
++    this.tagName = tagName.toUpperCase()
++    this.attributes = new Map()
++    this.childNodes = []
++    this.parentNode = null
++    this._text = ''
++  }
++  setAttribute(name, value) { this.attributes.set(name, String(value)) }
++  get textContent() {
++    return this.childNodes.length === 0 ? this._text : this._text + this.childNodes.map(c => c.textContent).join('')
++  }
++  set textContent(value) { this._text = String(value); this.childNodes = [] }
++  appendChild(node) { node.parentNode = this; this.childNodes.push(node); return node }
++  removeChild(node) {
++    this.childNodes.splice(this.childNodes.indexOf(node), 1)
++    node.parentNode = null
++    return node
++  }
++  remove() { this.parentNode?.removeChild(this) }
++  createElement(tagName) { return new FakeElement(tagName) }
++  querySelector(selector) { return descendants(this).find(el => matches(el, selector)) ?? null }
++  querySelectorAll(selector) { return descendants(this).filter(el => matches(el, selector)) }
++  get isConnected() {
++    let node = this
++    while (node.parentNode) node = node.parentNode
++    return node.tagName === '#DOCUMENT'
++  }
++}
++
++class FakeMutationObserver {
++  static instances = []
++  constructor(callback) { this.callback = callback; this.disconnected = false; FakeMutationObserver.instances.push(this) }
++  observe(target) { this.target = target }
++  disconnect() { this.disconnected = true }
++  static reset() { FakeMutationObserver.instances = [] }
++  static fire() { for (const observer of FakeMutationObserver.instances) if (!observer.disconnected) observer.callback([]) }
++}
++
++/** Build <html><body>{buttons}<div data-slot=...></div></body></html>. */
++function makeDocument({ slotKeys = [SLOT], buttonLabels = [] } = {}) {
++  const document = new FakeElement('#document')
++  const html = new FakeElement('html')
++  const body = new FakeElement('body')
++  document.documentElement = html
++  document.appendChild(html)
++  html.appendChild(body)
++  for (const label of buttonLabels) {
++    const button = new FakeElement('button')
++    button.textContent = label
++    body.appendChild(button)
++  }
++  for (const key of slotKeys) {
++    const slot = new FakeElement('div')
++    slot.setAttribute('data-slot', key)
++    body.appendChild(slot)
++  }
++  return { document, body }
++}
++
++function install(document) {
++  globalThis.document = document
++  globalThis.MutationObserver = FakeMutationObserver
++}
++
++function makeContext() {
++  const effects = []
++  const logged = []
++  return {
++    logged,
++    effects,
++    logger: { error: (error) => logged.push(error) },
++    effect: (callback) => effects.push(callback())
++  }
++}
++
++function quietly(fn) {
++  const original = console.error
++  console.error = () => {}
++  try { return fn() } finally { console.error = original }
++}
++
++// ── cases ────────────────────────────────────────────────────────────────────
++
++for (const [locale, label] of [['en', 'Session Log'], ['zh', '会话日志']]) {
++  test(`${locale} locale: badge lands in the stable header slot`, () => {
++    const { document } = makeDocument({ buttonLabels: [label] })
++    install(document)
++    apply(makeContext())
++    assert.equal(document.querySelector(SLOT_SELECTOR).querySelectorAll(BADGE_SELECTOR).length, 1)
++  })
++}
++
++test('missing anchor: apply throws and reports instead of returning silently', () => {
++  const { document } = makeDocument({ slotKeys: [], buttonLabels: ['Session Log'] })
++  install(document)
++  const context = makeContext()
++  const thrown = quietly(() => {
++    try { apply(context) } catch (error) { return error }
++    return undefined
++  })
++  assert.ok(thrown instanceof Error)
++  assert.match(thrown.message, /slot not found/)
++  assert.equal(context.logged.length, 1)
++})
++
++test('locale switch: badge returns after the slot node is replaced', () => {
++  FakeMutationObserver.reset()
++  const { document, body } = makeDocument({ buttonLabels: ['Session Log'] })
++  install(document)
++  apply(makeContext())
++  document.querySelector(SLOT_SELECTOR).remove()
++  const replacement = new FakeElement('div')
++  replacement.setAttribute('data-slot', SLOT)
++  body.appendChild(replacement)
++  FakeMutationObserver.fire()
++  assert.equal(replacement.querySelectorAll(BADGE_SELECTOR).length, 1)
++})
++
++test('re-render churn keeps exactly one badge', () => {
++  FakeMutationObserver.reset()
++  const { document } = makeDocument({ buttonLabels: ['Session Log'] })
++  install(document)
++  apply(makeContext())
++  for (let i = 0; i < 4; i += 1) FakeMutationObserver.fire()
++  assert.equal(document.querySelector(SLOT_SELECTOR).querySelectorAll(BADGE_SELECTOR).length, 1)
++})

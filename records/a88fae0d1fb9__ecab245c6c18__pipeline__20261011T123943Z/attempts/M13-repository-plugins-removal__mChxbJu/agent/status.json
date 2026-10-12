@@ -1,0 +1,110 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": false
+            },
+            "e2eSubsetFirst": true,
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "final",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 1,
+        "lastFingerprint": "pending: webServer",
+        "failure": {
+          "check": "boot",
+          "outcome": "fail",
+          "fingerprint": "pending: webServer",
+          "detail": "dsh: agent \"session-15b10197-0cfc-4e1c-97d7-fdf0aeb5a98e\" setup aborted: owner disposed during setup\nfile:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511\n\t\tthrow new Error(`${binName}: ${stage}: ${detail}${stack}`, { cause });\n\t\t      ^\n\nError: dsh: plugin tree failed to load: dsh: 1 entry did not activate\n@demo/dsh-bench-repo: pending (waiting for service: webServer)\n    at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511:9)\n    at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3 {\n  [cause]: Error: dsh: 1 entry did not activate\n  @demo/dsh-bench-repo: pending (waiting for service: webServer)\n      at assertEntriesActivated (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1458:9)\n      at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1503:9)\n      at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n      at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3\n}\n\nNode.js v24.21.0"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "fail",
+          "fingerprint": "exit1: dsh: profile bundle \"@demo/dsh-bench-repo\" declares no dsh.bundle in its package.json",
+          "detail": "file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:862\n\t\tif (declared === void 0) throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no dsh.bundle in its package.json`);\n\t\t                               ^\n\nError: dsh: profile bundle \"@demo/dsh-bench-repo\" declares no dsh.bundle in its package.json\n    at file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:862:34\n    at Array.map (<anonymous>)\n    at loadProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:859:25)\n    at prepareProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:162:18)\n    at composeProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:187:18)\n    at runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:234:25)\n    at file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n\nNode.js v24.21.0"
+        },
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "comments": []
+      },
+      "run": "local-2026-10-11T14-48-55-251Z",
+      "startedAt": "2026-10-11T14:48:58.348Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": false
+          },
+          "e2eSubsetFirst": true,
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "final",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 1,
+      "lastFingerprint": "pending: webServer",
+      "failure": {
+        "check": "boot",
+        "outcome": "fail",
+        "fingerprint": "pending: webServer",
+        "detail": "dsh: agent \"session-15b10197-0cfc-4e1c-97d7-fdf0aeb5a98e\" setup aborted: owner disposed during setup\nfile:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511\n\t\tthrow new Error(`${binName}: ${stage}: ${detail}${stack}`, { cause });\n\t\t      ^\n\nError: dsh: plugin tree failed to load: dsh: 1 entry did not activate\n@demo/dsh-bench-repo: pending (waiting for service: webServer)\n    at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511:9)\n    at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3 {\n  [cause]: Error: dsh: 1 entry did not activate\n  @demo/dsh-bench-repo: pending (waiting for service: webServer)\n      at assertEntriesActivated (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1458:9)\n      at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1503:9)\n      at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n      at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3\n}\n\nNode.js v24.21.0"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "fail",
+        "fingerprint": "exit1: dsh: profile bundle \"@demo/dsh-bench-repo\" declares no dsh.bundle in its package.json",
+        "detail": "file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:862\n\t\tif (declared === void 0) throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no dsh.bundle in its package.json`);\n\t\t                               ^\n\nError: dsh: profile bundle \"@demo/dsh-bench-repo\" declares no dsh.bundle in its package.json\n    at file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:862:34\n    at Array.map (<anonymous>)\n    at loadProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:859:25)\n    at prepareProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:162:18)\n    at composeProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:187:18)\n    at runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:234:25)\n    at file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n\nNode.js v24.21.0"
+      },
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "comments": []
+    },
+    "run": "local-2026-10-11T14-48-55-251Z",
+    "startedAt": "2026-10-11T14:48:58.348Z"
+  }
+}

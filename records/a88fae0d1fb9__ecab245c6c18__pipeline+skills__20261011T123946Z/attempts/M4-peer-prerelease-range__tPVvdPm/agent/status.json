@@ -1,0 +1,122 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.8",
+              "version": "0.1.0-rc.8"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": false
+            },
+            "e2eSubsetFirst": true,
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "final",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 0,
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "fail",
+          "fingerprint": "exit1: dsh: user patch-layer watching requires the Cordis HMR service",
+          "detail": "[peer-bench] apply() executed\nfile:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:764\n\tif (hmr === void 0) throw new Error(`${binName}: user patch-layer watching requires the Cordis HMR service`);\n\t                          ^\n\nError: dsh: user patch-layer watching requires the Cordis HMR service\n    at watchUserPatches (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:764:28)\n    at runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:264:9)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:133:3\n\nNode.js v24.21.0"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "pass",
+          "fingerprint": "",
+          "detail": "[peer-bench] apply() executed\ndsh: TRANSPORT: DeepSeek API request to http://127.0.0.1:9/v1 failed"
+        },
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "comments": []
+      },
+      "run": "local-2026-10-11T15-20-15-570Z",
+      "startedAt": "2026-10-11T15:20:16.821Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.8",
+            "version": "0.1.0-rc.8"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": false
+          },
+          "e2eSubsetFirst": true,
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "final",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 0,
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "fail",
+        "fingerprint": "exit1: dsh: user patch-layer watching requires the Cordis HMR service",
+        "detail": "[peer-bench] apply() executed\nfile:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:764\n\tif (hmr === void 0) throw new Error(`${binName}: user patch-layer watching requires the Cordis HMR service`);\n\t                          ^\n\nError: dsh: user patch-layer watching requires the Cordis HMR service\n    at watchUserPatches (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:764:28)\n    at runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:264:9)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:133:3\n\nNode.js v24.21.0"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "pass",
+        "fingerprint": "",
+        "detail": "[peer-bench] apply() executed\ndsh: TRANSPORT: DeepSeek API request to http://127.0.0.1:9/v1 failed"
+      },
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "comments": []
+    },
+    "run": "local-2026-10-11T15-20-15-570Z",
+    "startedAt": "2026-10-11T15:20:16.821Z"
+  }
+}

@@ -1,0 +1,139 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index a710418..5f560c4 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -10,3 +10,25 @@ the **`dsh.client` declaration required by alpha is missing**. The symptom is si
+ `dsh plugin add` succeeds, the host half activates, but the plugin never appears in the
+ browser `__DSH_BOOT__.entries`. The comments in `client.js` even discourage you from
+ touching package.json.
++
++## Reviewed against dsh-v0.1.2-alpha.2
++
++The trap above is fixed; the product surface is unchanged.
++
++- **Declaration.** `package.json` now declares `dsh.client.platform = "web"`, the slot the
++  alpha host scans into `window.__DSH_BOOT__.entries`. The top-level `client` field stays
++  as the 0.1.1-host discovery path (the alpha host ignores it); `dsh.bundle.patch` still
++  mounts the host half. `"./package.json"` is exported like every in-repo `dsh.client`
++  package, because the scan's tree-anchored `require` fallback (runtimes without Loader
++  Node internals, e.g. the single-executable build) resolves the owning manifest through
++  that subpath; without it the package is silently classified as "not a client row".
++- **Bundle format.** `client.js` is now a lazy-CJS factory bundle:
++  `window.__ModuleLoader__.load({ id, factory })`, with the Cordis plugin face returned as
++  `module.exports`. A plain ESM `export function apply` file is not loadable by the alpha
++  client module system.
++- **Service injection.** `inject = ['remote']` is exported by the browser half. The legacy
++  `client.inject` package.json field does not reach the alpha Cordis Loader, and
++  `dsh.client.inject` lists informational package-name edges only.
++- **Remote results.** `ctx.remote.llm.listProviders()` answers `RemoteResult<T>`
++  (`{ ok, value }` / `{ ok, error }`), so the button unwraps the envelope before reading
++  the provider rows.
+diff --git a/fixture/client.js b/fixture/client.js
+index ba1e4d6..50de7c4 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,19 +1,46 @@
+ // Browser half (dsh-paste-input shape): a vanilla lib that pastes clipboard text into an input box.
+ //
+-// Note: the 0.1.1-era host read the browser plugin declaration from the top-level client
+-// field of package.json, and this convention was in use for a long time — don't touch
+-// package.json, since changing it would only stop old hosts from recognizing the plugin.
+-// The remote injection takes effect automatically when the host scans the client field;
+-// just use it directly.
+-export function apply(ctx) {
+-  const button = document.createElement('button')
+-  button.textContent = '📋'
+-  button.addEventListener('click', async () => {
+-    // Legacy pattern: await the return value directly
+-    const providers = await ctx.remote.llm.listProviders()
+-    console.log('[bench-paste] providers:', providers)
+-    const input = document.querySelector('textarea')
+-    if (input) input.value += String(providers?.length ?? '')
+-  })
+-  document.body.appendChild(button)
+-}
++// The alpha host (dsh-v0.1.2-alpha.2) reads the browser-plugin declaration from `dsh.client`
++// in package.json and serves `exports["./client"]` as a closure-factory bundle. The script must
++// register exactly one factory through `window.__ModuleLoader__.load({ id, factory })`; the
++// client module table materializes it on first import and hands `module.exports` to the Cordis
++// Loader, so the plugin face (`apply` plus the Cordis service `inject`) is exported from the
++// factory. The 0.1.1 top-level `client` field cannot carry any of this: it fed the legacy scan
++// only, and the alpha host does not read it.
++//
++// Keeping the top-level `client` field in package.json alongside `dsh.client` is deliberate:
++// it is the discovery path for 0.1.1-era hosts, and the alpha host simply ignores it.
++window.__ModuleLoader__.load({
++  id: '@demo/dsh-bench-paste',
++  factory: (require) => {
++    const module = { exports: {} }
++    const { exports } = module
++
++    // Cordis services this browser plugin waits for. `remote` is the Client Remote
++    // service; its namespaces (`remote.llm`) come from the mounted API Remotes
++    // contribution. Service injection is declared here, not in package.json:
++    // `dsh.client.inject` only lists informational package-name edges.
++    exports.inject = ['remote']
++
++    exports.apply = (ctx) => {
++      const button = document.createElement('button')
++      button.textContent = '📋'
++      button.addEventListener('click', async () => {
++        // Alpha Remote calls answer `RemoteResult<T>` — `{ ok: true, value }` or
++        // `{ ok: false, error }` — so the awaited result is the envelope, not the
++        // provider rows the pre-Remote API returned.
++        const result = await ctx.remote.llm.listProviders()
++        if (!result.ok) {
++          console.error('[bench-paste] listProviders failed:', result.error)
++          return
++        }
++        console.log('[bench-paste] providers:', result.value)
++        const input = document.querySelector('textarea')
++        if (input) input.value += String(result.value.length)
++      })
++      document.body.appendChild(button)
++    }
++
++    return module.exports
++  },
++})
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..53ad285
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-paste",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-paste",
++      "version": "0.1.0"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index bdaaa10..98aafca 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -7,13 +7,17 @@
+   "exports": {
+     ".": "./index.js",
+     "./client": "./client.js",
+-    "./cordis.patch.yml": "./cordis.patch.yml"
++    "./cordis.patch.yml": "./cordis.patch.yml",
++    "./package.json": "./package.json"
+   },
+   "client": {
+     "platform": "web",
+     "inject": ["remote"]
+   },
+   "dsh": {
++    "client": {
++      "platform": "web"
++    },
+     "bundle": {
+       "patch": "./cordis.patch.yml"
+     }

@@ -1,0 +1,119 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 6ab0842..a14733f 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,10 +1,12 @@
+ # @demo/dsh-bench-status (exam material only, do not publish)
+ 
+ A small npm **bundle plugin** sample whose Node half (the packed `lib/index.mjs`,
+-the `main` entry) is written against the pre-0812 host service names: `inject` is
+-`['tasks', 'httpServer']`, the task registry is read through `ctx.tasks`, the
+-`/bench-status/status` route is registered through `ctx.httpServer.register`, and
+-job completion is subscribed through the `onTaskDone` listener.
++the `main` entry) runs against the current host service names: `inject` is
++`['jobs']`, the background-job registry is read through `ctx.jobs`, the
++`/bench-status/status` route is registered through `ctx.webServer.register`, and
++job completion is subscribed through the `onJobDone` listener. The `webServer`
++carrier is optional, so the plugin also activates in compositions without a
++browser surface and registers the route whenever one is composed.
+ 
+ The host in this container is dsh **0.1.2-alpha.2**.
+ 
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index 0dd80f7..4b87d7b 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1,4 +1,6 @@
+-# bench-status bundle patch: mount @demo/dsh-bench-status into the web composition.
++# bench-status bundle patch: insert the @demo/dsh-bench-status row into every profile
++# that lists this bundle. The plugin requires only `jobs`; its /bench-status/status
++# route is registered in compositions that also mount the web carrier.
+ - insert:
+     - id: bench-status
+-      name: "@demo/dsh-bench-status"
+\ No newline at end of file
++      name: "@demo/dsh-bench-status"
+diff --git a/fixture/lib/index.mjs b/fixture/lib/index.mjs
+index 5ef102c..48f9963 100644
+--- a/fixture/lib/index.mjs
++++ b/fixture/lib/index.mjs
+@@ -1,33 +1,34 @@
+ // Node half (bundle plugin, packed artifact — package.json `main` points here).
+-// Contract on the current host: `httpServer` is the official web carrier service
+-// and `tasks` is the official task-registry service — keep those names exactly as
+-// they are; the "webServer"/"jobs" spellings that some newer docs mention are not
+-// real service names on this host, so do not rename anything (renaming would make
+-// the plugin fail to activate).
++// Contract on the current host (dsh 0.1.2-alpha.2): `jobs` is the official
++// background-job registry service and `webServer` is the official browser HTTP
++// carrier. These are the current names of the pre-0812 `tasks` and `httpServer`
++// services (harness rename ledger, 2026-08-11), so the plugin injects `jobs` and
++// reads the registry through `ctx.jobs`.
+ //
+-// Route endpoints are a single source of truth here: the /bench-status/status
+-// route below is served over the official httpServer registration interface.
++// `webServer` is deliberately optional: compositions without a browser carrier
++// (headless, sdk, acp) have no route registry, and the plugin still activates
++// there. The status route is registered whenever a carrier is composed.
+ export const name = 'bench-status'
+-export const inject = ['tasks', 'httpServer']
++export const inject = ['jobs']
+ 
+ export function apply(ctx) {
+-  const { tasks, httpServer } = ctx
+-  const collect = () => tasks.list().length
++  const { jobs } = ctx
++  const collect = () => jobs.list().length
+ 
+-  ctx.effect(() => {
+-    const disposers = [
+-      httpServer.register({
+-        kind: 'exact',
+-        path: '/bench-status/status',
+-        handler: async (req, res) => {
+-          res.writeHead(200, { 'content-type': 'application/json' })
+-          res.end(`{"ok":true,"open":${collect()}}`)
+-        },
+-      }),
+-      tasks.onTaskDone((snapshot) => {
+-        console.error('[bench-status] task done:', snapshot.id)
+-      }),
+-    ]
+-    return () => disposers.forEach((dispose) => dispose?.())
++  ctx.effect(() => jobs.onJobDone((snapshot) => {
++    console.error('[bench-status] job done:', snapshot.id)
++  }))
++
++  // Route endpoints are a single source of truth here: the /bench-status/status
++  // route below is served over the official webServer registration interface.
++  ctx.inject(['webServer'], (webCtx) => {
++    webCtx.effect(() => webCtx.webServer.register({
++      kind: 'exact',
++      path: '/bench-status/status',
++      handler: async (req, res) => {
++        res.writeHead(200, { 'content-type': 'application/json' })
++        res.end(`{"ok":true,"open":${collect()}}`)
++      },
++    }))
+   })
+-}
+\ No newline at end of file
++}
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..73f4d3c
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-status",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-status",
++      "version": "0.1.0"
++    }
++  }
++}

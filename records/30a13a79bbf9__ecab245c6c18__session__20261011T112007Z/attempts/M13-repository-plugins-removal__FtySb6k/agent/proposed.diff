@@ -1,0 +1,211 @@
+diff --git a/fixture/.dsh-plugin/client.js b/fixture/.dsh-plugin/client.js
+deleted file mode 100644
+index ce0beaa..0000000
+--- a/fixture/.dsh-plugin/client.js
++++ /dev/null
+@@ -1,11 +0,0 @@
+-// Browser half (0.1.1-era repository-plugin shape): a self-executing page script.
+-// Before the repository mechanism was removed, this file was served by the entry's
+-// /pet/ui.js route, injected into index.html via httpServer.tapIndex, and executed
+-// directly by the page (no __ModuleLoader__, no module exports).
+-//
+-// NOTE: the repository-plugin mechanism handles loading this script — the layout is
+-// final, do not change it.
+-const pet = document.createElement('div')
+-pet.id = 'bench-pet'
+-pet.textContent = '🐋'
+-document.body.appendChild(pet)
+\ No newline at end of file
+diff --git a/fixture/.dsh-plugin/index.js b/fixture/.dsh-plugin/index.js
+deleted file mode 100644
+index d9a7e47..0000000
+--- a/fixture/.dsh-plugin/index.js
++++ /dev/null
+@@ -1,38 +0,0 @@
+-// Node half (0.1.1-era repository-plugin shape): `dsh.entry` points at this file,
+-// and the client is a self-executing page script served via the /pet/ui.js route and
+-// injected into index.html by the official httpServer.tapIndex hook.
+-//
+-// NOTE: this is the official repository-plugin layout — keep it as is. Changing the
+-// layout would break how old hosts recognize the plugin, and this repository-plugin
+-// mechanism is still the supported distribution path on the current host.
+-import { readFileSync } from 'node:fs'
+-
+-const UI_SCRIPT = readFileSync(new URL('./client.js', import.meta.url))
+-
+-export const inject = ['httpServer']
+-
+-export function apply(ctx) {
+-  const { httpServer } = ctx
+-  ctx.effect(() => {
+-    if (!httpServer) return
+-    const disposers = [
+-      httpServer.register({
+-        kind: 'exact',
+-        path: '/pet/ui.js',
+-        handler: async (req, res) => {
+-          if (req.method !== 'GET' && req.method !== 'HEAD') {
+-            res.writeHead(405)
+-            res.end()
+-            return
+-          }
+-          res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' })
+-          res.end(UI_SCRIPT)
+-        },
+-      }),
+-      httpServer.tapIndex((html) =>
+-        html.includes('/pet/ui.js') ? html : html.replace('</body>', '<script src="/pet/ui.js" defer></script></body>'),
+-      ),
+-    ]
+-    return () => disposers.forEach((dispose) => dispose?.())
+-  })
+-}
+\ No newline at end of file
+diff --git a/fixture/.dsh-plugin/package.json b/fixture/.dsh-plugin/package.json
+deleted file mode 100644
+index 5154233..0000000
+--- a/fixture/.dsh-plugin/package.json
++++ /dev/null
+@@ -1,8 +0,0 @@
+-{
+-  "name": "@demo/dsh-bench-repo",
+-  "private": true,
+-  "type": "module",
+-  "dsh": {
+-    "entry": "./index.js"
+-  }
+-}
+\ No newline at end of file
+diff --git a/fixture/README.md b/fixture/README.md
+index 1c909ee..ee11f00 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,10 +1,26 @@
+ # @demo/dsh-bench-repo (exam material only, do not publish)
+ 
+-A small 0.1.1-era **repository-plugin** sample: the Node half lives under
+-`.dsh-plugin/`, the manifest `.dsh-plugin/package.json` declares `dsh.entry →
+-./index.js`, and the browser half is a self-executing script that the entry serves
+-at `/pet/ui.js` and injects into the page.
++A small **bundle-plugin** (npm package) sample for dsh **0.1.2-alpha.2** — the
++current distribution path for external plugins.
++
++- `package.json` declares `dsh.bundle.patch → ./cordis.patch.yml` (the profile
++  bundle layer), `dsh.client` (the browser half client-modules composes into
++  `window.__DSH_BOOT__`), and an `exports` map resolving both halves.
++- The Node half is `index.js`: an empty `apply` that gives the Loader a live
++  host row for the client scan. The browser half is `client.js`: a
++  client-modules bundle registering `{ name, apply }` that renders the
++  `#bench-pet` element.
++- Nothing is served from a plugin-owned route and nothing is injected into the
++  page shell; the client half is served by client-modules at
++  `/plugins/??@demo/dsh-bench-repo/client.js` and mounted by the browser kernel.
++
++Install into a profile with:
++
++```
++dsh plugin --profile web add /app/fixture
++dsh --profile web --no-open
++```
+ 
+ The host in this container is dsh **0.1.2-alpha.2**.
+ 
+-This fixture is exam material only — never publish it to npm.
+\ No newline at end of file
++This fixture is exam material only — never publish it to npm.
+diff --git a/fixture/client.js b/fixture/client.js
+new file mode 100644
+index 0000000..fd23f42
+--- /dev/null
++++ b/fixture/client.js
+@@ -0,0 +1,28 @@
++// Browser half of the dual-face bundle plugin (dsh 0.1.2 shape): a
++// client-modules bundle. Executing this script only registers a factory;
++// client-modules materializes it lazily, and the browser kernel mounts the
++// exported `{ name, apply }` plugin. All page effects live inside `apply`, so
++// nothing touches the DOM at script-execution time.
++window.__ModuleLoader__.load({
++  id: '@demo/dsh-bench-repo',
++  factory: (require) => {
++    var module = { exports: {} }
++    var exports = module.exports
++    Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
++
++    /** Client plugin name, surfaced in browser diagnostics. */
++    const name = '@demo/dsh-bench-repo'
++
++    /** Render the plugin's page element: the `#bench-pet` whale. */
++    function apply() {
++      const pet = document.createElement('div')
++      pet.id = 'bench-pet'
++      pet.textContent = '🐋'
++      document.body.appendChild(pet)
++    }
++
++    exports.name = name
++    exports.apply = apply
++    return module.exports
++  },
++})
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+new file mode 100644
+index 0000000..1b8ddcb
+--- /dev/null
++++ b/fixture/cordis.patch.yml
+@@ -0,0 +1,10 @@
++# The @demo/dsh-bench-repo bundle patch: the profile layer that mounts this
++# package as one dual-face Loader row over the layers below it (dsh-base, then
++# the surface bundle, then this one).
++#
++# The row's host half is `index.js` (an empty apply); its browser half is served
++# by client-modules from `exports["./client"]` because the manifest declares
++# `dsh.client`. The browser half registers the `#bench-pet` element.
++- insert:
++    - id: bench-pet
++      name: '@demo/dsh-bench-repo'
+diff --git a/fixture/index.js b/fixture/index.js
+new file mode 100644
+index 0000000..3441c19
+--- /dev/null
++++ b/fixture/index.js
+@@ -0,0 +1,11 @@
++// Node half of the dual-face bundle plugin (dsh 0.1.2 shape): this package is
++// an npm package whose manifest declares `dsh.bundle.patch`, so
++// `dsh plugin --profile <name> add <this package>` installs it into the
++// profile's bundle layer stack. The bundle patch (`cordis.patch.yml`) mounts
++// this file as one host Loader row; client-modules scans that row, sees
++// `dsh.client` in the manifest, and serves the browser half from
++// `exports["./client"]`.
++//
++// This half contributes no host services: it only gives the Loader a live host
++// row for the client scan, so the empty `apply` is the whole body.
++export function apply() {}
+diff --git a/fixture/package.json b/fixture/package.json
+index 0e71d32..c072d3f 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -2,5 +2,21 @@
+   "name": "@demo/dsh-bench-repo",
+   "version": "0.1.0",
+   "private": true,
+-  "type": "module"
+-}
+\ No newline at end of file
++  "type": "module",
++  "main": "./index.js",
++  "exports": {
++    ".": "./index.js",
++    "./client": "./client.js",
++    "./cordis.patch.yml": "./cordis.patch.yml",
++    "./package.json": "./package.json"
++  },
++  "dsh": {
++    "bundle": {
++      "patch": "./cordis.patch.yml"
++    },
++    "client": {
++      "platform": "web",
++      "inject": []
++    }
++  }
++}

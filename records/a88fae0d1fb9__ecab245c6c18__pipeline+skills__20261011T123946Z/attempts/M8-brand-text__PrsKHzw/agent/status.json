@@ -1,0 +1,136 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.8",
+              "version": "0.1.0-rc.8"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": false
+            },
+            "e2eSubsetFirst": true,
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "final",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 1,
+        "lastFingerprint": "mechanical: npm error peer @deepseek-ai/dsh-settings@\"^<n>.<n>-rc.<n>\" from @deepseek-ai/dsh-agent-default-model@<n>.<n>-rc.<n>",
+        "failure": {
+          "check": "mechanical",
+          "outcome": "fail",
+          "fingerprint": "mechanical: npm error peer @deepseek-ai/dsh-settings@\"^<n>.<n>-rc.<n>\" from @deepseek-ai/dsh-agent-default-model@<n>.<n>-rc.<n>",
+          "detail": "npm error peer @deepseek-ai/dsh-settings@\"^0.1.2-rc.1\" from @deepseek-ai/dsh-agent-default-model@0.1.2-rc.1\nnpm error node_modules/@deepseek-ai/dsh-agent-default-model\nnpm error   peer @deepseek-ai/dsh-agent-default-model@\"^0.1.2-alpha.2\" from @deepseek-ai/dsh-api-session-controller@0.1.2-alpha.2\nnpm error   node_modules/@deepseek-ai/dsh-api-session-controller\nnpm error     peerOptional @deepseek-ai/dsh-api-session-controller@\"0.1.2-alpha.2\" from the root project\nnpm error\nnpm error Conflicting peer dependency: @deepseek-ai/dsh-settings@0.1.2-rc.1\nnpm error node_modules/@deepseek-ai/dsh-settings\nnpm error   peer @deepseek-ai/dsh-settings@\"^0.1.2-rc.1\" from @deepseek-ai/dsh-agent-default-model@0.1.2-rc.1\nnpm error   node_modules/@deepseek-ai/dsh-agent-default-model\nnpm error     peer @deepseek-ai/dsh-agent-default-model@\"^0.1.2-alpha.2\" from @deepseek-ai/dsh-api-session-controller@0.1.2-alpha.2\nnpm error     node_modules/@deepseek-ai/dsh-api-session-controller\nnpm error       peerOptional @deepseek-ai/dsh-api-session-controller@\"0.1.2-alpha.2\" from the root project\nnpm error\nnpm error Fix the upstream dependency conflict, or retry this command with --force or --legacy-peer-deps to accept an incorrect (and potentially broken) dependency resolution.\nnpm error\nnpm error\nnpm error For a full report see:\nnpm error /root/.npm/_logs/2026-10-11T16_15_13_330Z-eresolve-report.txt\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-11T16_15_13_330Z-debug-0.log"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "fail",
+          "fingerprint": "pending: webServer",
+          "detail": "dsh: agent \"session-d6d4e4c3-9d44-410d-9607-e886f441b23b\" setup aborted: owner disposed during setup\nfile:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1187\n\t\tthrow new Error(`${binName}: ${stage}: ${detail}${stack}`, { cause });\n\t\t      ^\n\nError: dsh: plugin tree failed to load: dsh: 1 entry did not activate\n@bench/dsh-bench-brand-text: pending (waiting for service: webServer)\n    at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1187:9)\n    at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:247:14)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:133:3 {\n  [cause]: Error: dsh: 1 entry did not activate\n  @bench/dsh-bench-brand-text: pending (waiting for service: webServer)\n      at assertEntriesActivated (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1134:9)\n      at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1179:9)\n      at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:247:14)\n      at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:133:3\n}\n\nNode.js v24.21.0"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "fail",
+          "fingerprint": "pending: webServer",
+          "detail": "dsh: agent \"session-bffc14d0-b604-4464-bfdf-35811534e922\" setup aborted: owner disposed during setup\nfile:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511\n\t\tthrow new Error(`${binName}: ${stage}: ${detail}${stack}`, { cause });\n\t\t      ^\n\nError: dsh: plugin tree failed to load: dsh: 1 entry did not activate\n@bench/dsh-bench-brand-text: pending (waiting for service: webServer)\n    at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511:9)\n    at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3 {\n  [cause]: Error: dsh: 1 entry did not activate\n  @bench/dsh-bench-brand-text: pending (waiting for service: webServer)\n      at assertEntriesActivated (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1458:9)\n      at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1503:9)\n      at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n      at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3\n}\n\nNode.js v24.21.0"
+        },
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "comments": []
+      },
+      "run": "local-2026-10-11T15-48-20-584Z",
+      "startedAt": "2026-10-11T15:48:28.158Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.8",
+            "version": "0.1.0-rc.8"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": false
+          },
+          "e2eSubsetFirst": true,
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "final",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 1,
+      "lastFingerprint": "mechanical: npm error peer @deepseek-ai/dsh-settings@\"^<n>.<n>-rc.<n>\" from @deepseek-ai/dsh-agent-default-model@<n>.<n>-rc.<n>",
+      "failure": {
+        "check": "mechanical",
+        "outcome": "fail",
+        "fingerprint": "mechanical: npm error peer @deepseek-ai/dsh-settings@\"^<n>.<n>-rc.<n>\" from @deepseek-ai/dsh-agent-default-model@<n>.<n>-rc.<n>",
+        "detail": "npm error peer @deepseek-ai/dsh-settings@\"^0.1.2-rc.1\" from @deepseek-ai/dsh-agent-default-model@0.1.2-rc.1\nnpm error node_modules/@deepseek-ai/dsh-agent-default-model\nnpm error   peer @deepseek-ai/dsh-agent-default-model@\"^0.1.2-alpha.2\" from @deepseek-ai/dsh-api-session-controller@0.1.2-alpha.2\nnpm error   node_modules/@deepseek-ai/dsh-api-session-controller\nnpm error     peerOptional @deepseek-ai/dsh-api-session-controller@\"0.1.2-alpha.2\" from the root project\nnpm error\nnpm error Conflicting peer dependency: @deepseek-ai/dsh-settings@0.1.2-rc.1\nnpm error node_modules/@deepseek-ai/dsh-settings\nnpm error   peer @deepseek-ai/dsh-settings@\"^0.1.2-rc.1\" from @deepseek-ai/dsh-agent-default-model@0.1.2-rc.1\nnpm error   node_modules/@deepseek-ai/dsh-agent-default-model\nnpm error     peer @deepseek-ai/dsh-agent-default-model@\"^0.1.2-alpha.2\" from @deepseek-ai/dsh-api-session-controller@0.1.2-alpha.2\nnpm error     node_modules/@deepseek-ai/dsh-api-session-controller\nnpm error       peerOptional @deepseek-ai/dsh-api-session-controller@\"0.1.2-alpha.2\" from the root project\nnpm error\nnpm error Fix the upstream dependency conflict, or retry this command with --force or --legacy-peer-deps to accept an incorrect (and potentially broken) dependency resolution.\nnpm error\nnpm error\nnpm error For a full report see:\nnpm error /root/.npm/_logs/2026-10-11T16_15_13_330Z-eresolve-report.txt\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-11T16_15_13_330Z-debug-0.log"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "fail",
+        "fingerprint": "pending: webServer",
+        "detail": "dsh: agent \"session-d6d4e4c3-9d44-410d-9607-e886f441b23b\" setup aborted: owner disposed during setup\nfile:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1187\n\t\tthrow new Error(`${binName}: ${stage}: ${detail}${stack}`, { cause });\n\t\t      ^\n\nError: dsh: plugin tree failed to load: dsh: 1 entry did not activate\n@bench/dsh-bench-brand-text: pending (waiting for service: webServer)\n    at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1187:9)\n    at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:247:14)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:133:3 {\n  [cause]: Error: dsh: 1 entry did not activate\n  @bench/dsh-bench-brand-text: pending (waiting for service: webServer)\n      at assertEntriesActivated (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1134:9)\n      at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1179:9)\n      at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-DG5t9aNs.js:247:14)\n      at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:133:3\n}\n\nNode.js v24.21.0"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "fail",
+        "fingerprint": "pending: webServer",
+        "detail": "dsh: agent \"session-bffc14d0-b604-4464-bfdf-35811534e922\" setup aborted: owner disposed during setup\nfile:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511\n\t\tthrow new Error(`${binName}: ${stage}: ${detail}${stack}`, { cause });\n\t\t      ^\n\nError: dsh: plugin tree failed to load: dsh: 1 entry did not activate\n@bench/dsh-bench-brand-text: pending (waiting for service: webServer)\n    at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1511:9)\n    at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3 {\n  [cause]: Error: dsh: 1 entry did not activate\n  @bench/dsh-bench-brand-text: pending (waiting for service: webServer)\n      at assertEntriesActivated (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1458:9)\n      at boot (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1503:9)\n      at async runProfile (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/profile-boot-BTzzdrGY.js:261:14)\n      at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.2-alpha.2/lib/node_modules/@deepseek-ai/dsh/lib/bin.js:130:3\n}\n\nNode.js v24.21.0"
+      },
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "comments": []
+    },
+    "run": "local-2026-10-11T15-48-20-584Z",
+    "startedAt": "2026-10-11T15:48:28.158Z"
+  }
+}

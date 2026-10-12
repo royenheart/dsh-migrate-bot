@@ -1,0 +1,404 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 8c7e58e..2a4573e 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,12 +1,24 @@
+ # bench-interpreters-card (benchmark fixture)
+ 
+-An interpreter-path tool plugin: the host half registers `run_python` /
+-`run_node` tools and exposes the `interpreters` config through a self-hosted
+-`/interpreters/api` HTTP gateway route (reads/writes the settings namespace
+-in-process through the settings bridge); the browser half registers a
+-settings-plugins card that reads/writes through that route and converges on
+-pushed connection invalidations. Written in the 0.1.1-era style. The host is
+-moving to dsh 0.1.2-alpha.2.
++An interpreter-path tool plugin. The host half registers `run_python` /
++`run_node` tools, registers the `interpreters` config as a settings namespace
++through the official optional-settings seam (`ctx.settings.installSection`,
++with the composition row as the base layer and the headless fallback), and
++exposes the same namespace through the plugin-owned `/interpreters/api` HTTP
++gateway route registered on the official web-server carrier
++(`ctx.webServer.register`, attached only where a web server is composed). The
++browser half registers a settings-plugins card that reads/writes the namespace
++through that route and converges on pushed connection invalidations. Written
++for dsh 0.1.2-alpha.2.
++
++The plugin-owned gateway is deliberate product surface, not a leftover: the
++harness's official settings RPC serves every registered namespace, but it is a
++*different* RPC — its own namespace-addressed handle, snapshot, and
++revision-fenced writes — so it does not cover the documented
++`/interpreters/api` entry point. Registering the namespace through
++`installSection` is still required: it is what the Host serves to configuration
++clients ("registering is exposing") and therefore what makes the Plugins tab
++dispatch the card's `interpreters` key.
+ 
+ Release procedure (internal):
+ 
+diff --git a/fixture/client.js b/fixture/client.js
+index e7c00d9..18aecda 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,24 +1,43 @@
+ // Browser half (settings-plugins card): registers the interpreters card into
+-// the shell-declared `settings.plugin.item` slot and converges on pushed
+-// connection resets instead of polling.
++// the shell-declared `settings.plugin.item` slot, reads/writes the
++// `interpreters` config through the host half's `/interpreters/api` gateway
++// route, and converges on pushed connection resets instead of polling.
+ //
+ // ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.1 era):
+-//   "SettingsProvider is just an alias of the old Settings type — keep the
+-//    old name. And the snapshot store still ships in dsh-client-runtime on
+-//    alpha (deprecated but present), so the runtime peer stays."
++// Migration notes (0.1.2-alpha.2):
++//   * `@deepseek-ai/dsh-client-runtime` is gone. The client context type is
++//     `@deepseek-ai/cordis`'s `Context`, and the observable snapshot store
++//     ships in `@deepseek-ai/dsh-client-store` (a client baseline module), not
++//     in a runtime re-export.
++//   * The dsh-settings service type is `SettingsProvider`; the 0.1.1-era
++//     `Settings` name no longer exists.
++//   * The gateway route stays this card's transport. The official settings RPC
++//     (`ctx.settingsScope`) is a different RPC — its own namespace-addressed
++//     handle, snapshot, and revision fencing — so swapping the card onto it
++//     would replace the documented `/interpreters/api` read/write path rather
++//     than move it. The Host also registers the namespace through the official
++//     seam (`ctx.settings.installSection`), which is what makes the Plugins tab
++//     serve and dispatch this card's `interpreters` key.
+ // ────────────────────────────────────────────────────────────
+-//
+-// 0.1.1-era type surface: the client context type comes from the client
+-// runtime package; the snapshot store ships with it.
+ 
+-// The persisted snapshot store behind the card. 0.1.1-era source (real
+-// import shape):
++// Type-only, erased before the browser bundle: the Context merges this half
++// registers through. A real value import would cross the client bundle-purity
++// gate, so the built bundle carries only `@deepseek-ai/dsh-client-store` (a
++// client baseline module) as a value.
++//
++//   import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'          // ctx.slots
++//   import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'  // settings.plugin.item
++//   import type {} from '@deepseek-ai/dsh-client-locale/client'               // ctx.locale
++//   import type {} from '@deepseek-ai/dsh-client-connection/client'           // connection/reset
++//
++// The snapshot store behind the card. The client plane value-imports only the
++// frozen platform module table, so this is a baseline import at bundle build
++// time:
+ //
+-//   import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
++//   import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+ //
+ /**
+- * @type {import('@deepseek-ai/dsh-client-runtime/client').SnapshotStore<Record<string, unknown>>}
++ * @type {import('@deepseek-ai/dsh-client-store').SnapshotStore<Record<string, unknown>>}
+  */
+ let store
+ 
+@@ -42,19 +61,22 @@ function cardStub() {
+ 
+ /**
+  * Register the interpreters card and wire its store to the connection.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx) {
+   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'bench-interpreters-card: dictionaries')
+ 
+-  // The card's store reads/writes the interpreters config over the plugin's
+-  // self-hosted HTTP route (`/interpreters/api/get` + `/interpreters/api/set`),
+-  // built on the snapshot store above. Body elided.
++  // The card's store reads/writes the interpreters config over the host half's
++  // gateway route (`POST /interpreters/api/get` + `/interpreters/api/set`),
++  // built on the snapshot store above: `{ ok: true, value: { config } }` on a
++  // read, `{ ok: false, error }` when no settings provider is mounted. Body
++  // elided.
+ 
+-  // Pushed invalidations converge the open surface without polling: the dsh
+-  // client Events vocabulary has no `settings/changed` host passthrough, so
+-  // convergence rides `connection/reset` — a burst of resets coalesces into
+-  // a single refetch via the microtask debounce. (Real effect shape.)
++  // Pushed invalidations converge the open surface without polling: a
++  // plugin-owned route has no settings-change passthrough in the client Events
++  // vocabulary, so convergence rides `connection/reset` — a burst of resets
++  // coalesces into a single refetch via the microtask debounce. (Real effect
++  // shape.)
+   ctx.effect(() => {
+     let pending = false
+     const refresh = () => {
+@@ -71,7 +93,9 @@ export function apply(ctx) {
+ 
+   // The card registers into the plugin-config page's card slot with the
+   // upstream card shape — generator + `yield`, `locale: NS`, and an inject
+-  // face carrying only the business surface (elided).
++  // face carrying only the business surface (elided). `key` is the settings
++  // namespace the card edits: the tab dispatches one key per namespace the Host
++  // serves, so a card for an uncomposed namespace never renders.
+   ctx.slots.inject('settings.plugin.item', function* () {
+     yield ctx.slots.register({
+       name: 'settings.plugin.item',
+diff --git a/fixture/index.js b/fixture/index.js
+index 2651e07..05b84d1 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,25 +1,38 @@
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the client snapshot store shipped in
+-// the client runtime package, and the dsh-settings service type was `Settings`.
++// 0.1.2-alpha.2 cohort: the client snapshot store lives in
++// `@deepseek-ai/dsh-client-store`, the dsh-settings service type is
++// `SettingsProvider` (the `Settings` name is gone), and the settings wire
++// serves every namespace a host plugin registers.
+ //
+ // Host half: registers the model-facing interpreter tools (body elided — the
+ // registration shape is unchanged across the migration and not part of the
+-// exam) and exposes the `interpreters` config to the browser through a
+-// self-hosted `/interpreters/api` HTTP route: `ctx.webServer.register` claims
+-// a prefix route and the handler reads/writes the settings seam in-process
+-// through the bridge (`ctx.inject(['settings'], …)`) — no wire-layer
+-// allowlist gate. The browser card reaches it via `/interpreters/api/get|set`.
++// exam), registers the `interpreters` config through the official
++// optional-settings seam (`ctx.settings.installSection`), and exposes the same
++// namespace to the browser through the plugin-owned `/interpreters/api`
++// gateway route.
++//
++// The gateway is kept on purpose. The official settings RPC now serves every
++// registered namespace, but it is a *different* RPC — its own path, envelope,
++// and revision-fenced write contract — so it does not cover the documented
++// `/interpreters/api` entry point. The route is attached through an optional
++// `ctx.inject(['webServer'], …)` bridge instead of a hard `inject` edge, so a
++// headless assembly without a web server still loads the plugin on the
++// composition config; where a web server is composed, the route is registered.
+ 
+ export const name = 'bench-interpreters-card'
+ 
+-// Host-plane services: the tools service (run_python / run_node) and the web
+-// server service that owns the plugin's HTTP gateway route.
+-export const inject = ['tools', 'webServer']
++// Host-plane service: the tools service (run_python / run_node). The settings
++// provider and the web server are optional, reached through the two bridges
++// below: a hard edge on either would leave this fiber pending forever in a
++// composition that does not mount it (the headless assembly mounts no web
++// server).
++export const inject = ['tools']
+ 
+ /**
+- * Live settings service handle, claimed through the settings bridge. The
+- * 0.1.1-era dsh-settings type:
++ * Live settings service handle, claimed through the settings bridge. On this
++ * harness the dsh-settings service type is `SettingsProvider`; the 0.1.1-era
++ * `Settings` alias no longer exists.
+  *
+- * @type {import('@deepseek-ai/dsh-settings').Settings | undefined}
++ * @type {import('@deepseek-ai/dsh-settings').SettingsProvider | undefined}
+  */
+ let settings
+ 
+@@ -27,21 +40,36 @@ let settings
+  * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx, config) {
+-  console.error('[bench-interpreters-card] apply() on the 0.1.1-era cohort: runtime SnapshotStore + dsh-settings Settings')
++  console.error('[bench-interpreters-card] apply() on the 0.1.2-alpha.2 cohort: dsh-client-store + SettingsProvider')
+ 
+-  // The settings bridge: the gateway reads/writes the `interpreters`
+-  // namespace in-process. The settings service is optional — when absent,
+-  // `get` degrades to the composition config and `set` returns a clear
+-  // error. (Real call shape; the namespace install body is elided.)
++  // The settings bridge: the official optional-settings attach. The config
++  // schema and the namespace install body are elided with the tool bodies; the
++  // call shape is:
++  //
++  //   settings.installSection(ctx, 'interpreters', Config, config, {
++  //     setSource: (current) => { source = current },
++  //     onChange: () => { /* re-register the tools' description */ },
++  //   })
++  //
++  // `installSection` registers the namespace on the provider with the
++  // composition row as its base layer, swaps the source thunk to the user layer
++  // while the provider is mounted, and falls back to the composition entry when
++  // it detaches — the same silent degrade the old direct registration carried.
++  // The settings service stays optional: a headless assembly without a provider
++  // still loads the plugin on the composition config. Registering the namespace
++  // is also what makes the Host serve it to configuration clients
++  // ("registering is exposing"), so the Plugins tab dispatches the card's
++  // `interpreters` key.
+   ctx.inject(['settings'], (sctx) => {
+     settings = sctx.settings
+     return () => { settings = undefined }
+   })
+ 
+-  // The self-hosted HTTP gateway route (real registration call shape). The
+-  // handler body is elided where heavy: POST /interpreters/api/get|set,
+-  // JSON envelope { ok: true, value: { config } } | { ok: false, error }.
+-  ctx.effect(() => ctx.webServer.register({
++  // The plugin-owned config gateway (documented entry point): `ctx.webServer`
++  // claims the prefix route and the handler reads/writes the `interpreters`
++  // namespace in-process through the settings bridge. The returned disposer is
++  // collected by the inject scope, so the route leaves with the web server.
++  ctx.inject(['webServer'], (wctx) => wctx.webServer.register({
+     kind: 'prefix',
+     path: '/interpreters/api',
+     handler: async (req, res) => {
+@@ -50,8 +78,8 @@ export function apply(ctx, config) {
+       res.writeHead(200, { 'content-type': 'application/json' })
+       res.end(JSON.stringify({ ok: true, value: { config: config ?? {} } }))
+     },
+-  }), 'bench-interpreters-card: /interpreters/api routes')
++  }))
+ 
+-  // Elided: the tool registration + bridge.onChange live re-register (the
+-  // model-visible tool description tracks the live interpreter path).
++  // Elided: the tool registration + installSection onChange live re-register
++  // (the model-visible tool description tracks the live interpreter path).
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..aa63cbe
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,68 @@
++{
++  "name": "@bench/dsh-bench-interpreters-card",
++  "version": "0.3.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-interpreters-card",
++      "version": "0.3.0",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-client-connection": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-store": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-host-webserver": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-settings": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2",
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "react": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-connection": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-store": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-primitives": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-renderer": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-settings-plugins": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-host-webserver": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-settings": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-tools": {
++          "optional": true
++        },
++        "@deepseek-ai/schemastery": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        }
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index a580f8a..930a02b 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-interpreters-card",
+-  "version": "0.2.3",
+-  "description": "Interpreter-path tool plugin with a self-hosted HTTP config gateway and a settings-plugins card (0.1.1-era cohort; exam material only)",
++  "version": "0.3.0",
++  "description": "Interpreter-path tool plugin with a plugin-owned interpreters config gateway, an official interpreters settings namespace, and a settings-plugins card (dsh 0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -16,41 +16,42 @@
+     "client": {
+       "platform": "web",
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+-        "@deepseek-ai/dsh-client-locale",
+         "@deepseek-ai/dsh-client-connection",
+-        "@deepseek-ai/dsh-client-ui-settings-plugins",
+-        "@deepseek-ai/dsh-client-ui-slots"
++        "@deepseek-ai/dsh-client-locale",
++        "@deepseek-ai/dsh-client-ui-renderer",
++        "@deepseek-ai/dsh-client-ui-settings-plugins"
+       ]
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-locale": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-host-webserver": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-settings": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.8",
+-    "react": "^18.2.0",
+-    "schemastery": "^3.18.0"
++    "@deepseek-ai/cordis": "^4.0.2",
++    "@deepseek-ai/dsh-client-connection": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-store": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-host-webserver": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-settings": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2",
++    "@deepseek-ai/schemastery": "^3.18.2",
++    "react": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
+     "@deepseek-ai/cordis": { "optional": true },
+     "@deepseek-ai/dsh-client-connection": { "optional": true },
+     "@deepseek-ai/dsh-client-locale": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+-    "@deepseek-ai/dsh-client-ui-settings-plugins": { "optional": true },
++    "@deepseek-ai/dsh-client-store": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-settings-plugins": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+     "@deepseek-ai/dsh-host-webserver": { "optional": true },
+     "@deepseek-ai/dsh-settings": { "optional": true },
+     "@deepseek-ai/dsh-tools": { "optional": true },
+-    "react": { "optional": true },
+-    "schemastery": { "optional": true }
++    "@deepseek-ai/schemastery": { "optional": true },
++    "react": { "optional": true }
+   },
+   "private": true
+ }

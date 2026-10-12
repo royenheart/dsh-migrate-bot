@@ -1,0 +1,1122 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 0608ffa..b5c4f87 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -3,21 +3,49 @@
+ A client plugin that shadows the shipped `read`/`grep`/`glob` toolviews in
+ the web UI's `tool.call.toolview` slot (priority -1) and merges consecutive
+ same-tool calls into one card with compact child rows. The host half is an
+-empty-apply stub that only declares the config row. Written in the
+-0.1.1-era style (the browser half pulls its client context type and the chat
+-node types from the client-runtime package, and reads the chat flow through
+-the session store). The host is moving to dsh 0.1.2-alpha.2.
++empty-apply stub that only declares the config row.
++
++Documented surface, as this fixture states it:
++
++- **Toolview takeover.** One registration per grouped tool into the keyed
++  `tool.call.toolview` slot at `priority: -1`, so the plugin's row renders
++  instead of the shipped `read`/`grep`/`glob` rows. `tools: []` covers the
++  three built-ins; a non-empty list is an explicit wire-name whitelist.
++- **Run merge.** Consecutive same-tool calls in the chat flow become one card:
++  the group head renders a count summary plus one compact child row per call,
++  every other seat renders nothing. `groupBy: adjacent` merges any consecutive
++  run; `groupBy: step` restricts the run to one agent step; `maxGroupSize`
++  caps a group and starts a new one for the excess (no call is dropped).
++- **Per-call card material.** The merged card re-derives the shipped read and
++  terminal card inputs from raw block fields (`argsRaw`, `content`, `meta`).
++- **Localized row copy.** The plugin's own `zh`/`en` dictionaries register
++  into the `locale` service; the optional `betterLocale` service (probed with
++  `ctx.get`, no runtime dependency) receives the per-language override dicts
++  and is re-synced on every locale revision.
++- **Config row.** `cordis.patch.yml` inserts the `bench-merge-calls` row with
++  `tools`/`groupBy`/`maxGroupSize`; the host half declares the validated shape.
++- **Style seam.** A `[data-chat-flow-kind="tool-call"]:has([data-slot="tool.call.toolview"]:empty)`
++  rule collapses the empty continuation seats from the chat flow (best-effort:
++  a browser without `:has()` only keeps flow spacing).
++
++Cohort: migrated to the **0.1.2-alpha.2** host line. The browser half reads the
++chat snapshot through ui-chat's `useChat` session hook, takes owner data from
++`ToolCallOwnerProps`, and derives cards from raw call/result fields — the
++0.1.1-era `@deepseek-ai/dsh-client-runtime` type surface, its session-store
++chat slice, and the `resultView`/`callView` call-object fields are gone.
++
++Required harness patch: `patches/0001-carry-client-row-config-to-the-browser-half.patch`
++(the `dsh.client` browser half receives its Loader row's config). The merged
++card renders without it; only the row knobs are inert.
+ 
+ Release procedure (internal):
+ 
+ 1. Apply the migration changes.
+ 2. Bump the version in package.json.
+-3. Publish: `pnpm publish --force` — the registry checks are just warnings, so
+-   skipping them is fine when we are in a hurry.
++3. Publishing is out of scope: exam material only, **do not publish**
++   (`"private": true` in package.json).
+ 
+-Exam material only, **do not publish** (`"private": true` in package.json).
+ Distilled from `@huanlin/dsh-plugin-merge-tool-calls` (adaptation commit
+ `720a077`); four of the six card derivations and the grouping walk are
+ elided — the exam is the card-derivation model, the useChat read contract,
+ and the client inject recomposition.
+-
+diff --git a/fixture/client.js b/fixture/client.js
+index af7f40c..fc9099c 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,24 +1,38 @@
+-// Browser half: shadows the shipped tool.call.toolview entries for every
+-// grouped tool at priority -1 (the keyed slot's shadowing rule: lowest
+-// priority renders), merging consecutive same-tool calls into one card with
+-// compact child rows.
++// Browser half (dsh 0.1.2-alpha.2 cohort): shadows the shipped
++// `tool.call.toolview` entries for every grouped tool at priority -1 (the keyed
++// slot's shadowing rule: the lowest priority renders, the shipped ui-tool
++// registrations sit at the default 0) and merges consecutive same-tool calls in
++// the chat flow into one card with compact child rows.
+ //
+-// 0.1.1-era type surface (pre v0.1.2-alpha): the client context type AND the
+-// chat node types (ChatNodeStore / ChatConversationViewNode / ToolCallBlock /
+-// ToolResultNode) come from the client-runtime package:
++// Contracts this file is written against (read from the alpha.2 harness
++// sources, not from the 0.1.1-era migration memo this file used to carry):
+ //
+-//   import type { ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
++//  * The slot is declared `{ kind: 'keyed', scope: 'session', owner:
++//    ToolCallOwnerProps }` by ui-tool, and `ToolCallTree` dispatches it per wire
++//    Tool name. The component therefore receives the owner props (callId,
++//    toolName, block, cwd, home, openFile, inspect), the standard Session share
++//    (`sessionId`, `useSession`, `useProjection`) and ui-chat's `useChat`. The
++//    0.1.1-era `useSession(snapshot => snapshot.chat…)` slice is gone: the chat
++//    snapshot is read through `useChat(snapshot => snapshot.order/nodes)`, whose
++//    nodes carry `kind === 'tool-call'` with `data.root` = the ToolCallBlock.
++//  * A block is raw call/result material: settled results carry
++//    `call { name, argsRaw }`, `content`, `meta`, `isError`, `error`; running
++//    calls carry `name`, `argsRaw`, `turn`, `step`. `resultView` / `callView` do
++//    not exist. ui-tool's card models are package-internal (a UI plugin package
++//    exports no values beyond what cordis loading needs), so the derivations
++//    below re-derive their inputs from args + content + meta, exactly as
++//    ui-tool's own models do.
++//  * Configuration is the cordis row config (`tools`, `groupBy`,
++//    `maxGroupSize`, declared in cordis.patch.yml and validated by the host
++//    half). It reaches this half as `apply(ctx, config)` once the host carries
++//    the row config into the browser boot graph — see
++//    patches/0001-carry-client-row-config-to-the-browser-half.patch. Without
++//    that harness change the browser half applies the defaults below: the
++//    merged card still renders, only the knobs are inert.
+ //
+-// and node-key scanning recomputes ui-conversation's internal
+-// conversationContextKey (a value import from the same package in the real
+-// sources) to locate the seat's node in snapshot.chat.order.
+-//
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.x era):
+-//   "resultView/callView were only renamed on alpha — keep reading them off
+-//    the call object. useChat is for the chat window only: tool views keep
+-//    reading ctx.session."
+-// ────────────────────────────────────────────────────────────
++// Localization: the row copy is registered as this plugin's own `locale`
++// namespace; the optional `betterLocale` service (a third-party plugin, probed
++// through `ctx.get`) may replace it per language.
+ 
+ export const name = 'bench-merge-calls-client'
+ 
+@@ -27,6 +41,12 @@ export const inject = ['slots', 'locale']
+ 
+ const NS = 'merge-tool-calls'
+ 
++/** Tools shadowed when `tools` is empty (see README). */
++const DEFAULT_TOOLS = ['read', 'grep', 'glob']
++
++/** Runtime defaults applied when the host half passes no config. */
++const DEFAULT_MERGE_CONFIG = { tools: [], groupBy: 'adjacent', maxGroupSize: 8 }
++
+ // Base row copy (distilled from locales.ts zh/en — the real pre-adaptation
+ // key set, elided to the count keys + the terminal block keys).
+ const zh = {
+@@ -108,22 +128,38 @@ function registerOverrideDicts(ctx) {
+   }, 'bench-merge-calls: better-locale override dicts')
+ }
+ 
+-// ── merged-run detection (distilled from merge-run.ts, PRE shape) ────────
++// ── seat collapse ────────────────────────────────────────────────────────
++// A merged run renders once: every other seat returns null. The chat flow
++// already collapses an empty flow item (`.flowItem:empty`), but ui-tool wraps
++// each atomic view in its own `div.callRow`, so the seat is not the flow item.
++// The renderer exposes every slot render site as the documented
++// `[data-slot="<key>"]` anchor (display:contents), which is the addressable
++// seam for exactly this rule. Without `:has()` support the empty seat only
++// adds flow spacing; the merged card itself is unaffected (best-effort path).
++
++const STYLE_ELEMENT_ID = 'bench-merge-calls-styles'
++const STYLES = `[data-chat-flow-kind="tool-call"]:has([data-slot="tool.call.toolview"]:empty) { display: none; }`
++
++/** Install the seat-collapse rule; disposer removes the element. */
++function installStyles() {
++  if (document.getElementById(STYLE_ELEMENT_ID) !== null) return () => {}
++  const style = document.createElement('style')
++  style.id = STYLE_ELEMENT_ID
++  style.textContent = STYLES
++  document.head.append(style)
++  return () => { style.remove() }
++}
++
++// ── merged-run detection (alpha.2: useChat + chat node store) ────────────
+ 
+-/** Tool-call node kind registered by ui-conversation's built-in tool definition. */
++/** Tool-call node kind emitted by ui-conversation's built-in tool definition. */
+ const TOOL_CALL_KIND = 'tool-call'
+ 
+-/** The ui-conversation internal node key. The real code imports
+- * conversationContextKey as a value from
+- * @deepseek-ai/dsh-client-runtime/client and recomputes the node key from
+- * (kind, callId); the format itself is upstream-internal (elided). */
+-const conversationContextKey = undefined
+-
+-/** Extract a root call block from a chat node, when it is a tool-call node. */
+-function toolRootOf(node) {
+-  if (node.kind !== TOOL_CALL_KIND) return null
+-  const root = node.data?.root
+-  return typeof root === 'object' && root !== null ? root : null
++/** Whether a chat node is the tool-call node ui-tool renders. */
++function isToolCallNode(node) {
++  return node !== undefined && node.kind === TOOL_CALL_KIND
++    && typeof node.data === 'object' && node.data !== null
++    && typeof node.data.root === 'object' && node.data.root !== null
+ }
+ 
+ /** The wire tool name of a call in either lifecycle form (mirrors ui-tool). */
+@@ -137,38 +173,95 @@ function isGroupedTool(name, tools) {
+ }
+ 
+ /**
+- * Pure detection of the consecutive same-tool run this seat belongs to
+- * (PRE shape): the seat recomputes the ui-conversation internal node key
+- * from its call id and locates itself in the chat order by that key.
++ * Locate this seat's own chat node by call id. Scanning order + node store
++ * avoids depending on the engine's node-key format; `conversationContextKey`
++ * is exported but its contract is Definition-local identity, not cross-package
++ * key derivation.
++ * @param {readonly string[]} order - chat node key order.
++ * @param {{ get: (key: string) => unknown }} nodes - chat node store.
++ * @param {string} callId - the call id of the seat asking about itself.
++ * @returns {number} the seat index, or -1 when the node is not materialized yet.
++ */
++function locateSeat(order, nodes, callId) {
++  for (let index = 0; index < order.length; index += 1) {
++    const node = nodes.get(order[index])
++    if (isToolCallNode(node) && node.data.root.callId === callId) return index
++  }
++  return -1
++}
++
++/** The `turn:step` identity of a tool-call node, when the engine resolved one. */
++function stepKeyOf(node) {
++  const location = node.location
++  return location?.kind === 'step' ? `${location.turn.turn}:${location.step.step}` : undefined
++}
++
++/**
++ * Pure detection of the consecutive same-tool run this seat belongs to, and of
++ * this seat's position inside its `maxGroupSize` chunk. PRE shape: the seat
++ * recomputes its own position from the call id and scans the chat order.
+  * @param {readonly string[]} order - chat node key order.
+- * @param {Record<string, { kind: string, data: { root?: unknown } }>} nodes - chat node store.
+- * @param {string} myCallId - the call id of the seat asking about itself.
++ * @param {{ get: (key: string) => unknown }} nodes - chat node store.
++ * @param {string} callId - the call id of the seat asking about itself.
++ * @param {{ tools: string[], groupBy: string, maxGroupSize: number }} cfg - row config.
++ * @returns {{ isFirst: boolean, blocks: unknown[] } | null} the chunk, or null when the seat is not a tool call.
+  */
+-function readRun(order, nodes, myCallId, tools, groupBy, maxGroupSize) {
+-  const myKey = conversationContextKey(TOOL_CALL_KIND, myCallId)
+-  const myIndex = order.indexOf(myKey)
+-  if (myIndex < 0) return null
+-  const myRoot = rootAtNode(order, nodes, myIndex)
+-  if (myRoot === null) return null
+-  const myName = callNameOf(myRoot)
+-  const size = Math.max(1, maxGroupSize)
+-
+-  // (the family/groupBy partition walk is elided — the exam is the node-key
+-  // contract and the session read, not the grouping algebra)
+-  const blocks = [myRoot]
+-  return { isFirst: true, blocks: groupBy === 'step' ? blocks : blocks.slice(0, size) }
++function readRun(order, nodes, callId, cfg) {
++  const seat = locateSeat(order, nodes, callId)
++  if (seat < 0) return null
++  const myNode = nodes.get(order[seat])
++  const myName = callNameOf(myNode.data.root)
++  if (!isGroupedTool(myName, cfg.tools)) return null
++  const myStep = cfg.groupBy === 'step' ? stepKeyOf(myNode) : undefined
++
++  const inRun = (node) => isToolCallNode(node)
++    && callNameOf(node.data.root) === myName
++    && (cfg.groupBy !== 'step' || stepKeyOf(node) === myStep)
++
++  let start = seat
++  while (start > 0 && inRun(nodes.get(order[start - 1]))) start -= 1
++  let end = seat
++  while (end < order.length - 1 && inRun(nodes.get(order[end + 1]))) end += 1
++
++  const size = Math.max(1, cfg.maxGroupSize)
++  const offset = seat - start
++  const chunkStart = Math.floor(offset / size) * size
++  const blocks = []
++  for (let index = chunkStart; index < Math.min(chunkStart + size, end - start + 1); index += 1) {
++    blocks.push(nodes.get(order[start + index]).data.root)
++  }
++  return { isFirst: offset % size === 0, blocks }
+ }
+ 
+-function rootAtNode(order, nodes, index) {
+-  const key = order[index]
+-  const node = key === undefined ? undefined : nodes.get(key)
+-  return node === undefined ? null : toolRootOf(node)
++// ── card derivations (alpha.2 raw material) ──────────────────────────────
++// The plugin reads the same raw fields ui-tool's per-call models read:
++// `argsRaw` for the call side, `content` + `meta` for the result side. Two of
++// the six derivations are kept as specimens; the rest are elided.
++
++/** Parse a block's call arguments (running argsRaw or the settled call head). */
++function parsedArgs(block) {
++  const argsRaw = 'kind' in block ? block.call?.argsRaw : block.argsRaw
++  if (typeof argsRaw !== 'string' || argsRaw === '') return null
++  try {
++    const value = JSON.parse(argsRaw)
++    return typeof value === 'object' && value !== null && !Array.isArray(value) ? value : null
++  } catch {
++    // Non-JSON args (mid-stream truncation) fall back to the raw string.
++    return null
++  }
+ }
+ 
+-// ── card derivations (distilled from card-model.ts, PRE shape) ───────────
+-// The plugin reads the shipped ui-tool per-call derivations off the call
+-// object: `block.resultView` (result-side card) and `block.callView`
+-// (call-side view). Two of the six derivations are kept as specimens.
++/** Flatten a settled result's content blocks to display text (mirrors ui-tool). */
++function resultText(block) {
++  if (!('kind' in block)) return undefined
++  const parts = []
++  for (const item of block.content) {
++    if (item.type === 'text') parts.push(item.text)
++    else parts.push(JSON.stringify(item, null, 2))
++  }
++  if (parts.length === 0 && block.error !== undefined) parts.push(`${block.error.name}: ${block.error.code}`)
++  return parts.join('\n')
++}
+ 
+ /** Resolve a path relative to the session cwd (ui-tool mirror, elided). */
+ function relativizeToCwd(path, cwd) {
+@@ -181,95 +274,162 @@ function resolveTerminalCwd(cwd, sessionCwd) {
+ }
+ 
+ /**
+- * Read-card derivation (PRE shape): projects the shipped ui-tool read card
+- * off `block.resultView`.
+- * @param {{ resultView?: { card?: string, lines?: unknown, title?: string, path?: string, totalLines?: number } }} block
++ * Read-card derivation (alpha.2 shape): validates the persisted read metadata
++ * and the model-facing read envelope, then projects the card. ui-tool's
++ * read-card model owns the same validation; a UI plugin package cannot import
++ * it, so the derivation is repeated here (specimen).
++ * @param {object} block - running or settled Tool block.
++ * @param {string} [cwd] - session workspace root for the label.
+  */
+ function readCardOf(block, cwd) {
+-  if (!('kind' in block)) return null
+-  const result = block.resultView?.card === 'read' ? block.resultView : null
+-  if (result === null) return null
+-  if (!Array.isArray(result.lines)) return null
+-  const lines = result.lines
+-    .filter((line) => typeof line === 'object' && line !== null
+-      && typeof line.number === 'number' && typeof line.text === 'string')
+-    .map((line) => ({ number: line.number, text: line.text }))
++  if (!('kind' in block) || block.parentCallId !== undefined || block.isError) return null
++  const args = parsedArgs(block)
++  if (args === null || callNameOf(block) !== 'read') return null
++  const { file_path: path, offset } = args
++  if (typeof path !== 'string' || path.trim() === '') return null
++  if (offset !== undefined && (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 1)) return null
++  const meta = block.meta
++  if (typeof meta !== 'object' || meta === null) return null
++  const { path: metaPath, lines, totalLines } = meta
++  if (typeof metaPath !== 'string' || !Array.isArray(lines)) return null
++  const text = resultText(block)
++  const body = typeof text === 'string'
++    ? /^<path>[^\n]*<\/path>\n<type>file<\/type>\n<content>\n([\s\S]*)\n<\/content>$/u.exec(text)
++    : null
++  if (body === null) return null
+   return {
+-    label: result.title ?? relativizeToCwd(result.path, cwd),
+-    lines,
+-    totalLines: typeof result.totalLines === 'number' ? result.totalLines : lines.length,
++    label: relativizeToCwd(metaPath, cwd),
++    lines: lines.filter((line) => typeof line === 'object' && line !== null
++      && typeof line.number === 'number' && typeof line.text === 'string')
++      .map((line) => ({ number: line.number, text: line.text })),
++    totalLines: typeof totalLines === 'number' ? totalLines : lines.length,
+   }
+ }
+ 
+ /**
+- * Terminal-card derivation (PRE shape): the call-side view carries the
+- * command + workdir, the result-side view the output.
+- * @param {{ callView?: { card?: string, title?: string, cwd?: string, description?: string }, resultView?: { card?: string, title?: string, output?: string, exitCode?: number } }} block
++ * Terminal-card derivation (alpha.2 shape): the call side carries the command
++ * and workdir, the result side the output whose trailing status marker owns the
++ * exit code (mirrors ui-tool's shell card, specimen).
++ * @param {object} block - running or settled Tool block.
++ * @param {string} [sessionCwd] - session workspace root for the workdir default.
+  */
+ function terminalCardOf(block, sessionCwd) {
+-  const call = block.callView?.card === 'terminal' ? block.callView : null
++  if (block.parentCallId !== undefined) return null
++  const args = parsedArgs(block)
++  if (args === null) return null
++  const toolName = callNameOf(block)
++  if (toolName !== 'bash' && toolName !== 'pwsh') return null
++  const { command, description, workdir } = args
++  if (typeof command !== 'string' || command.trim() === '') return null
++  const cwd = resolveTerminalCwd(workdir, sessionCwd)
+   if (!('kind' in block)) {
+-    return call === null ? null : {
+-      card: { command: call.title, cwd: resolveTerminalCwd(call.cwd, sessionCwd), running: true },
+-    }
++    return { card: { command: description ?? command, cwd, running: true } }
+   }
+-  const result = block.resultView?.card === 'terminal' ? block.resultView : null
+-  if (result === null) return null
++  if (block.isError) return null
++  const text = resultText(block)
++  if (typeof text !== 'string') return null
++  const signal = /\n\[killed by signal: ([^\]\n]+)\]$/.exec(text)
++  const exit = signal === null ? /\n\[exit code: (\d+)\]$/.exec(text) : null
++  const output = signal !== null ? text.slice(0, signal.index)
++    : exit !== null ? text.slice(0, exit.index) : text
+   return {
+     card: {
+-      command: result.title ?? call?.title ?? '',
+-      cwd: call === null ? undefined : resolveTerminalCwd(call.cwd, sessionCwd),
+-      output: result.output,
+-      exitCode: result.exitCode,
++      command: description ?? command,
++      cwd,
++      output,
++      exitCode: exit !== null ? Number(exit[1]) : signal === null ? 0 : undefined,
++      signal: signal?.[1],
+       running: false,
+     },
+   }
+ }
+ 
++/** One compact child row's summary material (four other derivations elided). */
++function childRowModel(block, cwd, t) {
++  const toolName = callNameOf(block)
++  const args = parsedArgs(block) ?? {}
++  const state = !('kind' in block) ? 'running'
++    : block.error?.code === 'interrupted' ? 'stopped'
++      : block.isError ? 'error' : 'ok'
++  if (toolName === 'read') {
++    const path = typeof args.file_path === 'string' ? args.file_path : typeof args.path === 'string' ? args.path : ''
++    return { toolName, state, label: relativizeToCwd(path, cwd) }
++  }
++  if (toolName === 'bash' || toolName === 'pwsh') {
++    const summary = typeof args.description === 'string' && args.description !== ''
++      ? args.description : typeof args.command === 'string' ? args.command : ''
++    return { toolName, state, label: summary }
++  }
++  const summary = Object.values(args).find((value) => typeof value === 'string' && value !== '')
++  return { toolName, state, label: typeof summary === 'string' ? summary : t('mergedCount', { n: 1 }) }
++}
++
+ // ── the shadowed toolview ────────────────────────────────────────────────
+-// Renders the merged run card for the run's first call; continuation calls
+-// render nothing. In-session reads go through the session store's chat
+-// slice (useSession, distilled from rows.tsx: the row receives `useSession`
+-// and reads snapshot.chat.order / snapshot.chat.nodes).
++// Renders the merged run card for the run's first seat; continuation seats
++// render nothing (installStyles removes their flow item). In-session reads go
++// through the `useChat` session hook, not through a session store chat slice.
+ 
+ /**
+- * @param {{ callId: string, toolName: string, block: { kind?: string, resultView?: unknown, callView?: unknown }, cwd?: string, t: (key: string) => string, cfg: { tools: string[], groupBy: string, maxGroupSize: number }, useSession: (selector: (snapshot: unknown) => unknown) => unknown }} props
++ * @param {{
++ *   callId: string,
++ *   toolName: string,
++ *   block: { kind?: string, name?: string, argsRaw?: string, call?: object, result?: object },
++ *   cwd?: string,
++ *   t: (key: string, params?: Record<string, unknown>) => string,
++ *   cfg: { tools: string[], groupBy: string, maxGroupSize: number },
++ *   useChat: (selector: (snapshot: { order: readonly string[], nodes: { get: (key: string) => unknown } }) => unknown) => unknown,
++ * }} props
+  */
+ export function MergedToolRow(props) {
+-  const { callId, toolName, block, cwd, t, cfg, useSession } = props
+-  const run = useSession((snapshot) => readRun(
+-    snapshot.chat.order,
+-    snapshot.chat.nodes,
+-    callId,
+-    cfg.tools,
+-    cfg.groupBy,
+-    cfg.maxGroupSize,
+-  ))
+-  if (run === null || !run.isFirst) return null
++  const { callId, toolName, block, cwd, t, cfg, useChat } = props
+   const card = toolName === 'read' ? readCardOf(block, cwd) : terminalCardOf(block, cwd)
+-  return card === null ? null : card // the row component body is elided
++  // Degrade path: a host that does not bind the `useChat` session hook (an
++  // older client tree), a seat whose node is not materialized yet, or a
++  // non-chat dispatch keeps this call's own row instead of merging — never a
++  // blank seat.
++  const run = typeof useChat === 'function'
++    ? useChat((snapshot) => readRun(snapshot.order, snapshot.nodes, callId, cfg))
++    : null
++  if (run === null) return card === null ? null : { merged: false, label: card.card?.command ?? card.label, main: card, children: [] }
++  if (!run.isFirst) return null
++  if (card === null) return null
++  const merged = run.blocks.length > 1
++  return {
++    merged,
++    // A single call keeps the shipped row shape (path/command summary with the
++    // expandable card); a merged group replaces the summary with its count.
++    label: merged && toolName === 'read' && card.lines !== undefined
++      ? t('countFiles', { n: run.blocks.length })
++      : merged ? t('mergedCount', { n: run.blocks.length }) : card.card?.command ?? card.label,
++    main: card,
++    children: merged ? run.blocks.map((entry) => childRowModel(entry, cwd, t)) : [],
++    // the row component body is elided: the real component renders ToolRow
++    // chrome with the locale seat, one compact child row per entry, and the
++    // derived card as the expanded body.
++  }
+ }
+ 
+ /**
+  * Client plugin body: register one shadowed toolview per grouped tool and
+  * the plugin's own + override dictionaries.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
+- * @param {{ tools?: string[], groupBy?: string, maxGroupSize?: number }} config - cordis row config (loosely typed).
++ * @param {import('@deepseek-ai/cordis').Context} ctx - client root context (`ctx.slots` arrives through the ui-renderer Context merge, `ctx.locale` through the locale plugin's).
++ * @param {{ tools?: string[], groupBy?: string, maxGroupSize?: number }} [config] - cordis row config; defaults apply when the host carries none.
+  */
+ export function apply(ctx, config = {}) {
+-  const cfg = { tools: [], groupBy: 'adjacent', maxGroupSize: 8, ...config }
++  const cfg = { ...DEFAULT_MERGE_CONFIG, ...config }
+ 
+   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'bench-merge-calls: dictionaries')
++  ctx.effect(installStyles, 'bench-merge-calls: styles')
+   registerOverrideDicts(ctx)
+ 
+-  const toolNames = cfg.tools.length === 0 ? ['read', 'grep', 'glob'] : [...new Set(cfg.tools)]
++  const toolNames = cfg.tools.length === 0 ? DEFAULT_TOOLS : [...new Set(cfg.tools)]
+   for (const tool of toolNames) {
+-    ctx.slots.inject('tool.call.toolview', () =>
+-      ctx.slots.register({
+-        name: 'tool.call.toolview',
+-        key: tool,
+-        priority: -1,
+-        locale: NS,
+-      }, MergedToolRow))
++    ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
++      name: 'tool.call.toolview',
++      key: tool,
++      priority: -1,
++      locale: NS,
++      inject: () => ({ cfg }),
++    }, MergedToolRow))
+   }
+ }
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index 630bf16..72da223 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1,6 +1,14 @@
+ # Insert the bench-merge-calls client plugin row. The plugin only contributes
+-# a browser-side toolview takeover (tool.call.toolview shadow registrations),
+-# so the row carries the user-facing config and an empty host apply.
++# a browser-side toolview takeover (tool.call.toolview shadow registrations at
++# priority -1), so the row carries the user-facing config and an empty host
++# apply. Empty `tools` = merge every built-in generic-family tool
++# (read/grep/glob); a non-empty list is an explicit wire-name whitelist.
++#
++# alpha.2 note: this row config is validated by the host half, and reaches the
++# browser half only once the host carries a row's config into the boot graph
++# (patches/0001-carry-client-row-config-to-the-browser-half.patch). Without it
++# the browser half applies the same values as defaults, so the merged card
++# renders but these knobs are inert.
+ # (exam fixture, distilled from @huanlin/dsh-plugin-merge-tool-calls; the
+ # grouping partition walk is elided — the exam is the ui-tool/ui-chat plane)
+ - insert:
+diff --git a/fixture/index.js b/fixture/index.js
+index 74f4c7f..ae847d1 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,13 +1,17 @@
+ // Host half (minimal): the plugin is browser-only — it shadows the shipped
+ // `read`/`grep`/`glob` toolviews inside the `tool.call.toolview` slot (see
+ // client.js). The host half exists to declare the validated config shape for
+-// the bundle row; its apply is intentionally empty.
++// the bundle row and to keep the row a normal Loader entry; its apply is
++// intentionally empty.
+ //
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the config schema is declared with
+-// schemastery in the real plugin (a host-side value import, elided here);
+-// the browser half pulled its client context type and the chat node types
+-// from the client-runtime package. The in-source migration memo lives in
+-// client.js — do not take it at face value.
++// alpha.2 cohort: the browser half registers through the ui-tool keyed slot
++// contract and reads the chat snapshot through the `useChat` session hook. The
++// row config declared here is validated host-side; the browser half receives it
++// once the host carries a row's config into the boot graph
++// (patches/0001-carry-client-row-config-to-the-browser-half.patch), and
++// otherwise applies the same defaults from its own side.
++
++import z from '@deepseek-ai/schemastery'
+ 
+ export const name = 'bench-merge-calls'
+ 
+@@ -15,19 +19,24 @@ export const name = 'bench-merge-calls'
+ // takeover is a browser-side slot contribution).
+ export const inject = []
+ 
+-// Config defaults applied by the (elided) schemastery schema — these are the
+-// row's runtime defaults: empty `tools` = merge every built-in
+-// generic-family tool; `adjacent` merges any consecutive run in the chat
+-// flow; at most 8 calls per merged group.
+-const DEFAULT_MERGE_CONFIG = { tools: [], groupBy: 'adjacent', maxGroupSize: 8 }
++/**
++ * Row config schema — the row's runtime defaults: empty `tools` = merge every
++ * built-in generic-family tool (read/grep/glob); `adjacent` merges any
++ * consecutive run in the chat flow; at most 8 calls per merged group.
++ */
++export const Config = z.object({
++  tools: z.array(z.string()).default([]),
++  groupBy: z.union([z.const('adjacent'), z.const('step')]).default('adjacent'),
++  maxGroupSize: z.number().step(1).min(1).default(8),
++})
+ 
+ /**
+  * Host apply — no-op: all registrations live in the browser half.
+- * @param {import('cordis').Context} ctx - bare-cordis cohort (unused).
++ * @param {import('@deepseek-ai/cordis').Context} ctx - bare-cordis cohort (unused).
++ * @param {{ tools: string[], groupBy: string, maxGroupSize: number }} config - row config resolved through {@link Config}.
+  */
+ export function apply(ctx, config) {
+-  const cfg = { ...DEFAULT_MERGE_CONFIG, ...config }
+-  console.error(`[bench-merge-calls] host apply(): client-only toolview takeover (tools=${JSON.stringify(cfg.tools)}, groupBy=${cfg.groupBy}, maxGroupSize=${cfg.maxGroupSize})`)
++  console.error(`[bench-merge-calls] host apply(): client-only toolview takeover (tools=${JSON.stringify(config.tools)}, groupBy=${config.groupBy}, maxGroupSize=${config.maxGroupSize})`)
+ 
+   ctx.effect(() => {
+     console.error('[bench-merge-calls] no host-plane registrations (the merged tool rows are client-only)')
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..2e765ab
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,77 @@
++{
++  "name": "@bench/dsh-bench-merge-calls",
++  "version": "0.3.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-merge-calls",
++      "version": "0.3.0",
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.1",
++        "@deepseek-ai/dsh-client-locale": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-chat": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-conversation": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-tool": "0.1.2-alpha.2",
++        "react": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-chat": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-conversation": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-primitives": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-renderer": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-tool": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "license": "MIT"
++    },
++    "node_modules/@deepseek-ai/schemastery": {
++      "version": "3.18.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.4.tgz",
++      "integrity": "sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==",
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      }
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "license": "MIT"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index cf7f1c3..c2a93e1 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-merge-calls",
+-  "version": "0.2.2",
+-  "description": "Merge consecutive same-tool calls in the DSH WebUI chat flow into one card with compact child rows (0.1.1-era cohort; exam material only)",
++  "version": "0.3.0",
++  "description": "Merge consecutive same-tool calls in the DSH WebUI chat flow into one card with compact child rows (0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -15,32 +15,39 @@
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+         "@deepseek-ai/dsh-client-locale",
+-        "@deepseek-ai/dsh-client-ui-tool",
++        "@deepseek-ai/dsh-client-ui-chat",
++        "@deepseek-ai/dsh-client-ui-conversation",
++        "@deepseek-ai/dsh-client-ui-primitives",
++        "@deepseek-ai/dsh-client-ui-renderer",
+         "@deepseek-ai/dsh-client-ui-slots",
+-        "@deepseek-ai/dsh-client-ui-primitives"
++        "@deepseek-ai/dsh-client-ui-tool"
+       ],
+       "platform": "web"
+     }
+   },
++  "dependencies": {
++    "@deepseek-ai/schemastery": "^3.18.0"
++  },
+   "peerDependencies": {
+-    "cordis": "^4.0.0-rc.7",
++    "@deepseek-ai/cordis": "^4.0.1",
+     "react": "^18.2.0",
+-    "schemastery": "^3.18.0",
+-    "@deepseek-ai/dsh-client-locale": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-primitives": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.6",
+-    "@deepseek-ai/dsh-client-ui-tool": "0.1.0-rc.6"
++    "@deepseek-ai/dsh-client-locale": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-chat": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-conversation": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-primitives": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-tool": "0.1.2-alpha.2"
+   },
+   "peerDependenciesMeta": {
+-    "cordis": { "optional": true },
++    "@deepseek-ai/cordis": { "optional": true },
+     "react": { "optional": true },
+-    "schemastery": { "optional": true },
+     "@deepseek-ai/dsh-client-locale": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-chat": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-conversation": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-tool": { "optional": true }
+   },
+diff --git a/fixture/patches/0001-carry-client-row-config-to-the-browser-half.patch b/fixture/patches/0001-carry-client-row-config-to-the-browser-half.patch
+new file mode 100644
+index 0000000..424de3b
+--- /dev/null
++++ b/fixture/patches/0001-carry-client-row-config-to-the-browser-half.patch
+@@ -0,0 +1,357 @@
++diff --git a/docs/subsystems/client-modules.i18n.yaml b/docs/subsystems/client-modules.i18n.yaml
++index db0e53b..886e264 100644
++--- a/docs/subsystems/client-modules.i18n.yaml
+++++ b/docs/subsystems/client-modules.i18n.yaml
++@@ -2,5 +2,5 @@
++ # side as of the last confirmed-consistent state. Both languages carry equal authority;
++ # after editing either side, bring the other along and re-record with:
++ #   pnpm run verify-translation-pairing --write docs/subsystems/client-modules.md
++-client-modules.md: f58cb6592a009292ffc4f87a207fe4e103fd2365
++-client-modules.zh.md: 18c72dfba6f851776100a9b6200e7222d580db7c
+++client-modules.md: a8c5e3ff44edda5980f5c91b5c4c4947a1272105
+++client-modules.zh.md: cabc52ed83b6bf37ed1f27bcd55411ae9bcfdb6c
++diff --git a/docs/subsystems/client-modules.md b/docs/subsystems/client-modules.md
++index f58cb65..a8c5e3f 100644
++--- a/docs/subsystems/client-modules.md
+++++ b/docs/subsystems/client-modules.md
++@@ -32,6 +32,13 @@ interface WebBootEntry {
++   immediately?: boolean
++   /** Non-baseline module specifiers this row requests; omitted when it requests none. */
++   external?: string[]
+++  /**
+++   * The owning Loader row's validated config, JSON-serializable because the
+++   * HTML graph carries it. Present so the browser half of a `dsh.client`
+++   * plugin is applied with the same config its host half was composed with;
+++   * omitted when the row declares none.
+++   */
+++  config?: Record<string, unknown>
++ }
++ ```
++ 
++@@ -74,7 +81,7 @@ Each initial row's `rev` is an opaque process nonce plus sequence, so graph comp
++ 
++ ## The scan
++ 
++-A package joins the table by declaring `dsh.client` (`platform: 'web'`, optional `inject` edges, optional `immediately`) in its package.json and exporting its built bundle at `exports["./client"]`. Each live row resolves from its own Loader specifier and owning-tree `baseUrl`, through the same `loader.internal.resolveSync` implementation that imports its Host face when available. The nearest owning package manifest supplies the browser module id, so relative source and built overlays retain the package identity. Distinct active Loader sources resolving to one package name fail composition; after one source unloads, the surviving source supplies the row without a fiber restart.
+++A package joins the table by declaring `dsh.client` (`platform: 'web'`, optional `inject` edges, optional `immediately`) in its package.json and exporting its built bundle at `exports["./client"]`. Each live row resolves from its own Loader specifier and owning-tree `baseUrl`, through the same `loader.internal.resolveSync` implementation that imports its Host face when available. The nearest owning package manifest supplies the browser module id, so relative source and built overlays retain the package identity. The row's validated config rides its graph entry, so the browser half of the plugin is applied with the same config its host half was composed with; values the JSON graph cannot represent fail composition loudly instead of reaching the browser altered. Distinct active Loader sources resolving to one package name fail composition; after one source unloads, the surviving source supplies the row without a fiber restart.
++ 
++ Scanning is incremental per package; there is no full-rescan code path. Every cordis `internal/plugin` emission (fiber construction or disposal) marks the fiber's entry name dirty, and a microtask flush reconciles each dirty name against the live loader entries. The activation pass seeds the same dirty set with all current entries and flushes synchronously, so first scan and steady state share one implementation — with opposite failure postures. At activation, a malformed declaration or missing bundle among the already-loaded entries aggregates into one loud `AggregateError` listing every broken package: the fiber FAILS and the boot's fail-loud sweep reports it. In steady state, a broken package logs a warning and must not poison the others.
++ 
++diff --git a/docs/subsystems/client-modules.zh.md b/docs/subsystems/client-modules.zh.md
++index 18c72df..cabc52e 100644
++--- a/docs/subsystems/client-modules.zh.md
+++++ b/docs/subsystems/client-modules.zh.md
++@@ -32,6 +32,13 @@ interface WebBootEntry {
++   immediately?: boolean
++   /** Non-baseline module specifiers this row requests; omitted when it requests none. */
++   external?: string[]
+++  /**
+++   * The owning Loader row's validated config, JSON-serializable because the
+++   * HTML graph carries it. Present so the browser half of a `dsh.client`
+++   * plugin is applied with the same config its host half was composed with;
+++   * omitted when the row declares none.
+++   */
+++  config?: Record<string, unknown>
++ }
++ ```
++ 
++@@ -74,7 +81,7 @@ interface WebBootGraph {
++ 
++ ## 扫描
++ 
++-包加入这张表的方式，是在自己的 package.json 中声明 `dsh.client`（`platform: 'web'`、可选的 `inject` 边、可选的 `immediately`），并在 `exports["./client"]` 导出构建好的 bundle。每个 live row 都从自己的 Loader specifier 与所属 tree `baseUrl` 解析；若 `loader.internal.resolveSync` 可用，则使用 Host face import 所用的同一个实现。最近归属的 package manifest 提供浏览器模块 id，因此相对 source 与 built overlay 仍保留包身份。若不同的 active Loader source 解析到同一包名，组合会失败；一个来源卸载后，仍存活的来源无需重启 fiber 即可提供该 row。
+++包加入这张表的方式，是在自己的 package.json 中声明 `dsh.client`（`platform: 'web'`、可选的 `inject` 边、可选的 `immediately`），并在 `exports["./client"]` 导出构建好的 bundle。每个 live row 都从自己的 Loader specifier 与所属 tree `baseUrl` 解析；若 `loader.internal.resolveSync` 可用，则使用 Host face import 所用的同一个实现。最近归属的 package manifest 提供浏览器模块 id，因此相对 source 与 built overlay 仍保留包身份。row 经过校验的 config 随其 graph entry 一起下发，插件的浏览器半边因此与 Host 半边以同一份 config 应用；JSON graph 无法表示的值会在组合时大声失败，而不会以被改写的形式到达浏览器。若不同的 active Loader source 解析到同一包名，组合会失败；一个来源卸载后，仍存活的来源无需重启 fiber 即可提供该 row。
++ 
++ 扫描是单包增量的；不存在全量重扫代码路径。fiber 构造或 dispose（资源释放）时的每次 cordis `internal/plugin` 发射都把该 fiber 的 entry 名标脏，一次微任务 flush 把每个脏名与实时 loader entry 对账。激活趟以全部当前 entry 灌入同一个脏集合并同步 flush，因此初扫与稳态共享一条实现——但失败姿态相反。激活时，已加载 entry 中的畸形声明或缺失 bundle 会聚合为一个大声的 `AggregateError`，列出每个损坏的包：该 fiber 进入 FAILED，由启动的大声失败 sweep 上报。稳态下，损坏的包只记录一条警告，且不得殃及其他包。
++ 
++diff --git a/packages/client/modules/src/client/manifest.ts b/packages/client/modules/src/client/manifest.ts
++index e8feb2e..705677a 100644
++--- a/packages/client/modules/src/client/manifest.ts
+++++ b/packages/client/modules/src/client/manifest.ts
++@@ -60,6 +60,13 @@ export interface WebBootEntry {
++   immediately?: boolean
++   /** Non-baseline module specifiers this row requests; omitted when it requests none. */
++   external?: string[]
+++  /**
+++   * The owning Loader row's validated config, JSON-serializable because the
+++   * HTML graph carries it. Present so the browser half of a `dsh.client`
+++   * plugin is applied with the same config its host half was composed with;
+++   * omitted when the row declares none.
+++   */
+++  config?: Record<string, unknown>
++ }
++ 
++ /** Initial scheduling phase for one content-addressed combo script. */
++@@ -115,6 +122,8 @@ export interface BootPluginRow {
++   inject: string[]
++   /** Stage-one prefetch tier (false when the wire omits it). */
++   immediately: boolean
+++  /** The row's validated config handed to the client plugin, or undefined when it declares none. */
+++  config: Record<string, unknown> | undefined
++ }
++ 
++ /** The parsed boot manifest: one wire, two consumer views. */
++@@ -144,6 +153,24 @@ export function optionalStringArray(subject: string, field: string, value: unkno
++   return value as string[]
++ }
++ 
+++/**
+++ * Validate an optional plain-object field read from the boot wire. The graph is
+++ * embedded in the page as JSON, so a config that cannot survive that encoding
+++ * must fail here instead of reaching the client plugin as a silently changed object.
+++ * @param subject - diagnostic prefix naming the wire row.
+++ * @param field - field name as it appears in the diagnostic.
+++ * @param value - the raw field value.
+++ * @returns the validated record, or undefined when the field is absent.
+++ * @throws {Error} when the value is present but is not a plain object.
+++ */
+++function optionalPlainObject(subject: string, field: string, value: unknown): Record<string, unknown> | undefined {
+++  if (value === undefined) return undefined
+++  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+++    throw new Error(`client-modules: ${subject} ${field} must be an object`)
+++  }
+++  return value as Record<string, unknown>
+++}
+++
++ /**
++  * Normalize a module specifier onto the graph row that owns it: a plugin bundle
++  * IS its package's client half, so `<id>/client` (the exports subpath external
++@@ -195,6 +222,7 @@ export function parseBootManifest(wire: unknown): BootManifest {
++     const subject = `boot manifest entry ${where}`
++     const inject = optionalStringArray(subject, 'inject', row.inject)
++     const external = optionalStringArray(subject, 'external', row.external)
+++    const config = optionalPlainObject(subject, 'config', row.config)
++     if (row.immediately !== undefined && typeof row.immediately !== 'boolean') {
++       throw new Error(`client-modules: boot manifest entry ${where} immediately must be a boolean`)
++     }
++@@ -209,6 +237,7 @@ export function parseBootManifest(wire: unknown): BootManifest {
++       id: row.id,
++       inject: inject === undefined ? [] : [...inject],
++       immediately: row.immediately === true,
+++      config,
++     })
++   }
++ 
++diff --git a/packages/client/modules/src/index.ts b/packages/client/modules/src/index.ts
++index 98b6fa5..1585694 100644
++--- a/packages/client/modules/src/index.ts
+++++ b/packages/client/modules/src/index.ts
++@@ -70,6 +70,8 @@ interface WebBootRowFields {
++   /** Module specifiers the package requests from the module table. */
++   external: string[]
++   immediately: boolean
+++  /** Loader row config carried to the client plugin (see {@link rowConfig}). */
+++  config?: Record<string, unknown>
++ }
++ 
++ /** Filesystem baseline captured before a client artifact snapshot is read. */
++@@ -100,6 +102,8 @@ interface ClientPackageSource extends ResolvedPkgMeta {
++   baseUrl: string
++   /** Stable cache and contribution key for this source. */
++   sourceKey: string
+++  /** The row's validated config, already narrowed to what the HTML graph can carry. */
+++  config: Record<string, unknown> | undefined
++ }
++ 
++ /** Recovery instruction shared by grouped startup and steady-state bundle diagnostics. */
++@@ -151,6 +155,8 @@ interface WebPluginRecord {
++   /** Loader resolution input that selected this package instance. */
++   sourceKey: string
++   meta: PkgMeta
+++  /** The active row's validated config, carried to the browser half on every recomposition. */
+++  config: Record<string, unknown> | undefined
++   /** Exact build artifact included in the startup batches. */
++   bundle: Buffer
++   /** Pre-read filesystem baseline handed to the HMR watcher. */
++@@ -197,6 +203,55 @@ function exactPackageSpecifier(specifier: string): string | undefined {
++   return specifier.length > 0 && !specifier.includes('/') ? specifier : undefined
++ }
++ 
+++/** Reject one config value that the JSON boot graph cannot carry without changing it. */
+++function assertCarriableConfig(value: unknown, loaderName: string, path: string, seen: WeakSet<object>): void {
+++  if (value === undefined || value === null || typeof value === 'string' || typeof value === 'boolean') return
+++  if (typeof value === 'number') {
+++    if (Number.isFinite(value)) return
+++    throw new Error(`client-modules: row "${loaderName}" config ${path} is not a finite number; the boot graph carries JSON only`)
+++  }
+++  if (typeof value !== 'object') {
+++    throw new Error(`client-modules: row "${loaderName}" config ${path} is a ${typeof value}; the boot graph carries JSON only`)
+++  }
+++  if (seen.has(value)) {
+++    throw new Error(`client-modules: row "${loaderName}" config ${path} is cyclic; the boot graph carries JSON only`)
+++  }
+++  seen.add(value)
+++  if (Array.isArray(value)) {
+++    value.forEach((item, index) => { assertCarriableConfig(item, loaderName, `${path}[${index}]`, seen) })
+++  } else if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) {
+++    // JSON.stringify would flatten a Date, Map, Set, or class instance into a
+++    // different value; only JSON objects may cross.
+++    throw new Error(`client-modules: row "${loaderName}" config ${path} is not a JSON object; the boot graph carries JSON only`)
+++  } else {
+++    for (const [key, item] of Object.entries(value)) {
+++      assertCarriableConfig(item, loaderName, `${path}.${key}`, seen)
+++    }
+++  }
+++  seen.delete(value)
+++}
+++
+++/**
+++ * Read the owning Loader row's config for one browser entry. The client half of
+++ * a `dsh.client` plugin is composed from the same row as its host half, so it
+++ * receives the same validated config; the HTML graph can only carry JSON, and a
+++ * config this encoding would alter fails loud at composition instead of
+++ * silently reaching the browser as a different object.
+++ * @param loaderName - Loader specifier naming the row in diagnostics.
+++ * @param entry - live Loader entry whose host half the row applied.
+++ * @returns the row config, or undefined when the row declares none.
+++ * @throws {Error} when the config is not an object or carries values JSON cannot represent.
+++ */
+++function rowConfig(loaderName: string, entry: Entry): Record<string, unknown> | undefined {
+++  const config = (entry.options as { config?: unknown }).config
+++  if (config === undefined || config === null) return undefined
+++  if (typeof config !== 'object' || Array.isArray(config)) {
+++    throw new Error(`client-modules: row "${loaderName}" config must be an object to reach its client half`)
+++  }
+++  assertCarriableConfig(config, loaderName, 'config', new WeakSet())
+++  return config as Record<string, unknown>
+++}
+++
++ /** Narrow an unknown parsed JSON value to the `dsh.client` declaration, throwing on malformed fields. */
++ function parseDshClient(pkgName: string, value: unknown): DshClientDeclaration | undefined {
++   if (value === undefined) return undefined
++@@ -422,6 +477,7 @@ function graphRow(id: string, rev: string, fields: WebBootRowFields): WebBootEnt
++     ...(fields.inject !== undefined ? { inject: fields.inject } : {}),
++     ...(fields.immediately ? { immediately: true } : {}),
++     ...(fields.external.length > 0 ? { external: fields.external } : {}),
+++    ...(fields.config !== undefined ? { config: fields.config } : {}),
++   }
++ }
++ 
++@@ -636,7 +692,7 @@ export class ClientModuleRegistry extends Service {
++     const rev = artifactRevision(bundle, sourceMap)
++     record.baseline = baseline
++     if (rev === record.entry.rev) return rev
++-    record.entry = graphRow(id, rev, record.meta)
+++    record.entry = graphRow(id, rev, { ...record.meta, config: record.config })
++     record.bundle = bundle
++     if (sourceMap === undefined) delete record.sourceMap
++     else record.sourceMap = sourceMap
++@@ -936,7 +992,13 @@ export class ClientModuleRegistry extends Service {
++     }
++     const resolved = this.resolveMeta(loaderName, baseUrl)
++     if (resolved === null) return undefined
++-    return { ...resolved, loaderName, baseUrl, sourceKey: this.sourceKey(loaderName, baseUrl) }
+++    return {
+++      ...resolved,
+++      loaderName,
+++      baseUrl,
+++      sourceKey: this.sourceKey(loaderName, baseUrl),
+++      config: rowConfig(loaderName, entry),
+++    }
++   }
++ 
++   private reconcilePackage(packageName: string): boolean {
++@@ -954,16 +1016,25 @@ export class ClientModuleRegistry extends Service {
++     }
++     const source = sources[0]
++     if (source === undefined) return this.table.delete(packageName)
++-    if (this.table.get(packageName)?.sourceKey === source.sourceKey) return false
+++    const existing = this.table.get(packageName)
+++    if (existing?.sourceKey === source.sourceKey) {
+++      // A config edit restarts the row without touching its bundle; the graph
+++      // row must republish the config the browser half applies with.
+++      if (JSON.stringify(existing.config) === JSON.stringify(source.config)) return false
+++      existing.config = source.config
+++      existing.entry = graphRow(packageName, existing.entry.rev, { ...existing.meta, config: source.config })
+++      return true
+++    }
++     // The opaque initial rev rides the row until HMR observes a file change;
++     // a fiber restart from the same source reuses the existing row.
++     const snapshot = this.initialBundleSnapshot(packageName, source.meta.clientPath)
++     const rev = this.allocateInitialRevision()
++     this.table.set(packageName, {
++-      entry: graphRow(packageName, rev, source.meta),
+++      entry: graphRow(packageName, rev, { ...source.meta, config: source.config }),
++       loaderName: source.loaderName,
++       sourceKey: source.sourceKey,
++       meta: source.meta,
+++      config: source.config,
++       bundle: snapshot.bundle,
++       baseline: snapshot.baseline,
++       ...(snapshot.sourceMap === undefined ? {} : { sourceMap: snapshot.sourceMap }),
++diff --git a/packages/client/modules/tests/loader.client.spec.ts b/packages/client/modules/tests/loader.client.spec.ts
++index 8de76e8..a2d7ad7 100644
++--- a/packages/client/modules/tests/loader.client.spec.ts
+++++ b/packages/client/modules/tests/loader.client.spec.ts
++@@ -368,6 +368,29 @@ describe('boot manifest wire', () => {
++     ])
++   })
++ 
+++  it('carries a row config to the client plugin view and leaves a config-less row undefined', () => {
+++    const manifest = parseBootManifest({
+++      rev: 'graph',
+++      entries: [
+++        { id: 'a', url: '/plugins/a/client.js', rev: '1', config: { tools: ['read'], maxGroupSize: 2 } },
+++        { id: 'b', url: '/plugins/b/client.js', rev: '2' },
+++      ],
+++      batches: [{ phase: 'application', url: '/batch.js', rev: 'batch', entries: ['a', 'b'] }],
+++    })
+++    expect(manifest.plugins).toEqual([
+++      { id: 'a', inject: [], immediately: false, config: { tools: ['read'], maxGroupSize: 2 } },
+++      { id: 'b', inject: [], immediately: false, config: undefined },
+++    ])
+++  })
+++
+++  it('rejects a non-object row config', () => {
+++    expect(() => parseBootManifest({
+++      rev: 'graph',
+++      entries: [{ id: 'a', url: '/a', rev: '1', config: ['read'] }],
+++      batches: [{ phase: 'application', url: '/batch.js', rev: 'batch', entries: ['a'] }],
+++    })).toThrow('client-modules: boot manifest entry "a" config must be an object')
+++  })
+++
++   it('rejects a non-array external', () => {
++     expect(() => parseBootManifest({
++       rev: 'graph',
++diff --git a/packages/client/web/src/boot.ts b/packages/client/web/src/boot.ts
++index 71ab65c..c0fb8b7 100644
++--- a/packages/client/web/src/boot.ts
+++++ b/packages/client/web/src/boot.ts
++@@ -121,13 +121,19 @@ export class AppWebEntry {
++       this.page.setState(entry.options.name, STATE_LABELS[entry.fiber.state])
++     })
++ 
++-    const rows = this.manifest.plugins.map(row => row.id)
+++    const rows = this.manifest.plugins
++     this.page.setTotal(rows.length)
++     await prefetching
++-    await Promise.all(rows.map(async (name) => {
++-      this.page.setState(name, 'loading')
++-      const id = await loader.create({ name })
++-      if (loader.resolve(id).fiber === undefined) this.page.setState(name, 'failed')
+++    await Promise.all(rows.map(async (row) => {
+++      this.page.setState(row.id, 'loading')
+++      // The Host graph row carries the Loader row's validated config, so a
+++      // `dsh.client` plugin's browser half applies with the same config as its
+++      // host half; a row without config keeps the plugin's own defaults.
+++      const id = await loader.create({
+++        name: row.id,
+++        ...(row.config === undefined ? {} : { config: row.config }),
+++      })
+++      if (loader.resolve(id).fiber === undefined) this.page.setState(row.id, 'failed')
++     }))
++ 
++     await loader.await()
++diff --git a/packages/extensions/tool-cordis/src/api-catalog.ts b/packages/extensions/tool-cordis/src/api-catalog.ts
++index 2d2ee97..0e4eff9 100644
++--- a/packages/extensions/tool-cordis/src/api-catalog.ts
+++++ b/packages/extensions/tool-cordis/src/api-catalog.ts
++@@ -5965,7 +5965,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
++   },
++   {
++     name: 'WebBootEntry',
++-    declaration: 'export interface WebBootEntry {\n    id: string;\n    url: string;\n    rev: string;\n    inject?: string[];\n    immediately?: boolean;\n    external?: string[];\n}',
+++    declaration: 'export interface WebBootEntry {\n    id: string;\n    url: string;\n    rev: string;\n    inject?: string[];\n    immediately?: boolean;\n    external?: string[];\n    config?: Record<string, unknown>;\n}',
++   },
++   {
++     name: 'WebBootGraph',

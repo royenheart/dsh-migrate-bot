@@ -1,0 +1,15 @@
+diff --git a/fixture/client.js b/fixture/client.js
+index d6f2218..5181964 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,7 +1,7 @@
+-// This plugin was renamed. Keep the legacy registration id so older profiles
+-// can still find it. The host already serves this bundle under the new name.
++// The registration key must match the boot-graph row id, which is the resolved
++// package name; the loader rejects a bundle that registers any other id.
+ window.__ModuleLoader__.load({
+-  id: '@demo/dsh-bench-browser-activation-legacy',
++  id: '@demo/dsh-bench-browser-activation',
+   factory: () => ({
+     apply() {
+       document.documentElement.dataset.benchBrowserActivation = 'active'

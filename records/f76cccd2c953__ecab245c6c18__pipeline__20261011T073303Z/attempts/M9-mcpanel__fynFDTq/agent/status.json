@@ -1,0 +1,136 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.5",
+              "version": "0.1.0-rc.5"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "boot": true,
+              "web": true,
+              "e2e": false
+            },
+            "e2eSubsetFirst": true,
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "final",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 1,
+        "lastFingerprint": "mechanical: npm error code E404",
+        "failure": {
+          "check": "mechanical",
+          "outcome": "fail",
+          "fingerprint": "mechanical: npm error code E404",
+          "detail": "npm error code E404\nnpm error 404 Not Found - GET https://registry.npmjs.org/@deepseek-ai%2fdsh-client-plugin-build - Not found\nnpm error 404\nnpm error 404  The requested resource '@deepseek-ai/dsh-client-plugin-build@^0.1.2-alpha.2' could not be found or you do not have permission to access it.\nnpm error 404\nnpm error 404 Note that you can also install from a\nnpm error 404 tarball, folder, http url, or git url.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-11T10_22_41_187Z-debug-0.log"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "could not install dsh 0.1.0-rc.5 for the checks: npm error code ETARGET\nnpm error notarget No matching version found for @deepseek-ai/dsh@0.1.0-rc.5.\nnpm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-11T10_01_45_871Z-debug-0.log"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "pass",
+          "fingerprint": "",
+          "detail": "[bench-mcpanel] apply() on the 0.1.2-era cohort: bare cordis Context; client plane still on the client-runtime package\n[bench-mcpanel] host half active: mcp-client insert rows in the profile cordis.patch.yml + /api/mcp-manager routes + mcp_* tools (real body elided)\ndsh: TRANSPORT: DeepSeek API request to http://127.0.0.1:9/v1 failed"
+        },
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "comments": []
+      },
+      "run": "local-2026-10-11T10-01-40-777Z",
+      "startedAt": "2026-10-11T10:01:45.825Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.5",
+            "version": "0.1.0-rc.5"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "boot": true,
+            "web": true,
+            "e2e": false
+          },
+          "e2eSubsetFirst": true,
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "final",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 1,
+      "lastFingerprint": "mechanical: npm error code E404",
+      "failure": {
+        "check": "mechanical",
+        "outcome": "fail",
+        "fingerprint": "mechanical: npm error code E404",
+        "detail": "npm error code E404\nnpm error 404 Not Found - GET https://registry.npmjs.org/@deepseek-ai%2fdsh-client-plugin-build - Not found\nnpm error 404\nnpm error 404  The requested resource '@deepseek-ai/dsh-client-plugin-build@^0.1.2-alpha.2' could not be found or you do not have permission to access it.\nnpm error 404\nnpm error 404 Note that you can also install from a\nnpm error 404 tarball, folder, http url, or git url.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-11T10_22_41_187Z-debug-0.log"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "could not install dsh 0.1.0-rc.5 for the checks: npm error code ETARGET\nnpm error notarget No matching version found for @deepseek-ai/dsh@0.1.0-rc.5.\nnpm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-11T10_01_45_871Z-debug-0.log"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "pass",
+        "fingerprint": "",
+        "detail": "[bench-mcpanel] apply() on the 0.1.2-era cohort: bare cordis Context; client plane still on the client-runtime package\n[bench-mcpanel] host half active: mcp-client insert rows in the profile cordis.patch.yml + /api/mcp-manager routes + mcp_* tools (real body elided)\ndsh: TRANSPORT: DeepSeek API request to http://127.0.0.1:9/v1 failed"
+      },
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "comments": []
+    },
+    "run": "local-2026-10-11T10-01-40-777Z",
+    "startedAt": "2026-10-11T10:01:45.825Z"
+  }
+}

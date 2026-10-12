@@ -1,0 +1,113 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 865ecb9..c64dd8e 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,8 +1,18 @@
+ # @demo/dsh-bench-ping (fixture)
+ 
+ DSH benchmark M5 fixture: a web plugin registering a self-built `/ping` HTTP
+-channel directly on the web server. The trap state is intentional — the raw
+-`webServer.register` prefix route answers `pong` with 200 and no host
+-authentication.
++channel directly on the web server. Its M5 trap state was the raw
++`webServer.register` prefix route answering `pong` with 200 and no host
++authentication; the channel now runs the host's own Connection request fence
++(`ctx.connection.requestRejection`: Host/Origin checks plus browser-session
++authentication) before it answers, so `/ping` serves `pong` to an
++authenticated browser session and 401/403 otherwise. The route itself is
++unchanged: prefix `/ping`, registered on `ctx.webServer`.
++
++The package declares `dsh.bundle.patch`, so a profile that lists
++`@demo/dsh-bench-ping` under `dsh.profile.bundles` mounts the channel. The
++plugin resolves its carrier with `ctx.inject`, so a profile without
++`webServer`/`connection` (headless) still loads and simply registers no
++route.
+ 
+ Exam material only, **do not publish** (`"private": true` in package.json).
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index bc609be..0e8c311 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1,3 +1,14 @@
++# The plugin's own bundle layer: mount the /ping channel plugin into every
++# profile that lists @demo/dsh-bench-ping as a bundle. The web carrier
++# (webserver + connection, supplied by the dsh-web-app bundle) is resolved by
++# the plugin's ctx.inject, so a headless profile without an HTTP server still
++# loads.
++#
++# The former `peer-bench` row named @demo/dsh-peer-bench, a companion package
++# that is neither installed nor published in this deployment; the host-side
++# wiring that name stood in for is this release's own extension points — the
++# ctx.webServer named-route registry plus ctx.connection.requestRejection
++# (Host/Origin and browser-session fence).
+ - insert:
+-    - id: peer-bench
+-      name: "@demo/dsh-peer-bench"
++    - id: bench-ping
++      name: "@demo/dsh-bench-ping"
+diff --git a/fixture/index.js b/fixture/index.js
+index 5df8e63..f7d05f9 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,14 +1,33 @@
+-// 0.1.2 self-built channel: register the web route directly and let the caller
+-// bring its own check — no host-side wiring is needed here.
+-export const inject = ['webServer']
++// Self-built /ping channel on the host's own HTTP carrier. The plugin still
++// registers the route on ctx.webServer, but the host's browser-trust and
++// browser-session policy is applied through the public
++// ctx.connection.requestRejection seam instead of being left to the caller —
++// the same pattern dsh-api-gateway uses for its own webServer route.
++//
++// ctx.inject waits for the carrier without making the plugin entry pending, so
++// a composition without an HTTP server (headless) still loads; the /ping route
++// simply does not exist there.
++//
++// This stays a plain named route rather than a Connection RPC channel:
++// ctx.connection.rpc.handle() occupies the same absolute prefix but dispatches
++// the JSON-RPC envelope, and /ping must answer plain text.
++export const name = 'dsh-bench-ping'
+ 
+ export function apply(ctx) {
+-  ctx.webServer.register({
+-    kind: 'prefix',
+-    path: '/ping',
+-    handler: (_req, res) => {
+-      res.writeHead(200)
+-      res.end('pong')
+-    },
++  ctx.inject(['webServer', 'connection'], (webCtx) => {
++    webCtx.effect(() => webCtx.webServer.register({
++      kind: 'prefix',
++      path: '/ping',
++      handler: (req, res) => {
++        const rejection = webCtx.connection.requestRejection(req)
++        if (rejection !== undefined) {
++          res.writeHead(rejection, { 'content-type': 'text/plain; charset=utf-8' })
++          res.end(rejection === 401 ? 'unauthorized' : 'forbidden')
++          return
++        }
++        res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' })
++        res.end('pong')
++      },
++    }), 'dsh-bench-ping: /ping channel')
+   })
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..bbb2476
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-ping",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-ping",
++      "version": "0.1.0"
++    }
++  }
++}

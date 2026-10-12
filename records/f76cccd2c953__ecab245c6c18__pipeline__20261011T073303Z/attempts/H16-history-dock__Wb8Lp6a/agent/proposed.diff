@@ -1,0 +1,1541 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 10bce69..661a053 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -2,8 +2,53 @@
+ 
+ Terminal-style prompt history navigation for the DSH composer
+ (ArrowUp/ArrowDown cycles through recently sent messages, persisted in
+-localStorage), written in the 0.1.1-era style. The host is moving to
+-dsh 0.1.2-alpha.2.
++localStorage), migrated to the dsh 0.1.2-alpha.2 client surface.
++
++## Capabilities
++
++- **↑ / ↓ history navigation in the composer**: ArrowUp walks to older sent
++  prompts, ArrowDown walks forward; past the newest entry the draft that was
++  being edited is restored.
++- **localStorage persistence**: the store is a FIFO list of unique prompts
++  (capacity 500), shared across sessions in the browser profile.
++- **Conversation-sourced history**: entries come from the current session's
++  `user` + `steering` conversation nodes, not from an input echo.
++- **Multi-line gate**: ArrowUp only fires from the first line, ArrowDown only
++  from the last line; elsewhere the editor keeps the arrow.
++- **IME safety**: keys during composition (including the Safari
++  post-`compositionend` keydown) are left to the editor.
++- **Slash/@ menu compatibility**: while a trigger menu is open, both arrows stay
++  with menu highlight navigation.
++- **Hero/blank-mode navigation**: the gesture is attached in the plugin's
++  `apply` body, so it stays live while the session renders as the hero and the
++  session-scoped dock is not mounted.
++
++## Migrated surface (dsh 0.1.2-alpha.2)
++
++| Concern | 0.1.1-era | 0.1.2-alpha.2 |
++| --- | --- | --- |
++| Composer surface | `<textarea>` located by `document.querySelector` | shell-owned Lexical contenteditable; the gesture uses the `ctx.conversation.composerKeys` seam, with `[data-composer-input]` only as the fallback anchor |
++| Draft write | native value setter + `input` event | `ctx.conversation.input.for(actx).setDraft(text)` |
++| Draft read | `textarea.value` | `InputState.draft` from that session's input facade |
++| Session resolution | renderer binding through `ctx.uiSession.adapter` | `ctx.sessions.list` current selection + `ctx.sessions.scope(id)` |
++| History source | `session.nodes` owner props | `useChat(s => s.legacy.nodes)` (Chat target nodes) |
++| Key listener | document bubble phase, `defaultPrevented` arbitration | the `composerKeys` offer (dispatched after trigger-menu arbitration); the fallback is a document **capture** listener whose consumed keys call `preventDefault` + `stopPropagation` |
++| Menu arbitration | `defaultPrevented` heuristic | done by the shell before the seam offer; the fallback asks `ctx.inputTriggers` `menu.open` and probes `[data-trigger-menu]` |
++| Dock entry | `conversation.composer.dock` (id, order 100) | unchanged — the slot still exists with the same id/order |
++
++The bundle layer (`cordis.patch.yml`) is unchanged and still required: it
++inserts the plugin row into the profile it is installed into.
++
++## Required harness patch
++
++`patches/composer-key-seam.patch` (slug `composer-key-seam`) adds the
++`ctx.conversation.composerKeys` registry to `dsh-v0.1.2-alpha.2`, so a plugin can
++claim one composer arrow gesture after the trigger menu declines it and before
++the editor moves the caret. The plugin detects the registry and prefers it; on a
++build without it the capture-phase fallback keeps the documented gesture
++working. The patch is therefore required for the supported path, not for the
++plugin to run at all. Rationale, verification, and related upstream discussions
++live in `.dsh-migrate/patch-reports/composer-key-seam/report.md`.
+ 
+ Release procedure (internal):
+ 
+diff --git a/fixture/client.js b/fixture/client.js
+index c8cae4c..098c99d 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,57 +1,84 @@
+-// bench-history-dock — browser half (0.1.1-era cohort, pre v0.1.2-alpha).
++// bench-history-dock — browser half, migrated to the dsh 0.1.2-alpha.2 client surface.
+ //
+-// The DSH composer (InputBar) is a <textarea>: the plugin locates it with
+-// document.querySelector('textarea') and feeds history text back through the
+-// native prototype value setter + a dispatched 'input' event, which fires
+-// InputBar's controlled-component onChange → keyboard.setDraft — the same
+-// path the user's typing takes.
++// The DSH composer is a shell-owned Lexical editor bound to a contenteditable.
++// This plugin never touches the editor object or its internal keymap; it uses
++// the public session faces instead:
+ //
+-// Two registrations (distilled from the real PRE client sources):
+-//   - the conversation.composer.dock list entry (id `bench-history-dock`,
+-//     order 100) — the invisible dock that collects history from the
+-//     session's conversation-node slice (session.nodes) on every render;
+-//   - a document-level 'keydown' listener attached in the plugin's apply
+-//     body (NOT in the dock component), so the listener stays active in
+-//     hero/blank mode where the session-scoped dock is suppressed.
+-//
+-// History is collected from user/steering nodes, persisted to localStorage
+-// (FIFO, 500 entries), and shared across all sessions in the browser profile.
++//   - draft read  -> `ctx.conversation.input.for(actx).state` (`InputState.draft`,
++//                    the clipboard projection) carried by the Session scope;
++//   - draft write -> `ctx.conversation.input.for(actx).setDraft(text)` (the
++//                    documented whole-draft programmatic write; Lexical update,
++//                    caret to the end);
++//   - session     -> `ctx.sessions.list` (current selection) and
++//                    `ctx.sessions.scope(id)` (the Session scope ctx);
++//   - history     -> the Chat target's node list through the `useChat`
++//                    standard hook (`snapshot.legacy.nodes`), user + steering
++//                    nodes only, matching the 0.1.1-era conversation-node slice.
+ //
+ // ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.1 era):
+-//   "The composer is still a <textarea> under the hood — only its styling
+-//    changed. Keep querySelector('textarea') and the apply-level keydown
+-//    listener so history navigation also works in hero mode; a session-
+-//    scoped listener would go dark exactly when the composer is on screen."
++// The composer key gesture has two paths. The official one is preferred and is
++// detected by the presence of the registry; the raw-listener path is the
++// fallback for harness builds that predate the seam (including the released
++// 0.1.2-alpha.2). See patches/composer-key-seam.patch for the harness side.
++//
++//   official: `ctx.conversation.composerKeys.register(handler)`. The composer
++//   keymap offers ArrowUp/ArrowDown only after the trigger menu declined the
++//   key and before the editor's own caret move, and the offer carries the
++//   originating keydown, the shell's composition window, and the Session
++//   scope. No DOM anchor, no IME re-derivation, no menu probe.
++//
++//   fallback: a document-level capture-phase keydown observer attached in the
++//   plugin's `apply` body (NOT in the dock component), so navigation stays
++//   active while the session renders as the hero and the session-scoped dock
++//   is not mounted. The 0.1.1-era bubble-phase handler with
++//   `event.defaultPrevented` arbitration cannot work: the shell's Lexical
++//   keymap registers ArrowUp/ArrowDown at CRITICAL priority on the editor root
++//   and consumes them first. This handler therefore decides first and consumes
++//   the key with preventDefault + stopPropagation. Menu arbitration asks the
++//   trigger service (`ctx.inputTriggers`, menu.open) and falls back to the
++//   menu's `[data-trigger-menu]` node.
+ // ────────────────────────────────────────────────────────────
+ 
+ export const name = 'bench-history-dock-client'
+ 
+-/** Required services: slots + locale. */
+-export const inject = ['slots', 'locale']
++/** Required services: slots + locale + the session registry and input registry. */
++export const inject = ['slots', 'locale', 'conversation', 'sessions']
+ 
+ const NS = 'bench-history-dock'
+ const STORAGE_KEY = 'bench-history-dock:v1'
+ const CAPACITY = 500
+ 
+-/** Navigation cursor + saved draft; module-scoped because the keydown
+- * listener is attached once in `apply` and persists across dock
+- * mount/unmount cycles. */
++/** Fallback composer-surface anchors (Lexical contenteditable + its card). */
++const COMPOSER_INPUT_SELECTOR = '[data-composer-input]'
++const COMPOSER_CARD_SELECTOR = '[data-composer-card]'
++const TRIGGER_MENU_SELECTOR = '[data-trigger-menu]'
++
++/** Navigation cursor + saved draft; module-scoped because the gesture handler
++ * is attached once in `apply` and persists across dock mount/unmount cycles. */
+ let navCursor = null
+ let savedDraft = null
+ 
++/** Last text handed to the history store, so repeated renders do not rewrite
++ * localStorage with an entry the store already holds. */
++let lastCollected = null
++
++/** Safari delivers the closing keydown AFTER compositionend; hold the IME
++ * guard for one tick (the same window the shell's keymap uses). Fallback path
++ * only — the official seam carries the shell's own composition state. */
++let composingUntil = 0
++
+ /**
+- * Client plugin body: register the dock + attach the document keydown
+- * listener.
++ * Client plugin body: register the dock + attach the composer-key gesture.
+  *
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx) {
+   ctx.effect(() => ctx.locale.register(NS, { zh: {}, en: {} }), 'bench-history-dock: dictionaries')
+ 
+-  // The dock collects history from the session's conversation-node slice.
+-  // Session-scoped: DSH suppresses the dock in hero/blank mode (blank
+-  // sessions render as hero), so collection only runs in active sessions.
++  // The dock collects history from the current session's conversation nodes.
++  // Session-scoped: DSH renders a blank session as the hero, where this dock is
++  // intentionally not mounted (the session-scoped collection has nothing to do
++  // yet). Navigation is NOT bound to the dock — see the apply-level gesture.
+   ctx.slots.inject('conversation.composer.dock', () =>
+     ctx.slots.register(
+       { name: 'conversation.composer.dock', id: 'bench-history-dock', order: 100, locale: NS },
+@@ -59,97 +86,310 @@ export function apply(ctx) {
+     ),
+   )
+ 
+-  // Attach the document-level keydown listener. This lives in `apply` (not
+-  // in the dock component) so navigation stays active even when the dock is
+-  // suppressed in hero/blank mode. Bubble phase — the composer's own key
+-// handling runs first, and the handler below defers to it.
+-  ctx.effect(() => {
+-    if (typeof document === 'undefined') return undefined
+-    const handler = (event) => {
+-      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+-      if (isImeComposition(event)) return
+-      // Slash/@ menu arbitration: the 0.1.1-era heuristic — InputBar marks
+-      // menu-navigated arrows as handled, and this handler defers to any
+-      // earlier consumer via the defaultPrevented branch.
+-      if (event.defaultPrevented) return
+-      const textarea = findComposerTextarea(event.target)
+-      if (textarea === null || event.target !== textarea) return
+-      if (textarea.readOnly || textarea.disabled) return
+-
+-      const history = getHistoryStore().list
+-      const info = cursorLineInfo(textarea.value, textarea.selectionStart, textarea.selectionEnd)
+-      if (event.key === 'ArrowUp' && !info.atFirstLine) return
+-      if (event.key === 'ArrowDown' && !info.atLastLine) return
+-
+-      const dir = event.key === 'ArrowUp' ? 'up' : 'down'
+-      const next = nextIndex(navCursor, history.length, dir)
+-      if (next === null) {
+-        const saved = savedDraft
+-        navCursor = null
+-        if (saved !== null) {
+-          setNativeTextareaValue(textarea, saved)
+-          savedDraft = null
+-        }
+-        event.preventDefault()
+-        return
+-      }
+-      if (navCursor === null && savedDraft === null) savedDraft = textarea.value
+-      const entry = entryAt(history, next)
+-      if (entry === null) return
+-      navCursor = next
+-      setNativeTextareaValue(textarea, entry)
+-      event.preventDefault()
+-    }
+-    document.addEventListener('keydown', handler, false)
+-    return () => {
+-      document.removeEventListener('keydown', handler, false)
+-    }
+-  }, 'bench-history-dock: keydown listener')
++  // The registry's presence IS the capability: a harness build without the
++  // composer-key seam keeps the raw-listener path.
++  const composerKeys = ctx.conversation?.composerKeys
++  if (composerKeys !== undefined && typeof composerKeys.register === 'function') {
++    ctx.effect(
++      () => composerKeys.register((request) => handleComposerKey(ctx, request)),
++      'bench-history-dock: composer-key offers',
++    )
++  } else {
++    ctx.effect(() => attachKeydownFallback(ctx), 'bench-history-dock: keydown fallback')
++  }
++}
++
++/**
++ * The official seam: the shell already arbitrated the trigger menu and carries
++ * its own composition window, so this handler only applies the documented
++ * modifier, caret, phase, and history gates.
++ *
++ * @param {import('@deepseek-ai/cordis').Context} ctx
++ * @param {{ key: 'up' | 'down', event: KeyboardEvent, composing: boolean, session: object }} request
++ * @returns {boolean} true = the gesture is consumed.
++ */
++function handleComposerKey(ctx, request) {
++  if (request.composing) return false
++  // An earlier capture listener already claimed the key (the 0.1.1-era
++  // `defaultPrevented` deference, preserved).
++  if (request.event.defaultPrevented === true) return false
++  if (hasModifier(request.event)) return false
++
++  const input = inputFor(ctx, request.session)
++  if (input === null) return false
++  const state = input.state.getSnapshot()
++  if (state.phase !== 'plain') return false
++
++  const editable = seamEditableOf(request.event.target)
++  if (editable === null) return false
++  const gate = gateFor(editable, request.key)
++  if (gate !== true) return false
++
++  return navigate(request.key, state.draft, input.setDraft)
++}
++
++/**
++ * The fallback observer for harness builds without the composer-key seam.
++ *
++ * @param {import('@deepseek-ai/cordis').Context} ctx
++ * @returns {(() => void) | undefined} the disposer, when a DOM exists.
++ */
++function attachKeydownFallback(ctx) {
++  if (typeof document === 'undefined') return undefined
++
++  const onCompositionEnd = () => {
++    composingUntil = Date.now() + 10
++  }
++  const handler = (event) => {
++    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
++    // An earlier capture listener already claimed the key.
++    if (event.defaultPrevented) return
++    if (isImeComposition(event)) return
++    if (hasModifier(event)) return
++
++    const editable = composerEditableOf(event.target)
++    if (editable === null || editable.isContentEditable === false) return
++
++    const actx = currentSessionCtx(ctx)
++    if (actx === null) return
++    const input = inputFor(ctx, actx)
++    if (input === null) return
++    const state = input.state.getSnapshot()
++    if (state.phase !== 'plain') return
++
++    // Slash/@ menu arbitration: the menu keeps both arrows for highlight
++    // navigation. Checked before the caret gate because the open menu owns
++    // the keys regardless of where the caret sits.
++    if (triggerMenuOpen(ctx, actx, editable)) return
++
++    const key = event.key === 'ArrowUp' ? 'up' : 'down'
++    const gate = gateFor(editable, key)
++    if (gate !== true) return
++
++    if (!navigate(key, state.draft, input.setDraft)) return
++    event.preventDefault()
++    event.stopPropagation()
++  }
++  document.addEventListener('compositionend', onCompositionEnd, true)
++  document.addEventListener('keydown', handler, true)
++  return () => {
++    document.removeEventListener('compositionend', onCompositionEnd, true)
++    document.removeEventListener('keydown', handler, true)
++  }
+ }
+ 
+ /**
+- * Set the textarea value via the native prototype setter and dispatch an
+- * `input` event so React's controlled-component onChange fires — the same
+- * technique browser-automation libraries use on React controlled inputs.
++ * The documented multi-line gate, shared by both paths: ArrowUp only from the
++ * first line, ArrowDown only from the last. `null` means the gate cannot be
++ * answered (no collapsed caret in the editable) and the key stays with the
++ * editor; `true` means the gate passed.
++ *
++ * @param {Element} editable - the composer contenteditable.
++ * @param {'up' | 'down'} key - the intercepted gesture.
++ * @returns {boolean | null}
++ */
++function gateFor(editable, key) {
++  const info = caretLineInfo(editable)
++  if (info === null) return null
++  if (key === 'up' && !info.atFirstLine) return false
++  if (key === 'down' && !info.atLastLine) return false
++  return true
++}
++
++/**
++ * Walk the history one step and write the recalled text through the public
++ * draft action. False leaves the key to the editor: at the oldest entry, at a
++ * fresh ArrowDown, or when the walk cannot resolve an entry.
++ *
++ * @param {'up' | 'down'} dir - walk direction.
++ * @param {string} draft - the current draft, saved before the first step.
++ * @param {(text: string) => void} setDraft - the Session's public draft write.
++ * @returns {boolean} true = the gesture was consumed.
+  */
+-function setNativeTextareaValue(textarea, value) {
+-  const descriptor = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')
+-  if (descriptor === undefined || descriptor.set === undefined) {
+-    textarea.value = value
+-    return
++function navigate(dir, draft, setDraft) {
++  const history = getHistoryStore().list
++  const next = nextIndex(navCursor, history.length, dir)
++  let text
++  if (next === null) {
++    // Walking forward past the newest entry restores the pre-navigation
++    // draft. With no walk in progress, or at the oldest entry, there is
++    // nothing to do and the editor keeps the key.
++    if (dir !== 'down' || navCursor === null) return false
++    text = savedDraft ?? ''
++    navCursor = null
++    savedDraft = null
++  } else {
++    if (navCursor === null) savedDraft = draft
++    const entry = entryAt(history, next)
++    if (entry === null) return false
++    navCursor = next
++    text = entry
+   }
+-  descriptor.set.call(textarea, value)
+-  textarea.dispatchEvent(new Event('input', { bubbles: true }))
++  setDraft(text)
++  return true
++}
++
++/**
++ * The current Session scope, or null when no session is selected (the inert
++ * workspace-picker composer has no input machine).
++ *
++ * @param {import('@deepseek-ai/cordis').Context} ctx
++ */
++function currentSessionCtx(ctx) {
++  const current = ctx.sessions.list.getSnapshot().current
++  if (current === undefined) return null
++  return ctx.sessions.scope(current) ?? null
+ }
+ 
+ /**
+- * Locate the DSH composer textarea. The real locator scopes the query to the
+- * composer card's stable internal attribute; the distilled fixture keeps the
+- * document-level shape the exam anchors on.
++ * The Session's public input facade (`ctx.conversation.input`), or null when
++ * the scope carries no input machine.
++ *
++ * @param {import('@deepseek-ai/cordis').Context} ctx
++ * @param {object} actx - the Session scope.
+  */
+-function findComposerTextarea(from) {
+-  if (typeof document === 'undefined') return null
+-  if (from instanceof Element) {
+-    const card = from.closest('[data-composer-card]')
+-    if (card !== null) {
+-      const ta = card.querySelector('textarea')
+-      if (ta !== null) return ta
++function inputFor(ctx, actx) {
++  try {
++    const input = ctx.conversation.input.for(actx)
++    if (input === undefined || input === null) return null
++    if (typeof input.setDraft !== 'function') return null
++    if (input.state === undefined || typeof input.state.getSnapshot !== 'function') return null
++    return input
++  } catch {
++    // Scope without an input shell (non-session ctx): no gesture to serve.
++    return null
++  }
++}
++
++/** Whether an open slash/@ menu currently owns the arrow keys (fallback path). */
++function triggerMenuOpen(ctx, actx, editable) {
++  const triggers = ctx.get('inputTriggers')
++  if (triggers !== undefined) {
++    try {
++      const menu = triggers.sessionOf(actx)?.menu?.getSnapshot?.()
++      if (menu !== undefined) return menu.open === true
++    } catch {
++      // Scope without a trigger controller: fall through to the DOM probe.
+     }
+   }
+-  return document.querySelector('textarea')
++  const card = editable.closest(COMPOSER_CARD_SELECTOR)
++  return card !== null && card.querySelector(TRIGGER_MENU_SELECTOR) !== null
++}
++
++/**
++ * The seam's caret host: the keydown's own target when it is (or sits inside)
++ * a contenteditable. The composer keymap only raises the offer from the
++ * editor root, so this needs no shipped attribute.
++ */
++function seamEditableOf(target) {
++  if (typeof Element === 'undefined' || !(target instanceof Element)) return null
++  if (target.isContentEditable === true) return target
++  return target.closest('[contenteditable="true"]')
++}
++
++/**
++ * Locate the DSH composer editable for a raw keydown target: the target must
++ * be the Lexical contenteditable itself or inside it, so composer chrome (card
++ * buttons, chips outside the editable) never triggers navigation.
++ */
++function composerEditableOf(target) {
++  if (typeof Element === 'undefined' || !(target instanceof Element)) return null
++  return target.closest(COMPOSER_INPUT_SELECTOR)
++}
++
++/**
++ * Line position of the collapsed caret inside the composer, or null when the
++ * selection is not a collapsed caret in the editable (or the environment has
++ * no Range).
++ *
++ * Lexical renders one block element per line (`<p>`) plus `<br>` hard breaks,
++ * so line breaks are counted structurally instead of by layout: a caret is on
++ * the first line when no break point precedes it, and on the last line when no
++ * break point follows it. This keeps the gate answerable in headless test
++ * environments and while the editor is off-screen.
++ *
++ * @param {Element} editable - the composer contenteditable.
++ * @returns {{ atFirstLine: boolean, atLastLine: boolean } | null}
++ */
++function caretLineInfo(editable) {
++  if (typeof window === 'undefined' || typeof Range === 'undefined') return null
++  const selection = window.getSelection()
++  if (selection === null || selection === undefined) return null
++  if (selection.rangeCount === 0 || !selection.isCollapsed) return null
++  const caret = selection.getRangeAt(0)
++  if (!editable.contains(caret.startContainer)) return null
++
++  const point = document.createRange()
++  point.setStart(caret.startContainer, caret.startOffset)
++  point.collapse(true)
++
++  let before = 0
++  let after = 0
++  const compare = (other) => {
++    const order = point.compareBoundaryPoints(Range.START_TO_START, other)
++    if (order > 0) before += 1
++    else if (order < 0) after += 1
++  }
++
++  const lines = editable.children
++  for (let index = 1; index < lines.length; index++) {
++    const start = document.createRange()
++    start.setStartBefore(lines[index])
++    start.collapse(true)
++    compare(start)
++  }
++  for (const br of editable.querySelectorAll('br')) {
++    const end = document.createRange()
++    end.setStartAfter(br)
++    end.collapse(true)
++    compare(end)
++  }
++  return { atFirstLine: before === 0, atLastLine: after === 0 }
+ }
+ 
+ /**
+- * The invisible dock entry: collects prompt history from the session's
+- * conversation-node slice (session.nodes) on every render. Session-scoped;
+- * suppressed in hero/blank mode.
++ * The invisible dock entry: collects prompt history from the current session's
++ * conversation nodes on every render. Session-scoped; suppressed while the
++ * session renders as the hero.
+  *
+- * @param {{ session: { nodes: Array<{ kind: string, content?: Array<{ type: string, text?: string }> }> }}} props
++ * @param {{ session: object, useChat?: Function }} props
+  */
+ function HistoryDock(props) {
+-  const lastText = latestUserOrSteeringText(props.session.nodes)
+-  if (lastText !== null) getHistoryStore().append(lastText)
+-  return null // aria-hidden anchor elided in the fixture
++  // The `chat` standard hook is contributed by ui-chat's uiSession.provide;
++  // its presence is fixed for an assembly's lifetime, so selecting the
++  // collector by it keeps a stable hook order across renders.
++  if (typeof props.useChat === 'function') return ChatHistoryDock(props)
++  return PendingHistoryDock(props)
++}
++
++/** Collector over the Chat target's node list (the shipped web assembly). */
++function ChatHistoryDock(props) {
++  const nodes = props.useChat(selectChatNodes)
++  const text = latestUserOrSteeringText(nodes)
++  if (text !== null) rememberCollected(text)
++  return null
++}
++
++/** Collector over local prompt echoes, for assemblies without the Chat target. */
++function PendingHistoryDock(props) {
++  const pending = props.session?.pendingSubmissions ?? []
++  const text = pending.length === 0 ? null : pending[pending.length - 1].text ?? null
++  if (text !== null) rememberCollected(text)
++  return null
++}
++
++/** Stable selector: the Chat target's flat node array, unchanged between publications. */
++function selectChatNodes(snapshot) {
++  return snapshot?.legacy?.nodes ?? EMPTY_NODES
++}
++
++const EMPTY_NODES = []
++
++/** Append one collected prompt unless it is already the last collected text. */
++function rememberCollected(text) {
++  if (text === lastCollected) return
++  lastCollected = text
++  getHistoryStore().append(text)
+ }
+ 
+ /** Latest user/steering text from a conversation snapshot's nodes list. */
+@@ -167,30 +407,32 @@ function latestUserOrSteeringText(nodes) {
+   return null
+ }
+ 
+-/** Caret line information for a multi-line textarea value. */
+-function cursorLineInfo(value, selectionStart, selectionEnd) {
+-  const end = selectionEnd ?? selectionStart
+-  const collapsed = selectionStart === end
+-  const totalLines = value.split('\n').length
+-  const currentLine = value.slice(0, selectionStart).split('\n').length - 1
+-  return {
+-    currentLine: Math.max(0, Math.min(currentLine, totalLines - 1)),
+-    totalLines,
+-    atFirstLine: collapsed && currentLine === 0,
+-    atLastLine: collapsed && currentLine === totalLines - 1,
+-  }
++/** Whether the key carries a modifier the editor should keep (fallback path). */
++function hasModifier(event) {
++  return event.shiftKey || event.ctrlKey || event.altKey || event.metaKey
+ }
+ 
+ /** The pure decision: is this keyboard event part of an IME composition? */
+ function isImeComposition(event) {
+-  return event.isComposing === true || event.keyCode === 229
++  // keyCode 229 is the legacy IME-composition signal engines emit without isComposing.
++  // oxlint-disable-next-line typescript/no-deprecated
++  return event.isComposing === true || event.keyCode === 229 || Date.now() < composingUntil
+ }
+ 
+-/** Terminal-style cursor: ArrowUp walks to older entries, ArrowDown to newer. */
++/**
++ * Terminal-style cursor: ArrowUp walks to older entries, ArrowDown to newer.
++ * Null means the walk ran off an end: the newest end restores the saved draft,
++ * the oldest end (and a fresh ArrowDown) leaves the key to the editor.
++ *
++ * @param {number | null} cursor - current index, null when no walk is active.
++ * @param {number} length - history length.
++ * @param {'up' | 'down'} dir - walk direction.
++ * @returns {number | null} next index, or null past an end.
++ */
+ function nextIndex(cursor, length, dir) {
+   if (length === 0) return null
+-  if (dir === 'up') return cursor === null ? length - 1 : cursor - 1
+-  return cursor === null ? null : cursor + 1
++  if (dir === 'up') return cursor === null ? length - 1 : (cursor > 0 ? cursor - 1 : null)
++  return cursor === null ? null : (cursor + 1 < length ? cursor + 1 : null)
+ }
+ 
+ /** The history entry at a cursor index, or null when out of bounds. */
+@@ -202,10 +444,9 @@ function entryAt(history, index) {
+ let historyStore = null
+ function getHistoryStore() {
+   if (historyStore === null) {
+-    const key = 'bench-history-dock:v1'
+     let list = []
+     try {
+-      list = JSON.parse(window.localStorage.getItem(key) ?? '[]')
++      list = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '[]')
+     } catch {
+       list = []
+     }
+@@ -218,9 +459,9 @@ function getHistoryStore() {
+         if (trimmed === '') return
+         const filtered = list.filter((item) => item !== trimmed)
+         filtered.push(trimmed)
+-        list = filtered.slice(-500)
++        list = filtered.slice(-CAPACITY)
+         try {
+-          window.localStorage.setItem(key, JSON.stringify(list))
++          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
+         } catch {
+           // Storage unavailable: degrade to the in-memory list.
+         }
+diff --git a/fixture/index.js b/fixture/index.js
+index c1dec70..c890978 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,15 +1,20 @@
+-// bench-history-dock — host plugin entry (0.1.1-era cohort).
++// bench-history-dock — host plugin entry (dsh 0.1.2-alpha.2 cohort).
+ //
+ // Client-only plugin: the host half has no runtime work. The browser half
+ // (./client.js) registers an invisible entry in `conversation.composer.dock`
+-// that collects prompt history from the session's conversation-node slice
+-// and implements terminal-style history navigation (ArrowUp/ArrowDown) over
+-// the composer textarea.
++// that collects prompt history from the current session's Chat nodes and
++// implements terminal-style history navigation (ArrowUp/ArrowDown) over the
++// composer's Lexical contenteditable, writing recalled text through the public
++// `ctx.conversation.input.setDraft` face. The key gesture prefers the
++// `ctx.conversation.composerKeys` seam when the harness build provides it and
++// falls back to a document capture-phase listener otherwise; see
++// patches/composer-key-seam.patch.
+ 
+ export const name = 'bench-history-dock'
+ 
+-// Client-only plugin: the host half carries no runtime work — every exam
+-// surface lives in client.js (dock registration + keydown listener).
++// Client-only plugin: the host half carries no runtime work — every surface
++// lives in client.js (dock registration + composer-key gesture + session draft
++// faces).
+ export const inject = []
+ 
+ /**
+@@ -18,5 +23,5 @@ export const inject = []
+  * @param {import('@deepseek-ai/cordis').Context} _ctx - host context (unused).
+  */
+ export function apply(_ctx, config) {
+-  console.error('[bench-history-dock] host apply(): client-only plugin (0.1.1-era cohort); no host-side resources')
++  console.error('[bench-history-dock] host apply(): client-only plugin (0.1.2-alpha.2 cohort); no host-side resources')
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..f53cfe9
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,60 @@
++{
++  "name": "@bench/dsh-bench-history-dock",
++  "version": "0.1.2",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-history-dock",
++      "version": "0.1.2",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.1-rc.1",
++        "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-chat": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-session": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++        "react": "^18.2.0",
++        "react-dom": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-api-session-controller": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-chat": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-conversation": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-renderer": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-session": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-invariants": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        },
++        "react-dom": {
++          "optional": true
++        }
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index c0ec4de..c2ba2b4 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-history-dock",
+   "version": "0.1.2",
+-  "description": "Terminal-style prompt history navigation for the DSH composer: ArrowUp/ArrowDown cycles through recently sent messages (0.1.1-era cohort; exam material only)",
++  "description": "Terminal-style prompt history navigation for the DSH composer: ArrowUp/ArrowDown cycles through recently sent messages (0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -16,27 +16,36 @@
+     "client": {
+       "platform": "web",
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
++        "@deepseek-ai/dsh-api-session-controller",
+         "@deepseek-ai/dsh-client-locale",
++        "@deepseek-ai/dsh-client-ui-renderer",
++        "@deepseek-ai/dsh-client-ui-session",
+         "@deepseek-ai/dsh-client-ui-slots",
+-        "@deepseek-ai/dsh-client-ui-conversation"
++        "@deepseek-ai/dsh-client-ui-conversation",
++        "@deepseek-ai/dsh-client-ui-chat"
+       ]
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/dsh-client-locale": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-conversation": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-invariants": "^0.0.1-rc.1",
++    "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-chat": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-session": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
+     "@deepseek-ai/cordis": "^4.0.1-rc.1",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
++    "@deepseek-ai/dsh-api-session-controller": { "optional": true },
+     "@deepseek-ai/dsh-client-locale": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-chat": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-conversation": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-session": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+     "@deepseek-ai/dsh-invariants": { "optional": true },
+     "@deepseek-ai/cordis": { "optional": true },
+diff --git a/fixture/patches/README.md b/fixture/patches/README.md
+new file mode 100644
+index 0000000..d845780
+--- /dev/null
++++ b/fixture/patches/README.md
+@@ -0,0 +1,17 @@
++# patches/
++
++Harness-side patches this plugin needs for its complete documented surface.
++
++| Patch | Target | Applies with |
++| --- | --- | --- |
++| `composer-key-seam.patch` | `dsh-v0.1.2-alpha.2` | `git apply patches/composer-key-seam.patch` at the harness root |
++
++`composer-key-seam.patch` adds `ctx.conversation.composerKeys`, the registry the
++composer keymap offers declined ArrowUp/ArrowDown gestures to. It is additive:
++without it the released harness still boots, and the plugin falls back to its
++document capture-phase listener, which depends on undocumented composer DOM
++anchors. The patch keeps the documented gesture path on a supported seam.
++
++The patch is written against the release tag, not `main`. Rebase it on the
++current default branch before proposing it; the rationale and the upstream
++discussion links are in `.dsh-migrate/patch-reports/composer-key-seam/report.md`.
+diff --git a/fixture/patches/composer-key-seam.patch b/fixture/patches/composer-key-seam.patch
+new file mode 100644
+index 0000000..21ddb41
+--- /dev/null
++++ b/fixture/patches/composer-key-seam.patch
+@@ -0,0 +1,711 @@
++diff --git a/.agents/notes/proposed/architecture/2026-10-11-composer-key-plugin-offers.i18n.yaml b/.agents/notes/proposed/architecture/2026-10-11-composer-key-plugin-offers.i18n.yaml
++new file mode 100644
++index 0000000..f5c41dd
++--- /dev/null
+++++ b/.agents/notes/proposed/architecture/2026-10-11-composer-key-plugin-offers.i18n.yaml
++@@ -0,0 +1,6 @@
+++# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+++# side as of the last confirmed-consistent state. Both languages carry equal authority;
+++# after editing either side, bring the other along and re-record with:
+++#   pnpm run verify-translation-pairing --write .agents/notes/proposed/architecture/2026-10-11-composer-key-plugin-offers.md
+++2026-10-11-composer-key-plugin-offers.md: 03594f8b80c8951290ae2eefda4d690ccf83de1e
+++2026-10-11-composer-key-plugin-offers.zh.md: f1b9ad487849fc25ae255c89c9ea2f53434b0050
++diff --git a/.agents/notes/proposed/architecture/2026-10-11-composer-key-plugin-offers.md b/.agents/notes/proposed/architecture/2026-10-11-composer-key-plugin-offers.md
++new file mode 100644
++index 0000000..03594f8
++--- /dev/null
+++++ b/.agents/notes/proposed/architecture/2026-10-11-composer-key-plugin-offers.md
++@@ -0,0 +1,45 @@
+++# Agent Note: Composer key offers for client plugins
+++
+++Status: proposed
+++
+++English | [中文](2026-10-11-composer-key-plugin-offers.zh.md)
+++
+++## Problem
+++
+++The composer keymap owns ArrowUp/ArrowDown at `COMMAND_PRIORITY_CRITICAL`, and the only face carrying the editor's keyboard operations (`ComposerKeyboard`) is InputBar-exclusive by contract. A client plugin that needs one composer arrow gesture — terminal-style prompt-history recall is the concrete case — therefore has no extension point to register on: `ctx.conversation.input` covers draft reads and writes, but nothing offers the key. The workaround is a capture-phase `document` keydown listener plus the editor's undocumented DOM anchors, duplicating the shell's composition window and trigger-menu arbitration and breaking silently when the markup changes ([stable composer locator request](https://github.com/deepseek-ai/deepseek-harness/discussions/3981)). Community plugins ship the gesture this way, and the same user-facing request recurs ([input history in the Web composer](https://github.com/deepseek-ai/deepseek-harness/discussions/5031), [composer draft-history recall](https://github.com/deepseek-ai/deepseek-harness/discussions/6347), [ArrowUp prompt recall](https://github.com/deepseek-ai/deepseek-harness/discussions/1193)).
+++
+++## Proposal
+++
+++Add a root-scoped `ComposerKeys` registry to the public conversation service, reached as `ctx.conversation.composerKeys` and following `ctx.conversation.blocks`:
+++
+++- `register(handler)` returns a disposer; handlers run in registration order and the first `true` answer consumes the gesture.
+++- The keymap raises the offer through the shell (`ComposerKeyboard.keystroke`) after `arbitrate` declines the key and before the plain-text caret move. A consumed offer calls `preventDefault()` and returns `true` from the Lexical command, exactly like a menu `consumed` verdict.
+++- `ComposerKeyRequest` carries the gesture, the originating `KeyboardEvent`, the shell's composition state, and the composer's Session scope. The handler reads and writes that Session's draft through the existing `ctx.conversation.input` face instead of observing raw document keys.
+++- Offers stop while the input is not `plain`; a claimed or submitting composer keeps every gesture until it settles.
+++
+++The registry's presence is the capability: a plugin that finds it must not also observe raw keydowns, and one running against a build without it keeps its own listener as the fallback path.
+++
+++The seam is additive to the [Web composer as a Lexical editor](../../implemented/architecture/2026-08-20-web-composer-lexical-editor.md) contract and the [Web input machine and slash pipeline](../../implemented/architecture/2026-07-25-web-input-machine-and-slash-pipeline.md): it offers a key the trigger pipeline already declined, and changes neither the submit plane nor the `slash/input-*` events. Neither note is superseded.
+++
+++## Alternatives considered
+++
+++**Scoped bail event (`conversation/composer-key`)**, matching `slash/input-*`. It loses on detection: a plugin cannot tell a build that dispatches the event from one that does not until a key arrives, so the fallback listener and the official path would both act on the first gesture, or the plugin would have to depend on a build that is not released.
+++
+++**Expose the editor or the `ComposerKeyboard` face to plugins.** It loses because the frozen contract is deliberately InputBar-exclusive; widening it hands every consumer the submit and trigger verbs the composer owns, instead of the one gesture a plugin needs.
+++
+++**Implement prompt recall in-tree instead** ([#1193](https://github.com/deepseek-ai/deepseek-harness/discussions/1193), [#6347](https://github.com/deepseek-ai/deepseek-harness/discussions/6347)). It loses because plugin-first composition leaves this product decision to plugins; the seam lets an in-tree recall and plugin implementations share one mechanism rather than choosing one and blocking the other.
+++
+++**Document the composer DOM anchors as stable surface** ([#3981](https://github.com/deepseek-ai/deepseek-harness/discussions/3981)). It removes the silent-breakage risk without new API, but leaves every consumer re-deriving composition state, menu arbitration, and caret gating that the shell already owns.
+++
+++## Acceptance criteria
+++
+++- `ctx.conversation.composerKeys.register(handler)` is reachable by a plugin that injects `conversation`; disposing the caller's fiber removes the offer.
+++- A registered handler receives ArrowUp/ArrowDown with the originating event and the shell's composition state only when the trigger menu passed the key and the input phase is `plain`.
+++- A `true` answer prevents the default and stops the editor's own caret move; a `false` answer leaves the gesture to `@lexical/plain-text`.
+++- Existing trigger-menu, IME, Enter, Tab, and paste routing stay byte-compatible, and no plugin handler is reached for a key the menu consumed.
+++
+++## Risks
+++
+++- The offer sits on the composer's critical key path; a slow or throwing handler can delay or break typing. Handlers run synchronously with no completion promise, so a throw must be contained by the handler, as every plugin registration already assumes.
+++- The Session-scope carrier admits untagged root listeners globally, so a handler registered at the root hears every Session's composer; the request carries the Session scope for resolution, but a handler that ignores it can write to the wrong Session.
+++- The registry is additive surface on a 1.x-alpha client contract; once published it is held to the same compatibility promise as the rest of `IConversation`.
++diff --git a/.agents/notes/proposed/architecture/2026-10-11-composer-key-plugin-offers.zh.md b/.agents/notes/proposed/architecture/2026-10-11-composer-key-plugin-offers.zh.md
++new file mode 100644
++index 0000000..f1b9ad4
++--- /dev/null
+++++ b/.agents/notes/proposed/architecture/2026-10-11-composer-key-plugin-offers.zh.md
++@@ -0,0 +1,45 @@
+++# Agent Note: 面向客户端插件的 composer 按键 offer
+++
+++Status: proposed
+++
+++[English](2026-10-11-composer-key-plugin-offers.md) | 中文
+++
+++## 问题
+++
+++composer keymap 以 `COMMAND_PRIORITY_CRITICAL` 独占 ArrowUp/ArrowDown，而唯一承载编辑器键盘操作的面（`ComposerKeyboard`）按契约仅供 InputBar 使用。因此，需要一个 composer 方向键手势的客户端插件——终端风格的 prompt 历史回溯就是具体例子——没有任何可注册的扩展点：`ctx.conversation.input` 覆盖草稿的读写，但没有任何东西提供这个按键。现有的绕行方案是在 `document` 捕获阶段挂 keydown 监听器，再依赖编辑器未公开的 DOM 锚点，重复实现 shell 的输入法窗口与触发菜单仲裁，并在标记结构变化时静默失效（[稳定的 composer 定位请求](https://github.com/deepseek-ai/deepseek-harness/discussions/3981)）。社区插件正是这样交付该手势的，同一个面向用户的请求也反复出现（[Web composer 中的输入历史](https://github.com/deepseek-ai/deepseek-harness/discussions/5031)、[composer 草稿历史回溯](https://github.com/deepseek-ai/deepseek-harness/discussions/6347)、[ArrowUp prompt 回溯](https://github.com/deepseek-ai/deepseek-harness/discussions/1193)）。
+++
+++## 提案
+++
+++在公开的 conversation 服务上增加一个 root 作用域的 `ComposerKeys` 注册表，通过 `ctx.conversation.composerKeys` 访问，并沿用 `ctx.conversation.blocks` 的形式：
+++
+++- `register(handler)` 返回 disposer；handler 按注册顺序运行，第一个 `true` 答案消费该手势。
+++- keymap 通过 shell（`ComposerKeyboard.keystroke`）在 `arbitrate` 放弃该键之后、纯文本光标移动之前发出 offer。被消费的 offer 调用 `preventDefault()` 并从 Lexical command 返回 `true`，与菜单的 `consumed` 裁决完全一致。
+++- `ComposerKeyRequest` 携带手势、原始 `KeyboardEvent`、shell 的输入法状态以及 composer 所属的 Session scope。handler 通过既有的 `ctx.conversation.input` 面读写该 Session 的草稿，而不是观察原始 document 按键。
+++- 输入阶段不是 `plain` 时停止 offer；已 claim 或正在提交的 composer 在手势结算前保留全部按键。
+++
+++注册表的存在本身就是能力标识：找到它的插件必须不再观察原始 keydown；运行在不含该注册表的构建上时，插件保留自己的监听器作为回退路径。
+++
+++该 seam 是对 [Web composer 作为 Lexical 编辑器](../../implemented/architecture/2026-08-20-web-composer-lexical-editor.zh.md) 契约与 [Web 输入机与 slash 管线](../../implemented/architecture/2026-07-25-web-input-machine-and-slash-pipeline.zh.md) 的增量扩展：它提供的是一个触发管线已经放弃的按键，既不改变提交面，也不改变 `slash/input-*` 事件。两者都未被取代。
+++
+++## 备选方案
+++
+++**作用域 bail 事件（`conversation/composer-key`）**，与 `slash/input-*` 一致。它在可探测性上失败：插件在按键到来之前无法区分会派发该事件的构建与不会派发的构建，于是回退监听器与官方路径会同时处理第一个手势，或者插件只能依赖一个尚未发布的构建。
+++
+++**向插件暴露编辑器或 `ComposerKeyboard` 面。** 它失败的原因是该冻结契约刻意仅供 InputBar 使用；放宽它会把手势之外的提交与触发动词一并交给所有消费者，而插件只需要一个手势。
+++
+++**改为在树内实现 prompt 回溯**（[#1193](https://github.com/deepseek-ai/deepseek-harness/discussions/1193)、[#6347](https://github.com/deepseek-ai/deepseek-harness/discussions/6347)）。它失败的原因是 plugin-first 组合把这一产品决策留给插件；该 seam 让树内回溯与插件实现共用同一机制，而不是二选一并互相阻塞。
+++
+++**把 composer DOM 锚点记录为稳定表面**（[#3981](https://github.com/deepseek-ai/deepseek-harness/discussions/3981)）。它无需新 API 即可消除静默失效风险，但仍让每个消费者重新推导 shell 已经拥有的输入法状态、菜单仲裁与光标门禁。
+++
+++## 验收标准
+++
+++- 注入 `conversation` 的插件可以访问 `ctx.conversation.composerKeys.register(handler)`；销毁调用方 fiber 会移除该 offer。
+++- 只有在触发菜单放弃该键且输入阶段为 `plain` 时，已注册的 handler 才会收到携带原始事件与 shell 输入法状态的 ArrowUp/ArrowDown。
+++- 返回 `true` 会阻止默认行为并停止编辑器自身的光标移动；返回 `false` 会把该手势留给 `@lexical/plain-text`。
+++- 既有的触发菜单、输入法、Enter、Tab 与粘贴路由保持字节级兼容，且菜单已消费的按键不会到达任何插件 handler。
+++
+++## 风险
+++
+++- offer 位于 composer 的关键按键路径上；缓慢或抛错的 handler 会拖慢或破坏输入。handler 同步运行且没有完成 promise，因此抛错必须由 handler 自行兜住，这也是所有插件注册本来的前提。
+++- Session scope 载体全局接纳未打标签的 root 监听器，因此注册在 root 的 handler 会听到每个 Session 的 composer；请求携带 Session scope 供解析，但忽略它的 handler 可能写入错误的 Session。
+++- 该注册表是在 1.x-alpha 客户端契约上新增的公开表面；一旦发布，它将与 `IConversation` 的其余部分承担同样的兼容性承诺。
++diff --git a/packages/client/ui-conversation/README.i18n.yaml b/packages/client/ui-conversation/README.i18n.yaml
++index a293070..03db2f9 100644
++--- a/packages/client/ui-conversation/README.i18n.yaml
+++++ b/packages/client/ui-conversation/README.i18n.yaml
++@@ -2,5 +2,5 @@
++ # side as of the last confirmed-consistent state. Both languages carry equal authority;
++ # after editing either side, bring the other along and re-record with:
++ #   pnpm run verify-translation-pairing --write packages/client/ui-conversation/README.md
++-README.md: bcce1e77c45cfa75c6a7fe9c45a98b1036d9ea63
++-README.zh.md: 1d24141945c68d7e948a730ff5b93e8d2e38e9bb
+++README.md: 8d4e10a602e39aab2b3f8868689b699182a37211
+++README.zh.md: 41f6b2261ae90e92e5cdd67b730fa76bc2a21784
++diff --git a/packages/client/ui-conversation/README.md b/packages/client/ui-conversation/README.md
++index bcce1e7..8d4e10a 100644
++--- a/packages/client/ui-conversation/README.md
+++++ b/packages/client/ui-conversation/README.md
++@@ -44,6 +44,8 @@ Default sends commit optimistically: Enter clears the draft, occurrence table, a
++ 
++ While a normal composer is running, its primary pointer action remains Stop when the draft is empty or input is unavailable. Actionable text or attachments switch the same seat to Queue Send; clearing or successfully submitting the draft restores Stop. The busy-Enter setting continues to select the Queue or Steer keyboard action. Continuable subagents keep separate Send and Stop actions ([decision](../../../.agents/notes/implemented/bug-fix/2026-08-20-running-draft-primary-send.md)).
++ 
+++A plugin that owns one composer arrow gesture registers with the public `ctx.conversation.composerKeys` registry (`ComposerKeys`). The composer keymap offers ArrowUp/ArrowDown after the trigger menu declines the key and before the editor's plain-text caret move; a `true` answer consumes the gesture exactly like a menu `consumed` verdict. The offer carries the originating keydown, the shell's composition state, and the composer's Session scope, so a handler reads and writes that Session's draft through `ctx.conversation.input` instead of observing raw document keys or the editor's DOM.
+++
++ <a id="temporary-composer-entries"></a>
++ ## Temporary composer entries
++ 
++diff --git a/packages/client/ui-conversation/README.zh.md b/packages/client/ui-conversation/README.zh.md
++index 1d24141..41f6b22 100644
++--- a/packages/client/ui-conversation/README.zh.md
+++++ b/packages/client/ui-conversation/README.zh.md
++@@ -44,6 +44,8 @@ View 选择规则固定：有效且已注册的持久化选择优先，其次是
++ 
++ 普通 composer 运行时，如果草稿为空或输入不可用，主指针操作保持为 Stop。可提交的文字或附件会把同一位置切换为 Queue Send；清空或成功提交草稿后恢复 Stop。繁忙态 Enter 设置继续选择 Queue 或 Steer 键盘操作。可继续 subagent 保留独立的 Send 与 Stop 操作（[决策](../../../.agents/notes/implemented/bug-fix/2026-08-20-running-draft-primary-send.zh.md)）。
++ 
+++拥有单个 composer 方向键手势的插件注册到公开的 `ctx.conversation.composerKeys` 注册表（`ComposerKeys`）。触发菜单放弃该键之后、编辑器纯文本光标移动之前，composer keymap 会提供 ArrowUp/ArrowDown；返回 `true` 会像菜单的 `consumed` 裁决一样消费该手势。offer 携带原始 keydown、shell 的输入法状态以及 composer 所属的 Session scope，因此 handler 通过 `ctx.conversation.input` 读写该 Session 的草稿，而无需观察原始 document 按键或编辑器 DOM。
+++
++ <a id="temporary-composer-entries"></a>
++ ## 临时 composer entry
++ 
++diff --git a/packages/client/ui-conversation/src/client/apply.ts b/packages/client/ui-conversation/src/client/apply.ts
++index b154e73..0f2c401 100644
++--- a/packages/client/ui-conversation/src/client/apply.ts
+++++ b/packages/client/ui-conversation/src/client/apply.ts
++@@ -21,6 +21,7 @@ import { ConversationController, UnsupportedImageMediaTypeError } from './servic
++ import type { IConversation } from './service.ts'
++ import { ComposerBlockRegistry } from './input/blocks.ts'
++ import type { ComposerBlock } from './contract/composer-blocks.ts'
+++import { ComposerKeyRegistry } from './input/composer-keys.ts'
++ import { InputHub } from './input/hub.ts'
++ import { ComposerSubmissionPolicy } from './input/submission-policy.ts'
++ import { queueDockEntry } from './queue/QueueDock.tsx'
++@@ -149,7 +150,8 @@ export function apply(ctx: Context): void {
++     }
++   }, 'ui-conversation: View roster')
++ 
++-  const inputHub = new InputHub(ctx, t)
+++  const composerKeys = new ComposerKeyRegistry()
+++  const inputHub = new InputHub(ctx, t, composerKeys)
++   const composerBlocks = new ComposerBlockRegistry()
++ 
++   // Conversation assembly and input share the Session binding lifecycle. The
++@@ -330,7 +332,7 @@ export function apply(ctx: Context): void {
++     yield registerComposerBar()
++   })
++ 
++-  ctx.plugin(ConversationController, { input: inputHub, blocks: composerBlocks })
+++  ctx.plugin(ConversationController, { input: inputHub, blocks: composerBlocks, composerKeys })
++   ctx.plugin(todoDockEntry)
++   ctx.plugin(queueDockEntry)
++ }
++diff --git a/packages/client/ui-conversation/src/client/contract/composer-keys.ts b/packages/client/ui-conversation/src/client/contract/composer-keys.ts
++new file mode 100644
++index 0000000..881be63
++--- /dev/null
+++++ b/packages/client/ui-conversation/src/client/contract/composer-keys.ts
++@@ -0,0 +1,32 @@
+++/** Public composer-gesture offers for plugins that own one composer keystroke. */
+++import type { Context } from '@deepseek-ai/cordis'
+++
+++/**
+++ * One composer arrow gesture offered to the registered handlers. The keymap
+++ * raises it after the trigger menu declined the key and before the editor's
+++ * plain-text caret move, so a `true` answer consumes the gesture exactly as the
+++ * menu's `consumed` verdict does. The originating event carries the
+++ * contenteditable the caret lives in; the session scope addresses the same
+++ * draft and actions the public input registry exposes.
+++ */
+++export interface ComposerKeyRequest {
+++  /** The intercepted gesture. */
+++  readonly key: 'up' | 'down'
+++  /** The originating keydown, for caret and modifier decisions. */
+++  readonly event: KeyboardEvent
+++  /** Whether the composer's composition watch currently holds the IME guard. */
+++  readonly composing: boolean
+++  /** The Session scope whose composer raised the gesture. */
+++  readonly session: Context
+++}
+++
+++/** The registry face other plugins reach through `ctx.conversation.composerKeys`. */
+++export interface ComposerKeys {
+++  /**
+++   * Register one composer-gesture handler. Handlers run in registration order;
+++   * the first `true` consumes the gesture.
+++   * @param handler - Offer handler; true = the gesture is consumed.
+++   * @returns Disposer removing this handler.
+++   */
+++  register(handler: (request: ComposerKeyRequest) => boolean): () => void
+++}
++diff --git a/packages/client/ui-conversation/src/client/contract/input.ts b/packages/client/ui-conversation/src/client/contract/input.ts
++index d6a0741..3f363c1 100644
++--- a/packages/client/ui-conversation/src/client/contract/input.ts
+++++ b/packages/client/ui-conversation/src/client/contract/input.ts
++@@ -270,6 +270,14 @@ export interface ComposerKeyboard {
++   caretSpan(): EditSelection
++   /** Keyboard arbitration while the menu is open ('pass' when no pipeline). */
++   arbitrate(key: ArbitrateKey, composing: boolean): ArbitrateOutcome
+++  /**
+++   * Offer an unclaimed composer arrow gesture to the registered plugin handlers
+++   * (`ctx.conversation.composerKeys`); true = consumed — caller preventDefaults.
+++   * @param key - The intercepted gesture.
+++   * @param event - The originating keydown.
+++   * @param composing - Whether the composition watch currently holds the IME guard.
+++   */
+++  keystroke(key: 'up' | 'down', event: KeyboardEvent, composing: boolean): boolean
++   /** Space adjudication; true = the input applied a claim — caller preventDefaults. */
++   space(): boolean
++   /** Dismiss the popupSelect shell (any interaction outside the box). */
++diff --git a/packages/client/ui-conversation/src/client/index.ts b/packages/client/ui-conversation/src/client/index.ts
++index 102b385..0058d35 100644
++--- a/packages/client/ui-conversation/src/client/index.ts
+++++ b/packages/client/ui-conversation/src/client/index.ts
++@@ -63,6 +63,7 @@ export type {
++   SubmitOutcome, TokenSpan,
++ } from './contract/input.ts'
++ export type { ComposerBlock, ComposerBlocks } from './contract/composer-blocks.ts'
+++export type { ComposerKeyRequest, ComposerKeys } from './contract/composer-keys.ts'
++ 
++ declare module '@deepseek-ai/cordis' {
++   interface Context {
++diff --git a/packages/client/ui-conversation/src/client/input/composer-keys.ts b/packages/client/ui-conversation/src/client/input/composer-keys.ts
++new file mode 100644
++index 0000000..c6822d0
++--- /dev/null
+++++ b/packages/client/ui-conversation/src/client/input/composer-keys.ts
++@@ -0,0 +1,41 @@
+++/**
+++ * Composer keys: the one way another plugin claims an unclaimed composer
+++ * gesture.
+++ *
+++ * The composer keymap owns ArrowUp/ArrowDown at CRITICAL priority, so a plugin
+++ * outside ui-conversation cannot observe them without a raw document listener
+++ * and the shell's private DOM. A handler registered here is asked after the
+++ * trigger menu passed the key and before the plain-text caret move; returning
+++ * true consumes the gesture (preventDefault and no caret move), exactly like a
+++ * menu `consumed` verdict. The offer carries the composer's own Session scope,
+++ * so the handler resolves that Session's draft through the public input
+++ * registry instead of reaching into the editor.
+++ */
+++import type { ComposerKeyRequest, ComposerKeys } from '../contract/composer-keys.ts'
+++
+++/** The root-scoped composer-gesture registry (one instance per plugin fiber). */
+++export class ComposerKeyRegistry implements ComposerKeys {
+++  private readonly handlers: ((request: ComposerKeyRequest) => boolean)[] = []
+++
+++  /** @inheritdoc */
+++  register(handler: (request: ComposerKeyRequest) => boolean): () => void {
+++    this.handlers.push(handler)
+++    return () => {
+++      const index = this.handlers.indexOf(handler)
+++      if (index >= 0) this.handlers.splice(index, 1)
+++    }
+++  }
+++
+++  /**
+++   * Offer one gesture to the registered handlers in registration order.
+++   * @param request - Gesture, originating event, composition state, and Session scope.
+++   * @returns True when a handler consumed the gesture.
+++   */
+++  offer(request: ComposerKeyRequest): boolean {
+++    // A copy so a handler may dispose its own registration mid-offer.
+++    for (const handler of [...this.handlers]) {
+++      if (handler(request)) return true
+++    }
+++    return false
+++  }
+++}
++diff --git a/packages/client/ui-conversation/src/client/input/editor/keymap.ts b/packages/client/ui-conversation/src/client/input/editor/keymap.ts
++index 3c3e460..176cca2 100644
++--- a/packages/client/ui-conversation/src/client/input/editor/keymap.ts
+++++ b/packages/client/ui-conversation/src/client/input/editor/keymap.ts
++@@ -1,10 +1,11 @@
++ /**
++  * Composer keymap over the Lexical command layer: menu arbitration
++- * (arrows/escape/enter), space adjudication, the Enter submit gesture, and
++- * paste routing. Registered at CRITICAL priority so it decides before
++- * @lexical/plain-text's own Enter/paste defaults; a handler returning false
++- * falls through to those defaults (Shift+Enter's line break, ordinary
++- * spaces, text paste the bar routes itself).
+++ * (arrows/escape/enter), the plugin composer-gesture offer (arrows), space
+++ * adjudication, the Enter submit gesture, and paste routing. Registered at
+++ * CRITICAL priority so it decides before @lexical/plain-text's own
+++ * Enter/paste defaults; a handler returning false falls through to those
+++ * defaults (Shift+Enter's line break, ordinary spaces, text paste the bar
+++ * routes itself).
++  *
++  * IME guard: a composition-closing Enter/Space must not submit or adjudicate.
++  * KeyboardEvent.isComposing covers most engines; Safari delivers the closing
++@@ -24,6 +25,14 @@ import type { ArbitrateKey, ArbitrateOutcome } from '../../contract/input.ts'
++ export interface ComposerKeymapHandlers {
++   /** Keyboard arbitration while the menu is open ('pass' when no pipeline). */
++   arbitrate(key: ArbitrateKey, composing: boolean): ArbitrateOutcome
+++  /**
+++   * Plugin composer-gesture offer, raised only after arbitration passed the
+++   * key; true = consumed, so the editor must not also act on it.
+++   * @param key - The intercepted gesture.
+++   * @param event - The originating keydown.
+++   * @param composing - Whether the composition watch holds the IME guard.
+++   */
+++  keystroke(key: 'up' | 'down', event: KeyboardEvent, composing: boolean): boolean
++   /** Space adjudication; true = a claim was applied — the keystroke is consumed. */
++   space(): boolean
++   /** Dismiss the popupSelect shell (Escape layering: an open overlay closes first). */
++@@ -72,6 +81,13 @@ export function registerComposerKeymap(editor: LexicalEditor, handlers: Composer
++       event?.preventDefault()
++       return true
++     }
+++    // The menu declined the key: offer the plain arrows to the registered
+++    // plugin handlers before the plain-text caret move (see ComposerKeys).
+++    if (event !== null && (key === 'up' || key === 'down')
+++      && handlers.keystroke(key, event, inComposition)) {
+++      event.preventDefault()
+++      return true
+++    }
++     return false
++   }
++ 
++diff --git a/packages/client/ui-conversation/src/client/input/facade.ts b/packages/client/ui-conversation/src/client/input/facade.ts
++index e2fb81f..834fce9 100644
++--- a/packages/client/ui-conversation/src/client/input/facade.ts
+++++ b/packages/client/ui-conversation/src/client/input/facade.ts
++@@ -27,6 +27,7 @@ import type {
++   SubmitOutcome, TokenSpan,
++ } from '../contract/input.ts'
++ import type { InputSubmitMode } from '../contract/composer-submission.ts'
+++import type { ComposerKeyRegistry } from './composer-keys.ts'
++ import { SubmitMachine } from './machine.ts'
++ import { ReferenceChipNode, $createReferenceChipNode } from './editor/chip-node.tsx'
++ import { refreshClaimDecoration, registerClaimDecoration } from './editor/claim-decor.ts'
++@@ -60,6 +61,11 @@ export interface SessionInputDeps {
++    * order (the empty-draft accelerated-Enter gesture); absent = unsupported.
++    */
++   steerQueue?: (() => void) | undefined
+++  /**
+++   * The composer-gesture registry offered to plugins; absent = no consumer can
+++   * claim an unclaimed arrow (directly constructed shells in tests).
+++   */
+++  composerKeys?: ComposerKeyRegistry | undefined
++   /** The plain-message sink (send choreography / materialize fork — the hub owns it). */
++   defaultSink(
++     text: string,
++@@ -406,6 +412,25 @@ export class SessionInputShell implements SessionInput {
++     return this.deps.inputTriggers?.()?.arbitrate(key, composing) ?? 'pass'
++   }
++ 
+++  /**
+++   * Offer an unclaimed composer arrow gesture to the registered plugin
+++   * handlers. Offered only while the input is plain: a claimed or submitting
+++   * composer owns every gesture until it settles.
+++   * @param key - the intercepted gesture.
+++   * @param event - the originating keydown.
+++   * @param composing - whether the composition watch holds the IME guard.
+++   * @returns true = a handler consumed the gesture — the caller preventDefaults.
+++   */
+++  keystroke(key: 'up' | 'down', event: KeyboardEvent, composing: boolean): boolean {
+++    if (this.disposed || this.snapshot.phase !== 'plain') return false
+++    return this.deps.composerKeys?.offer({
+++      key,
+++      event,
+++      composing,
+++      session: this.deps.actx,
+++    }) ?? false
+++  }
+++
++   /**
++    * Steer every still-pending queued message into the running turn (the
++    * empty-draft accelerated-Enter gesture). Execution belongs to the hub's
++diff --git a/packages/client/ui-conversation/src/client/input/hub.ts b/packages/client/ui-conversation/src/client/input/hub.ts
++index 6c71324..8e07d75 100644
++--- a/packages/client/ui-conversation/src/client/input/hub.ts
+++++ b/packages/client/ui-conversation/src/client/input/hub.ts
++@@ -21,6 +21,7 @@ import type {
++ import type { InputSubmitMode } from '../contract/composer-submission.ts'
++ import type { PopupDismissFace } from './facade.ts'
++ import { SessionInputShell } from './facade.ts'
+++import type { ComposerKeyRegistry } from './composer-keys.ts'
++ 
++ /** Structural command face for per-session popup resolution. */
++ interface CommandFace {
++@@ -53,10 +54,12 @@ export class InputHub implements SessionInputResolver {
++   /**
++    * @param ctx - client root context (services resolved lazily per call — boot order stays free).
++    * @param t - conversation-namespace translate thunk (reads the active locale at call time).
+++   * @param composerKeys - composer-gesture registry every shell offers declined arrows to.
++    */
++   constructor(
++     private readonly rootCtx: Context,
++     private readonly t: TranslateNS<'conversation'>,
+++    private readonly composerKeys: ComposerKeyRegistry,
++   ) {}
++ 
++   /**
++@@ -88,6 +91,7 @@ export class InputHub implements SessionInputResolver {
++       inputTriggers: () => this.controller(actx),
++       popup: () => this.popup(actx),
++       queue: queueReadFaceOf(session),
+++      composerKeys: this.composerKeys,
++       defaultSink: (text, imageIds, mode, signal) => this.sink(session, text, imageIds, mode, signal),
++       steerQueue: () => { void this.steerQueue(session, shell) },
++       commandImages: {
++diff --git a/packages/client/ui-conversation/src/client/service.ts b/packages/client/ui-conversation/src/client/service.ts
++index fd59a49..32f9473 100644
++--- a/packages/client/ui-conversation/src/client/service.ts
+++++ b/packages/client/ui-conversation/src/client/service.ts
++@@ -21,6 +21,7 @@ import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
++ import type { ComposerAttachment } from './contract/slots.ts'
++ import type { QueueAction, QueueItemId } from './contract/queue.ts'
++ import type { ComposerBlocks } from './contract/composer-blocks.ts'
+++import type { ComposerKeys } from './contract/composer-keys.ts'
++ import type {
++   DraftAttachmentId, SessionInputResolver, SubmitImageAttachment, SubmitOutcome,
++ } from './contract/input.ts'
++@@ -39,6 +40,11 @@ export interface IConversation {
++    * cannot import makes a session's input inert with its own reason.
++    */
++   readonly blocks: ComposerBlocks
+++  /**
+++   * The composer-gesture registry: how a plugin the composer cannot import
+++   * claims an arrow the trigger menu declined (`ComposerKeys`).
+++   */
+++  readonly composerKeys: ComposerKeys
++   /**
++    * Send a prompt into the caller scope's session (queued turn).
++    * @param text - prompt text, sent verbatim as one text block.
++@@ -149,19 +155,25 @@ export class ConversationController extends Service implements IConversation {
++   readonly input: SessionInputResolver
++   /** The per-session composer-block registry. */
++   readonly blocks: ComposerBlocks
+++  /** The composer-gesture registry declined arrows are offered to. */
+++  readonly composerKeys: ComposerKeys
++   private readonly draftAttachments = new Map<DraftAttachmentId, ComposerAttachment>()
++ 
++   /**
++    * @param ctx - owning root context (the plugin apply context; the service
++    * registers itself and follows that fiber's lifetime).
++-   * @param config - carries the SessionInputResolver and composer-block registry
++-   * constructed by the plugin apply (the same instances the slot inject
++-   * factories close over).
+++   * @param config - carries the SessionInputResolver, composer-block registry,
+++   * and composer-gesture registry constructed by the plugin apply (the same
+++   * instances the slot inject factories and the input shells close over).
++    */
++-  constructor(ctx: Context, config: { input: SessionInputResolver; blocks: ComposerBlocks }) {
+++  constructor(
+++    ctx: Context,
+++    config: { input: SessionInputResolver; blocks: ComposerBlocks; composerKeys: ComposerKeys },
+++  ) {
++     super(ctx, 'conversation')
++     this.input = config.input
++     this.blocks = config.blocks
+++    this.composerKeys = config.composerKeys
++     ctx.effect(() => () => {
++       for (const attachment of this.draftAttachments.values()) {
++         revokePreview(attachment.previewUrl)
++diff --git a/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx b/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx
++index d4c06d8..68c486f 100644
++--- a/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx
+++++ b/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx
++@@ -257,6 +257,10 @@ export function InputBar({
++     if (editor === null || keyboard === undefined) return
++     return registerComposerKeymap(editor, {
++       arbitrate: (key, composing) => keyboard.arbitrate(key, composing),
+++      keystroke: (key, event, composing) => {
+++        if (gate.current.machineBusy || gate.current.locked) return false
+++        return keyboard.keystroke(key, event, composing)
+++      },
++       space: () => {
++         if (gate.current.machineBusy || gate.current.locked) return false
++         return keyboard.space()
++diff --git a/packages/client/ui-conversation/tests/composer-keys.client.spec.ts b/packages/client/ui-conversation/tests/composer-keys.client.spec.ts
++new file mode 100644
++index 0000000..defbf48
++--- /dev/null
+++++ b/packages/client/ui-conversation/tests/composer-keys.client.spec.ts
++@@ -0,0 +1,70 @@
+++/**
+++ * The composer-gesture registry behind `ctx.conversation.composerKeys`:
+++ * registration order, first-answer-wins, and disposal.
+++ */
+++import { describe, expect, it, vi } from 'vitest'
+++import { ComposerKeyRegistry } from '../src/client/input/composer-keys.ts'
+++import type { ComposerKeyRequest } from '../src/client/contract/composer-keys.ts'
+++
+++/** One gesture request; the registry reads only the fields it forwards. */
+++function request(): ComposerKeyRequest {
+++  return {
+++    key: 'up',
+++    event: {} as KeyboardEvent,
+++    composing: false,
+++    session: {} as ComposerKeyRequest['session'],
+++  }
+++}
+++
+++describe('composer key registry', () => {
+++  it('offers the gesture in registration order and stops at the first consumer', () => {
+++    const registry = new ComposerKeyRegistry()
+++    const declined = vi.fn(() => false)
+++    const consumed = vi.fn(() => true)
+++    const never = vi.fn(() => true)
+++    registry.register(declined)
+++    registry.register(consumed)
+++    registry.register(never)
+++    const offer = request()
+++    expect(registry.offer(offer)).toBe(true)
+++    expect(declined).toHaveBeenCalledWith(offer)
+++    expect(consumed).toHaveBeenCalledWith(offer)
+++    expect(never).not.toHaveBeenCalled()
+++  })
+++
+++  it('reports an unclaimed gesture when every handler declines', () => {
+++    const registry = new ComposerKeyRegistry()
+++    const handler = vi.fn(() => false)
+++    registry.register(handler)
+++    expect(registry.offer(request())).toBe(false)
+++    expect(handler).toHaveBeenCalledTimes(1)
+++  })
+++
+++  it('removes one handler on dispose without disturbing the rest, idempotently', () => {
+++    const registry = new ComposerKeyRegistry()
+++    const first = vi.fn(() => false)
+++    const second = vi.fn(() => false)
+++    const disposeFirst = registry.register(first)
+++    registry.register(second)
+++    disposeFirst()
+++    disposeFirst()
+++    expect(registry.offer(request())).toBe(false)
+++    expect(first).not.toHaveBeenCalled()
+++    expect(second).toHaveBeenCalledTimes(1)
+++  })
+++
+++  it('lets a handler dispose its own registration while the offer runs', () => {
+++    const registry = new ComposerKeyRegistry()
+++    const later = vi.fn(() => false)
+++    const disposeSelf = registry.register(() => {
+++      disposeSelf()
+++      return false
+++    })
+++    registry.register(later)
+++    expect(registry.offer(request())).toBe(false)
+++    expect(later).toHaveBeenCalledTimes(1)
+++    // The disposed handler is gone from the next offer.
+++    expect(registry.offer(request())).toBe(false)
+++    expect(later).toHaveBeenCalledTimes(2)
+++  })
+++})
++diff --git a/packages/client/ui-conversation/tests/keymap-routing.client.spec.tsx b/packages/client/ui-conversation/tests/keymap-routing.client.spec.tsx
++index 3cefe67..59499e3 100644
++--- a/packages/client/ui-conversation/tests/keymap-routing.client.spec.tsx
+++++ b/packages/client/ui-conversation/tests/keymap-routing.client.spec.tsx
++@@ -21,6 +21,7 @@ describe('keymap keydown routing', () => {
++     const submit = vi.fn()
++     registerComposerKeymap(editor, {
++       arbitrate: () => 'pass',
+++      keystroke: () => false,
++       space: () => false,
++       dismissPopup: () => {},
++       canSubmit: () => true,
++@@ -46,6 +47,7 @@ describe('keymap keydown routing', () => {
++       .mockReturnValue('pass')
++     registerComposerKeymap(editor, {
++       arbitrate,
+++      keystroke: () => false,
++       space: () => false,
++       dismissPopup: () => {},
++       canSubmit: () => true,
++@@ -60,4 +62,77 @@ describe('keymap keydown routing', () => {
++     expect(passed).toBe(true) // pass: the browser keeps native focus traversal
++   })
++ 
+++  it('offers a declined arrow to the composer-key handler; a true answer consumes it', () => {
+++    const editor = createEditor({ namespace: 'keymap-routing', onError: (e) => { throw e } })
+++    const root = document.createElement('div')
+++    root.contentEditable = 'true'
+++    document.body.appendChild(root)
+++    editor.setRootElement(root)
+++    registerPlainText(editor)
+++    const keystroke = vi.fn<(key: string, event: KeyboardEvent, composing: boolean) => boolean>()
+++      .mockReturnValueOnce(true)
+++      .mockReturnValue(false)
+++    registerComposerKeymap(editor, {
+++      arbitrate: () => 'pass',
+++      keystroke,
+++      space: () => false,
+++      dismissPopup: () => {},
+++      canSubmit: () => true,
+++      submit: () => {},
+++      intakeFiles: () => {},
+++      pasteText: () => {},
+++    })
+++    const claimed = fireEvent.keyDown(root, { key: 'ArrowUp' })
+++    expect(keystroke).toHaveBeenCalledWith('up', expect.anything(), false)
+++    expect(claimed).toBe(false) // consumed: the caret must not also move
+++    const passed = fireEvent.keyDown(root, { key: 'ArrowUp' })
+++    expect(keystroke).toHaveBeenLastCalledWith('up', expect.anything(), false)
+++    expect(passed).toBe(true) // declined: the editor keeps its caret move
+++  })
+++
+++  it('never offers an arrow the trigger menu consumed', () => {
+++    const editor = createEditor({ namespace: 'keymap-routing', onError: (e) => { throw e } })
+++    const root = document.createElement('div')
+++    root.contentEditable = 'true'
+++    document.body.appendChild(root)
+++    editor.setRootElement(root)
+++    registerPlainText(editor)
+++    const keystroke = vi.fn(() => false)
+++    registerComposerKeymap(editor, {
+++      arbitrate: () => 'consumed',
+++      keystroke,
+++      space: () => false,
+++      dismissPopup: () => {},
+++      canSubmit: () => true,
+++      submit: () => {},
+++      intakeFiles: () => {},
+++      pasteText: () => {},
+++    })
+++    const consumed = fireEvent.keyDown(root, { key: 'ArrowDown' })
+++    expect(consumed).toBe(false)
+++    expect(keystroke).not.toHaveBeenCalled()
+++  })
+++
+++  it('forwards the composition state to the composer-key handler', () => {
+++    const editor = createEditor({ namespace: 'keymap-routing', onError: (e) => { throw e } })
+++    const root = document.createElement('div')
+++    root.contentEditable = 'true'
+++    document.body.appendChild(root)
+++    editor.setRootElement(root)
+++    registerPlainText(editor)
+++    const keystroke = vi.fn(() => false)
+++    registerComposerKeymap(editor, {
+++      arbitrate: () => 'pass',
+++      keystroke,
+++      space: () => false,
+++      dismissPopup: () => {},
+++      canSubmit: () => true,
+++      submit: () => {},
+++      intakeFiles: () => {},
+++      pasteText: () => {},
+++    })
+++    fireEvent.keyDown(root, { key: 'ArrowUp', isComposing: true })
+++    expect(keystroke).toHaveBeenCalledWith('up', expect.anything(), true)
+++  })
+++
++ })
++diff --git a/packages/client/ui-conversation/tests/service-orchestration.client.spec.ts b/packages/client/ui-conversation/tests/service-orchestration.client.spec.ts
++index 9fbcaf9..d71ff44 100644
++--- a/packages/client/ui-conversation/tests/service-orchestration.client.spec.ts
+++++ b/packages/client/ui-conversation/tests/service-orchestration.client.spec.ts
++@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest'
++ import { makeTranslate, RemoteError, SlotTestRuntime } from '@deepseek-ai/dsh-client-test-runtime'
++ import type { QueuedMessage } from '@deepseek-ai/dsh-api-session-controller/client'
++ import { ComposerBlockRegistry } from '../src/client/input/blocks.ts'
+++import { ComposerKeyRegistry } from '../src/client/input/composer-keys.ts'
++ import { InputHub } from '../src/client/input/hub.ts'
++ import { ConversationController, UnsupportedImageMediaTypeError } from '../src/client/service.ts'
++ import { zh } from '../src/client/locales.ts'
++@@ -24,10 +25,11 @@ async function bench() {
++   })
++   // config.input is required (the apply shares its hub with the inject
++   // factories); the bench passes its own instance explicitly.
++-  const hub = new InputHub(runtime.ctx, makeTranslate(zh, {}))
+++  const hub = new InputHub(runtime.ctx, makeTranslate(zh, {}), new ComposerKeyRegistry())
++   const fiber = runtime.ctx.plugin(ConversationController, {
++     input: hub,
++     blocks: new ComposerBlockRegistry(),
+++    composerKeys: new ComposerKeyRegistry(),
++   })
++   await fiber.await()
++   const root = runtime.ctx.get('conversation') as ConversationController
++@@ -145,8 +147,9 @@ describe('ConversationController', () => {
++     // No Client Sessions service at all: a bare context lacks the assembled controller.
++     const bare = new Context()
++     await bare.plugin(ConversationController, {
++-      input: new InputHub(bare, makeTranslate(zh, {})),
+++      input: new InputHub(bare, makeTranslate(zh, {}), new ComposerKeyRegistry()),
++       blocks: new ComposerBlockRegistry(),
+++      composerKeys: new ComposerKeyRegistry(),
++     }).await()
++     const orphan = bare.get('conversation') as ConversationController
++     await expect(orphan.send('x')).rejects.toThrow(/sessions service unavailable/)

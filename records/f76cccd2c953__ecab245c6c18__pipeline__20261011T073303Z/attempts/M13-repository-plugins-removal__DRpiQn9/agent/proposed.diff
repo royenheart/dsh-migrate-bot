@@ -1,0 +1,200 @@
+diff --git a/fixture/.dsh-plugin/client.js b/fixture/.dsh-plugin/client.js
+index ce0beaa..9fa2a76 100644
+--- a/fixture/.dsh-plugin/client.js
++++ b/fixture/.dsh-plugin/client.js
+@@ -1,11 +1,9 @@
+-// Browser half (0.1.1-era repository-plugin shape): a self-executing page script.
+-// Before the repository mechanism was removed, this file was served by the entry's
+-// /pet/ui.js route, injected into index.html via httpServer.tapIndex, and executed
+-// directly by the page (no __ModuleLoader__, no module exports).
+-//
+-// NOTE: the repository-plugin mechanism handles loading this script — the layout is
+-// final, do not change it.
++// Browser half: a self-executing page script. The node half serves this file at
++// /pet/ui.js and injects a classic `<script src="/pet/ui.js">` row into
++// index.html, so it runs directly in the page (no __ModuleLoader__, no module
++// exports). It is not a `dsh.client` client-modules bundle, because the plugin's
++// documented browser entry point is its own served classic script.
+ const pet = document.createElement('div')
+ pet.id = 'bench-pet'
+ pet.textContent = '🐋'
+-document.body.appendChild(pet)
+\ No newline at end of file
++document.body.appendChild(pet)
+diff --git a/fixture/.dsh-plugin/index.js b/fixture/.dsh-plugin/index.js
+index d9a7e47..4e482b2 100644
+--- a/fixture/.dsh-plugin/index.js
++++ b/fixture/.dsh-plugin/index.js
+@@ -1,38 +1,47 @@
+-// Node half (0.1.1-era repository-plugin shape): `dsh.entry` points at this file,
+-// and the client is a self-executing page script served via the /pet/ui.js route and
+-// injected into index.html by the official httpServer.tapIndex hook.
++// Node half: serves the browser half at /pet/ui.js and injects it into the
++// index through the webserver's structured injection table.
+ //
+-// NOTE: this is the official repository-plugin layout — keep it as is. Changing the
+-// layout would break how old hosts recognize the plugin, and this repository-plugin
+-// mechanism is still the supported distribution path on the current host.
++// The package is loaded as a profile bundle (root package.json declares
++// `dsh.bundle.patch`); the Cordis plugin below is the row that patch inserts.
++// The old `.dsh-plugin/package.json` `dsh.entry` manifest is the 0.1.1-era
++// repository-plugin path, kept beside this file for hosts that still read it —
++// current hosts only read the bundle manifest and this package's exports.
++//
++// NOTE: `ctx.inject` is the optional-service form: the webserver exists only in
++// browser-facing compositions, so a headless profile simply leaves the pet
++// surface absent instead of holding its root fiber pending.
+ import { readFileSync } from 'node:fs'
+ 
++const UI_PATH = '/pet/ui.js'
+ const UI_SCRIPT = readFileSync(new URL('./client.js', import.meta.url))
+ 
+-export const inject = ['httpServer']
++export const name = 'bench-pet'
+ 
+ export function apply(ctx) {
+-  const { httpServer } = ctx
+-  ctx.effect(() => {
+-    if (!httpServer) return
+-    const disposers = [
+-      httpServer.register({
+-        kind: 'exact',
+-        path: '/pet/ui.js',
+-        handler: async (req, res) => {
+-          if (req.method !== 'GET' && req.method !== 'HEAD') {
+-            res.writeHead(405)
+-            res.end()
+-            return
+-          }
+-          res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' })
+-          res.end(UI_SCRIPT)
+-        },
+-      }),
+-      httpServer.tapIndex((html) =>
+-        html.includes('/pet/ui.js') ? html : html.replace('</body>', '<script src="/pet/ui.js" defer></script></body>'),
+-      ),
+-    ]
+-    return () => disposers.forEach((dispose) => dispose?.())
++  ctx.inject(['webServer'], (webCtx) => {
++    webCtx.effect(() => {
++      const disposers = [
++        webCtx.webServer.register({
++          kind: 'exact',
++          path: UI_PATH,
++          handler: async (req, res) => {
++            if (req.method !== 'GET' && req.method !== 'HEAD') {
++              res.writeHead(405)
++              res.end()
++              return
++            }
++            res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' })
++            res.end(UI_SCRIPT)
++          },
++        }),
++        // The structured row is the current injection surface: it renders in the
++        // served index and ships in the static worker boot payload, unlike the
++        // raw `tapIndex(html => html)` string transform the 0.1.1 host used.
++        webCtx.on('webserver/index-inject', (table) => {
++          table.push({ kind: 'script-src', placement: 'body', src: UI_PATH })
++        }),
++      ]
++      return () => disposers.forEach((dispose) => dispose?.())
++    })
+   })
+-}
+\ No newline at end of file
++}
+diff --git a/fixture/README.md b/fixture/README.md
+index 1c909ee..4e3fc1c 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,10 +1,25 @@
+ # @demo/dsh-bench-repo (exam material only, do not publish)
+ 
+-A small 0.1.1-era **repository-plugin** sample: the Node half lives under
+-`.dsh-plugin/`, the manifest `.dsh-plugin/package.json` declares `dsh.entry →
+-./index.js`, and the browser half is a self-executing script that the entry serves
+-at `/pet/ui.js` and injects into the page.
++A small **profile-bundle** sample: the Node half lives under `.dsh-plugin/`, the
++browser half is a self-executing script that the Node half serves at
++`/pet/ui.js` and injects into the page, and the package is installed into a dsh
++profile as a bundle.
++
++- `package.json` declares `dsh.bundle.patch → ./cordis.patch.yml`, the current
++  external-plugin manifest; `cordis.patch.yml` inserts the `bench-pet` row that
++  mounts this package.
++- `.dsh-plugin/index.js` is that row's Cordis plugin: it registers the exact
++  `/pet/ui.js` route on `ctx.webServer` and pushes a `script-src` row onto the
++  `webserver/index-inject` table.
++- `.dsh-plugin/client.js` is the browser half: a self-executing classic script
++  that appends the `#bench-pet` whale to `document.body`.
++- The browser half stays outside `dsh.client`: its documented entry point is the
++  plugin's own classic script served from `/pet/ui.js`, not a client-modules
++  factory bundle, so the root manifest declares no `dsh.client` surface.
++- `.dsh-plugin/package.json` keeps the 0.1.1-era repository-plugin manifest
++  (`dsh.entry → ./index.js`) for older hosts; dsh 0.1.2-alpha.2 reads the bundle
++  manifest in the root `package.json` instead and never opens this directory.
+ 
+ The host in this container is dsh **0.1.2-alpha.2**.
+ 
+-This fixture is exam material only — never publish it to npm.
+\ No newline at end of file
++This fixture is exam material only — never publish it to npm.
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+new file mode 100644
+index 0000000..188bb26
+--- /dev/null
++++ b/fixture/cordis.patch.yml
+@@ -0,0 +1,11 @@
++# The @demo/dsh-bench-repo bundle patch: the out-of-tree pet plugin as one row
++# over the profile root. The package declares this file through
++# `dsh.bundle.patch`; the profile mounts it by naming the package in
++# `dsh.profile.bundles` (or `dsh plugin --profile <name> add <spec>`).
++#
++# A patch replaces a targeted row's whole `config`, so `insert` is how a bundle
++# adds rows that the layers below it do not have.
++
++- insert:
++    - id: bench-pet
++      name: '@demo/dsh-bench-repo'
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..dc3ca3c
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-repo",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-repo",
++      "version": "0.1.0"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 0e71d32..6e7aa9f 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -2,5 +2,15 @@
+   "name": "@demo/dsh-bench-repo",
+   "version": "0.1.0",
+   "private": true,
+-  "type": "module"
+-}
+\ No newline at end of file
++  "type": "module",
++  "main": "./.dsh-plugin/index.js",
++  "exports": {
++    ".": "./.dsh-plugin/index.js",
++    "./package.json": "./package.json"
++  },
++  "dsh": {
++    "bundle": {
++      "patch": "./cordis.patch.yml"
++    }
++  }
++}
