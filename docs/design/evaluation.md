@@ -23,8 +23,8 @@ The Action is scored on the community migration suite [`oh-my-dsh/dsh-plugin-upg
 
 | Subject | What runs as the Harbor agent (`tools/harbor/dsh_agent.py`) |
 |---|---|
-| `pipeline` | `dsh-migrate run --skip-github` on a copy of the task fixture, as a consumer repository with publishing off |
-| `pipeline+skills` | The same, with `agent.upgradeSkills: true` |
+| `pipeline` | `dsh-migrate run --skip-github` on a copy of the task fixture, as a consumer repository with publishing off, with `agent.upgradeSkills: false` |
+| `pipeline+skills` | The same, with `agent.upgradeSkills: true`, the Action's default |
 | `session` | One `dsh --profile migrate` session with the task statement as its task, in `/app` |
 | `session+skills` | The same, with the `plugin-upgrade` skill loaded |
 | `oracle` | The task's reference solution |

@@ -61,8 +61,8 @@ export const configSchema = z.strictObject({
     model: z.string().min(1).default('deepseek-v4-flash').describe('Model of the agent sessions.'),
     thinking: z.enum(['enabled', 'disabled']).default('enabled').describe('Provider thinking mode.'),
     reasoningEffort: z.enum(THINKING_EFFORTS).default('max').describe('Provider reasoning effort.'),
-    upgradeSkills: z.boolean().default(false)
-      .describe('Load the `plugin-upgrade` skill of the community upgrade skills into the review and repair sessions.'),
+    upgradeSkills: z.boolean().default(true)
+      .describe('Load the `plugin-upgrade` skill of the community upgrade skills into the review and repair sessions. The skill ships in the image; nothing is fetched or sent.'),
   }).prefault({}),
   repair: z.strictObject({
     maxAttempts: z.number().int().min(1).default(5).describe('Attempt limit: the most repair attempts one migration runs.'),

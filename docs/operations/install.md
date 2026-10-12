@@ -41,7 +41,7 @@ reports:
       enabled: true
 ```
 
-A channel with any other id is your own and needs `repo`, `method` (`issue` or `discussion`) and `prompt`; its session receives the same evidence and must print `{ "title": …, "body": … }` as its last fenced JSON block. A channel without its token is skipped with the reason in the log. `agent.upgradeSkills` loads the community upgrade skills into the review and repair sessions independently of the `upgrade-skill` channel.
+A channel with any other id is your own and needs `repo`, `method` (`issue` or `discussion`) and `prompt`; its session receives the same evidence and must print `{ "title": …, "body": … }` as its last fenced JSON block. A channel without its token is skipped with the reason in the log. `agent.upgradeSkills`, on by default, loads the community upgrade skill into the review and repair sessions; it ships in the image, fetches and sends nothing, and is independent of the `upgrade-skill` channel.
 
 Each channel writes to a repository the consumer does not own, so whoever configures the Action for someone else asks before enabling one: what the channel sends and where, and which token with write access to that repository it needs.
 
