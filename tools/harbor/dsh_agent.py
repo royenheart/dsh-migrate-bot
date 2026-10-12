@@ -23,7 +23,8 @@ vendored upgrade-skill commit is loaded.
 
 The agent leaves in its log directory: `proposed.diff` (the fixture against
 its baseline commit), `agent.log`, and for a pipeline `events.jsonl` and
-`status.json`.
+`status.json`. A pipeline writes `agent.log` as it runs, so a run that times
+out still leaves it.
 """
 
 from __future__ import annotations
@@ -48,6 +49,8 @@ SKILL = "plugin-upgrade"
 WORK = "/tmp/dsh-migrate-bench"
 STATUS_PREFIX = "dsh-migrate-status:"
 BROWSERS = "/ms-playwright"
+# Harbor binds the trial's agent log directory here, so what is written to it survives a timeout.
+AGENT_LOGS = "/logs/agent"
 
 
 class DshAgent(BaseAgent):
@@ -121,7 +124,9 @@ class DshAgent(BaseAgent):
         else:
             code, log = await self._run_session(environment, api_key, instruction, context)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
-        (self.logs_dir / "agent.log").write_text(log, encoding="utf-8")
+        # A pipeline wrote its log in the container, as root, while it ran.
+        if not self._subject.startswith("pipeline"):
+            (self.logs_dir / "agent.log").write_text(log, encoding="utf-8")
         (self.logs_dir / "proposed.diff").write_text(await self._fixture_diff(environment, baseline), encoding="utf-8")
         context.metadata = {"subject": self._subject, "agent_exit_code": code}
 
@@ -166,7 +171,7 @@ class DshAgent(BaseAgent):
         ))
         env = {"DEEPSEEK_API_KEY": api_key, "DSH_BIN": DSH, "DSH_HOME": DSH_HOME, "DSH_MIGRATE_SKILLS_DIR": SKILLS_DIR, "PLAYWRIGHT_BROWSERS_PATH": BROWSERS, "CI": "1"}
         options = f"--workdir {plugin} --config {WORK}/config.json"
-        result = await environment.exec(command=f"dsh-migrate run {options} --target {shlex.quote(target)} --skip-github", env=env)
+        result = await environment.exec(command=f"dsh-migrate run {options} --target {shlex.quote(target)} --skip-github > {AGENT_LOGS}/agent.log 2>&1", env=env)
         status = json.loads(await self._exec(environment, f"dsh-migrate status {options}", env=env))
         (self.logs_dir / "status.json").write_text(json.dumps(status, indent=2), encoding="utf-8")
         migration = next((view for view in status["migrations"] if view["target"]["version"] == target), None)
@@ -185,7 +190,7 @@ class DshAgent(BaseAgent):
                 " && find /app/fixture -mindepth 1 -maxdepth 1 ! -name node_modules -exec rm -rf {} +"
                 " && git checkout-index -a -f --prefix=/app/fixture/"
             ))
-        return result.return_code, f"{result.stdout or ''}\n{result.stderr or ''}"
+        return result.return_code, await self._exec(environment, f"cat {AGENT_LOGS}/agent.log")
 
     async def _fixture_diff(self, environment: BaseEnvironment, baseline: str) -> str:
         """The fixture against the baseline commit, untracked files included, without touching the index."""
