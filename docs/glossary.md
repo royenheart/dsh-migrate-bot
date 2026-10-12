@@ -15,6 +15,7 @@ Every document uses these terms as written here and does not redefine them. *Rep
 | **target release** | The release a migration moves the plugin to. | `target` | — |
 | **source release** | The release the plugin worked on before: the target of the last verified migration, or the lowest release the plugin's `@deepseek-ai/dsh-*` ranges admit. | `source` | baseline tag |
 | **consumer** | A plugin repository that runs the Action. | `GITHUB_REPOSITORY` | consumer plugin repo, plugin repo |
+| **plugin** | A directory whose `package.json` declares `dsh.bundle`; a consumer holds one at its root or several below it. | `Plugin`, `findPlugins` | — |
 | **migration** | One consumer and one target release: the unit of work, identified by the target version. | `migrations/<version>/` | migrate run |
 | **check** | One of the four keyless checks of a tree against a release: mechanical, boot, web, end-to-end. A check produces a **check result** with an outcome `pass`, `fail` or `skipped`. | `CheckName`, `CheckResult` | gate stack, verification layer, fast gate |
 | **mechanical check** | The plugin's build, typecheck and tests with `@deepseek-ai/dsh-*` pinned to the release, and the plugin shape scan. | `mechanical` | — |

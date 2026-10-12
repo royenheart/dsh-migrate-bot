@@ -14,13 +14,13 @@ import { parseCommand, mayRunCommands } from './commands/parse.ts'
 import { runCommand } from './commands/run.ts'
 import { renderCommandHelp } from './commands/table.ts'
 import { openLogStream, type LogStream } from './deploy/log-stream.ts'
-import { declaredRelease } from './domain/release.ts'
+import { declaredRelease, newest } from './domain/release.ts'
 import { defaultBranch, excludeIgnoredPaths } from './git/worktree.ts'
 import { GitHubClient, repositoryOf, slugOf, type Repository } from './github/client.ts'
 import { writeGithubOutput } from './github/output.ts'
 import { resolveTarget } from './github/releases.ts'
 import { renderStepSummary, statusOf, writeStepSummary } from './github/summary.ts'
-import { readPluginName } from './mechanical/run.ts'
+import { findPlugins, pluginNames } from './plugins.ts'
 import { resolveChannels } from './merge-reports/channels.ts'
 import { runReportChannel } from './merge-reports/run.ts'
 import { createQuotaQuery } from './quota/query.ts'
@@ -166,7 +166,8 @@ function engineFor(runtime: Runtime): InJobEngine {
 
 function migrationInput(runtime: Runtime, target: MigrationInput['target'], verified: MigrationInput['target'] | undefined, proposal: MigrationInput['proposal']): MigrationInput {
   const { config } = runtime
-  const declared = verified === undefined ? declaredRelease(JSON.parse(readFileSync(join(runtime.workdir, 'package.json'), 'utf8'))) : undefined
+  // The earliest release every plugin admits: the release they last worked on together.
+  const declared = verified === undefined ? newest(findPlugins(runtime.workdir).flatMap(plugin => declaredRelease(plugin.manifest) ?? [])) : undefined
   const source = verified !== undefined ? { release: verified, origin: 'verified' as const } : declared === undefined ? undefined : { release: declared, origin: 'declared-peers' as const }
   return {
     target,
@@ -193,7 +194,7 @@ function report(runtime: Runtime, engine: InJobEngine, view: MigrationView | und
     log_stream_url: stream?.url,
     ...extra,
   }, runtime.env)
-  if (view !== undefined) writeStepSummary(renderStepSummary({ view, pluginName: readPluginName(runtime.workdir), logStreamUrl: stream?.url }), runtime.env)
+  if (view !== undefined) writeStepSummary(renderStepSummary({ view, pluginName: pluginNames(runtime.workdir), logStreamUrl: stream?.url }), runtime.env)
 }
 
 async function run(runtime: Runtime, force: boolean): Promise<number> {
@@ -201,8 +202,8 @@ async function run(runtime: Runtime, force: boolean): Promise<number> {
     process.stderr.write(`${runtime.config.secrets.apiKeyEnv} is not set; a migration needs it for its agent sessions\n`)
     return 1
   }
-  if (!existsSync(join(runtime.workdir, 'package.json'))) {
-    process.stderr.write('the repository root has no package.json; dsh-migrate migrates the one plugin at the root of a repository\n')
+  if (findPlugins(runtime.workdir).length === 0) {
+    process.stderr.write('the repository holds no plugin: no package.json that declares dsh.bundle, at its root or below it\n')
     writeGithubOutput({ status: 'error' }, runtime.env)
     return 1
   }

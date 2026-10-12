@@ -33,7 +33,7 @@ Rules:
 
 ## 4. The preview deployment
 
-When a pull request is opened, the deploy service builds an instance from its head, installs the plugin into it, and serves it. **Creation is the service's job**: it receives the repository's `pull_request` webhook events and builds from them. The Action calls the preview API only for the verbs a person types, and never creates an instance itself. Every push to the pull request rebuilds the instance from the pushed commit, so what a person sees always corresponds to a commit that exists.
+When a pull request is opened, the deploy service builds an instance from its head, installs the plugin into it, and serves it. The reference implementation previews a repository whose plugin is at its root; for a repository of several plugins its build fails with that reason. **Creation is the service's job**: it receives the repository's `pull_request` webhook events and builds from them. The Action calls the preview API only for the verbs a person types, and never creates an instance itself. Every push to the pull request rebuilds the instance from the pushed commit, so what a person sees always corresponds to a commit that exists.
 
 A preview runs the pull request's code on the consumer's machine, so it is built only for a pull request whose branch is in the repository itself: that code was pushed by someone with write access to the repository. A pull request from a fork, or from a fork that was deleted, gets no preview; the service logs the reason, and `status` reports the state `none` with it.
 

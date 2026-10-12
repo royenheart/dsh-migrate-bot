@@ -8,7 +8,6 @@ import { checkDependencyContract, npmPublishedVersions } from './dependencies.ts
 import { dshPeerSpecs, pinDshPeersCommand } from './peers.ts'
 import { scanKeyedSlots, scanPluginShape } from './scan.ts'
 import { typecheckCommand } from './typecheck.ts'
-import { inline } from '../render/text.ts'
 
 export interface MechanicalResult {
   ok: boolean
@@ -63,41 +62,6 @@ function readPackageJson(root: string): unknown {
   const pkgPath = join(root, 'package.json')
   if (!existsSync(pkgPath)) return undefined
   return JSON.parse(readFileSync(pkgPath, 'utf8')) as unknown
-}
-
-/**
- * The `name` in a plugin's `package.json`, when that file holds a usable one.
- *
- * The package.json belongs to the tree being migrated, so a file that is not
- * JSON, or a name that is not a non-empty string, is nothing rather than a
- * crash: this is read once to name the plugin in the boot check's profile and
- * again to name it in a report, and neither is worth failing a run over.
- * @param workdir - the plugin working tree.
- */
-export function readPackageName(workdir: string): string | undefined {
-  try {
-    const pkg = readPackageJson(workdir)
-    if (typeof pkg !== 'object' || pkg === null) return undefined
-    const name = (pkg as { name?: unknown }).name
-    return typeof name === 'string' && name !== '' ? name : undefined
-  } catch {
-    return undefined
-  }
-}
-
-/**
- * The name a report calls the plugin by.
- *
- * That name lands in an issue title and an issue body, so it is collapsed to one
- * line and bounded like every other value that came from outside this Action; a
- * tree with no usable name is called `plugin` rather than nothing.
- * @param workdir - the plugin working tree.
- */
-export function readPluginName(workdir: string): string {
-  const name = readPackageName(workdir)
-  if (name === undefined) return 'plugin'
-  const collapsed = inline(name, 80)
-  return collapsed === '' ? 'plugin' : collapsed
 }
 
 function packageScripts(pkg: unknown): Record<string, string> {

@@ -35,7 +35,7 @@ test('a plugin without a client surface skips the web layer instead of failing i
       },
     })
     assert.equal(result.ok, true)
-    assert.match(result.skipped ?? '', /no dsh\.client surface/)
+    assert.match(result.skipped ?? '', /no plugin declares a dsh\.client surface/)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

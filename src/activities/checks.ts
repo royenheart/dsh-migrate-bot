@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { runMechanical } from '../mechanical/run.ts'
+import { findPlugins } from '../plugins.ts'
 import { bootProbe, normalizeSignature } from '../verify/boot.ts'
 import { ensureDsh } from '../verify/dsh-install.ts'
 import { hasClientSurface, webSmoke } from '../verify/web.ts'
@@ -76,12 +77,26 @@ export class CheckRunner {
     const { workdir, config } = this.deps
     switch (request.check) {
       case 'mechanical': {
-        const result = runMechanical(workdir, config, { dshVersion: release.version, timeoutMs: config.timeouts.commandMs })
-        if (result.ok && result.checks === 0) {
-          return { outcome: 'skipped', fingerprint: '', output: 'the plugin declares no build, typecheck or test command' }
+        // Every plugin is checked, so a repair is given every failure at once.
+        const found = findPlugins(workdir)
+        // A tree with no plugin is checked at its root, where the shape scan says what it lacks.
+        const plugins = found.length === 0 ? [{ dir: '', name: '' }] : found
+        const named = plugins.length > 1
+        const results = plugins.map(plugin => ({ plugin, result: runMechanical(join(workdir, plugin.dir), config, { dshVersion: release.version, timeoutMs: config.timeouts.commandMs }) }))
+        const failed = results.filter(({ result }) => !result.ok)
+        if (failed.length > 0) {
+          const first = failed[0] as (typeof failed)[number]
+          const firstError = first.result.errors.split('\n').find(line => line.trim() !== '') ?? 'mechanical checks failed'
+          return {
+            outcome: 'fail',
+            fingerprint: `mechanical: ${named ? `${first.plugin.name}: ` : ''}${normalizeSignature(firstError)}`,
+            output: failed.map(({ plugin, result }) => `${named ? `## ${plugin.name} (${plugin.dir})\n` : ''}${result.errors || result.log}`).join('\n\n'),
+          }
         }
-        const firstError = result.errors.split('\n').find(line => line.trim() !== '') ?? 'mechanical checks failed'
-        return { outcome: result.ok ? 'pass' : 'fail', fingerprint: `mechanical: ${normalizeSignature(firstError)}`, output: result.errors || result.log }
+        if (results.every(({ result }) => result.checks === 0)) {
+          return { outcome: 'skipped', fingerprint: '', output: 'no plugin declares a build, typecheck or test command' }
+        }
+        return { outcome: 'pass', fingerprint: '', output: results.map(({ result }) => result.log).join('\n') }
       }
       case 'boot': {
         const installed = this.install(release)

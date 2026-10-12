@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { detectE2EFramework, INDEX_FILE, readIndex, renderAuthoringBrief, syncE2EBranch } from '../e2e/branch.ts'
-import { readPluginName } from '../mechanical/run.ts'
+import { pluginNames } from '../plugins.ts'
 import { defaultBranch } from '../git/worktree.ts'
 import { usageOf } from './sessions.ts'
 import type { AgentRunner } from '../agents/types.ts'
@@ -33,7 +33,7 @@ export async function authorE2ESuite(deps: {
         suiteDir: deps.config.checks.e2e.dir,
         framework: detectE2EFramework(deps.workdir),
         dshTag: target,
-        pluginName: readPluginName(deps.workdir),
+        pluginName: pluginNames(deps.workdir),
         stagingDir: staging,
       }),
       workdir: deps.workdir,

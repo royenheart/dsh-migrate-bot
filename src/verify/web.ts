@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { classifyBoot, writeProbeProfile, type BootProbeResult } from './boot.ts'
-import { readPackageName } from '../mechanical/run.ts'
+import { classifyBoot, linkPlugins, writeProbeProfile, type BootProbeResult } from './boot.ts'
+import { findPlugins } from '../plugins.ts'
 
 /**
  * The web check: boot the real `dsh web` server with the plugin mounted
@@ -63,18 +63,12 @@ export interface WebSmokeOptions {
   readyPattern?: RegExp | undefined
 }
 
-/** A plugin declares a browser surface through `dsh.client`. */
+/** Whether a plugin of the repository declares a browser surface through `dsh.client`. */
 export function hasClientSurface(workdir: string): boolean {
-  const path = join(workdir, 'package.json')
-  if (!existsSync(path)) return false
-  try {
-    const pkg: unknown = JSON.parse(readFileSync(path, 'utf8'))
-    if (typeof pkg !== 'object' || pkg === null) return false
-    const client = (pkg as { dsh?: { client?: unknown } }).dsh?.client
+  return findPlugins(workdir).some((plugin) => {
+    const client = (plugin.manifest.dsh as { client?: unknown }).client
     return typeof client === 'object' && client !== null
-  } catch {
-    return false
-  }
+  })
 }
 
 /**
@@ -137,14 +131,10 @@ export async function webSmoke(options: WebSmokeOptions): Promise<WebSmokeResult
       ok: true,
       signature: 'web: no client surface',
       detail: '',
-      skipped: 'the plugin declares no dsh.client surface',
+      skipped: 'no plugin declares a dsh.client surface',
     }
   }
-
-  const pluginName = readPackageName(options.workdir)
-  if (pluginName === undefined) {
-    return { ok: false, signature: 'web: package.json has no usable name', detail: '' }
-  }
+  const plugins = findPlugins(options.workdir)
 
   const profile = options.profile ?? 'probe-web'
   const ownHome = options.homeDir === undefined
@@ -156,10 +146,9 @@ export async function webSmoke(options: WebSmokeOptions): Promise<WebSmokeResult
     // The web profile is base + the shipped web app bundle + the plugin under test.
     const dir = join(home, 'profiles', profile)
     mkdirSync(join(dir, 'node_modules'), { recursive: true })
-    writeProbeProfile(home, profile, pluginName, ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', pluginName])
-    const link = join(dir, 'node_modules', pluginName)
-    mkdirSync(dirname(link), { recursive: true })
-    if (!existsSync(link)) symlinkSync(options.workdir, link, 'dir')
+    const names = plugins.map(plugin => plugin.name)
+    writeProbeProfile(home, profile, names, ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', ...names])
+    linkPlugins(dir, options.workdir, plugins)
 
     const env: NodeJS.ProcessEnv = {
       ...process.env,

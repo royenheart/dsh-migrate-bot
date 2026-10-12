@@ -11,7 +11,7 @@ A consumer configures the Action in `.github/dsh-migrate.yml`. Every key is opti
 | --- | --- | --- | --- |
 | `target` | string | `latest` | Target release: `latest`, a version such as `0.2.0-rc.2`, or a `dsh-v*` tag. |
 | `review.policy` | `always` \| `when-checks-fail` | `always` | `always` runs the overlap and extension-point reviews; `when-checks-fail` skips them when the unmodified tree passes every check on the target release. |
-| `tests.commands` | list of string | — | Shell commands that replace the built-in mechanical checks. |
+| `tests.commands` | list of string | — | Shell commands that replace the built-in mechanical checks; they run in each plugin's directory. |
 | `prompts.overlap` | string | — | Replaces the overlap review prompt. |
 | `prompts.extensionPoints` | string | — | Replaces the extension-point review prompt. |
 | `prompts.repair` | string | — | Replaces the repair prompt. |

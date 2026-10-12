@@ -49,7 +49,7 @@ export const configSchema = z.strictObject({
       .describe('`always` runs the overlap and extension-point reviews; `when-checks-fail` skips them when the unmodified tree passes every check on the target release.'),
   }).prefault({}),
   tests: z.strictObject({
-    commands: z.array(z.string().min(1)).min(1).describe('Shell commands that replace the built-in mechanical checks.'),
+    commands: z.array(z.string().min(1)).min(1).describe('Shell commands that replace the built-in mechanical checks; they run in each plugin\'s directory.'),
   }).optional(),
   prompts: z.strictObject({
     overlap: z.string().min(1).optional().describe('Replaces the overlap review prompt.'),

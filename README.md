@@ -4,7 +4,7 @@ A GitHub Action that moves a [DeepSeek Harness](https://github.com/deepseek-ai/d
 
 ## What it does
 
-For each consumer repository and target release, one migration:
+For each consumer repository and target release, one migration, which covers the plugin at the repository's root or every plugin below it:
 
 1. boots the unmodified plugin on the release it last worked on and on the target release, to tell a regression from a pre-existing failure;
 2. runs an overlap review (which documented capabilities the release now covers) and an extension-point review (which official extension points the plugin should use), unless the review policy skips them because the unmodified plugin already passes;

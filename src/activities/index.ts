@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { readPluginName } from '../mechanical/run.ts'
+import { pluginNames } from '../plugins.ts'
 import { isTreeChanged, changedPaths, treeDiff } from '../git/worktree.ts'
 import { renderProposal } from '../github/templates.ts'
 import { runReportChannel, type ReportDeps } from '../merge-reports/run.ts'
@@ -87,7 +87,7 @@ export function createActivities(deps: ActivityDeps): ActivityRunner {
         const repairs = [...reports.entries()].filter(([path]) => path.startsWith('reports/repair-')).map(([, text]) => text)
         const documents = renderProposal({
           context,
-          pluginName: readPluginName(deps.workdir),
+          pluginName: pluginNames(deps.workdir),
           checks: [...latest.values()],
           reports: { overlap: reports.get('reports/overlap.md'), extensionPoints: reports.get('reports/extension-points.md'), repairs },
           diff: treeDiff(deps.workdir),

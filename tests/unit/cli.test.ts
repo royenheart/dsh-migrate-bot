@@ -113,7 +113,7 @@ test('a run stops with the reason when the repository root holds no plugin', () 
   try {
     const result = cli(['run'], repo.work, { DEEPSEEK_API_KEY_DSH_MIGRATE_BOT: 'sk-test' })
     assert.equal(result.status, 1)
-    assert.match(result.stderr, /the repository root has no package\.json/)
+    assert.match(result.stderr, /the repository holds no plugin/)
     assert.match(result.output, /status/)
     assert.match(result.output, /error/)
   } finally {

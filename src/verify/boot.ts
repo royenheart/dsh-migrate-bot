@@ -1,8 +1,8 @@
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { readPackageName } from '../mechanical/run.ts'
+import { findPlugins, type Plugin } from '../plugins.ts'
 
 /**
  * `dsh` reports a plugin that cannot load, a plugin whose `apply` throws, and a
@@ -228,8 +228,8 @@ export interface BootProbeOptions {
 export function writeProbeProfile(
   home: string,
   profile: string,
-  pluginName: string,
-  bundles: readonly string[] = ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', pluginName],
+  pluginNames: readonly string[],
+  bundles: readonly string[] = ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', ...pluginNames],
 ): void {
   const dir = join(home, 'profiles', profile)
   mkdirSync(join(dir, 'node_modules'), { recursive: true })
@@ -241,8 +241,18 @@ export function writeProbeProfile(
   }, null, 2)}\n`, 'utf8')
 }
 
+/** Link each plugin into a profile's `node_modules`, so Node resolution finds it as an installed one. */
+export function linkPlugins(profileDir: string, workdir: string, plugins: readonly Plugin[]): void {
+  for (const plugin of plugins) {
+    const link = join(profileDir, 'node_modules', plugin.name)
+    // A scoped name needs its scope directory to exist before the link lands.
+    mkdirSync(dirname(link), { recursive: true })
+    if (!existsSync(link)) symlinkSync(join(workdir, plugin.dir), link, 'dir')
+  }
+}
+
 /**
- * Load the plugin into a scratch dsh home and boot the host under target.
+ * Load the plugins into a scratch dsh home and boot the host under target.
  *
  * Keyless by construction: the model route points at a dead port, so a boot
  * that reaches the credential/connection check has already activated every
@@ -250,12 +260,12 @@ export function writeProbeProfile(
  * @param options - workdir, timeout, injectable spawn
  */
 export async function bootProbe(options: BootProbeOptions): Promise<BootProbeResult> {
-  const pluginName = readPackageName(options.workdir)
-  if (pluginName === undefined) {
+  const plugins = findPlugins(options.workdir)
+  if (plugins.length === 0) {
     return {
       outcome: 'fail',
-      signature: 'load: package.json has no usable name',
-      detail: `no package.json name in ${options.workdir}`,
+      signature: 'load: no plugin',
+      detail: `no package.json that declares dsh.bundle and a name in ${options.workdir}`,
     }
   }
 
@@ -265,11 +275,9 @@ export async function bootProbe(options: BootProbeOptions): Promise<BootProbeRes
   const spawnImpl = options.spawnImpl ?? defaultSpawn
 
   try {
-    writeProbeProfile(home, profile, pluginName)
-    const link = join(home, 'profiles', profile, 'node_modules', pluginName)
-    // A scoped name needs its scope directory to exist before the link lands.
-    mkdirSync(dirname(link), { recursive: true })
-    if (!existsSync(link)) symlinkSync(options.workdir, link, 'dir')
+    // Every plugin of the repository boots in one profile, as a user installs them together.
+    writeProbeProfile(home, profile, plugins.map(plugin => plugin.name))
+    linkPlugins(join(home, 'profiles', profile), options.workdir, plugins)
 
     const env: NodeJS.ProcessEnv = {
       ...process.env,

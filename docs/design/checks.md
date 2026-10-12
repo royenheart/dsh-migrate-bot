@@ -18,10 +18,12 @@ A check looks at the plugin working tree under one release and produces a check 
 
 | Check | What it runs | Needs an API key | What it catches |
 |---|---|---|---|
-| `mechanical` | The dependency contract, the plugin-shape scan, then `npm install`, the `@deepseek-ai/dsh-*` dependencies pinned to the release, and the plugin's `build`, `typecheck` and `test` scripts; `tests.commands` replaces the scripts | no | A dependency the release no longer publishes or a range that does not admit it; type, build and unit-test failures |
-| `boot` | Installs the tree into a temporary profile and starts dsh | no | A plugin that fails to load, throws in `apply`, waits forever for a service, or hangs the host |
-| `web` | Starts `dsh web` headless with the plugin mounted and waits for the ready line; skipped when the plugin declares no `dsh.client` | no | A web client that never attaches |
+| `mechanical` | In each plugin's directory: the dependency contract, the plugin-shape scan, then `npm install`, the `@deepseek-ai/dsh-*` dependencies pinned to the release, and the plugin's `build`, `typecheck` and `test` scripts; `tests.commands` replaces the scripts | no | A dependency the release no longer publishes or a range that does not admit it; type, build and unit-test failures |
+| `boot` | Installs every plugin of the tree into one temporary profile and starts dsh | no | A plugin that fails to load, throws in `apply`, waits forever for a service, or hangs the host |
+| `web` | Starts `dsh web` headless with every plugin mounted and waits for the ready line; skipped when no plugin declares `dsh.client` | no | A web client that never attaches |
 | `e2e` | The agent-authored suite from the suite branch, overlaid on the tree; `subset` runs the previously failing tests and the smoke tests, `full` runs everything; skipped while no suite exists | no | Runtime behaviour, layout and console errors |
+
+A plugin is a directory whose `package.json` declares `dsh.bundle` (`src/plugins.ts`). A repository is one plugin at its root, or several below it, for example a host, a web and a tools plugin shipped together; then the mechanical check runs in each plugin's directory and reports every failing plugin by name, and the boot and web checks load all of them into one profile, as a user who installs them together does. One migration and one proposal cover every plugin, and the source release is the earliest release every plugin's ranges admit.
 
 The dependency contract (`src/mechanical/dependencies.ts`) runs first, because pinning the dependencies to the release hides what a user installing the plugin would meet. Every `@deepseek-ai/dsh-*` package is published with the release's version and a removed one stops at its last release, so each package the plugin names must be published at the release, under a range that admits it by npm's rules, which compare a prerelease only within the same `major.minor.patch`. The published versions are read from the npm registry; when it cannot be read, the contract decides nothing and the install that follows fails instead.
 
