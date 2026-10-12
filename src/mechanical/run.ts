@@ -77,13 +77,13 @@ function packageScripts(pkg: unknown): Record<string, string> {
  * `npm install` when node_modules is missing, then pin dsh packages to the
  * target version when one was resolved.
  */
-function installCommands(root: string, pkg: unknown, dshVersion: string | undefined): string[] {
+function installCommands(root: string, pkg: unknown, dshVersion: string | undefined, published: (name: string) => readonly string[] | undefined): string[] {
   const commands: string[] = []
   if (pkg !== undefined && !existsSync(join(root, 'node_modules'))) {
     commands.push('npm install')
   }
   if (dshVersion !== undefined && pkg !== undefined) {
-    const pin = pinDshPeersCommand(dshPeerSpecs(pkg, dshVersion))
+    const pin = pinDshPeersCommand(dshPeerSpecs(pkg, dshVersion, published))
     if (pin !== undefined) commands.push(pin)
   }
   return commands
@@ -120,8 +120,9 @@ export function runMechanical(
   options: MechanicalOptions = {},
 ): MechanicalResult {
   const pkg = readPackageJson(root)
+  const published = options.published ?? npmPublishedVersions
   if (options.dshVersion !== undefined) {
-    const contract = checkDependencyContract(pkg, options.dshVersion, options.published ?? npmPublishedVersions)
+    const contract = checkDependencyContract(pkg, options.dshVersion, published)
     if (contract.length > 0) {
       const text = contract.map(item => `error: ${item.message}`).join('\n')
       return { ok: false, errors: text, log: text, checks: 0 }
@@ -130,7 +131,7 @@ export function runMechanical(
   const extraEnv: NodeJS.ProcessEnv = options.dshVersion === undefined
     ? {}
     : { DSH_MIGRATE_TARGET_VERSION: options.dshVersion }
-  const prefix = installCommands(root, pkg, options.dshVersion)
+  const prefix = installCommands(root, pkg, options.dshVersion, published)
   const timeoutMs = options.timeoutMs
 
   if (config.tests !== undefined) {

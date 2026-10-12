@@ -12,6 +12,10 @@ import semver from 'semver'
  * `0.1.2-alpha.2`. The other checks install the target's packages whatever the
  * plugin declares, so they cannot see either mistake; a user installing the
  * plugin would.
+ *
+ * An optional peer is installed only by whoever needs it, so one the harness
+ * stopped publishing harms nothing; its range still has to admit the target,
+ * because dsh refuses a plugin whose peer ranges do not.
  */
 
 const DSH_SCOPE = '@deepseek-ai/dsh-'
@@ -29,6 +33,7 @@ export interface DependencyFinding {
 export function checkDependencyContract(pkg: unknown, target: string, published: (name: string) => readonly string[] | undefined): DependencyFinding[] {
   if (typeof pkg !== 'object' || pkg === null) return []
   const findings: DependencyFinding[] = []
+  const meta = (pkg as { peerDependenciesMeta?: Record<string, { optional?: boolean } | undefined> }).peerDependenciesMeta ?? {}
   for (const block of BLOCKS) {
     const entries = (pkg as Record<string, unknown>)[block]
     if (typeof entries !== 'object' || entries === null) continue
@@ -38,6 +43,7 @@ export function checkDependencyContract(pkg: unknown, target: string, published:
       const versions = published(name)
       if (versions === undefined) continue
       if (!versions.includes(target)) {
+        if (block === 'peerDependencies' && meta[name]?.optional === true) continue
         findings.push({ message: `${block}: ${name} is not published at ${target}; the harness removed or renamed it (last published ${versions.at(-1) ?? 'never'})` })
       } else if (!semver.satisfies(target, range)) {
         findings.push({ message: `${block}: ${name} is "${range}", which does not admit ${target}` })

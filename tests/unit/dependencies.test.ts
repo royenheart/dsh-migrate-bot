@@ -25,6 +25,15 @@ test('a range must admit the target by npm prerelease rules, and every package m
   ])
 })
 
+test('an optional peer the harness stopped publishing harms nothing, but its range still has to admit the target', () => {
+  // dsh-skill-hub at 0.1.7-alpha.1 kept dsh-client-runtime as an optional peer after 0.1.1-rc.2 was its last release.
+  const findings = checkDependencyContract({
+    peerDependencies: { '@deepseek-ai/dsh-client-runtime': '>=0.1.1-rc.2 <0.2.0-0', '@deepseek-ai/dsh-agent': '^0.1.0-rc.8' },
+    peerDependenciesMeta: { '@deepseek-ai/dsh-client-runtime': { optional: true }, '@deepseek-ai/dsh-agent': { optional: true } },
+  }, '0.1.2-alpha.2', published)
+  assert.deepEqual(findings.map(finding => finding.message), ['peerDependencies: @deepseek-ai/dsh-agent is "^0.1.0-rc.8", which does not admit 0.1.2-alpha.2'])
+})
+
 test('a range written for the target cohort passes, and an unreadable registry decides nothing', () => {
   assert.deepEqual(checkDependencyContract({ peerDependencies: { '@deepseek-ai/dsh-agent': '^0.1.0-rc.8 || ^0.1.2-alpha.2' } }, '0.1.2-alpha.2', published), [])
   assert.deepEqual(checkDependencyContract({ peerDependencies: { '@deepseek-ai/dsh-agent': '^0.0.1' } }, '0.1.2-alpha.2', () => undefined), [])
