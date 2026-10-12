@@ -36,6 +36,8 @@ A pipeline does not read the task statement. It takes its target from the dsh re
 - The static tasks (`S`) ask for a written analysis, which a pipeline does not produce, so they are not applicable to a pipeline.
 - A task that installs no dsh release gives a pipeline no target, so it is not applicable either.
 
+For every subject, a task whose verifier reads a variable the run does not set (the suite's report judge reads `REPORT_JUDGE_BASE_URL`, `REPORT_JUDGE_MODEL` and `REPORT_JUDGE_API_KEY`) is not applicable, because Harbor refuses a job in which any task lacks one; the record names the missing variables. No record is written when Harbor ran no trial.
+
 The fixture receives what a consumer would be proposed: the tree of a migration that ended `unpublished` (it changed and passed with publishing off). A migration that ended `failed`, `compatible` or `error` leaves the fixture as it was, and the verifier scores that.
 
 Means are never averaged across subjects.
