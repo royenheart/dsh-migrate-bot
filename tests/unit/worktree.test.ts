@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { changedPaths, excludeIgnoredPaths, isIgnoredPath, isTreeChanged, stageChanges } from '../../src/git/worktree.ts'
+import { changedPaths, excludeIgnoredPaths, isIgnoredPath, isTreeChanged, restoreTree, snapshotTree, stageChanges } from '../../src/git/worktree.ts'
 
 test('report and secrets paths are ignored paths', () => {
   assert.equal(isIgnoredPath('.dsh-migrate/'), true)
@@ -182,6 +182,33 @@ test('Agent Notes never reach the staged set even when the plugin tracks them', 
     const staged = spawnSync('git', ['diff', '--cached', '--name-only'], { cwd: dir, encoding: 'utf8' }).stdout
     assert.match(staged, /src\.ts/)
     assert.doesNotMatch(staged, /\.agents\/notes/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('a tree restored from its snapshot loses what was written since and keeps the uncommitted migration and the ignored paths', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-mig-snap-'))
+  try {
+    git(dir, ['init'])
+    git(dir, ['config', 'user.name', 'test'])
+    git(dir, ['config', 'user.email', 'test@example.test'])
+    writeFileSync(join(dir, 'index.js'), 'export const v = 1\n')
+    git(dir, ['add', 'index.js'])
+    git(dir, ['commit', '-m', 'init'])
+    excludeIgnoredPaths(dir)
+    writeFileSync(join(dir, 'index.js'), 'export const v = 2\n')
+    const tree = snapshotTree(dir)
+    writeFileSync(join(dir, 'index.js'), 'export const v = 3\n')
+    mkdirSync(join(dir, 'specs'))
+    writeFileSync(join(dir, 'specs', 'stray.spec.ts'), '')
+    mkdirSync(join(dir, 'node_modules', 'x'), { recursive: true })
+    writeFileSync(join(dir, 'node_modules', 'x', 'index.js'), '')
+    restoreTree(dir, tree)
+    assert.equal(readFileSync(join(dir, 'index.js'), 'utf8'), 'export const v = 2\n')
+    assert.deepEqual(changedPaths(dir), ['index.js'])
+    assert.equal(readFileSync(join(dir, 'node_modules', 'x', 'index.js'), 'utf8'), '')
+    assert.deepEqual(stagedNames(dir), [])
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

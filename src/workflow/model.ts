@@ -46,7 +46,6 @@ export const settingsSchema = z.strictObject({
   maxAttempts: z.number().int().min(1),
   e2eFailurePolicy: z.enum(E2E_FAILURE_POLICIES),
   checks: z.strictObject({ boot: z.boolean(), web: z.boolean(), e2e: z.boolean() }),
-  e2eSubsetFirst: z.boolean(),
   /** Whether a changed tree becomes a proposal on GitHub. */
   publish: z.boolean(),
   /** Report channels that are enabled, in delivery order. */
@@ -93,7 +92,15 @@ export const migrationEventSchema = z.discriminatedUnion('type', [
     report: z.string().optional(),
   }),
   z.strictObject({
-    type: z.literal('e2e.authored'),
+    type: z.literal('e2e.characterized'),
+    outcome: z.enum(['characterized', 'skipped', 'failed']),
+    /** The tests that passed on the source release. */
+    baseline: z.array(z.string()),
+    detail: z.string(),
+    usage: usageSchema.optional(),
+  }),
+  z.strictObject({
+    type: z.literal('e2e.published'),
     outcome: z.enum(['pushed', 'unchanged', 'failed']),
     detail: z.string(),
     usage: usageSchema.optional(),

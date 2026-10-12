@@ -26,7 +26,7 @@ export async function checkTree(tree: string, release: Release, deps: Omit<Check
   const order: CheckName[] = ['mechanical', ...(boot.enabled ? ['boot' as const] : []), ...(web.enabled ? ['web' as const] : []), ...(e2e.enabled ? ['e2e' as const] : [])]
   const results: CheckResult[] = []
   for (const check of order) {
-    const result = await runner.run({ activity: 'check', check, release: 'target', e2eScope: 'full' }, release)
+    const result = await runner.run({ activity: 'check', check, release: 'target', e2eBaseline: [] }, release)
     results.push(result)
     const refuses = result.outcome === 'fail' && (check !== 'e2e' || e2e.failurePolicy === 'blocking')
     if (refuses) {

@@ -25,7 +25,6 @@ const inputArbitrary: fc.Arbitrary<MigrationInput> = fc.record({
   boot: fc.boolean(),
   web: fc.boolean(),
   e2e: fc.boolean(),
-  e2eSubsetFirst: fc.boolean(),
   publish: fc.boolean(),
   channels: fc.subarray(CHANNELS),
 }).map(drawn => ({
@@ -36,7 +35,6 @@ const inputArbitrary: fc.Arbitrary<MigrationInput> = fc.record({
     maxAttempts: drawn.maxAttempts,
     e2eFailurePolicy: drawn.e2eFailurePolicy,
     checks: { boot: drawn.boot, web: drawn.web, e2e: drawn.e2e },
-    e2eSubsetFirst: drawn.e2eSubsetFirst,
     publish: drawn.publish,
     reportChannels: drawn.channels,
   },
@@ -77,8 +75,12 @@ function answer(request: ActivityRequest, choices: Choices): MigrationEvent {
         blocker: request.kind === 'repair' ? choices.pick(['none', 'none', 'incomplete', 'valid'] as const) : 'none',
         detail: '',
       }
-    case 'authorE2E':
-      return { type: 'e2e.authored', outcome: choices.pick(['pushed', 'unchanged', 'failed'] as const), detail: '' }
+    case 'characterize': {
+      const outcome = choices.pick(['characterized', 'skipped', 'failed'] as const)
+      return { type: 'e2e.characterized', outcome, baseline: outcome === 'characterized' ? ['specs/panel.spec.ts › opens'] : [], detail: '' }
+    }
+    case 'publishE2E':
+      return { type: 'e2e.published', outcome: choices.pick(['pushed', 'unchanged', 'failed'] as const), detail: '' }
     case 'inspectTree':
       return { type: 'tree.inspected', changed: choices.pick([true, false]), files: 1 }
     case 'publishProposal':
@@ -198,7 +200,7 @@ test('I3 the repair loop is bounded and stops early only on evidence', () => {
   }), { numRuns: 1000 })
 })
 
-test('I4 nothing is concluded from a tree whose last checks failed, except an advisory end-to-end failure', () => {
+test('I4 nothing is concluded from a tree whose last checks failed, except an advisory end-to-end failure without a baseline', () => {
   fc.assert(fc.property(runArbitrary, ([input, values, withErrors]) => {
     const run = drive(input, values, withErrors)
     if (!run.requests.some(request => request.activity === 'inspectTree')) return
@@ -206,7 +208,17 @@ test('I4 nothing is concluded from a tree whose last checks failed, except an ad
       if (outcome !== 'fail') continue
       assert.equal(check, 'e2e', `${check} failed and the migration concluded`)
       assert.equal(run.input.settings.e2eFailurePolicy, 'advisory')
+      assert.deepEqual(run.snapshot.context.e2eBaseline, [], 'a test of the end-to-end baseline broke and the migration concluded')
     }
+  }), { numRuns: 1000 })
+})
+
+test('a suite that recorded an end-to-end baseline is published once the migration concluded, and only then', () => {
+  fc.assert(fc.property(runArbitrary, ([input, values, withErrors]) => {
+    const run = drive(input, values, withErrors)
+    const publishes = run.requests.findIndex(request => request.activity === 'publishE2E')
+    if (publishes >= 0) assert.ok(run.requests.slice(0, publishes).some(request => request.activity === 'inspectTree'))
+    if (run.snapshot.context.e2eBaseline.length > 0 && run.snapshot.context.concluded !== undefined) assert.ok(publishes >= 0)
   }), { numRuns: 1000 })
 })
 

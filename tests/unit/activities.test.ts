@@ -34,7 +34,7 @@ test('a failing mechanical check keeps its errors for the repair and a bounded e
     plugin(dir)
     const config = parseConfig({ tests: { commands: [`node -e "console.log('noise\\n'.repeat(3000)); console.error('error TS2304: cannot find name'); process.exit(1)"`] } })
     const runner = new CheckRunner({ workdir: dir, config, cacheDir: join(dir, 'cache'), runDir: join(dir, 'run') })
-    const result = await runner.run({ activity: 'check', check: 'mechanical', release: 'target', e2eScope: 'full' }, RELEASE)
+    const result = await runner.run({ activity: 'check', check: 'mechanical', release: 'target', e2eBaseline: [] }, RELEASE)
     assert.equal(result.outcome, 'fail')
     assert.equal(result.fingerprint, 'mechanical: error TS2304: cannot find name')
     assert.ok(result.detail.length <= 2_001)
@@ -51,7 +51,7 @@ test('a plugin that declares no command is a skipped mechanical check, not a pas
   try {
     plugin(dir)
     const runner = new CheckRunner({ workdir: dir, config: parseConfig({}), cacheDir: join(dir, 'cache'), runDir: join(dir, 'run') })
-    const result = await runner.run({ activity: 'check', check: 'mechanical', release: 'target', e2eScope: 'full' }, RELEASE)
+    const result = await runner.run({ activity: 'check', check: 'mechanical', release: 'target', e2eBaseline: [] }, RELEASE)
     assert.equal(result.outcome, 'skipped')
   } finally {
     cleanup()
@@ -68,10 +68,10 @@ test('a source release that does not install leaves the baseline unknown; a targ
     writeFileSync(join(dir, 'bin', 'npm'), '#!/bin/sh\nif [ "$1" = view ]; then echo \'{"0.0.1-rc.1":"2026-01-01T00:00:00.000Z","0.2.0":"2026-09-01T00:00:00.000Z"}\'; exit 0; fi\necho "npm error ERESOLVE could not resolve" >&2\nexit 1\n', { mode: 0o755 })
     process.env.PATH = `${join(dir, 'bin')}:${path ?? ''}`
     const runner = new CheckRunner({ workdir: dir, config: parseConfig({}), cacheDir: join(dir, 'cache'), runDir: join(dir, 'run') })
-    const source = await runner.run({ activity: 'check', check: 'boot', release: 'source', e2eScope: 'full' }, { tag: 'dsh-v0.0.1-rc.1', version: '0.0.1-rc.1' })
+    const source = await runner.run({ activity: 'check', check: 'boot', release: 'source', e2eBaseline: [] }, { tag: 'dsh-v0.0.1-rc.1', version: '0.0.1-rc.1' })
     assert.equal(source.outcome, 'skipped')
     assert.match(source.detail, /could not install dsh 0\.0\.1-rc\.1 for the checks: npm error ERESOLVE/)
-    await assert.rejects(runner.run({ activity: 'check', check: 'boot', release: 'target', e2eScope: 'full' }, RELEASE), /could not install dsh 0\.2\.0/)
+    await assert.rejects(runner.run({ activity: 'check', check: 'boot', release: 'target', e2eBaseline: [] }, RELEASE), /could not install dsh 0\.2\.0/)
   } finally {
     process.env.PATH = path
     cleanup()
@@ -199,7 +199,7 @@ test('a tree whose plugins all have a browser half leaves the boot check to the 
     mkdirSync(join(dir, 'cache', 'dsh-0.2.0', 'bin'), { recursive: true })
     writeFileSync(join(dir, 'cache', 'dsh-0.2.0', 'bin', 'dsh'), '#!/bin/sh\nexit 1\n', { mode: 0o755 })
     const runner = new CheckRunner({ workdir: dir, config: parseConfig({}), cacheDir: join(dir, 'cache'), runDir: join(dir, 'run') })
-    const result = await runner.run({ activity: 'check', check: 'boot', release: 'target', e2eScope: 'full' }, RELEASE)
+    const result = await runner.run({ activity: 'check', check: 'boot', release: 'target', e2eBaseline: [] }, RELEASE)
     assert.equal(result.outcome, 'skipped')
     assert.match(result.detail, /web check loads them/)
   } finally {

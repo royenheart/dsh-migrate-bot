@@ -9,9 +9,11 @@ docs/design/evaluation.md defines the subjects.
 * `session` and `session+skills` run one agent session with the task statement
   as its task, in `/app`.
 * `pipeline` and `pipeline+skills` run `dsh-migrate run` on a copy of the
-  fixture, as a consumer repository with publishing off, and apply the tree it
-  would propose to `/app/fixture`. The task statement is not read: the pipeline
-  takes its target from the dsh release installed in the task container.
+  fixture, as a consumer repository with publishing off and the default checks,
+  and apply the tree it would propose to `/app/fixture`. The task statement is
+  not read: the pipeline takes its target from the dsh release installed in
+  the task container. Their setup installs the Playwright and Chromium of the
+  image, which the end-to-end check runs.
 
 Every subject runs in the pinned agent runtime of `container/agent-runtime`,
 installed apart from the task's own dsh, with the migrate profile in
@@ -45,6 +47,7 @@ SKILLS_DIR = "/opt/dsh-migrate-skills"
 SKILL = "plugin-upgrade"
 WORK = "/tmp/dsh-migrate-bench"
 STATUS_PREFIX = "dsh-migrate-status:"
+BROWSERS = "/ms-playwright"
 
 
 class DshAgent(BaseAgent):
@@ -98,6 +101,14 @@ class DshAgent(BaseAgent):
         # A runtime that cannot start a session fails the setup, which Harbor
         # records before the agent runs: an infrastructure failure, not a score.
         await self._exec(environment, f"DSH_BIN={DSH} DSH_HOME={DSH_HOME} dsh-migrate self-test", timeout_sec=300)
+        if self._subject.startswith("pipeline"):
+            # As the image does: the suite pins the same Playwright and finds its browser here.
+            version = (await self._exec(environment, f"node -p \"require('{self._app_root}/dist/src/e2e/suite.js').PLAYWRIGHT_VERSION\"")).strip()
+            await self._exec(environment, (
+                f"npm install -g --no-audit --no-fund playwright@{version}"
+                f" && apt-get update -qq && PLAYWRIGHT_BROWSERS_PATH={BROWSERS} playwright install --with-deps chromium"
+                " && rm -rf /var/lib/apt/lists/*"
+            ), timeout_sec=1800)
 
     @override
     async def run(self, instruction: str, environment: BaseEnvironment, context: AgentContext) -> None:
@@ -147,14 +158,13 @@ class DshAgent(BaseAgent):
         config = {
             "secrets": {"apiKeyEnv": "DEEPSEEK_API_KEY"},
             "agent": {"provider": self._provider, "model": self._model, "upgradeSkills": self._skills},
-            "checks": {"e2e": {"enabled": False}},
         }
         await self._exec(environment, (
             f"rm -rf {plugin} && cp -R /app/fixture {plugin} && rm -rf {plugin}/.git && cd {plugin} && git init -q && git add -A"
             " && git -c user.name=bench -c user.email=bench@local commit -qm baseline"
             f" && printf '%s' {shlex.quote(json.dumps(config))} > {WORK}/config.json"
         ))
-        env = {"DEEPSEEK_API_KEY": api_key, "DSH_BIN": DSH, "DSH_HOME": DSH_HOME, "DSH_MIGRATE_SKILLS_DIR": SKILLS_DIR, "CI": "1"}
+        env = {"DEEPSEEK_API_KEY": api_key, "DSH_BIN": DSH, "DSH_HOME": DSH_HOME, "DSH_MIGRATE_SKILLS_DIR": SKILLS_DIR, "PLAYWRIGHT_BROWSERS_PATH": BROWSERS, "CI": "1"}
         options = f"--workdir {plugin} --config {WORK}/config.json"
         result = await environment.exec(command=f"dsh-migrate run {options} --target {shlex.quote(target)} --skip-github", env=env)
         status = json.loads(await self._exec(environment, f"dsh-migrate status {options}", env=env))

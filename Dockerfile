@@ -37,9 +37,10 @@ RUN set -eux; \
   npm ci --omit=dev; \
   ln -s /opt/agent-runtime/node_modules/.bin/dsh /usr/local/bin/dsh
 
-# Headless Chromium for the agent-authored end-to-end suite. Browsers live in a
-# shared path so a plugin's own playwright resolves them without re-downloading;
-# the system libraries come from --with-deps.
+# Headless Chromium for the end-to-end suite. Browsers live in a shared path so
+# the suite's @playwright/test, pinned to this version (PLAYWRIGHT_VERSION in
+# src/e2e/suite.ts), resolves them without downloading; the system libraries
+# come from --with-deps.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN set -eux; \
   npm install -g playwright@1.61.1; \

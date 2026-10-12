@@ -16,7 +16,6 @@ export function settings(overrides: Partial<Settings> = {}): Settings {
     maxAttempts: 2,
     e2eFailurePolicy: 'advisory',
     checks: { boot: false, web: false, e2e: false },
-    e2eSubsetFirst: false,
     publish: true,
     reportChannels: [],
     ...overrides,

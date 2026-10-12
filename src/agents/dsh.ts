@@ -156,6 +156,7 @@ export function createDshRunner(options: {
         DSH_MIGRATE_APP_ROOT: PACKAGE_ROOT,
       }
       if (request.usageLimit !== undefined) env.DSH_MIGRATE_USAGE_LIMIT = String(request.usageLimit)
+      Object.assign(env, request.env)
       if (options.dshHome !== undefined) env.DSH_HOME = options.dshHome
 
       let lastUsage: SessionProgress | undefined

@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { git, gitOut } from './run.ts'
 
@@ -85,4 +86,36 @@ export function defaultBranch(cwd: string): string {
   const head = git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], { cwd })
   if (head.status === 0 && head.stdout.trim() !== '') return head.stdout.trim().replace(/^origin\//, '')
   return gitOut(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd })
+}
+
+/**
+ * Put the tree back to `HEAD`: tracked files restored, untracked ones removed,
+ * ignored paths kept. Only for a tree that has no change of its own yet.
+ */
+
+/** Run `body` on a scratch index, leaving the repository's own index alone. */
+function withScratchIndex<T>(cwd: string, body: (env: NodeJS.ProcessEnv) => T): T {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-migrate-index-'))
+  try {
+    return body({ ...process.env, GIT_INDEX_FILE: join(dir, 'index') })
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+/** The working tree as a git tree, ignored files excepted. */
+export function snapshotTree(cwd: string): string {
+  return withScratchIndex(cwd, env => {
+    gitOut(['add', '-A', '--', '.'], { cwd, env })
+    return gitOut(['write-tree'], { cwd, env })
+  })
+}
+
+/** Put the working tree back to a snapshot: its files restored, files it lacks removed, ignored files kept. */
+export function restoreTree(cwd: string, tree: string): void {
+  withScratchIndex(cwd, env => {
+    gitOut(['read-tree', tree], { cwd, env })
+    gitOut(['checkout-index', '--all', '--force'], { cwd, env })
+    gitOut(['clean', '--force', '-d', '--quiet'], { cwd, env })
+  })
 }

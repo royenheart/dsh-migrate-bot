@@ -178,7 +178,6 @@ function migrationInput(runtime: Runtime, target: MigrationInput['target'], veri
       maxAttempts: config.repair.maxAttempts,
       e2eFailurePolicy: config.checks.e2e.failurePolicy,
       checks: { boot: config.checks.boot.enabled, web: config.checks.web.enabled, e2e: config.checks.e2e.enabled },
-      e2eSubsetFirst: config.checks.e2e.subsetFirst,
       publish: runtime.github !== undefined,
       reportChannels: resolveChannels(config).filter(channel => channel.enabled).map(channel => channel.id),
     },

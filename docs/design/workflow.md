@@ -27,12 +27,12 @@ The machine performs no I/O. A state that needs work declares one `run` entry ac
 The lifecycle, in order:
 
 1. **Pre-migration boot checks.** When the boot check is enabled, the unmodified tree is booted on the source release and on the target release. The two results classify a failure as a regression, pre-existing, or unaffected (`src/domain/outcome.ts`); the repair prompt and the proposal state the class.
-2. **Initial checks.** Under the `when-checks-fail` review policy, and when the unmodified tree did not fail to boot on the target, every check runs on the unmodified tree. If all pass, the migration concludes without an agent session.
-3. **Reviews.** The overlap review and the extension-point review run once. Both may edit the tree.
-4. **Checks and repair attempts.** A pass of checks runs after the reviews and after every repair attempt. A failing check leads to a repair attempt while attempts are left and the failure fingerprint differs from the one the previous attempt was given; otherwise the migration fails, unless the only failure is an end-to-end check under the `advisory` policy.
-5. **Final checks.** When the attempt pass ran only a subset of the end-to-end suite, the whole suite runs once more.
-6. **End-to-end authoring.** An agent session writes or extends the suite on its own branch. Its failure becomes a warning in the proposal and never stops the migration.
-7. **Conclusion.** An unchanged tree ends `compatible`. A changed tree becomes a proposal, or ends `unpublished` when publishing is off.
+2. **End-to-end baseline.** When the end-to-end check is enabled and a source release is known, the suite runs against the unmodified tree on the source release, written first by an agent session when its branch has none. The tests that pass are the end-to-end baseline the later checks hold the target to; when none pass, the proposal carries a warning ([the checks design](checks.md#the-end-to-end-suite-and-its-baseline)).
+3. **Initial checks.** Under the `when-checks-fail` review policy, and when the unmodified tree did not fail to boot on the target, every check runs on the unmodified tree. If all pass, the migration concludes without an agent session.
+4. **Reviews.** The overlap review and the extension-point review run once. Both may edit the tree.
+5. **Checks and repair attempts.** A pass of checks runs after the reviews and after every repair attempt. A failing check leads to a repair attempt while attempts are left and the failure fingerprint differs from the one the previous attempt was given; otherwise the migration fails, unless the only failure is an end-to-end check without an end-to-end baseline under the `advisory` policy.
+6. **Conclusion.** An unchanged tree ends `compatible`. A changed tree becomes a proposal, or ends `unpublished` when publishing is off.
+7. **Publishing the suite.** After the conclusion, so the proposal never waits for it, the suite is pushed to its branch; without an end-to-end baseline, an agent session first writes or extends it against the migrated tree, and whatever that session leaves in the tree is put back. A failure becomes a warning and never changes the conclusion. The suite is published when an end-to-end baseline was recorded or the tree went through the reviews; an unchanged tree that passed its initial checks without a baseline has nothing new to check.
 8. **Waiting for the merge.** The proposal waits in `awaitingMerge`. A merge starts the reporting pass and then `accepted`; a close without merge ends `rejected`; a later migration that takes over the proposal ends it `superseded`.
 
 The checks of each pass are listed in the reference under *Check passes*; [the checks design](checks.md) explains each check.
@@ -46,7 +46,7 @@ Each invariant is a fast-check property over generated runs of the machine (`tes
 | I1 | At most one open proposal per consumer; a newer release takes over the open proposal instead of opening a second | `decideStart` inherits the open proposal; a migration publishes at most once |
 | I2 | A release is verified only by a compatible migration or a merged proposal | The projection |
 | I3 | The repair loop runs at most `repair.maxAttempts` attempts and stops early only on a repeated failure fingerprint or an upstream blocker with every evidence field | The `canRepair` and `blockerValid` guards |
-| I4 | Nothing is concluded from a tree whose last pass failed, except an advisory end-to-end failure | The `evaluating` state |
+| I4 | Nothing is concluded from a tree whose last pass failed, except an advisory end-to-end failure without an end-to-end baseline | The `evaluating` state |
 | I5 | A channel does not receive the same merge report twice unless the report is resent | `delivered` in the context |
 | I6 | A comment delivered twice is handled once | The `newComment` guard; the reply marker |
 | I7 | A spend-cap breach ends the migration before anything is published | The `spendCap` guard |
@@ -91,7 +91,8 @@ A run also stops before the machine starts when the agent runtime fails its self
 |---|---|---|
 | `check` | None outside the job | — |
 | `session` | API spend | Not repeated: a job that dies before publishing restarts the migration from its start |
-| `authorE2E` | Pushes the suite branch | The branch is rebuilt and force-pushed with a lease |
+| `characterize` | API spend when a session writes the suite; nothing is pushed | Not repeated, like `session` |
+| `publishE2E` | Pushes the suite branch | The commit's parent is the branch tip it read, so a repeat with the same suite is `unchanged` and a concurrent push is refused, not overwritten |
 | `inspectTree` | None | — |
 | `publishProposal` | Pushes `dsh-migrate/proposal`; creates or updates the issue and the pull request; comments the patch reports | The branch is force-pushed; the issue and pull request are the inherited ones or the open ones carrying the proposal marker; the comments carry a marker per migration |
 | `deliverReport` | Creates an issue or a discussion in the channel's repository | The log records each delivery before the next one, and the machine skips channels that already took the report |

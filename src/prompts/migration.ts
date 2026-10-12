@@ -47,7 +47,7 @@ You receive:
 - A note on what the plugin did before this migration
 - The reports of earlier repair attempts, when this is not the first one
 
-The failure can come from any check: the mechanical checks (typecheck, build, unit tests), the boot check (the plugin did not load, threw during apply, waited forever on a service, or hung the host), the web check, or the end-to-end suite.
+The failure can come from any check: the mechanical checks (typecheck, build, unit tests), the boot check (the plugin did not load, threw during apply, waited forever on a service, or hung the host), the web check, or the end-to-end suite. An end-to-end failure lists the tests that passed against the unmodified plugin on the source release and no longer pass: a feature a user could reach before this migration and cannot now.
 
 Rules:
 - Use the two review reports as the source of intent. Do not reopen product-scope debates.

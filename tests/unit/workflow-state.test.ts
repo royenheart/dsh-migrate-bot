@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { decideStart } from '../../src/workflow/start.ts'
 import { badgeOf } from '../../src/workflow/badge.ts'
-import { input, logOf, proposal, proposedEvents, projectionOf } from '../support/migration.ts'
+import { input, logOf, proposal, proposedEvents, projectionOf, settings } from '../support/migration.ts'
 import type { MigrationEvent } from '../../src/workflow/model.ts'
 
 const compatible: MigrationEvent[] = [
@@ -70,4 +70,17 @@ test('the badge shows the verified release and what happened to a newer one', ()
     '0.2.0': logOf(input('0.2.0'), proposedEvents()),
   }))
   assert.deepEqual([proposed.message, proposed.color], ['dsh-v0.1.7 | dsh-v0.2.0 proposed', 'yellow'])
+})
+
+test('the end-to-end suite is published after the proposal, which stays open meanwhile', () => {
+  const withSuite = input('0.2.0', { settings: settings({ checks: { boot: false, web: false, e2e: true } }) })
+  const proposed = proposedEvents(proposal(9)).map(event => event.type === 'check.done' && event.result.outcome === 'pass'
+    ? [event, { type: 'check.done' as const, result: { check: 'e2e' as const, outcome: 'pass' as const, fingerprint: '', detail: '' } }]
+    : [event]).flat()
+  const publishing = projectionOf({ '0.2.0': logOf(withSuite, proposed) })
+  assert.equal(publishing.migrations[0]?.state, 'publishingE2E')
+  assert.equal(publishing.open?.context.proposal?.pullRequest.number, 9)
+  const settled = projectionOf({ '0.2.0': logOf(withSuite, [...proposed, { type: 'e2e.published', outcome: 'failed', detail: 'push refused' }]) })
+  assert.equal(settled.migrations[0]?.state, 'awaitingMerge')
+  assert.deepEqual(settled.migrations[0]?.context.warnings, ['end-to-end suite not updated: push refused'])
 })

@@ -19,8 +19,10 @@ function scripted(published: Proposal, calls: ActivityRequest[] = []): ActivityR
           event: { type: 'session.done', kind: request.kind, outcome: 'completed', blocker: 'none', detail: '', report: `reports/${request.kind}.md` },
           files: new Map([[`reports/${request.kind}.md`, `# ${request.kind}\n`]]),
         }
-      case 'authorE2E':
-        return { event: { type: 'e2e.authored', outcome: 'unchanged', detail: '' } }
+      case 'characterize':
+        return { event: { type: 'e2e.characterized', outcome: 'skipped', baseline: [], detail: '' } }
+      case 'publishE2E':
+        return { event: { type: 'e2e.published', outcome: 'unchanged', detail: '' } }
       case 'inspectTree':
         return { event: { type: 'tree.inspected', changed: true, files: 1 } }
       case 'publishProposal':

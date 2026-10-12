@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { PLAYWRIGHT_VERSION } from '../../src/e2e/suite.ts'
 import { appRootFrom } from '../../src/paths.ts'
 
 const root = appRootFrom(import.meta.url)
@@ -11,6 +12,10 @@ test('the image ships a browser for the agent-authored end-to-end suite', () => 
   // Without this layer every E2E run fails at launch, and only at runtime.
   assert.match(dockerfile, /playwright install --with-deps chromium/)
   assert.match(dockerfile, /ENV PLAYWRIGHT_BROWSERS_PATH=/)
+})
+
+test('the suite pins the Playwright of the image, so its browser build is the one installed', () => {
+  assert.equal(/npm install -g playwright@(\S+);/.exec(dockerfile)?.[1], PLAYWRIGHT_VERSION)
 })
 
 test('every slow or mirrored download is a build argument', () => {

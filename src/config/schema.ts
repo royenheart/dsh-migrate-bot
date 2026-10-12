@@ -77,17 +77,12 @@ export const configSchema = z.strictObject({
     boot: checkSchema(180_000, 'boot check').prefault({}),
     web: checkSchema(120_000, 'web check').prefault({}),
     e2e: z.strictObject({
-      enabled: z.boolean().default(true).describe('Run and maintain the agent-authored end-to-end suite.'),
-      branch: branchName.default('dsh-migrate/e2e').describe('Branch that holds the end-to-end suite.'),
-      baseRef: z.string().min(1).default('migration')
-        .describe('Ref the suite branch is rebased onto; `migration` means the consumer default branch.'),
-      forceRebase: z.boolean().default(true).describe('Rebase the suite branch onto `baseRef` before updating it.'),
-      dir: relativeDir.default('e2e').describe('Directory for a new suite when the repository has no end-to-end framework.')
+      enabled: z.boolean().default(true).describe('Record an end-to-end baseline on the source release, check it on the target, and keep the suite on its branch.'),
+      branch: branchName.default('dsh-migrate/e2e').describe('Branch that holds the end-to-end suite and nothing else.'),
+      dir: relativeDir.default('e2e').describe('Directory of the suite on its branch.')
         .transform(normalizeDir),
       failurePolicy: z.enum(E2E_FAILURE_POLICIES).default('advisory')
-        .describe('`advisory` reports an end-to-end failure in the proposal; `blocking` fails the migration.'),
-      subsetFirst: z.boolean().default(true)
-        .describe('During repair attempts, run only previously failing tests plus smoke tests.'),
+        .describe('Without an end-to-end baseline, `advisory` reports a failing test in the proposal and `blocking` fails the migration. With one, a test that passed on the source release and fails on the target always fails the migration.'),
     }).prefault({}),
   }).prefault({}),
   timeouts: z.strictObject({

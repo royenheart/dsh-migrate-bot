@@ -45,7 +45,7 @@ export async function botSnapshot(root: string = REPO_ROOT): Promise<Map<string,
     withHarnessContext: (prompt: string, harness: typeof HARNESS) => string
     assembleRepairPrompt: (input: Record<string, unknown>) => string
   }>(root, 'src/prompts/migration.js')
-  const e2e = await load<{ renderAuthoringBrief: (input: Record<string, unknown>) => string }>(root, 'src/e2e/branch.js')
+  const e2e = await load<{ renderAuthoringBrief: (input: Record<string, unknown>) => string }>(root, 'src/e2e/suite.js')
   const reports = await load<{ channelPrompt: (channel: { id: string }, evidence: string) => string }>(root, 'src/prompts/reports.js')
   const channels = await load<{ BUILTIN_CHANNELS: Record<string, unknown> }>(root, 'src/merge-reports/channels.js')
   const upgrade = await load<{ UPGRADE_SKILLS: readonly string[] }>(root, 'src/skills/upgrade.js')
@@ -65,14 +65,7 @@ export async function botSnapshot(root: string = REPO_ROOT): Promise<Map<string,
       harness: HARNESS,
       baselineNote: '<how the unmodified plugin booted on the source and target releases>',
     })],
-    ['prompts/e2e-authoring.md', e2e.renderAuthoringBrief({
-      workdir: '<plugin checkout>',
-      suiteDir: '<suite directory>',
-      framework: undefined,
-      dshTag: HARNESS.tag,
-      pluginName: '<plugin name>',
-      stagingDir: '<staging directory>',
-    })],
+    ['prompts/e2e-authoring.md', e2e.renderAuthoringBrief({ suiteDir: '<suite directory>', plugins: '<plugin names>', release: '<release tag>', existing: false })],
     ...Object.keys(channels.BUILTIN_CHANNELS).sort().map((id): [string, string] => [`prompts/report-${id}.md`, reports.channelPrompt({ id }, '<evidence of the merged proposal>')]),
     ['runtime/agent-runtime.json', readFileSync(join(root, 'container', 'agent-runtime', 'package.json'), 'utf8')],
     ...readdirSync(join(root, 'container', 'profile')).sort().map((name): [string, string] => [`runtime/profile/${name}`, readFileSync(join(root, 'container', 'profile', name), 'utf8')]),

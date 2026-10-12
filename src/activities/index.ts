@@ -5,7 +5,7 @@ import { renderProposal } from '../github/templates.ts'
 import { runReportChannel, type ReportDeps } from '../merge-reports/run.ts'
 import { CheckRunner } from './checks.ts'
 import { SessionRunner } from './sessions.ts'
-import { authorE2ESuite } from './e2e-suite.ts'
+import { characterize, publishE2E, type E2EDeps } from './e2e-suite.ts'
 import { publishProposal } from './proposal.ts'
 import type { ActivityRunner } from '../engine.ts'
 import type { AgentRunner } from '../agents/types.ts'
@@ -61,6 +61,7 @@ export function createActivities(deps: ActivityDeps): ActivityRunner {
     return sessions
   }
   const reports: Map<string, string> = new Map()
+  const e2eDeps: E2EDeps = { workdir: deps.workdir, config: deps.config, agent: deps.agent, apiKey: deps.apiKey ?? '', runDir, install: release => checks.install(release) }
 
   return async (request, context) => {
     switch (request.activity) {
@@ -76,10 +77,10 @@ export function createActivities(deps: ActivityDeps): ActivityRunner {
         for (const [path, text] of result.files) reports.set(path, text)
         return result
       }
-      case 'authorE2E':
-        return {
-          event: await authorE2ESuite({ workdir: deps.workdir, config: deps.config, agent: deps.agent, apiKey: deps.apiKey ?? '', runDir }, context),
-        }
+      case 'characterize':
+        return { event: await characterize(e2eDeps, context) }
+      case 'publishE2E':
+        return { event: await publishE2E(e2eDeps, context) }
       case 'inspectTree':
         return { event: { type: 'tree.inspected', changed: isTreeChanged(deps.workdir), files: changedPaths(deps.workdir).length } }
       case 'publishProposal': {

@@ -11,6 +11,8 @@ export interface AgentRequest {
   apiKey: string
   usageSoFar?: number | undefined
   usageLimit?: number | undefined
+  /** Environment the session's tools see, such as the address of a running `dsh web`. */
+  env?: Record<string, string> | undefined
 }
 
 export interface AgentResult {

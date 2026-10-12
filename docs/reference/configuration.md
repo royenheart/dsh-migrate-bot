@@ -27,13 +27,10 @@ A consumer configures the Action in `.github/dsh-migrate.yml`. Every key is opti
 | `checks.boot.timeoutMs` | integer | `180000` | Watchdog for one boot check, in milliseconds. |
 | `checks.web.enabled` | boolean | `true` | Run the web check. |
 | `checks.web.timeoutMs` | integer | `120000` | Watchdog for one web check, in milliseconds. |
-| `checks.e2e.enabled` | boolean | `true` | Run and maintain the agent-authored end-to-end suite. |
-| `checks.e2e.branch` | string | `dsh-migrate/e2e` | Branch that holds the end-to-end suite. |
-| `checks.e2e.baseRef` | string | `migration` | Ref the suite branch is rebased onto; `migration` means the consumer default branch. |
-| `checks.e2e.forceRebase` | boolean | `true` | Rebase the suite branch onto `baseRef` before updating it. |
-| `checks.e2e.dir` | string | `e2e` | Directory for a new suite when the repository has no end-to-end framework. |
-| `checks.e2e.failurePolicy` | `advisory` \| `blocking` | `advisory` | `advisory` reports an end-to-end failure in the proposal; `blocking` fails the migration. |
-| `checks.e2e.subsetFirst` | boolean | `true` | During repair attempts, run only previously failing tests plus smoke tests. |
+| `checks.e2e.enabled` | boolean | `true` | Record an end-to-end baseline on the source release, check it on the target, and keep the suite on its branch. |
+| `checks.e2e.branch` | string | `dsh-migrate/e2e` | Branch that holds the end-to-end suite and nothing else. |
+| `checks.e2e.dir` | string | `e2e` | Directory of the suite on its branch. |
+| `checks.e2e.failurePolicy` | `advisory` \| `blocking` | `advisory` | Without an end-to-end baseline, `advisory` reports a failing test in the proposal and `blocking` fails the migration. With one, a test that passed on the source release and fails on the target always fails the migration. |
 | `timeouts.agentMs` | integer | `3600000` | Watchdog for one agent session. |
 | `timeouts.commandMs` | integer | `1200000` | Watchdog for one mechanical command. |
 | `timeouts.checkoutMs` | integer | `600000` | Watchdog for the harness checkout. |

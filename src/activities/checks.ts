@@ -1,11 +1,12 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { runMechanical } from '../mechanical/run.ts'
 import { declaresClient, findPlugins } from '../plugins.ts'
 import { bootProbe, normalizeSignature } from '../verify/boot.ts'
 import { ensureDsh } from '../verify/dsh-install.ts'
-import { hasClientSurface, webSmoke } from '../verify/web.ts'
-import { runE2E } from '../e2e/run.ts'
+import { hasClientSurface, startWebHost, webSmoke } from '../verify/web.ts'
+import { readSuite, runSuite, type SuiteRun } from '../e2e/suite.ts'
+import { suiteDirOf } from './e2e-suite.ts'
 import type { MigrateConfig } from '../config/schema.ts'
 import type { ActivityRequest } from '../workflow/machine.ts'
 import type { CheckName, CheckResult, Release } from '../workflow/model.ts'
@@ -38,7 +39,6 @@ export interface CheckDeps {
 }
 
 export class CheckRunner {
-  private e2eFailing: string[] = []
   private sequence = 0
   /** The full output of the last failing check, for the next repair session. */
   lastFailure: { check: CheckName; output: string } | undefined
@@ -61,7 +61,7 @@ export class CheckRunner {
   }
 
   /** The dsh binary of a release, or why it could not be installed. */
-  private install(release: Release): { bin: string } | { failure: string } {
+  install(release: Release): { bin: string } | { failure: string } {
     const installed = ensureDsh(release.version, this.deps.cacheDir, { timeoutMs: this.deps.config.timeouts.commandMs })
     return installed.ok && installed.bin !== undefined ? { bin: installed.bin } : { failure: `could not install dsh ${release.version} for the checks: ${installed.detail}` }
   }
@@ -123,17 +123,26 @@ export class CheckRunner {
         return { outcome: smoke.ok ? 'pass' : 'fail', fingerprint: smoke.signature, output: smoke.detail }
       }
       case 'e2e': {
-        const run = runE2E({
-          workdir,
-          branch: config.checks.e2e.branch,
-          mode: request.e2eScope,
-          failing: this.e2eFailing,
-          worktreeDir: join(this.deps.runDir, 'e2e-worktree'),
-          timeoutMs: config.timeouts.commandMs,
-        })
-        this.e2eFailing = run.failedTests
-        if (run.skipped !== undefined) return { outcome: 'skipped', fingerprint: '', output: run.skipped }
-        return { outcome: run.ok ? 'pass' : 'fail', fingerprint: run.signature, output: run.detail }
+        // The suite the baseline was recorded with, or the one on the branch.
+        const suiteDir = suiteDirOf(this.deps.runDir)
+        const present = existsSync(join(suiteDir, 'package.json'))
+          || readSuite({ workdir, branch: config.checks.e2e.branch, dir: config.checks.e2e.dir, dest: suiteDir })
+        if (!present) return { outcome: 'skipped', fingerprint: '', output: `no suite on ${config.checks.e2e.branch} yet` }
+        const served = await startWebHost({ workdir, bin: this.dsh(release), timeoutMs: config.checks.web.timeoutMs, dshTag: release.tag })
+        if (!served.ok) return { outcome: 'fail', fingerprint: served.failure.signature, output: served.failure.detail }
+        let run: SuiteRun
+        try {
+          run = runSuite({ suiteDir, webUrl: served.host.url, timeoutMs: config.timeouts.commandMs })
+        } finally {
+          served.host.stop()
+        }
+        if (run.error !== undefined) return { outcome: 'fail', fingerprint: `e2e: ${normalizeSignature(run.error)}`, output: `${run.error}\n${run.output}` }
+        // With a baseline, a test fails the check when it passed on the source release and does not pass now.
+        const baseline = request.e2eBaseline
+        const broken = baseline.length > 0 ? baseline.filter(id => !run.passed.includes(id)) : run.failed
+        if (broken.length === 0) return { outcome: 'pass', fingerprint: '', output: `${String(run.passed.length)} test(s) passed` }
+        const heading = baseline.length > 0 ? 'These tests passed on the source release and do not pass now:' : 'These tests fail:'
+        return { outcome: 'fail', fingerprint: `e2e: ${[...broken].sort().join(' | ').slice(0, 300)}`, output: `${heading}\n${broken.map(id => `- ${id}${run.errors[id] === undefined ? '' : `: ${run.errors[id]}`}`).join('\n')}\n\n${run.output}` }
       }
     }
   }

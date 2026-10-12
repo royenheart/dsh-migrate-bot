@@ -168,7 +168,8 @@ function failingSuite(): { tree: string; deps: { cacheDir: string; runDir: strin
   const suite = join(root, 'suite')
   mkdirSync(suite)
   git(['init'], suite)
-  writeFileSync(join(suite, 'package.json'), JSON.stringify({ name: 'suite', private: true, scripts: { 'test:e2e': 'echo "1 failed" && exit 1' } }))
+  mkdirSync(join(suite, 'e2e'))
+  writeFileSync(join(suite, 'e2e', 'package.json'), JSON.stringify({ name: 'suite', private: true }))
   git(['add', '-A'], suite)
   git(['commit', '-m', 'suite'], suite)
   git(['push', bare, 'HEAD:refs/heads/dsh-migrate/e2e'], suite)
@@ -180,6 +181,10 @@ function failingSuite(): { tree: string; deps: { cacheDir: string; runDir: strin
   git(['add', '-A'], tree)
   git(['commit', '-m', 'plugin'], tree)
   git(['remote', 'add', 'origin', bare], tree)
+  // A dsh that exits at once: the web host never comes up, so the end-to-end check fails.
+  const bin = join(root, 'cache', `dsh-${RELEASE.version}`, 'bin')
+  mkdirSync(bin, { recursive: true })
+  writeFileSync(join(bin, 'dsh'), '#!/bin/sh\nexit 1\n', { mode: 0o755 })
   return {
     tree,
     deps: { cacheDir: join(root, 'cache'), runDir: join(root, 'run') },

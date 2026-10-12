@@ -1,6 +1,6 @@
 ---
 kind: design
-description: The four checks a migration runs, the agent runtime the sessions run in, and the end-to-end suite branch.
+description: The four checks a migration runs, the agent runtime the sessions run in, and the end-to-end suite and its baseline.
 ---
 
 # Checks and the agent runtime
@@ -12,7 +12,7 @@ A check looks at the plugin working tree under one release and produces a check 
 1. **Let the agent explore; classify nothing in advance.** A runtime failure shows up in open-ended ways: service collisions, duplicate slot registrations, renamed services, patch targets that disappeared. A fixed failure taxonomy would be wrong often, and a wrong label would enter every later repair prompt as a fact. The checks report what happened; the repair session interprets it.
 2. **Decide from evidence.** The repair loop continues while the failure fingerprint changes and stops on a repeated fingerprint, an upstream blocker with all evidence fields, the attempt limit, or the spend cap. It never stops on a guess about the cause.
 3. **Cheap checks first.** A pass stops at its first failure, and the repair session receives the output of that check only.
-4. **The repair session cannot edit the tests.** The end-to-end suite lives on its own branch, so a repair cannot make the suite pass by weakening it.
+4. **The repair session cannot edit the tests.** The end-to-end suite lives outside the plugin tree, on its own branch, so a repair cannot make the suite pass by weakening it.
 
 ## The four checks
 
@@ -21,7 +21,7 @@ A check looks at the plugin working tree under one release and produces a check 
 | `mechanical` | In each plugin's directory: the dependency contract, the plugin-shape scan, then `npm install`, the `@deepseek-ai/dsh-*` dependencies pinned to the release, and the plugin's `build`, `typecheck` and `test` scripts; `tests.commands` replaces the scripts | no | A dependency the release no longer publishes or a range that does not admit it; type, build and unit-test failures |
 | `boot` | Installs every plugin of the tree into one temporary profile and starts dsh | no | A plugin that fails to load, throws in `apply`, waits forever for a service, or hangs the host |
 | `web` | Starts `dsh web` headless with every plugin mounted and waits for the ready line; skipped when no plugin declares `dsh.client` | no | A web client that never attaches |
-| `e2e` | The agent-authored suite from the suite branch, overlaid on the tree; `subset` runs the previously failing tests and the smoke tests, `full` runs everything; skipped while no suite exists | no | Runtime behaviour, layout and console errors |
+| `e2e` | The suite from the suite branch, against a `dsh web` of the release serving every plugin; a test of the end-to-end baseline that no longer passes fails the check; skipped while no suite exists | no | A feature a user reached before the migration and can no longer reach, layout and console errors |
 
 A plugin is a directory whose `package.json` declares `dsh.bundle` (`src/plugins.ts`). A repository is one plugin at its root, or several below it, for example a host, a web and a tools plugin shipped together; then the mechanical check runs in each plugin's directory and reports every failing plugin by name, and the boot and web checks load all of them into one profile, as a user who installs them together does. One migration and one proposal cover every plugin, and the source release is the earliest release every plugin's ranges admit.
 
@@ -33,18 +33,19 @@ A plugin that declares no build, typecheck or test command produces a skipped me
 
 dsh's boot path ends by asserting that every entry activated, so it reports an import failure, an `apply` that threw, or an entry pending on a service nobody provides, and exits non-zero. The boot check gives dsh a placeholder key and points the model route at a closed port: reaching the credential or connection error proves the plugin tree assembled and activated, and the check costs nothing. dsh has no hang protection, so the check carries its own watchdog.
 
-## The end-to-end suite branch
+## The end-to-end suite and its baseline
 
-The suite is a durable asset; a proposal is a reviewed change. They are kept apart:
+The suite (`src/e2e/suite.ts`) is a self-contained Playwright project: its own `package.json` pinning `@playwright/test` to the image's Playwright, a configuration using Chromium, the specs, and an `index.json` with one row per user-visible feature. It never starts dsh. The Action serves the plugin tree with `dsh web` of a release and hands the suite the launch URL in `DSH_MIGRATE_WEB_URL`, so the same tests run against any release.
 
 | Decision | Value | Reason |
 |---|---|---|
-| Branch | `checks.e2e.branch`, default `dsh-migrate/e2e` | Never part of a proposal's diff, so a proposal stays reviewable and two migrations never conflict over the suite |
-| Base | Rebased onto the consumer's default branch (`checks.e2e.baseRef`) when `checks.e2e.forceRebase` is on | The tests describe the code they run against |
-| Discovery | An existing Playwright, Cypress or Vitest configuration, a `test:e2e` script, or an `e2e/` directory is extended; otherwise a suite is created under `checks.e2e.dir` | A plugin keeps one end-to-end stack |
-| Index | `index.json` lists every user-visible feature, how it is reached, what is asserted, the spec, and the release it last passed on; `files` lists what belongs to the suite | The index is the coverage record, and `files` lets a later run restore suite files after overlaying the plugin tree |
+| Location | `checks.e2e.dir` on `checks.e2e.branch` (default `dsh-migrate/e2e`), a branch that holds the suite and nothing else | Never part of a proposal's diff, so a proposal stays reviewable, two migrations never conflict over the suite, and a repair session never sees it |
+| Baseline | Before the migration changes anything, the suite runs against the unmodified tree on the source release; the tests that pass are the end-to-end baseline. When the branch has no suite yet, an agent session writes it first, against that same served tree | A test written against the source release and passing there describes what the plugin did, not what the migration made of it |
+| Check | After every review and repair, the suite runs on the target release. A baseline test that no longer passes fails the check, and its id enters the failure fingerprint and the repair prompt; a test outside the baseline cannot fail it | A failure means a feature broke in the migration, which the repair loop must fix |
+| Publishing | After the migration concludes, the suite is committed as `dir/` on the branch and pushed. Without a baseline (no source release, or the source release does not serve the plugins), a session first writes or extends the suite against the migrated tree on the target release | The next migration starts from the suite this one checked, and writing a suite never delays a proposal |
+| Index | `index.json` lists each feature, how a user reaches it, what is asserted, and the spec; `INDEX.md` renders it with the release it was last checked on | The index is the coverage record a maintainer reads |
 
-The suite is authored after the migration, so its first result is weak evidence: the agent wrote the tests it then passes. The default failure policy is therefore `advisory`, which reports a failure in the proposal; `blocking` makes it fail the migration once a suite with a passing history exists.
+A failure of a baseline test is a regression and is treated as one under either failure policy. Without a baseline, a suite was written against the migrated tree and passes by construction, so its result is weak evidence: under the default `advisory` policy its failure becomes a warning in the proposal, and `blocking` makes it fail the migration.
 
 ### Assertions
 
@@ -52,7 +53,7 @@ The suite is authored after the migration, so its first result is weak evidence:
 |---|---|---|
 | Structure | ARIA roles and accessible names, text content, geometry invariants (content clipped by its box, elements outside their parent's clip, occluded or collapsed elements), console and `pageerror` tripwires | no |
 | Timing | Drive to a state, then poll until two consecutive reads agree; never wait for network idle, which an open event stream never reaches | no |
-| Visual | `toHaveScreenshot()` with baselines on the suite branch | yes |
+| Visual | `toHaveScreenshot()` with reference images on the suite branch | yes |
 
 The suite uses Playwright with Chromium, as dsh tests its own web client, but asserts on roles and labels rather than dsh's internal `data-*` attributes, which change between releases.
 

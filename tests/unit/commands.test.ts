@@ -68,7 +68,6 @@ function migrationLog(options: {
       maxAttempts: 1,
       e2eFailurePolicy: 'advisory',
       checks: { boot: false, web: false, e2e: false },
-      e2eSubsetFirst: false,
       publish: true,
       reportChannels: options.channels ?? [],
     },

@@ -20,12 +20,13 @@ import type {
  */
 
 /** Which tree the checks look at, and therefore which checks run. */
-export type Scope = 'initial' | 'attempt' | 'final'
+export type Scope = 'initial' | 'attempt'
 
 export type ActivityRequest =
-  | { activity: 'check'; check: CheckName; release: 'source' | 'target'; e2eScope: 'subset' | 'full' }
+  | { activity: 'check'; check: CheckName; release: 'source' | 'target'; e2eBaseline: string[] }
+  | { activity: 'characterize' }
   | { activity: 'session'; kind: 'overlap' | 'extension-points' | 'repair'; attempt: number }
-  | { activity: 'authorE2E' }
+  | { activity: 'publishE2E' }
   | { activity: 'inspectTree' }
   | { activity: 'publishProposal' }
   | { activity: 'deliverReport'; channel: string }
@@ -43,6 +44,8 @@ export interface MigrationContext {
   /** Boot checks of the unmodified tree, on the source and on the target release. */
   sourceBoot: CheckResult | undefined
   targetBoot: CheckResult | undefined
+  /** End-to-end tests that passed on the source release; each must still pass on the target. */
+  e2eBaseline: string[]
   stoppedBy: StopReason | undefined
   warnings: string[]
   proposal: Proposal | undefined
@@ -52,6 +55,8 @@ export interface MigrationContext {
   pending: string[]
   /** Whether the proposal was merged. */
   merged: boolean
+  /** Where the migration ends once the end-to-end suite is published: the state it concluded in. */
+  concluded: 'compatible' | 'unpublished' | 'awaitingMerge' | undefined
   /** Comments whose `report` command was already handled. */
   comments: string[]
 }
@@ -60,21 +65,15 @@ export interface MigrationContext {
  * The checks one pass runs, in order.
  *
  * `initial` looks at the unmodified tree; when the pre-migration boot check on
- * the target already passed, boot is not run again. `attempt` runs after a review or a repair. `final`
- * re-runs the whole end-to-end suite when the attempt ran only a subset.
+ * the target already passed, boot is not run again. `attempt` runs after a review or a repair.
  */
 export function checksFor(scope: Scope, settings: Settings, bootPassed: boolean): CheckName[] {
   const enabled = (check: CheckName): boolean => check === 'mechanical' || settings.checks[check]
   const order: Record<Scope, CheckName[]> = {
     initial: ['mechanical', ...(bootPassed ? [] : ['boot'] as CheckName[]), 'web', 'e2e'],
     attempt: ['mechanical', 'boot', 'web', 'e2e'],
-    final: settings.e2eSubsetFirst ? ['e2e'] : [],
   }
   return order[scope].filter(enabled)
-}
-
-function e2eScopeOf(scope: Scope, settings: Settings): 'subset' | 'full' {
-  return scope === 'attempt' && settings.e2eSubsetFirst ? 'subset' : 'full'
 }
 
 type Guard = (args: { context: MigrationContext; event: MigrationEvent }) => boolean
@@ -89,11 +88,12 @@ export const GUARD_DESCRIPTIONS = {
   spendCap: 'The session was not run, or was stopped, because the spend cap was reached.',
   sessionFailed: 'The session crashed or exceeded its watchdog.',
   blockerValid: 'The repair report declared an upstream blocker with every evidence field.',
-  scopeIs: 'The current pass has the given scope.',
   notReviewed: 'The overlap and extension-point reviews have not run.',
   canRepair: 'Repair attempts are left, and the failure fingerprint differs from the one the last repair attempt was given.',
-  advisoryE2EFailure: 'The failing check is the end-to-end check and its failure policy is `advisory`.',
-  e2eEnabled: 'The end-to-end check is enabled.',
+  advisoryE2EFailure: 'The failing check is the end-to-end check, no end-to-end baseline was recorded, and the failure policy is `advisory`.',
+  characterizable: 'The end-to-end check is enabled and a source release is known.',
+  publishesE2E: 'The end-to-end check is enabled, and an end-to-end baseline was recorded or the tree went through a review.',
+  concludedIn: 'The migration concluded in the given state.',
   changedAndPublish: 'The tree changed and publishing is on.',
   changed: 'The tree changed.',
   proposalMerged: 'The closed pull request is this proposal, and it was merged.',
@@ -131,13 +131,14 @@ export const migrationMachine = setup({
     spendCap: sessionOutcome('spend-cap'),
     sessionFailed: sessionOutcome('failed'),
     blockerValid: ({ event }) => event.type === 'session.done' && event.blocker === 'valid',
-    scopeIs: ({ context }, params: { scope: Scope }) => context.scope === params.scope,
     notReviewed: ({ context }) => !context.reviewed,
     canRepair: ({ context }) => context.attempts < context.input.settings.maxAttempts
       && context.failure?.fingerprint !== context.lastFingerprint,
-    advisoryE2EFailure: ({ context }) => context.failure?.check === 'e2e'
+    advisoryE2EFailure: ({ context }) => context.failure?.check === 'e2e' && context.e2eBaseline.length === 0
       && context.input.settings.e2eFailurePolicy === 'advisory',
-    e2eEnabled: ({ context }) => context.input.settings.checks.e2e,
+    characterizable: ({ context }) => context.input.settings.checks.e2e && context.input.source !== undefined,
+    publishesE2E: ({ context }) => context.input.settings.checks.e2e && (context.e2eBaseline.length > 0 || context.reviewed),
+    concludedIn: ({ context }, params: { state: NonNullable<MigrationContext['concluded']> }) => context.concluded === params.state,
     changedAndPublish: ({ context, event }) => event.type === 'tree.inspected' && event.changed
       && context.input.settings.publish,
     changed: ({ event }) => event.type === 'tree.inspected' && event.changed,
@@ -161,12 +162,14 @@ export const migrationMachine = setup({
     failure: undefined,
     sourceBoot: undefined,
     targetBoot: undefined,
+    e2eBaseline: [],
     stoppedBy: undefined,
     warnings: [],
     proposal: undefined,
     delivered: [],
     pending: [],
     merged: false,
+    concluded: undefined,
     comments: [],
   }),
   initial: 'start',
@@ -178,12 +181,13 @@ export const migrationMachine = setup({
       always: [
         { guard: 'hasSource', target: 'sourceBoot' },
         { guard: 'bootEnabled', target: 'targetBoot' },
+        { guard: 'characterizable', target: 'characterizing' },
         { target: 'afterBaseline' },
       ],
     },
     sourceBoot: {
       description: 'Boot the unmodified tree on the source release, to classify the outcome.',
-      entry: { type: 'run', params: { activity: 'check', check: 'boot', release: 'source', e2eScope: 'full' } },
+      entry: { type: 'run', params: { activity: 'check', check: 'boot', release: 'source', e2eBaseline: [] } },
       on: {
         'check.done': {
           target: 'targetBoot',
@@ -193,11 +197,24 @@ export const migrationMachine = setup({
     },
     targetBoot: {
       description: 'Boot the unmodified tree on the target release.',
-      entry: { type: 'run', params: { activity: 'check', check: 'boot', release: 'target', e2eScope: 'full' } },
+      entry: { type: 'run', params: { activity: 'check', check: 'boot', release: 'target', e2eBaseline: [] } },
       on: {
-        'check.done': {
+        'check.done': [
+          { guard: 'characterizable', target: 'characterizing', actions: assign({ targetBoot: ({ event }) => event.result }) },
+          { target: 'afterBaseline', actions: assign({ targetBoot: ({ event }) => event.result }) },
+        ],
+      },
+    },
+    characterizing: {
+      description: 'Run the end-to-end suite, writing it first when there is none, against the unmodified tree on the source release; the tests that pass are the end-to-end baseline.',
+      entry: { type: 'run', params: { activity: 'characterize' } },
+      on: {
+        'e2e.characterized': {
           target: 'afterBaseline',
-          actions: assign({ targetBoot: ({ event }) => event.result }),
+          actions: assign({
+            e2eBaseline: ({ event }) => event.baseline,
+            warnings: ({ context, event }) => event.outcome === 'failed' ? [...context.warnings, `no end-to-end baseline: ${event.detail}`] : context.warnings,
+          }),
         },
       },
     },
@@ -256,7 +273,7 @@ export const migrationMachine = setup({
               activity: 'check',
               check: context.queue[0] as CheckName,
               release: 'target',
-              e2eScope: e2eScopeOf(context.scope, context.input.settings),
+              e2eBaseline: context.e2eBaseline,
             }),
           },
           on: {
@@ -273,16 +290,7 @@ export const migrationMachine = setup({
       },
     },
     checksPassed: {
-      always: [
-        { guard: { type: 'scopeIs', params: { scope: 'initial' } }, target: 'concluding' },
-        {
-          guard: { type: 'scopeIs', params: { scope: 'attempt' } },
-          target: 'checking',
-          actions: assign({ scope: 'final' }),
-        },
-        { guard: 'e2eEnabled', target: 'authoringE2E' },
-        { target: 'concluding' },
-      ],
+      always: { target: 'concluding' },
     },
     evaluating: {
       always: [
@@ -290,7 +298,7 @@ export const migrationMachine = setup({
         { guard: 'canRepair', target: 'repairing' },
         {
           guard: 'advisoryE2EFailure',
-          target: 'authoringE2E',
+          target: 'concluding',
           actions: assign({
             warnings: ({ context }) => [...context.warnings, `end-to-end check failed (advisory): ${context.failure?.fingerprint ?? ''}`],
           }),
@@ -321,28 +329,14 @@ export const migrationMachine = setup({
         ],
       },
     },
-    authoringE2E: {
-      description: 'An agent session writes or extends the end-to-end suite on its own branch. It never blocks.',
-      entry: { type: 'run', params: { activity: 'authorE2E' } },
-      on: {
-        'e2e.authored': {
-          target: 'concluding',
-          actions: assign({
-            warnings: ({ context, event }) => event.outcome === 'failed'
-              ? [...context.warnings, `end-to-end suite not updated: ${event.detail}`]
-              : context.warnings,
-          }),
-        },
-      },
-    },
     concluding: {
       description: 'Decide between a proposal and a compatible result from the state of the tree.',
       entry: { type: 'run', params: { activity: 'inspectTree' } },
       on: {
         'tree.inspected': [
           { guard: 'changedAndPublish', target: 'publishing' },
-          { guard: 'changed', target: 'unpublished' },
-          { target: 'compatible' },
+          { guard: 'changed', target: 'concluded', actions: assign({ concluded: 'unpublished' }) },
+          { target: 'concluded', actions: assign({ concluded: 'compatible' }) },
         ],
       },
     },
@@ -351,10 +345,37 @@ export const migrationMachine = setup({
       entry: { type: 'run', params: { activity: 'publishProposal' } },
       on: {
         'proposal.published': {
-          target: 'awaitingMerge',
-          actions: assign({ proposal: ({ event }) => event.proposal }),
+          target: 'concluded',
+          actions: assign({ proposal: ({ event }) => event.proposal, concluded: 'awaitingMerge' }),
         },
       },
+    },
+    concluded: {
+      always: [
+        { guard: 'publishesE2E', target: 'publishingE2E' },
+        { target: 'settled' },
+      ],
+    },
+    publishingE2E: {
+      description: 'Publish the end-to-end suite on its branch, writing or extending it first when there is no end-to-end baseline. It runs after the conclusion, so the proposal never waits for it, and it never blocks.',
+      entry: { type: 'run', params: { activity: 'publishE2E' } },
+      on: {
+        'e2e.published': {
+          target: 'settled',
+          actions: assign({
+            warnings: ({ context, event }) => event.outcome === 'failed'
+              ? [...context.warnings, `end-to-end suite not updated: ${event.detail}`]
+              : context.warnings,
+          }),
+        },
+      },
+    },
+    settled: {
+      always: [
+        { guard: { type: 'concludedIn', params: { state: 'awaitingMerge' } }, target: 'awaitingMerge' },
+        { guard: { type: 'concludedIn', params: { state: 'unpublished' } }, target: 'unpublished' },
+        { target: 'compatible' },
+      ],
     },
     awaitingMerge: {
       description: 'Wait for the maintainer to merge or close the proposal.',
