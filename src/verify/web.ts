@@ -1,9 +1,9 @@
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { classifyBoot, linkPlugins, writeProbeProfile, type BootProbeResult } from './boot.ts'
-import { findPlugins } from '../plugins.ts'
+import { declaresClient, findPlugins } from '../plugins.ts'
 
 /**
  * The web check: boot the real `dsh web` server with the plugin mounted
@@ -61,14 +61,27 @@ export interface WebSmokeOptions {
   homeDir?: string | undefined
   profile?: string | undefined
   readyPattern?: RegExp | undefined
+  /** The release's `dsh web --help`; read from the binary unless a test supplies it. */
+  webHelp?: string | undefined
+}
+
+/**
+ * The arguments that serve the web UI without opening a browser. Releases
+ * before `--no-open` existed do not open one, so the flag is passed only when
+ * the release's own help lists it.
+ */
+export function webArgs(help: string): string[] {
+  return ['web', '--port', '0', ...(help.includes('--no-open') ? ['--no-open'] : [])]
+}
+
+function webHelp(bin: string): string {
+  const result = spawnSync(bin, ['web', '--help'], { encoding: 'utf8', timeout: 60_000 })
+  return `${result.stdout ?? ''}${result.stderr ?? ''}`
 }
 
 /** Whether a plugin of the repository declares a browser surface through `dsh.client`. */
 export function hasClientSurface(workdir: string): boolean {
-  return findPlugins(workdir).some((plugin) => {
-    const client = (plugin.manifest.dsh as { client?: unknown }).client
-    return typeof client === 'object' && client !== null
-  })
+  return findPlugins(workdir).some(declaresClient)
 }
 
 /**
@@ -158,7 +171,8 @@ export async function webSmoke(options: WebSmokeOptions): Promise<WebSmokeResult
       DSH_TELEMETRY_DISABLED: '1',
     }
 
-    const result = await spawnImpl(['web', '--port', '0', '--no-open'], {
+    const help = options.webHelp ?? webHelp(options.bin)
+    const result = await spawnImpl(webArgs(help), {
       cwd: options.workdir,
       env,
       bin: options.bin,

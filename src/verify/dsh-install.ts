@@ -22,12 +22,38 @@ export interface DshInstallOptions {
   install?: ((prefix: string, version: string) => { ok: boolean; detail: string }) | undefined
 }
 
+/** How long after a release its own packages may still appear in the registry. */
+const PUBLISH_WINDOW_MS = 60 * 60 * 1000
+
+/**
+ * The npm arguments that install a release with the dependencies it was
+ * published with: `--before` excludes every version published after the
+ * release, so a later release of a transitive dependency cannot change it.
+ * A fresh install of an older release otherwise resolves today's Cordis and
+ * fails to boot for reasons the plugin has nothing to do with.
+ * @param published - when the release was published, ISO 8601.
+ */
+export function installArgs(prefix: string, version: string, published: string): string[] {
+  const before = new Date(Date.parse(published) + PUBLISH_WINDOW_MS).toISOString()
+  return ['install', '-g', '--prefix', prefix, '--no-fund', '--no-audit', '--before', before, `@deepseek-ai/dsh@${version}`]
+}
+
+function publishedAt(version: string, timeoutMs: number): string | undefined {
+  const result = spawnSync('npm', ['view', `@deepseek-ai/dsh@${version}`, 'time', '--json'], { encoding: 'utf8', timeout: timeoutMs, env: process.env })
+  if (result.status !== 0) return undefined
+  try {
+    const times = JSON.parse(result.stdout) as Record<string, unknown>
+    const published = times[version]
+    return typeof published === 'string' ? published : undefined
+  } catch {
+    return undefined
+  }
+}
+
 function npmInstall(prefix: string, version: string, timeoutMs: number): { ok: boolean; detail: string } {
-  const result = spawnSync(
-    'npm',
-    ['install', '-g', '--prefix', prefix, '--no-fund', '--no-audit', `@deepseek-ai/dsh@${version}`],
-    { encoding: 'utf8', timeout: timeoutMs, env: process.env },
-  )
+  const published = publishedAt(version, timeoutMs)
+  if (published === undefined) return { ok: false, detail: `the npm registry did not say when @deepseek-ai/dsh@${version} was published` }
+  const result = spawnSync('npm', installArgs(prefix, version, published), { encoding: 'utf8', timeout: timeoutMs, env: process.env })
   if (result.status !== 0) {
     const detail = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim().slice(-2000)
     return { ok: false, detail: detail === '' ? `npm install exited ${String(result.status)}` : detail }

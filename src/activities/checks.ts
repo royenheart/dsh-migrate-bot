@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { runMechanical } from '../mechanical/run.ts'
-import { findPlugins } from '../plugins.ts'
+import { declaresClient, findPlugins } from '../plugins.ts'
 import { bootProbe, normalizeSignature } from '../verify/boot.ts'
 import { ensureDsh } from '../verify/dsh-install.ts'
 import { hasClientSurface, webSmoke } from '../verify/web.ts'
@@ -106,7 +106,14 @@ export class CheckRunner {
           if (request.release === 'source') return { outcome: 'skipped', fingerprint: '', output: installed.failure }
           throw new Error(installed.failure)
         }
-        const probe = await bootProbe({ workdir, bin: installed.bin, dshTag: release.tag, timeoutMs: config.checks.boot.timeoutMs })
+        // A plugin with a browser half may need services only the web
+        // composition provides; the web check loads it there.
+        const plugins = findPlugins(workdir)
+        const headless = plugins.filter(plugin => !declaresClient(plugin))
+        if (plugins.length > 0 && headless.length === 0) {
+          return { outcome: 'skipped', fingerprint: '', output: 'every plugin has a browser half (dsh.client); the web check loads them in the web composition' }
+        }
+        const probe = await bootProbe({ workdir, bin: installed.bin, dshTag: release.tag, timeoutMs: config.checks.boot.timeoutMs, plugins: headless.length > 0 ? headless : undefined })
         return { outcome: probe.outcome === 'pass' ? 'pass' : 'fail', fingerprint: probe.signature, output: probe.detail }
       }
       case 'web': {

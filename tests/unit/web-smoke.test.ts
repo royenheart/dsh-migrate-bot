@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { hasClientSurface, scrubWebOutput, WEB_READY_PATTERN, webSmoke } from '../../src/verify/web.ts'
+import { hasClientSurface, scrubWebOutput, WEB_READY_PATTERN, webArgs, webSmoke } from '../../src/verify/web.ts'
 
 function plugin(fields: Record<string, unknown>): string {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-mig-web-'))
@@ -49,6 +49,7 @@ test('a server that reports ready passes, and the profile mounts the web bundle'
       workdir: dir,
       bin: '/bin/dsh',
       timeoutMs: 5_000,
+      webHelp: 'Options:\n  --host <host>\n  --no-open  do not open the Web UI\n',
       spawnImpl: async (args, options) => {
         seen = {
           args,
@@ -128,4 +129,10 @@ test('the live session token never reaches a report', async () => {
 test('the ready pattern matches what dsh web actually prints', () => {
   assert.equal(WEB_READY_PATTERN.test('dsh web: listening on http://127.0.0.1:4000'), true)
   assert.equal(WEB_READY_PATTERN.test('dsh: plugin(s) failed to load: x'), false)
+})
+
+test('the browser is kept closed with --no-open only where the release has the flag', () => {
+  assert.deepEqual(webArgs('Options:\n  --no-open  do not open the Web UI\n'), ['web', '--port', '0', '--no-open'])
+  // 0.1.0-rc.6 has no --no-open and opens no browser.
+  assert.deepEqual(webArgs('Options:\n  --host <host>\n  --port <port>\n'), ['web', '--port', '0'])
 })

@@ -208,6 +208,8 @@ export interface BootProbeOptions {
   profile?: string | undefined
   /** Kept on disk for inspection (implies the caller cleans up). */
   keepHome?: boolean | undefined
+  /** The plugins to load; every plugin of the tree when omitted. */
+  plugins?: readonly Plugin[] | undefined
 }
 
 /**
@@ -216,10 +218,9 @@ export interface BootProbeOptions {
  * bundle list, so Node resolution finds it exactly as an installed plugin.
  *
  * `patchReload: 'startup'` loads the profile's patches once instead of
- * watching them. Releases before 0.2 watch by default, which needs the Cordis
- * HMR service, and a fresh install of one of those releases resolves a Cordis
- * that no longer provides it, so every check against them failed whatever
- * the plugin did. Releases from 0.2 have no patch watching and ignore the field.
+ * watching them: a check boots once and exits, so it starts no watcher, as the
+ * benchmark suite's verifiers do not either. Releases from 0.2 have no patch
+ * watching and ignore the field.
  * @param home - scratch dsh home
  * @param profile - profile id inside that home
  * @param pluginName - package name of the plugin under test
@@ -260,7 +261,7 @@ export function linkPlugins(profileDir: string, workdir: string, plugins: readon
  * @param options - workdir, timeout, injectable spawn
  */
 export async function bootProbe(options: BootProbeOptions): Promise<BootProbeResult> {
-  const plugins = findPlugins(options.workdir)
+  const plugins = options.plugins ?? findPlugins(options.workdir)
   if (plugins.length === 0) {
     return {
       outcome: 'fail',

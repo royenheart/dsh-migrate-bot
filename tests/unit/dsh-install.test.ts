@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ensureDsh } from '../../src/verify/dsh-install.ts'
+import { ensureDsh, installArgs } from '../../src/verify/dsh-install.ts'
 
 function cacheRoot(): string {
   return mkdtempSync(join(tmpdir(), 'dsh-mig-cache-'))
@@ -101,4 +101,10 @@ test('two versions never share a prefix', () => {
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+test('a release is installed with the dependencies it was published with', () => {
+  assert.deepEqual(installArgs('/cache/dsh-0.1.0-rc.6', '0.1.0-rc.6', '2026-08-13T12:35:03.812Z'), [
+    'install', '-g', '--prefix', '/cache/dsh-0.1.0-rc.6', '--no-fund', '--no-audit', '--before', '2026-08-13T13:35:03.812Z', '@deepseek-ai/dsh@0.1.0-rc.6',
+  ])
 })

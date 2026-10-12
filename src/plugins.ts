@@ -62,6 +62,12 @@ export function findPlugins(root: string): Plugin[] {
   return found
 }
 
+/** Whether a plugin has a browser half (`dsh.client`), which only the web composition loads. */
+export function declaresClient(plugin: Plugin): boolean {
+  const client = (plugin.manifest.dsh as { client?: unknown }).client
+  return typeof client === 'object' && client !== null
+}
+
 /** The plugin names on one bounded line, for an issue, a summary or a prompt. */
 export function pluginNames(root: string): string {
   return inline(findPlugins(root).map(plugin => plugin.name).join(', '), 200) || 'plugin'

@@ -64,7 +64,8 @@ test('a source release that does not install leaves the baseline unknown; a targ
   try {
     plugin(dir)
     mkdirSync(join(dir, 'bin'))
-    writeFileSync(join(dir, 'bin', 'npm'), '#!/bin/sh\necho "npm error ERESOLVE could not resolve" >&2\nexit 1\n', { mode: 0o755 })
+    // The registry answers when each release was published; the install itself fails.
+    writeFileSync(join(dir, 'bin', 'npm'), '#!/bin/sh\nif [ "$1" = view ]; then echo \'{"0.0.1-rc.1":"2026-01-01T00:00:00.000Z","0.2.0":"2026-09-01T00:00:00.000Z"}\'; exit 0; fi\necho "npm error ERESOLVE could not resolve" >&2\nexit 1\n', { mode: 0o755 })
     process.env.PATH = `${join(dir, 'bin')}:${path ?? ''}`
     const runner = new CheckRunner({ workdir: dir, config: parseConfig({}), cacheDir: join(dir, 'cache'), runDir: join(dir, 'run') })
     const source = await runner.run({ activity: 'check', check: 'boot', release: 'source', e2eScope: 'full' }, { tag: 'dsh-v0.0.1-rc.1', version: '0.0.1-rc.1' })
@@ -186,6 +187,21 @@ test('the upgrade skills are loaded into and removed from the agent runtime home
     assert.deepEqual(readdirSync(join(home, 'skills')), ['my-own'])
     assert.throws(() => syncUpgradeSkills({ dshHome: home, enabled: true, source: join(dir, 'nowhere') }), /plugin-upgrade not found/)
     assert.equal(existsSync(join(home, 'skills', 'my-own')), true)
+  } finally {
+    cleanup()
+  }
+})
+
+test('a tree whose plugins all have a browser half leaves the boot check to the web check', async () => {
+  const { dir, cleanup } = scratch()
+  try {
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: '@acme/web', dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web' } } }))
+    mkdirSync(join(dir, 'cache', 'dsh-0.2.0', 'bin'), { recursive: true })
+    writeFileSync(join(dir, 'cache', 'dsh-0.2.0', 'bin', 'dsh'), '#!/bin/sh\nexit 1\n', { mode: 0o755 })
+    const runner = new CheckRunner({ workdir: dir, config: parseConfig({}), cacheDir: join(dir, 'cache'), runDir: join(dir, 'run') })
+    const result = await runner.run({ activity: 'check', check: 'boot', release: 'target', e2eScope: 'full' }, RELEASE)
+    assert.equal(result.outcome, 'skipped')
+    assert.match(result.detail, /web check loads them/)
   } finally {
     cleanup()
   }
