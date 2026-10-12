@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { runMechanical } from '../mechanical/run.ts'
 import { declaresClient, findPlugins } from '../plugins.ts'
 import { bootProbe, normalizeSignature } from '../verify/boot.ts'
+import { errorSummary } from '../mechanical/errors.ts'
 import { ensureDsh, publishedAt, releaseCutoff } from '../verify/dsh-install.ts'
 import { hasClientSurface, startWebHost, webSmoke } from '../verify/web.ts'
 import { readSuite, runSuite, type SuiteRun } from '../e2e/suite.ts'
@@ -89,7 +90,7 @@ export class CheckRunner {
         const failed = results.filter(({ result }) => !result.ok)
         if (failed.length > 0) {
           const first = failed[0] as (typeof failed)[number]
-          const firstError = first.result.errors.split('\n').find(line => line.trim() !== '') ?? 'mechanical checks failed'
+          const firstError = errorSummary(first.result.errors) || 'mechanical checks failed'
           return {
             outcome: 'fail',
             fingerprint: `mechanical: ${named ? `${first.plugin.name}: ` : ''}${normalizeSignature(firstError)}`,
