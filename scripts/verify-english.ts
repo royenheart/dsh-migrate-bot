@@ -10,7 +10,7 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { REPO_ROOT } from './repo.ts'
+import { REPO_ROOT, THIRD_PARTY } from './repo.ts'
 
 export interface EnglishViolation {
   file: string
@@ -31,7 +31,7 @@ export function nonLatinLetters(file: string, text: string): EnglishViolation[] 
 
 export function verifyEnglish(): EnglishViolation[] {
   const files = execFileSync('git', ['ls-files', '-z'], { cwd: REPO_ROOT, encoding: 'utf8' }).split('\0').filter(Boolean)
-  return files.flatMap((file) => {
+  return files.filter(file => !THIRD_PARTY.test(file)).flatMap((file) => {
     const path = join(REPO_ROOT, file)
     // A submodule is listed as a directory; its files are someone else's.
     if (!statSync(path, { throwIfNoEntry: false })?.isFile()) return []

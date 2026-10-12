@@ -21,6 +21,14 @@ export const EXCLUDED_DIRS = new Set([
   'vendor',
 ])
 
+/** Third-party trees outside `vendor`: the plugins the span suite's tasks are built from, and their authors' migrations. */
+export const THIRD_PARTY = /^bench\/tasks\/[^/]+\/(environment\/fixture|solution)(\/|$)/
+
+/** Whether a repository-relative path is someone else's file. */
+export function isExcluded(path: string): boolean {
+  return path.split('/').some(segment => EXCLUDED_DIRS.has(segment)) || THIRD_PARTY.test(path)
+}
+
 /**
  * Walk up from a starting directory to the repository root, identified by the
  * package manifest plus the commitizen config. Resolving from the module's own
@@ -54,7 +62,7 @@ export function repoFiles(extensions: readonly string[], root: string = REPO_ROO
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       if (entry.isDirectory()) {
-        if (!EXCLUDED_DIRS.has(entry.name)) walk(join(dir, entry.name))
+        if (!isExcluded(relative(REPO_ROOT, join(dir, entry.name)))) walk(join(dir, entry.name))
         continue
       }
       if (!entry.isFile()) continue

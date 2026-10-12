@@ -1,0 +1,226 @@
+/**
+ * 路由系统 (Routing System) panel — a simplified 9router.
+ *
+ * Five tabs fed by the host half (/router/api/*), mirroring 9router's
+ * dashboard: 概览 (usage), 供应商 (supplier cards → detail: accounts +
+ * add-account + models), 组合 (combo fallback chains),
+ * 扩展 (extension plugins — one toggle each, self-checked),
+ * 端点与密钥 (endpoint URL + API keys + auth).
+ *
+ * **挂载在「设置」里**（`settings.section` 座位），所以布局规则跟中心栏劫持时期不同：
+ *   - 没有 masthead / 返回会话按钮 —— 设置面板自带标题栏和关闭
+ *   - **tab 条固定、只有内容区滚**：根节点限高 `height:100%`，内容区
+ *     `flex:1 + min-height:0 + overflow-y:auto` 自己滚。
+ *     根节点**必须限高** —— 不限高内容会把外壳撑开，退化成整页滚、
+ *     tab 条跟着滚上去
+ *   - 根节点外面套了一层 `display: contents`（宿主 slot renderer 给的），
+ *     不过实测 `height:100%` 仍能穿过它解析到外壳高度
+ *   - 内容宽度实测 564px（面板 612 − 左右 padding 24），卡片 grid 按这个宽度排
+ */
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  ROUTER_API_BASE,
+  type RouterCombosResponse,
+  type RouterHealthResponse,
+  type RouterStatusResponse,
+} from '../shared.ts'
+import { SupplierDetail } from './SupplierDetail.tsx'
+import { EndpointTab } from './EndpointTab.tsx'
+import { CombosTab } from './CombosTab.tsx'
+import { supplierVisibility, type SupplierSummary } from './supplier-visibility.ts'
+import { StatsTab } from './StatsTab.tsx'
+import { ExtTab } from './ExtTab.tsx'
+
+type TabId = 'overview' | 'suppliers' | 'combos' | 'endpoint' | 'ext'
+
+interface Snapshot {
+  health: RouterHealthResponse | null
+  status: RouterStatusResponse | null
+  combos: RouterCombosResponse | null
+}
+
+async function getJson<T>(path: string): Promise<T> {
+  const response = await fetch(`${ROUTER_API_BASE}${path}`, { cache: 'no-store' })
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+  return response.json() as Promise<T>
+}
+
+interface RouterViewProps {
+  /**
+   * 设置页不提供「返回会话」（关闭由设置面板自己负责），所以这里是可选的：
+   * 中心栏劫持那套老挂载方式还留着时会传。
+   */
+  onBack?: () => void
+}
+
+export function RouterView({ onBack }: RouterViewProps): JSX.Element {
+  const [tab, setTab] = useState<TabId>('overview')
+  const [detailSupplier, setDetailSupplier] = useState<{ id: string; name: string; icon?: string; apiKeyHint?: string } | null>(null)
+  const [snapshot, setSnapshot] = useState<Snapshot>({ health: null, status: null, combos: null })
+  const [refreshing, setRefreshing] = useState(false)
+  const mounted = useRef(true)
+
+  const refresh = async (): Promise<void> => {
+    if (refreshing) return
+    setRefreshing(true)
+    try {
+      const [health, status, combos] = await Promise.all([
+        getJson<RouterHealthResponse>('/health').catch(() => null),
+        getJson<RouterStatusResponse>('/status').catch(() => null),
+        getJson<RouterCombosResponse>('/combos').catch(() => null),
+      ])
+      if (mounted.current) {
+        setSnapshot({ health, status, combos })
+      }
+    } finally {
+      if (mounted.current) setRefreshing(false)
+    }
+  }
+
+  useEffect(() => {
+    mounted.current = true
+    void refresh()
+    return () => { mounted.current = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const suppliers = snapshot.health?.suppliers ?? []
+  // 面板只列**开着**的供应商（关掉的卡片不出现，与「扩展」页同一形状）；开关在
+  // 插件页那节。判据与空状态文案都在 supplier-visibility.ts，可单测。
+  const panel = supplierVisibility(suppliers)
+  const accounts = snapshot.status?.accounts ?? []
+  const combos = snapshot.combos?.combos ?? []
+  const suppliersError = snapshot.status?.ok === false ? snapshot.status.error : undefined
+  const combosError = snapshot.combos?.ok === false ? snapshot.combos.error : undefined
+
+  /** 渲染一组供应商卡片（内置 / 插件分开）。 */
+  const renderSupplierGroup = (title: string, group: SupplierSummary[]): ReactNode => {
+    if (group.length === 0) return null
+    return (
+      <div className="dshr-supplierGroup">
+        <div className="dshr-supplierGroupTitle">{title}</div>
+        <div className="dshr-supplierGrid">
+          {group.map(supplier => {
+            const supplierAccounts = accounts.filter(a => a.supplier === supplier.id)
+            const healthy = supplierAccounts.filter(a => !a.cooling).length
+            return (
+              <section key={supplier.id} className="dshr-supplierCard" onClick={() => setDetailSupplier(supplier)}>
+                <div className="dshr-supplierRow">
+                  {supplier.icon !== undefined && (
+                    <img
+                      className="dshr-supplierIcon"
+                      src={supplier.icon}
+                      alt=""
+                      // 加载失败就藏起来（别留碎图）。图标不是关键信息，
+                      // 旁边有供应商名字。历史上的坑：icon 曾是
+                      // http://localhost:20128/... 这种外链，9router 没跑就全是坏图。
+                      onError={(e) => { e.currentTarget.style.display = 'none' }}
+                    />
+                  )}
+                  <div className="dshr-supplierName">{supplier.name}</div>
+                </div>
+                <div className="dshr-supplierMeta">
+                  {supplierAccounts.length > 0 && (
+                    <span className="dshr-muted">{healthy}/{supplierAccounts.length} 健康</span>
+                  )}
+                  <span className="dshr-chevron">›</span>
+                </div>
+              </section>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="dshr-settings">
+      {/* tab 切换：设置页已有页面标题，这里只做二级切换 */}
+      <nav className="dshr-tabs" role="tablist" aria-label="路由分区">
+        <button type="button" role="tab" aria-selected={tab === 'overview'} className={`dshr-tab${tab === 'overview' ? ' dshr-tab-on' : ''}`} onClick={() => setTab('overview')}>
+          概览
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'suppliers'} className={`dshr-tab${tab === 'suppliers' ? ' dshr-tab-on' : ''}`} onClick={() => setTab('suppliers')}>
+          供应商 <span className="dshr-navCount">{suppliers.length}</span>
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'combos'} className={`dshr-tab${tab === 'combos' ? ' dshr-tab-on' : ''}`} onClick={() => setTab('combos')}>
+          组合 <span className="dshr-navCount">{combos.length}</span>
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'ext'} className={`dshr-tab${tab === 'ext' ? ' dshr-tab-on' : ''}`} onClick={() => setTab('ext')}>
+          扩展
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'endpoint'} className={`dshr-tab${tab === 'endpoint' ? ' dshr-tab-on' : ''}`} onClick={() => setTab('endpoint')}>
+          端点与密钥
+        </button>
+        {/* 返回会话只在老的中心栏挂载方式下出现（设置页有关闭按钮） */}
+        {onBack !== undefined && (
+          <button type="button" className="dshr-tabBack" onClick={onBack}>返回会话</button>
+        )}
+      </nav>
+
+      <div className="dshr-settingsBody">
+        {/* ---------------- 概览（用量看板） ---------------- */}
+        {tab === 'overview' && (
+          <StatsTab
+            active
+            refreshing={refreshing}
+            health={snapshot.health}
+            onRefresh={() => void refresh()}
+          />
+        )}
+
+        {/* ---------------- 供应商 ---------------- */}
+        {tab === 'suppliers' && (
+          detailSupplier !== null
+            ? (
+              <SupplierDetail
+                supplier={detailSupplier}
+                accounts={accounts}
+                statusLoading={snapshot.status === null}
+                onBack={() => setDetailSupplier(null)}
+                onRefresh={() => void refresh()}
+              />
+            )
+            : (
+              <div className="dshr-tabBody">
+                {snapshot.health !== null && panel.empty !== undefined && (
+                  <div className="dshr-empty dshr-emptyStack">
+                    <div>{panel.empty.title}</div>
+                    {panel.empty.desc !== '' && <div className="dshr-muted">{panel.empty.desc}</div>}
+                  </div>
+                )}
+                {renderSupplierGroup('内置', panel.builtin)}
+                {renderSupplierGroup('插件', panel.external)}
+                {suppliersError !== undefined && (
+                  <div className="dshr-empty">{suppliersError}</div>
+                )}
+              </div>
+            )
+        )}
+
+        {/* ---------------- 组合 ---------------- */}
+        {tab === 'combos' && (
+          snapshot.combos === null
+            ? <div className="dshr-tabBody"><div className="dshr-empty">加载中…</div></div>
+            : combosError !== undefined
+              ? <div className="dshr-tabBody"><div className="dshr-empty">{combosError}</div></div>
+              : (
+                <CombosTab
+                  combos={combos}
+                  aliases={snapshot.combos?.aliases ?? []}
+                  onRefresh={() => void refresh()}
+                />
+              )
+        )}
+
+        {/* ---------------- 端点与密钥 ---------------- */}
+        {tab === 'endpoint' && <EndpointTab />}
+
+        {/* ---------------- 增强 (扩展插件) ---------------- */}
+        {tab === 'ext' && <ExtTab />}
+      </div>
+    </div>
+  )
+}

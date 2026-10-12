@@ -19,16 +19,18 @@ Harbor 0.24.0 is the version `src/evaluation/harbor.ts` reads; a record names th
 
 ## A run
 
-The oracle comes first: it decides which tasks this machine can judge, and costs no API key.
+The oracle comes first: it decides which tasks this machine can judge, and costs no API key. A `nop` run, also keyless, finds the tasks that doing nothing passes; the span suite needs one, the upgrade-skill suite may have one.
 
 ```sh
 npm run bench -- run --subject oracle --attempts 1 --harbor ~/.harbor/bin/harbor
+npm run bench -- run --suite spans --subject nop --attempts 1 --harbor ~/.harbor/bin/harbor
 DEEPSEEK_API_KEY=… npm run bench -- run --subject pipeline --attempts 3 --harbor ~/.harbor/bin/harbor
 ```
 
 | Option | Meaning | Default |
 |---|---|---|
-| `--subject` | `pipeline`, `pipeline+skills`, `session`, `session+skills` or `oracle` | required |
+| `--subject` | `pipeline`, `pipeline+skills`, `session`, `session+skills`, `oracle` or `nop` | required |
+| `--suite` | `upgrade-skill` or `spans` ([the suites](../design/evaluation.md#8-the-suites)) | `upgrade-skill` |
 | `--attempts` | Attempts per task | `3` |
 | `--tasks` | Comma-separated task ids | every task |
 | `--concurrency` | Trials at once (Harbor `-n`) | `1` |

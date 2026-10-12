@@ -3,8 +3,9 @@ import { day, escape, fail, fmt, interval, loadIndex, nav, params, select, setPa
 nav('Trend')
 
 /**
- * `meanReward` of every subject over time, so subjects can be compared at each
- * commit; the selected subject also gets its interval band and `passRate@1.0`.
+ * `meanReward` of every subject on one suite over time, so subjects can be
+ * compared at each commit; the selected subject also gets its interval band and
+ * `passRate@1.0`. The keyless subjects only say which tasks are feasible.
  */
 function chart(all, subject) {
   const point = record => ({
@@ -18,7 +19,7 @@ function chart(all, subject) {
     high: record.metrics.intervals.meanReward?.[1] ?? record.metrics.values.meanReward,
     passRate: record.metrics.values['passRate@1.0'],
   })
-  const values = all.filter(record => record.subject.id !== 'oracle').map(point)
+  const values = all.filter(record => !['oracle', 'nop'].includes(record.subject.id)).map(point)
   const x = { field: 'at', type: 'temporal', title: 'UTC', scale: { type: 'utc' } }
   const selected = { filter: `datum.subject === '${subject}'` }
   const tooltip = [{ field: 'subject' }, { field: 'commit' }, { field: 'message' }, { field: 'meanReward', format: '.3f' }, { field: 'low', format: '.3f' }, { field: 'high', format: '.3f' }]
@@ -64,18 +65,25 @@ function table(records) {
 
 try {
   const index = await loadIndex()
-  const subjects = [...new Set(index.records.map(record => record.subject.id))]
-  const show = (subject) => {
-    setParams({ subject })
-    const records = index.records.filter(record => record.subject.id === subject)
+  const suites = [...new Set(index.records.map(record => record.suite.repository))]
+  if (suites.length === 0) throw new Error('No record has been published yet.')
+  const show = (suite, subject) => {
+    setParams({ suite, subject })
+    const onSuite = index.records.filter(record => record.suite.repository === suite)
+    const records = onSuite.filter(record => record.subject.id === subject)
     document.getElementById('summary').textContent = `${records.length} record(s)`
-    chart([...index.records].reverse(), subject)
+    chart([...onSuite].reverse(), subject)
     table(records)
   }
-  if (subjects.length === 0) throw new Error('No record has been published yet.')
-  const initial = subjects.includes(params.get('subject')) ? params.get('subject') : subjects[0]
-  select('subject', subjects.map(subject => [subject, subject]), initial, show)
-  show(initial)
+  const showSuite = (suite) => {
+    const subjects = [...new Set(index.records.filter(record => record.suite.repository === suite).map(record => record.subject.id))]
+    const subject = subjects.includes(params.get('subject')) ? params.get('subject') : subjects[0]
+    select('subject', subjects.map(id => [id, id]), subject, id => show(suite, id))
+    show(suite, subject)
+  }
+  const suite = suites.includes(params.get('suite')) ? params.get('suite') : suites[0]
+  select('suite', suites.map(id => [id, id]), suite, showSuite)
+  showSuite(suite)
 } catch (error) {
   fail(error)
 }

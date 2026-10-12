@@ -1,0 +1,439 @@
+<h1 align="center">dsh-router</h1>
+
+<p align="center">DeepSeek Harness 的 OpenAI 兼容路由插件</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/dsh-router-core"><img src="https://img.shields.io/npm/v/dsh-router-core?style=flat-square&logo=npm&label=npm" alt="npm version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-10b981?style=flat-square" alt="MIT license"></a>
+  <a href="https://www.npmjs.com/package/@deepseek-ai/dsh?activeTab=versions"><img alt="DSH 0.1.5" src="https://img.shields.io/badge/DSH-0.1.5-4d6bfe?style=flat-square" /></a>
+  <a href="https://www.npmjs.com/package/@deepseek-ai/dsh?activeTab=versions"><img alt="DSH 0.1.7-alpha.2 支持" src="https://img.shields.io/badge/DSH-0.1.7--alpha.2-e400dd?style=flat-square" /></a>
+  <a href="#agent-team-支持"><img alt="Agent Team" src="https://img.shields.io/badge/Agent%20Team-%E2%9C%93-10b981?style=flat-square" /></a>
+</p>
+
+<p align="center">
+  <a href="#快速安装">快速安装</a> ·
+  <a href="#面板设置--路由">面板</a> ·
+  <a href="#agent-team-支持">Agent Team</a> ·
+  <a href="#api-端点openai-兼容v1">API 端点</a> ·
+  <a href="docs/suppliers.md">供应商开发</a> ·
+  <a href="docs/ext.md">扩展开发</a>
+</p>
+
+**插件版的 9router** —— 不是另开一个网关服务,而是直接作为 DSH 插件嵌进 DSH web,
+在宿主 Web 服务的 `/v1` 上原生暴露 OpenAI 兼容端点(`http://127.0.0.1:<宿主页端口>/v1`;`dsh web` 默认 3080,面板「端点与密钥」页显示的是实际地址),把请求路由到内部供应商。
+管理界面在**设置 → 路由**(官方设置页座位,不是自己开的页面)。装好即用,
+不用多开一个 9router、不用维护第二个端口、不用在网关和 DSH 之间搬配置。
+
+**原生支持 Agent Team / 多会话** —— 0.1.7 起每个 team 成员是独立会话,
+dsh-router 按**会话身份**亲和选号:同会话固定落同一个连接(前缀缓存只写一份),
+不同会话尽量铺开到不同连接;多会话共用同号时按会话隔离统计,**不会互相拖累**。
+详见 [Agent Team 支持](#agent-team-支持)。
+
+![设置 → 路由 面板：概览（用量看板）、供应商、组合、端点与密钥](docs/screenshot.png)
+
+## 快速安装
+
+需要 **DSH `0.1.5-rc.1` 及以上**(支持 `dsh plugin` profile 插件机制)、Node.js `>= 20`,以及 `web` profile。
+
+```bash
+dsh plugin --profile web add dsh-router-core
+```
+
+然后**重启 `dsh web`**。打开设置面板,左侧导航「模型」下面会出现 **路由**。
+
+第二处入口是侧栏的**插件**面板:内置的供应商与扩展在那里各占一行「包含的组件」,
+**供应商与扩展的开关也在那一面**(见 [面板](#面板设置--路由)与
+[供应商开关](#供应商开关))。
+
+> 更多供应商:DSH 插件形态的供应商各自发 npm 包,同样
+> `dsh plugin --profile web add <包名>` 即可;供应商接入与开发见
+> [`docs/suppliers.md`](docs/suppliers.md)。
+>
+> 本地开发版:不用 npm,直接 `dependencies` 加
+> `"dsh-router-core": "link:/path/to/dsh-router"` 指向本地仓库。
+
+## 它解决什么问题
+
+| 能力           | 说明                                                                                                                                                                                                                                                         |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 零额外进程     | 就是 DSH 插件,随 `dsh web` 启停,天然同源(`/router/api/*` 无 CORS、面板嵌在设置里)。                                                                                                                                                                          |
+| 扩展即插即拔   | 扩展插件(如 [`dsh-router-ext-rtk`](https://github.com/CARVIN94/dsh-router-ext-rtk))经 `router.ext` 注册,在 bash 执行前改写命令(如加 `rtk` 前缀压缩输出)。开关在官方插件页(设置 → 插件 → dsh-router-core),带自检;面板「扩展」页只列已启用的、只读。 |
+| 供应商即插即拔 | 内置供应商是插件页「包含的组件」里的三行,可单独开关;更多供应商 = 装一个 DSH 插件(`dsh-router-*`)或放一个 js 文件到 `~/.dsh/profiles/web/suppliers/`(同名 js 覆盖内置)。                                                                                                                                       |
+| 模型不内置     | 供应商只实现差异化能力,模型拉取与缓存由核心统一管,不写死、不过时。                                                                                                                                                                                           |
+| 策略只写一次   | 组合回退、账号池(选号/冷却/禁用)、响应写入、凭证存储、积分持久化、模型管理都由核心提供。供应商 js 只对**单个账号**调一次上游并报告成败,不自己遍历账号、不维护冷却表、不落盘积分——否则每个插件都会长出一份互相不一致的实现,而核心也就无从判断「该不该换号」。 |
+| 凭证单库       | `auths/credentials.sqlite`,供应商凭证不透明 blob,核心统一生命周期,干净可备份。                                                                                                                                                                               |
+| 组合即模型     | 建好的组合自动带出为 DSH 模型目录里的 `router` provider 选项,设置 → 模型直接选组合名即可。                                                                                                                                                                   |
+| 用量可观测     | 面板概览看板:周期切换、汇总卡、趋势折线、Top 榜、最近请求。                                                                                                                                                                                                  |
+| Team 友好      | 按**会话身份**亲和选号:同会话固定同一连接(前缀缓存只写一份),不同会话尽量铺开到不同连接;多会话共用同号时缓存质量**按会话隔离**统计,不会互相拖累。                                                                                                            |
+
+> 面板布局、组合 fallback、连接池/账号池、API key 管理都贴近
+> [9router](https://github.com/decolua/9router),但按 DSH「一切皆插件」的方式
+> 重组得更轻。
+>
+> 供应商开发与接入规范见 [`docs/suppliers.md`](docs/suppliers.md)
+> （契约 / 加载顺序 / 模型统一策略 / 内置供应商参考实现）。
+> 选号/亲和/team 的完整设计与实测见
+> [`docs/pool-sticky-block.md`](docs/pool-sticky-block.md)。
+
+## Agent Team 支持
+
+DSH 0.1.7 的**智能体团队**把任务拆给多个成员,**每个成员是独立会话**,一轮
+team 测试就是多个会话交错发请求。dsh-router 原生适配这个场景:
+
+- **真会话身份** —— 从宿主 `GenerateOptions.sessionId` 拿到权威会话 id
+  (adapter 转成内部头),不再靠猜。有 id 就按 id 亲和,精确、零撞车;
+  外部 OpenAI 客户端拿不到 id 时,回落前缀指纹兜底。
+- **会话亲和选号** —— 同一会话的连续请求**永远落回同一个连接**,前缀在该
+  连接缓存里只写一份,缓存命中率稳定在 ~98%;新会话按游标分发,天然均衡。
+- **fresh 会话优先铺开** —— 多个成员交替到达时,优先分配到**还没被别的会话
+  占用**的连接,各成员尽量独占一个连接;连接数不够时才回绕复用。
+- **按会话隔离的缓存统计** —— 多会话共用同号时,**各会话的缓存质量分开统计**,
+  不会因为别的会话"踩"了同一个号就把这个号误判成"缓存坏了"从而集体降权
+  (消除了 team 场景下的「降权串」)。
+- **底部命中指示** —— 输入框旁的「路由」徽章按**当前会话**显示最近一次命中
+  的连接/积分;点击展开卡片,点外部或 `Esc` 收起(与原生弹层一致)。
+
+> 天花板:**连接数 < 并发成员数**时,多出来的成员必然共用连接 → 前缀缓存互相
+> 驱逐,无法用选号手法消除(上游缓存空间是账号侧物理限制)。要彻底隔离只能
+> **加连接**或**限制 team 并发成员数 ≤ 连接数**。详见
+> [`docs/pool-sticky-block.md`](docs/pool-sticky-block.md) §11。
+>
+> 版本适配:「路由」徽章只在 **DSH ≥ 0.1.7** 出现(0.1.5 的对应座位渲染位置
+> 不同);0.1.5 与 0.1.7 的兼容差异(设置注册、tool 消息形态)统一按宿主版本号
+> 判定。
+
+## 面板(设置 → 路由)
+
+面板挂在 **设置 → 路由**(官方 `settings.section` 座位,排在「模型」下面):
+
+第二处入口是**设置 → 插件 → dsh-router-core 的详情页**,那里分两层:
+
+- 宿主的原生**「包含的组件」**列 core 自己 patch 里声明的**行**:core 本体、三个
+  内置供应商、插件自检这个内置扩展。每行一个宿主管的开关,关一行 = loader 不
+  import 它 = 它压根没注册。
+- 原生列表**下面**是本插件自绘的**「路由组件」**一节,列**外部供应商插件**与
+  **扩展插件**,两组都带开关。
+
+两层的分工:**已经在原生行里的(内置的那些)不进自绘节** —— 同一份东西列两遍,
+用户就不知道该在哪开关。反过来说外部供应商与扩展进不了原生行:官方那个列表只认
+**本 bundle 自己 patch 里声明的行**(`declaredRows` 只读该 bundle 自己的 patch),
+而它们各自是独立 bundle,自己的行在自己的详情页上。
+
+- **概览** — 用量看板(默认页):
+  - 周期切换 **今日 / 24 小时 / 7 天 / 30 天**;
+  - 汇总卡:总请求(含成功率)、输入 Tokens、输出 Tokens、缓存 Tokens、平均耗时(含首字节);
+  - 签到卡:**一键签到**所有支持签到的供应商(按 `checkinNow` 能力筛),并显示
+    「今天点过没」;
+  - Token 趋势折线图:鼠标悬停 / 触摸点选 / 键盘 `←` `→`(`Home` `End` 到两端,`Esc` 取消)
+    看每个时段;读数和峰值用 K/M 缩写,精确值在悬停提示里;
+  - Top 榜:按供应商 / 按模型(请求数带失败计数);
+  - 最近请求:时间 / 模型 / 供应商 / in↑ out↓ / 耗时,显示最近 10 条;
+  - **清空** — 清掉全部用量统计(不影响供应商、账号、组合配置);
+  - 数据落盘 `data/usage.json`(按天聚合 + 每天 24 个小时桶 + 最近 500 条明细 +
+    累计计数)。今日/7 天/30 天读天桶、24 小时读小时桶,都不受明细环容量限制;
+    明细环只服务「最近请求」列表。
+    小时桶从新数据开始累积,升级前那几天的天内分布查不到(明细环只剩 500 条
+    回溯不回去),那段历史的小时柱状图留空、24 小时口径按整桶计入 —— 不编数据。
+    token 口径:上游返回 `usage` 就用真值(分散在多帧时按字段取最大值合并);
+    上游不发时按 ~4 字符/token 估算,面板上标 `~`。**失败请求不估算**——
+    它没到上游,编造输入 token 只会把总量灌水;
+    缓存口径:OpenAI 系 `prompt_tokens` **含**缓存,Claude 系不含(单报
+    `cache_read_input_tokens`),归一时统一折成「prompt 含缓存」,
+    所以「缓存 Tokens」是「输入 Tokens」的**子集**,不是并列的第三种;
+    签到口径:卡片上的「今日已点」= 今天在这个浏览器点过这个按钮(记在
+    localStorage),**不代表上游一定签上了**——真凭据是上游的 `checked_in`,
+    当前契约没有「查签到状态」的能力,要真状态得先给供应商契约加
+    `checkinStatus?()`(升级路径写进 `CheckinCard.tsx` 头注释)。
+- **供应商** — 供应商卡片(内置 / 插件分组),点击进入详情:
+  - **链接池** — 账号列表(冷却/禁用/健康数/积分),支持删除;
+  - **加链接** — 按供应商能力弹出不同流程:URL 登录(生成链接 → 浏览器登录 → 回调)、
+    API key 弹窗(填名字 + key)、轮询登录(登录后自动取凭证);
+  - **签到** — 供应商实现了签到的才显示(如 codebuddy:每日 100 积分,连续第 7 天1000)。核心遍历所有链接逐个签,汇总「N/M 成功 · X 今日已签」;上游「今日已
+    签到」按成功处理(幂等),账号额度或凭证失效会单独标出;
+  - **刷新** — 刷所有链接的积分,并跑一次最简会话探测该供应商是否还有活着的链接
+    (走真实对话路径 + 账号池回退,能分清是账号额度没了还是供应商真挂了);
+  - **可用模型** — 模型列表,逐个启用/禁用 + 自定义模型(通用能力,持久化到
+    `data/supplier-config.json`,`/v1/models` 与 chat 只接受启用的模型);单个模型可
+    「测试」,走真实对话路径并按账号池依次回退,所以能分清是这个账号额度没了还是
+    该模型真的不支持;
+- **组合** — fallback 链(免费优先),可自定义。**组合即模型**:建好的组合会**自动带出**
+  为 DSH 模型目录里的 `router` provider 选项(设置 → 模型直接选组合名即可用),请求
+  按组合策略命中其中一个供应商模型;
+- **端点与密钥** — 端点核心(无隧道/Tailscale):
+  - API 端点 URL(面板按当前页面 origin 显示,可复制;端口跟着宿主走,`dsh web` 默认 3080);
+  - 鉴权设置 `requireApiKey` 开关;
+  - API Keys 管理:创建 / 启用切换 / 显示 / 复制 / 删除(持久化到 `data/keys.json`)。
+
+## API 端点(OpenAI 兼容,`/v1`)
+
+> 端口 = **宿主 Web 服务实际监听的端口**:`dsh web` 默认 3080,桌面端等通道由宿主
+> 分配(不一定还是 3080)。下面按 3080 写;换通道时把端口换成面板「端点与密钥」
+> 页里显示的那个即可。
+
+```bash
+# 模型列表
+curl http://localhost:3080/v1/models
+
+# 对话(流式/非流式)
+curl -X POST http://localhost:3080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"glm-5.2","messages":[{"role":"user","content":"你好"}],"stream":false}'
+```
+
+任何支持 OpenAI 兼容 API 的工具(Claude Code、Cline、DSH 设置-模型 等)都可以把
+`baseURL` 指向面板「端点与密钥」页里显示的那个端点(`dsh web` 下即 `http://localhost:3080/v1`)。
+
+**鉴权**:默认 `requireApiKey=false`,`/v1/*` 不要求鉴权(本地使用,与 9router 一致)。
+在「端点与密钥」页开启「要求 API Key」后,请求必须带
+`Authorization: Bearer <库内启用的 Key>`。
+
+## 面板 API(`/router/api/*`,同源)
+
+| 端点                            | 方法      | 说明                                                                   |
+| ------------------------------- | --------- | ---------------------------------------------------------------------- |
+| `/health`                       | GET       | 供应商列表(含来源/能力/开关 `enabled`)+ 宿主版本 `hostVersion` / 徽章支持位 `lastHitDock` |
+| `/last-hit`                     | GET       | 最近一次命中 `?session=<id>`(按会话取,缺省全局);供「路由」徽章 |
+| `/status`                       | GET       | 全部账号(含供应商 id)                                                  |
+| `/models`                       | GET       | 合并模型列表(已过滤禁用)                                               |
+| `/combos`                       | GET       | 组合 fallback 链                                                       |
+| `/keys`                         | GET/POST  | 密钥列表(含完整 key)/ 创建 `{name}` → 返回明文一次                     |
+| `/keys/toggle`                  | POST      | `{id, isActive}`                                                       |
+| `/keys/delete`                  | POST      | `{id}`                                                                 |
+| `/settings`                     | GET/PATCH | `{requireApiKey}`                                                      |
+| `/ext`                          | GET/PATCH | 扩展插件列表 + 开关 `{id, enabled}`(见下)                              |
+| `/stats`                        | GET       | 用量统计 `?period=today\|24h\|7d\|30d`(汇总 + Top 榜 + 最近请求 20 条) |
+| `/stats/chart`                  | GET       | 趋势图数据 `?period=…`(today/24h = 24 小时桶,7d/30d = 天桶)            |
+| `/stats/clear`                  | POST      | 清空全部用量统计                                                       |
+| `/suppliers/:id/login`          | POST      | 生成登录链接                                                           |
+| `/suppliers/:id/login/callback` | POST      | `{callbackUrl}` → 加账号                                               |
+| `/suppliers/:id/enabled`        | PATCH     | 供应商开关 `{enabled}` —— 关掉不参与路由(见下)                           |
+| `/suppliers/:id/models`         | GET       | 模型 + 启用状态                                                        |
+| `/suppliers/:id/models/toggle`  | POST      | `{id, enabled}`                                                        |
+| `/suppliers/:id/models/test`     | POST      | `{id, uid?}` 测模型可用性;`uid` = 只测这个连接(不回退),省略则池内任选      |
+
+## 供应商开关
+
+每个供应商有**一个开关**,决定它是否参与路由(默认开)。落盘在
+`supplier-config.json` 的 `enabled`(与扩展开关的 `ext.json` 同一层:都是用户对
+核心面板的操作,归核心持久化)。
+
+关掉之后**真的不参与路由**,不是只把卡片藏起来 —— 核心的活跃集合(`Router` 的
+`active`)里就没有它了:
+
+- 请求不会落到它(组合腿与 `alias/model` 直调两个入口都拦);
+- 它的模型前缀不再出现在对外模型全名里,模型列表与组合里也不再出现它
+  (避免留下「前缀存在但必然 503」的死前缀);
+- 面板「供应商」页**不再列它的卡片**(与「扩展」页同一形状:面板是在用什么的
+  工作面,只列开着的)。全关掉时那句空状态是「供应商都已关闭」并指去开关所在处 ——
+  不复用「暂无供应商」,那句说的是一个都没装,用来描述「装了但自己关的」就是说假话。
+
+但它**仍留在 `/health` 与插件页那一节**(含关掉的),否则关掉之后就再没有可点的开关能
+把它开回来。开关 UI 在**设置 → 插件 → dsh-router-core 详情页**下面的「路由组件」一节
+(「供应商」组 + 「扩展」组)。
+
+## 插件自检(内置扩展 `dsh-router-ext-test`)
+
+随核心分发的内置扩展,提供两块自检面板。它**不挂任何监听、不改写任何命令** ——
+与 RTK 那类扩展的区别只在于它只提供面板。
+
+1. **连接测试**:选**供应商 / 模型 / 连接**,跑一次真实的访问测试。
+2. **契约体检**:选一个**外部供应商插件**,逐个契约成员报告「实现了吗 / 实跑通了吗 /
+   为什么没跑」。
+
+它与三个内置供应商走同一套管道:是 `cordis.patch.yml` 里的一个**行**(子路径模块
+`dsh-router-core/ext-test`),因此在插件页原生「包含的组件」里占一行、开关由宿主管,
+且**默认关闭**。行关闭时 loader 根本不 import 这个模块,扩展就不在 `router.ext` 表里 ——
+「打开那一行才出现这张卡片」是天然的,不需要额外的状态位。
+
+面板入口**只有一处**:设置 → 路由 → 扩展 → 点开「插件自检」。插件页那一行不挂详情页,
+它只负责开关(理由见 [扩展插件](#扩展插件routerext) 一节)。
+
+测试走核心已有的 `POST /suppliers/:id/models/test`,与面板「供应商」详情里的「测试」
+按钮**同一条真实路径**(账号遍历 + chatOnce)。区别只在可以**钉死连接**:留空则由账号池
+任选可用号(与那个按钮同义);指定连接则只测它、**失败不回退到别的号** —— 否则
+「测这个连接」测出来的是另一个号的结果,诊断就成了假话。
+
+面板的模型下拉**只列可用模型**:那个端点给的是全部模型(含用户在供应商详情里停用的),
+把停用的也列出来,用户会挑一个自己明明关掉的模型去测。列表为空时还区分「一个模型都
+没有」(该去拉取)与「全被停用」(该去开启)—— 共用一句「没有模型」会把用户往错的方向指。
+
+### 契约体检:报告,不是代替你操作
+
+`POST /router/api/suppliers/:id/probe` 逐个成员给状态:`ok`(实现了且实跑通)/
+`fail`(必填成员缺失,或实跑抛错)/ `absent`(可选成员没实现)/ `skipped`(实现了但**故意
+不跑**)。
+
+**有副作用的一律不自动执行**,只标出它实现了并说明为什么:
+
+| 成员 | 为什么不给自动跑 |
+| --- | --- |
+| `dispose` | 调用它就是把这个供应商卸载掉 |
+| `addApiKey` / `removeLink` | 写/删凭证 |
+| `generateLoginUrl` | 可能直接触发设备码 / OAuth 登录流 |
+| `completeLogin` | 需要一个真实回调 URL,空调没有意义 |
+| `checkinNow` | 替这个连接真的去签到 |
+| `chatOnce` | 会真发一次请求(消耗额度)——用上面的「跑一次访问测试」单独测 |
+
+体检是给眼睛看的,不是给手用的:要触发上面这些,去供应商详情里点对应的按钮。
+
+清单与契约**必须一起长**:`src/suppliers/probe.ts` 的成员表有一条判据直接解析
+`contract.ts` 源码里的 `SupplierModule` 成员名并断言全覆盖(编译期抓不到这种「两份
+清单」),所以契约新增成员而体检漏检会当场红。
+
+## 扩展插件(`router.ext`)
+
+> 完整契约、注册方式、自检与降级约定见 [`docs/ext.md`](docs/ext.md)。
+
+扩展插件是**独立 npm 包**(如 [`dsh-router-ext-rtk`](https://github.com/CARVIN94/dsh-router-ext-rtk)),
+经 cordis service `router.ext` 把自己追加进核心持有的共享表 —— 与 `router.suppliers`
+同一模式,与加载顺序无关。
+
+### 契约
+
+注册进表的是一个**声明 + 状态**的对象,核心只认这几个成员:
+
+| 成员 | 说明 |
+| --- | --- |
+| `id` | 扩展器 id(表的键,也是 `ext.json` 的键) |
+| `name` / `description?` / `icon?` | 面板显示名 / 副标题 / 图标 |
+| `getState()` | **运行时事实**:`{ ready, detail? }`,现算不落盘 |
+| `dispose?` | 表里被移除时核心调用 |
+| `source?: 'builtin'` | 标了就是随核心分发(见下) |
+
+**没有 `rewrite`** —— 怎么改命令是插件自己的实现细节,核心不感知、不调用。**开关也不
+在契约里**:开关归核心持久化(`<dataDir>/ext.json`,默认关);插件要存自己的数据走
+`router.extStore` 的 `readData/writeData`,不自己 file IO(落盘位置由核心锚定,
+不跟 cwd 跑)。
+
+### 面板与开关
+
+面板「扩展」页只列**已启用**的扩展(关闭的连卡片都不出现),整页只读,详情页也没有开关
+—— 启停只有一个入口:插件页 dsh-router-core 详情页的「路由组件」一节
+(`PATCH /router/api/ext`)。开启时会**自检**:`getState().ready === false` 的拒绝开启
+(API 409),那一面的开关禁用并显示原因。
+
+### 扩展可以自带详情面板
+
+扩展详情页原本是一张写死的只读页(名字、id、状态、一段说明),扩展自己想放的交互
+(要选的模型、要跑的测试、要看的诊断)没地方放。客户端因此有一张按**扩展 id** 索引的
+面板注册表(`src/client/ext-panels.ts` 的 `registerExtPanel`):登记了就用你的组件渲染
+整个内容区,没登记才落回通用只读页。`插件自检` 就是这么用的。
+
+⚠️ 这张注册表目前只在 dsh-router 自己的 client bundle 内,**外部插件包还引不到** ——
+`dsh-router-core/client` 是整个入口闭包、不导出它。要让外部插件也能自带面板需要加一个
+真正的导出路径,详见 [`docs/ext.md`](docs/ext.md)。
+
+### 内置扩展不在自绘节里重复列
+
+随核心分发的扩展(`source: 'builtin'`)已经是插件页原生「包含的组件」里的一行、自带
+宿主管的开关,自绘节因此**只列独立安装的扩展**。与内置供应商同理:已经有原生行的东西,
+再列一遍就是同一个东西显示两处。
+
+### 已知坑
+
+- `ctx.tools.get(name)` **必须带 agent scope**(`exec.agent`):bash 工具注册在
+  agent scope,不带 scope 只查全局视图会查不到,静默走原样执行、从不改写。
+- 改写在一次已被审批授权的工具调用内发生,不绕过 sandbox / 审批。
+
+## 架构
+
+```
+浏览器(client 半)
+  ├─ 设置 → 路由(settings.section 座位, order 10, 排在「模型」下面)
+  │    ├─ RouterSettingsSection  注册入口(settings-section.tsx)
+  │    ├─ RouterView        tab: 概览 / 供应商 / 组合 / 扩展 / 端点与密钥(tab 条:下划线指示器)
+  │    │    ├─ StatsTab          概览:用量看板(周期按钮组 + 汇总卡 + 折线趋势 + Top 榜 + 最近请求)
+  │    │    ├─ SupplierDetail    供应商详情:链接池 + 加链接 + 可用模型 + 模型测试
+  │    │    ├─ CombosTab / EndpointTab
+  │    │    └─ ExtTab → ExtDetail  扩展列表(只列已启用)与详情(优先渲染扩展自带的面板)
+  │    └─ LastHitDock       「路由」徽章(composer.dock 座位,≥0.1.7;按会话显示最近命中)
+  ├─ 设置 → 插件(官方 plugins.detail.section 座位)
+  │    ├─ (原生「包含的组件」)  core patch 里声明的行:core 本体 + 内置供应商 + 内置扩展
+  │    │                        宿主管的开关,关一行 = loader 不 import 它
+  │    └─ RouterComponentsSection  dsh-router-core 详情页自绘的「路由组件」一节
+  │                                (外部供应商 + 扩展,两组都带开关)
+  │         └─ ExtTestPanel       插件自检扩展的详情面板(按 ext id 登记到 ext-panels.ts)
+  └─ fetch /router/api/*            (同源,无 CORS)
+       └─ host 半(src/index.ts)
+                 ├─ /v1/models + /v1/chat/completions   (OpenAI 兼容, KeysStore 鉴权)
+                 │    └─ RouterAdapter(src/llm/adapter.ts)  OpenAI SSE → DSH StreamChunk
+                 │         (usage 经 toTokenUsage 转 DSH 契约,见 docs/suppliers.md)
+                 │         (带 x-dsh-router-session 头:宿主 sessionId → 会话亲和)
+                 ├─ host-version(src/host-version.ts)  按宿主版本号适配 0.1.5 / 0.1.7
+                 ├─ KeysStore(src/keys.ts)              密钥库 + requireApiKey
+                 └─ Router(路由器) → suppliers[]
+                      ├─ OpenCodeSupplier(lib/suppliers/opencode/index.js) 无账号直连(Zen 免费档,需 CLI 握手)
+                      ├─ OpenRouterSupplier(lib/suppliers/openrouter/index.js) API key 账号
+                      ├─ NvidiaSupplier(lib/suppliers/nvidia/index.js)       API key 账号
+                      └─ 外部插件供应商(经 router.suppliers service 注册)
+                         ↑ 内置三个是 core 自己 patch 里的**行**(子路径模块),与外部插件同一条通道
+                 └─ 扩展表 router.ext(core provide 空表,谁都能往里 append)
+                      ├─ 内置:插件自检(行 dsh-router-core/ext-test,默认关闭)
+                      └─ 外部:dsh-router-ext-rtk 等独立 bundle 经同一个 service 注册
+```
+
+- **供应商抽象**:可插拔 js 模块只提供**差异化能力**(`status/listModels/getAlias/chatOnce`
+  - 可选登录/签到/加 key);**策略与通用能力**(组合回退、账号池选号/冷却/禁用、
+    连接池排序、模型启用/自定义、别名、凭证、响应写入)由核心统一管。
+    `chatOnce(uid, req)` 一次只服务一个账号,返回成功/失败 + 语义状态,换号由核心决定。
+- **供应商加载**(两来源,见 [`docs/suppliers.md`](docs/suppliers.md)):
+  1. **经 cordis service `router.suppliers`**(值为
+     `{ [supplierId]: (env) => SupplierModule }`),dsh-router
+     `ctx.inject(['router.suppliers'])` 延迟加载。两条子路径都走它:
+     - **内置三个 = core 自己 patch 里的行**(`cordis.patch.yml` insert
+       `dsh-router-core/suppliers/<x>`),所以在官方插件页 dsh-router-core 详情页的
+       **「包含的组件」里各占一行、带着宿主管的开关** —— 关掉一行 = loader 不 import
+       它 = 供应商没注册 = 路由不会落到它;
+     - 外部 DSH 插件(独立安装的供应商包)经同一个 service 注册。
+  2. **用户目录**:`~/.dsh/profiles/<profile>/suppliers/*.js`,**压过**同名内置行。
+- **模型统一策略**:插件不内置、不缓存模型;`listModels` 每次从上游拉取,
+  缓存由核心按 60s TTL 统一管(`/suppliers/:id/models`),`/v1/models` 保持实时。
+- **凭证存储**:SQLite 单库 `{authDir}/credentials.sqlite`(表 `credentials(supplier, uid, data)`,
+  凭证为供应商不透明 JSON blob)。
+- **/v1/\* 鉴权**:由 `KeysStore.requireApiKey` 控制。关闭 → 不鉴权;
+  开启 → Bearer 必须是「库内启用的 key」。
+
+## 与 DSH 的边界
+
+- dsh-router 复用 DSH 的 Web Server 与设置面板座位,不启动第二个应用或代理系统。
+- 供应商 js 不改 DSH 的 prompt、工具 schema 或权限;它只负责「把上游协议翻译成
+  OpenAI 形态」,路由/回退/存储归核心。
+- 数据分两处:`data/` 下的状态与用量 JSON(删了只是没统计了),以及
+  `auths/credentials.sqlite`(删了要重新登录所有供应商)。
+- 内置 patch 仅支持 DSH 的 `web` profile。
+
+## 前提
+
+- **DSH 版本**:`0.1.5-rc.1` 及以上;插件内部按宿主版本号自动适配 0.1.5 / 0.1.7
+  差异(设置注册方式、tool 消息形态、底部徽章);「路由」徽章需 **≥ 0.1.7**;
+- 凭证由 dsh-router 核心统一管(SQLite 库 `<dataDir>/auths/credentials.sqlite`);
+- 供应商接入与开发见 [`docs/suppliers.md`](docs/suppliers.md);
+- 重启 DSH 后 `/v1/*` 即生效;面板管理账号、模型与密钥。
+
+## 开发
+
+```bash
+pnpm install
+pnpm build        # lib/index.js(host) + lib/client.js / lib/client-registry.js(browser)
+pnpm typecheck
+pnpm test         # node --test "src/**/*.test.ts"
+```
+
+需要一个供应商最小实现作参考时,看 [`examples/suppliers/echo.js`](examples/suppliers/echo.js);
+完整契约、加载顺序与模型策略见 [`docs/suppliers.md`](docs/suppliers.md)。
+
+## 致谢
+
+感谢以下项目给的灵感:
+
+- [decolua/9router](https://github.com/decolua/9router) —— 本地 AI 路由网关,面板/组合/连接池/凭证等思路的来源;
+- [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) —— DSH「一切皆插件」的宿主框架;
+- [omdsh-dev/DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) —— DSH 插件形态与侧边栏入口的参考。
+
+## 许可证
+
+[MIT](LICENSE)
+
+## 免责声明
+
+本项目仅用于学习与技术研究，请勿用于商业用途。

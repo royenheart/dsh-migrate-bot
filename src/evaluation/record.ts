@@ -11,7 +11,7 @@ import { z } from 'zod'
 
 export const RECORD_SCHEMA = 3
 
-export const SUBJECTS = ['pipeline', 'pipeline+skills', 'session', 'session+skills', 'oracle'] as const
+export const SUBJECTS = ['pipeline', 'pipeline+skills', 'session', 'session+skills', 'oracle', 'nop'] as const
 export type SubjectId = (typeof SUBJECTS)[number]
 
 export const OUTCOMES = ['scored', 'timeout', 'exception', 'infrastructure'] as const
@@ -90,7 +90,7 @@ export const recordSchema = z.strictObject({
   }),
   suite: z.strictObject({
     repository: z.string().describe('The suite repository.'),
-    commit: z.string().regex(/^[0-9a-f]{40}$/).describe('The commit the `vendor/dsh-plugin-upgrade-skill` submodule pinned.'),
+    commit: z.string().regex(/^[0-9a-f]{40}$/).describe('For the upgrade-skill suite, the commit the `vendor/dsh-plugin-upgrade-skill` submodule pinned; for this repository\'s suite, the git tree of `bench/tasks`.'),
     tasks: z.array(taskSchema).describe('Every selected task, run or not.'),
   }),
   model: z.strictObject({

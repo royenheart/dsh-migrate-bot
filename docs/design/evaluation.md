@@ -28,6 +28,7 @@ The Action is scored on the community migration suite [`oh-my-dsh/dsh-plugin-upg
 | `session` | One `dsh --profile migrate` session with the task statement as its task, in `/app` |
 | `session+skills` | The same, with the `plugin-upgrade` skill loaded |
 | `oracle` | The task's reference solution |
+| `nop` | Nothing: the fixture as it was, which says what a task scores without a migration |
 
 Every subject but `oracle` runs in the agent runtime of `container/agent-runtime`, installed from its lockfile into the task container apart from the task's own dsh, and its setup ends with `dsh-migrate self-test`, so a runtime that cannot start a session fails the setup rather than scoring 0. The migrate profile goes into `/root/.dsh`, the home the task's dsh and its verifier read: a different home would hide the agent's changes from the verifier.
 
@@ -53,7 +54,7 @@ Harbor runs the verifier after an agent run that timed out or exited non-zero, s
 | `exception` | No reward, and the agent run stopped with another exception | 0 |
 | `infrastructure` | No reward, and the trial stopped before the agent ran or in the verifier | Not counted; `infrastructureRate` |
 
-A task is *feasible* when every attempt of the newest `oracle` record of the same suite commit scored 1.0 on it. A run of another subject refuses to start without that oracle record, and does not run infeasible tasks: the reference solution failing in this environment says the environment cannot judge the task.
+A task is *feasible* when every attempt of the newest `oracle` record of the same suite version scored 1.0 on it and, when a `nop` record of that version exists, no attempt of it did. A run of another subject refuses to start without that oracle record, and does not run infeasible tasks: the reference solution failing in this environment says the environment cannot judge the task, and doing nothing passing says the task cannot tell a migration from none.
 
 ## 4. Metrics
 
@@ -90,8 +91,32 @@ The Field page is built from the consumers' state branches at build time, not fr
 
 The charts are [Vega-Lite](https://vega.github.io/vega-lite/), which draws an interval band declaratively; the diff editor is [Monaco](https://microsoft.github.io/monaco-editor/), loaded on the Diff page only. Both come from a pinned CDN version, so the site has no build step of its own. Record data is fetched per page as it is needed, not embedded, because the records grow with every run.
 
-## 8. The suite
+## 8. The suites
 
-`vendor/dsh-plugin-upgrade-skill` is a submodule pinned to one commit, never a branch: the suite's own comparability rules require a frozen snapshot, and a record names the commit and the task list it ran.
+A run draws its tasks from one suite (`--suite`), and a record names the suite's repository and version.
+
+| Suite | Tasks | Version |
+|---|---|---|
+| `upgrade-skill` | `vendor/dsh-plugin-upgrade-skill/benchmark/tasks`, written by the upgrade skill's authors | The commit the submodule pins, never a branch: the suite's own comparability rules require a frozen snapshot |
+| `spans` | `bench/tasks` in this repository | The git tree of `bench/tasks`, which an amended or rebased commit keeps |
+
+### The span suite
+
+The upgrade-skill suite targets one release, so it says nothing about other release spans. The span suite adds tasks for the spans a consumer meets: a short prerelease bump, a step of one minor line, and a long jump across several. Each task is a migration a plugin author already made: the fixture is the plugin at the commit before it, and the reference solution is the commit that made it. A task's `README.md` names the repository, both commits and the licence, which the fixture keeps.
+
+A fixture leaves out what would hand the agent the answer or that no consumer commits: build output, the author's migration notes, agent notes, lockfiles of other package managers. The task image installs the target release globally with `npm install --before` an hour after its publication, so a prerelease resolves the dependencies it was published with.
+
+Every task has the same verifier, `bench/judge/judge.mjs`, copied into its `tests/` and configured by `tests/task.json`; `npm test` checks that every copy is current. It copies the plugin as the agent left it and scores, each 0 or 1 and weighted to a 0–100 score:
+
+| Check | Passes when | Weight |
+|---|---|---|
+| `contract` | Every `@deepseek-ai/dsh-*` range of the plugin admits the target | 15 |
+| `typecheck`, `test`, `build` | The plugin's script passes with every dsh package it names that the target published pinned to the target, and the task's hidden tests in place | 20, 30, 15 |
+| `boot` | dsh of the target loads the built plugin: headless dsh reaches the model call, `dsh web` reports ready for a plugin with a browser half | 20 |
+| `unchanged` | A control task's listed paths are as the fixture had them | 30 |
+
+The hidden tests are the tests the author's migration changed, kept only where the migration forced the change; a test that records the author's own choice (dropping support for an older release, renaming a helper) stays as the fixture had it, because a migration that makes another choice is not wrong. A control task is a span on which the plugin needed only its dependency ranges raised; it scores a migration that leaves the code alone.
+
+A task enters the suite when the oracle scores 1.0 on it and `nop` scores below 1.0.
 
 The suite does not require isolation from its agent: it states that "security is guaranteed jointly by the one-shot container, the scope constraints, and the verifier", sets no `[agent] user`, and uploads `tests/` only after the agent has finished. The adapter therefore runs as root in the task container, like the suite's own agents.

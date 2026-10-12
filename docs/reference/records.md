@@ -17,14 +17,14 @@ A record is `records/<id>/record.json` on the `bench/records` branch, schema 3, 
 | `producer.dirty` | boolean | A dirty tree is refused unless the run asked for it, and then the report labels it. |
 | `producer.message` | string | The first line of the commit message; the commit may be rewritten later, the record keeps what it said. |
 | `producer.snapshot` | string | The hash of what the Action brought to the run, stored under `snapshots/<hash>/`: the statechart, the configuration defaults, the prompts, the agent runtime, the upgrade skills and the source. |
-| `subject.id` | `pipeline` \| `pipeline+skills` \| `session` \| `session+skills` \| `oracle` | What ran as the Harbor agent; docs/design/evaluation.md defines each. |
+| `subject.id` | `pipeline` \| `pipeline+skills` \| `session` \| `session+skills` \| `oracle` \| `nop` | What ran as the Harbor agent; docs/design/evaluation.md defines each. |
 | `subject.agentRuntime` | string | The dsh version of the agent runtime. |
 | `subject.skills.commit` | string | The upgrade-skill commit the skills came from, for a `+skills` subject. |
 | `subject.skills.names` | list of string | The skills loaded. |
 | `subject.attempts` | integer | Attempts per task. |
 | `subject.agentTimeoutMultiplier` | number | Harbor `--agent-timeout-multiplier`. |
 | `suite.repository` | string | The suite repository. |
-| `suite.commit` | string | The commit the `vendor/dsh-plugin-upgrade-skill` submodule pinned. |
+| `suite.commit` | string | For the upgrade-skill suite, the commit the `vendor/dsh-plugin-upgrade-skill` submodule pinned; for this repository's suite, the git tree of `bench/tasks`. |
 | `suite.tasks` | list | Every selected task, run or not. |
 | `suite.tasks[].id` | string | The task directory name. |
 | `suite.tasks[].family` | string | The task id prefix: `S` static, `M` migration, `H` hands-on. |
