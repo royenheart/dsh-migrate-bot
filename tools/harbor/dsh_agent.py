@@ -10,10 +10,13 @@ docs/design/evaluation.md defines the subjects.
   as its task, in `/app`.
 * `pipeline` and `pipeline+skills` run `dsh-migrate run` on a copy of the
   fixture, as a consumer repository with publishing off and the default checks,
-  and apply the tree it would propose to `/app/fixture`. The task statement is
-  not read: the pipeline takes its target from the dsh release installed in
-  the task container. Their setup installs the Playwright and Chromium of the
-  image, which the end-to-end check runs.
+  and apply the tree it would propose to `/app/fixture`. The pipeline does not
+  read the task statement: it takes its target from the dsh release installed
+  in the task container. When the statement also asks for a written report
+  under `/app/agent-output/`, one more session, with the statement and the
+  pipeline's reports and event log, writes it; its cost counts. Their setup
+  installs the Playwright and Chromium of the image, which the end-to-end check
+  runs.
 
 Every subject runs in the pinned agent runtime of `container/agent-runtime`,
 installed apart from the task's own dsh, with the migrate profile in
@@ -51,6 +54,8 @@ STATUS_PREFIX = "dsh-migrate-status:"
 BROWSERS = "/ms-playwright"
 # Harbor binds the trial's agent log directory here, so what is written to it survives a timeout.
 AGENT_LOGS = "/logs/agent"
+# Where a task statement asks for its written deliverables.
+REPORT_DIR = "/app/agent-output/"
 
 
 class DshAgent(BaseAgent):
@@ -120,7 +125,9 @@ class DshAgent(BaseAgent):
             raise RuntimeError("DEEPSEEK_API_KEY is not set in the environment running Harbor")
         baseline = (await self._exec(environment, "git -C /app rev-parse HEAD")).strip()
         if self._subject.startswith("pipeline"):
-            code, log = await self._run_pipeline(environment, api_key, context)
+            code, log, target = await self._run_pipeline(environment, api_key, context)
+            if REPORT_DIR in instruction:
+                await self._write_report(environment, api_key, instruction, target, context)
         else:
             code, log = await self._run_session(environment, api_key, instruction, context)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
@@ -130,7 +137,7 @@ class DshAgent(BaseAgent):
         (self.logs_dir / "proposed.diff").write_text(await self._fixture_diff(environment, baseline), encoding="utf-8")
         context.metadata = {"subject": self._subject, "agent_exit_code": code}
 
-    async def _run_session(self, environment: BaseEnvironment, api_key: str, instruction: str, context: AgentContext) -> tuple[int, str]:
+    async def _run_session(self, environment: BaseEnvironment, api_key: str, instruction: str, context: AgentContext, log_name: str = "agent.log") -> tuple[int, str]:
         if self._skills:
             await self._exec(environment, f"mkdir -p {DSH_HOME}/skills && cp -R {SKILLS_DIR}/{SKILL} {DSH_HOME}/skills/")
         env = {
@@ -150,14 +157,32 @@ class DshAgent(BaseAgent):
             if line.strip().startswith(STATUS_PREFIX):
                 status = json.loads(line.strip()[len(STATUS_PREFIX):])
         if status is not None:
-            context.n_cache_tokens = int(status["cacheHitTokens"])
-            context.n_input_tokens = int(status["cacheMissTokens"]) + context.n_cache_tokens
-            context.n_output_tokens = int(status["outputTokens"])
-            if isinstance(status.get("costUsd"), (int, float)):
-                context.cost_usd = float(status["costUsd"])
+            _add_usage(context, int(status["cacheMissTokens"]), int(status["cacheHitTokens"]), int(status["outputTokens"]),
+                       float(status["costUsd"]) if isinstance(status.get("costUsd"), (int, float)) else None)
+        if log_name != "agent.log":
+            (self.logs_dir / log_name).write_text(log, encoding="utf-8")
         return result.return_code, log
 
-    async def _run_pipeline(self, environment: BaseEnvironment, api_key: str, context: AgentContext) -> tuple[int, str]:
+    async def _write_report(self, environment: BaseEnvironment, api_key: str, instruction: str, target: str, context: AgentContext) -> None:
+        """Write the report the statement asks for, in a session of its own, from what the pipeline left."""
+        evidence = f"{WORK}/pipeline-output"
+        await self._exec(environment, (
+            f"rm -rf {evidence} && mkdir -p {evidence}"
+            f" && if git -C {WORK}/plugin rev-parse -q --verify dsh-migrate/state >/dev/null;"
+            f" then git -C {WORK}/plugin archive dsh-migrate/state | tar -x -C {evidence}; fi"
+        ))
+        prompt = (
+            f"{instruction}\n\n---\n\n"
+            "An automated migration pipeline, dsh-migrate, already handled this task without seeing the statement above. "
+            "Its result is in /app/fixture: `git -C /app diff HEAD -- fixture` shows what it changed. "
+            f"Its reviews, repair reports, patch reports and event log are under {evidence}/migrations/{target}/. "
+            f"Your only job is the written deliverable the statement asks for under {REPORT_DIR}: "
+            "write it at the paths the statement names, from that evidence and your own reading of the fixture. "
+            "Do not modify /app/fixture."
+        )
+        await self._run_session(environment, api_key, prompt, context, log_name="report.log")
+
+    async def _run_pipeline(self, environment: BaseEnvironment, api_key: str, context: AgentContext) -> tuple[int, str, str]:
         plugin = f"{WORK}/plugin"
         target = (await self._exec(environment, "node -p \"require(require('path').join(require('child_process').execSync('npm root -g').toString().trim(), '@deepseek-ai/dsh/package.json')).version\"")).strip()
         config = {
@@ -190,7 +215,7 @@ class DshAgent(BaseAgent):
                 " && find /app/fixture -mindepth 1 -maxdepth 1 ! -name node_modules -exec rm -rf {} +"
                 " && git checkout-index -a -f --prefix=/app/fixture/"
             ))
-        return result.return_code, await self._exec(environment, f"cat {AGENT_LOGS}/agent.log")
+        return result.return_code, await self._exec(environment, f"cat {AGENT_LOGS}/agent.log"), target
 
     async def _fixture_diff(self, environment: BaseEnvironment, baseline: str) -> str:
         """The fixture against the baseline commit, untracked files included, without touching the index."""
@@ -213,7 +238,13 @@ def _add_session_usage(events: str, context: AgentContext) -> None:
                 totals[key] += usage.get(key, 0)
             if "usd" in usage:
                 usd = (usd or 0.0) + usage["usd"]
-    context.n_cache_tokens = totals["cacheHitTokens"]
-    context.n_input_tokens = totals["inputTokens"] + totals["cacheHitTokens"]
-    context.n_output_tokens = totals["outputTokens"]
-    context.cost_usd = usd
+    _add_usage(context, totals["inputTokens"], totals["cacheHitTokens"], totals["outputTokens"], usd)
+
+
+def _add_usage(context: AgentContext, miss: int, hit: int, output: int, usd: float | None) -> None:
+    """Add one session's usage to the attempt's, counted as Harbor counts it: input includes the cache hits."""
+    context.n_cache_tokens = (context.n_cache_tokens or 0) + hit
+    context.n_input_tokens = (context.n_input_tokens or 0) + miss + hit
+    context.n_output_tokens = (context.n_output_tokens or 0) + output
+    if usd is not None:
+        context.cost_usd = (context.cost_usd or 0.0) + usd

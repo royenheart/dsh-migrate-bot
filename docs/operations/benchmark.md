@@ -27,6 +27,8 @@ npm run bench -- run --suite spans --subject nop --attempts 1 --harbor ~/.harbor
 DEEPSEEK_API_KEY=… npm run bench -- run --subject pipeline --attempts 3 --harbor ~/.harbor/bin/harbor
 ```
 
+The upgrade-skill suite's static tasks and some others grade a written report with an LLM judge. They run only when the shell sets `REPORT_JUDGE_BASE_URL` (an OpenAI-compatible API prefix), `REPORT_JUDGE_MODEL` and `REPORT_JUDGE_API_KEY`; the judge must answer non-streamed chat completions with `response_format: json_object`. Read the key from its file inline, as the DeepSeek key is, and keep the same judge across the records you compare.
+
 | Option | Meaning | Default |
 |---|---|---|
 | `--subject` | `pipeline`, `pipeline+skills`, `session`, `session+skills`, `oracle` or `nop` | required |

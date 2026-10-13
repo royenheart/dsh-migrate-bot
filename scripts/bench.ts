@@ -43,7 +43,7 @@ const KEYLESS: ReadonlySet<SubjectId> = new Set(['oracle', 'nop'])
 const RECORDS_DIR = join(REPO_ROOT, '.bench', 'records')
 const AGENT = 'tools.harbor.dsh_agent:DshAgent'
 /** The files of a trial a record keeps, relative to the trial directory. */
-const AGENT_FILES = ['agent/proposed.diff', 'agent/agent.log', 'agent/events.jsonl', 'agent/status.json']
+const AGENT_FILES = ['agent/proposed.diff', 'agent/agent.log', 'agent/report.log', 'agent/events.jsonl', 'agent/status.json']
 
 const git = (args: string[], cwd = REPO_ROOT): string => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 const recordPath = (records: string, id: string): string => join(records, 'records', id, 'record.json')
@@ -216,6 +216,8 @@ async function run(argv: string[]): Promise<number> {
   const jobs = mkdtempSync(join(tmpdir(), 'dsh-migrate-bench-'))
   const harborArgs = ['run', '-p', tasksDir, '-o', jobs, '--job-name', id, '-k', String(attempts), '-n', String(concurrency), '--agent-timeout-multiplier', String(multiplier)]
   for (const task of runnable) harborArgs.push('-i', task.id)
+  // Harbor asks before it hands the shell's variables to a verifier; a run that set them for the report judge has answered.
+  if (runnable.some(task => suite.find(entry => entry.id === task.id)?.verifierEnv.length)) harborArgs.push('--yes')
   if (KEYLESS.has(subject)) {
     harborArgs.push('-a', subject)
   } else {
@@ -233,7 +235,12 @@ async function run(argv: string[]): Promise<number> {
     agentTimeoutMultiplier: multiplier,
     concurrency,
     model: { provider, model, ...(before === undefined ? {} : { before }) },
-    suite: { repository: SUITES[suiteId].repository, commit: suiteCommit, tasks },
+    suite: {
+      repository: SUITES[suiteId].repository,
+      commit: suiteCommit,
+      tasks,
+      ...(process.env.REPORT_JUDGE_MODEL ? { judge: { baseUrl: process.env.REPORT_JUDGE_BASE_URL ?? '', model: process.env.REPORT_JUDGE_MODEL } } : {}),
+    },
     skillsCommit: git(['rev-parse', 'HEAD'], SKILLS_DIR),
     names: Object.fromEntries(idOf),
   }
@@ -257,7 +264,7 @@ const runPlanSchema = z.strictObject({
   agentTimeoutMultiplier: z.number().positive(),
   concurrency: z.number().int().min(1),
   model: z.strictObject({ provider: z.string(), model: z.string(), before: recordSchema.shape.model.shape.before }),
-  suite: z.strictObject({ repository: z.string(), commit: z.string(), tasks: recordSchema.shape.suite.shape.tasks }),
+  suite: z.strictObject({ repository: z.string(), commit: z.string(), tasks: recordSchema.shape.suite.shape.tasks, judge: recordSchema.shape.suite.shape.judge }),
   /** The upgrade-skill commit a `+skills` subject loads, whichever suite the tasks come from. */
   skillsCommit: z.string(),
   /** Harbor names a trial's task by its `task.toml` name; a record by its directory. */
@@ -303,7 +310,7 @@ async function harborThenRecord(plan: RunPlan, jobDir: string, harborBin: string
       attempts,
       agentTimeoutMultiplier: plan.agentTimeoutMultiplier,
     },
-    suite: { repository: plan.suite.repository, commit: plan.suite.commit, tasks },
+    suite: { repository: plan.suite.repository, commit: plan.suite.commit, tasks, ...(plan.suite.judge === undefined ? {} : { judge: plan.suite.judge }) },
     model: KEYLESS.has(subject) ? { provider: 'none', model: 'none' } : { ...plan.model, ...(after === undefined ? {} : { after }) },
     environment: {
       harbor: execFileSync(harborBin, ['--version'], { encoding: 'utf8' }).trim(),

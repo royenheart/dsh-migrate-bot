@@ -33,6 +33,8 @@ A record is `records/<id>/record.json` on the `bench/records` branch, schema 3, 
 | `suite.tasks[].applicable` | boolean | Whether the subject can attempt the task; a `pipeline` subject does not answer the static tasks. |
 | `suite.tasks[].feasible` | boolean | Whether every attempt of the newest oracle record of this suite commit scored 1.0 on the task; always true in an oracle record. |
 | `suite.tasks[].note` | string | Why the task is not applicable or not feasible. |
+| `suite.judge.baseUrl` | string |  |
+| `suite.judge.model` | string |  |
 | `model.provider` | string | The requested provider route. |
 | `model.model` | string | The requested model. |
 | `model.before.at` | string | When the probe answered. |

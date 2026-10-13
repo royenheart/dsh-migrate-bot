@@ -92,6 +92,10 @@ export const recordSchema = z.strictObject({
     repository: z.string().describe('The suite repository.'),
     commit: z.string().regex(/^[0-9a-f]{40}$/).describe('For the upgrade-skill suite, the commit the `vendor/dsh-plugin-upgrade-skill` submodule pinned; for this repository\'s suite, the git tree of `bench/tasks`.'),
     tasks: z.array(taskSchema).describe('Every selected task, run or not.'),
+    judge: z.strictObject({
+      baseUrl: z.string(),
+      model: z.string(),
+    }).optional().describe('The model the suite\'s report judge scored written reports with (`REPORT_JUDGE_*`), when the run set one: scores from different judges do not compare.'),
   }),
   model: z.strictObject({
     provider: z.string().describe('The requested provider route.'),

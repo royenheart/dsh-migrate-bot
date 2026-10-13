@@ -23,7 +23,7 @@ The Action is scored on the community migration suite [`oh-my-dsh/dsh-plugin-upg
 
 | Subject | What runs as the Harbor agent (`tools/harbor/dsh_agent.py`) |
 |---|---|
-| `pipeline` | `dsh-migrate run --skip-github` on a copy of the task fixture, as a consumer repository with publishing off, with `agent.upgradeSkills: false` and every check at its default; the task container gets the image's Playwright and Chromium for the end-to-end check |
+| `pipeline` | `dsh-migrate run --skip-github` on a copy of the task fixture, as a consumer repository with publishing off, with `agent.upgradeSkills: false` and every check at its default; the task container gets the image's Playwright and Chromium for the end-to-end check. When the statement asks for a written report, one more session writes it (below) |
 | `pipeline+skills` | The same, with `agent.upgradeSkills: true`, the Action's default |
 | `session` | One `dsh --profile migrate` session with the task statement as its task, in `/app` |
 | `session+skills` | The same, with the `plugin-upgrade` skill loaded |
@@ -38,7 +38,9 @@ A pipeline does not read the task statement. It takes its target from the dsh re
 - A task that installs no dsh release gives a pipeline no target, so it is not applicable either.
 - A task whose agent runs without network gives a pipeline no way to install the releases its checks run on, so it is not applicable.
 
-For every subject, a task whose verifier reads a variable the run does not set (the suite's report judge reads `REPORT_JUDGE_BASE_URL`, `REPORT_JUDGE_MODEL` and `REPORT_JUDGE_API_KEY`) is not applicable, because Harbor refuses a job in which any task lacks one; the record names the missing variables. No record is written when Harbor ran no trial.
+The pipeline never sees the statement, so it never writes the report many statements ask for under `/app/agent-output/`: in the first runs 14 of 26 pipeline attempts lacked it, and no session attempt did. A missing report caps or costs a task's score whatever the migration did. So after the pipeline, one session of the same runtime and model is given the statement, the pipeline's state branch (its reviews, repair reports, patch reports and event log) and the fixture as the pipeline left it, and writes only that deliverable; its usage counts toward the attempt. It is a separate session, rather than the statement handed to the pipeline, because the pipeline is measured as a consumer runs it.
+
+For every subject, a task whose verifier reads a variable the run does not set (the suite's report judge reads `REPORT_JUDGE_BASE_URL`, `REPORT_JUDGE_MODEL` and `REPORT_JUDGE_API_KEY`) is not applicable, because Harbor refuses a job in which any task lacks one; the record names the missing variables. A run that sets them records the judge's endpoint and model with the suite, because scores from different judges do not compare. No record is written when Harbor ran no trial.
 
 The fixture receives what a consumer would be proposed: the tree of a migration that ended `unpublished` (it changed and passed with publishing off). A migration that ended `failed`, `compatible` or `error` leaves the fixture as it was, and the verifier scores that.
 
