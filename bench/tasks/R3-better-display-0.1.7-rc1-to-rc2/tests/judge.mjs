@@ -99,6 +99,8 @@ if (task.boot !== false) {
   symlinkSync(work, join(profile, 'node_modules', manifest.name), 'dir')
   const bundles = ['@deepseek-ai/dsh-base', web ? '@deepseek-ai/dsh-web-app' : '@deepseek-ai/dsh-headless', manifest.name]
   writeFileSync(join(profile, 'package.json'), JSON.stringify({ name: 'judge-profile', private: true, type: 'module', dsh: { profile: { bundles, patchReload: 'startup' } } }))
+  // The web composition turns HMR on, whose file watches run a shared host out of inotify instances (EMFILE); a boot that exits needs none.
+  writeFileSync(join(profile, 'cordis.patch.yml'), '- id: hmr\n  disabled: true\n')
   const help = spawnSync('dsh', ['web', '--help'], { encoding: 'utf8' }).stdout ?? ''
   // `dsh web` is the profile named web; the profile under test is named instead.
   const args = web ? ['--profile', 'judge', '--port', '0', ...(help.includes('--no-open') ? ['--no-open'] : [])] : ['--profile', 'judge', 'ping']
