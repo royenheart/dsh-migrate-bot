@@ -85,7 +85,7 @@ export const configSchema = z.strictObject({
       dir: relativeDir.default('e2e').describe('Directory of the suite on its branch.')
         .transform(normalizeDir),
       failurePolicy: z.enum(E2E_FAILURE_POLICIES).default('advisory')
-        .describe('`advisory` reports a failing end-to-end test in the proposal and goes on, without a repair attempt; `blocking` repairs it like any failing check and fails the migration when the repairs do not fix it.'),
+        .describe('`advisory` never lets an end-to-end failure stop a migration: a test that failed on the way through the host\'s UI is reported at once, one that failed in the plugin\'s part is repaired and reported when the repairs do not fix it. `blocking` repairs every failure and fails the migration when the repairs do not fix it.'),
     }).prefault({}),
   }).prefault({}),
   timeouts: z.strictObject({

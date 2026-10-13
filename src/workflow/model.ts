@@ -24,6 +24,12 @@ export const checkResultSchema = z.strictObject({
   fingerprint: z.string(),
   /** A bounded excerpt of the output, or why the check was skipped. */
   detail: z.string(),
+  /**
+   * For a failing end-to-end check: \`plugin\` when a test failed in a step that
+   * checks the plugin's own part, \`host\` when every failure was on the way
+   * there through the host's UI or cannot be placed.
+   */
+  blame: z.enum(['plugin', 'host']).optional(),
 })
 export type CheckResult = z.infer<typeof checkResultSchema>
 

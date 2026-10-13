@@ -91,7 +91,8 @@ export const GUARD_DESCRIPTIONS = {
   blockerValid: 'The repair report declared an upstream blocker with every evidence field.',
   notReviewed: 'The overlap and extension-point reviews have not run.',
   canRepair: 'Repair attempts are left, and the failure fingerprint differs from the one the last repair attempt was given.',
-  advisoryE2EFailure: 'The failing check is the end-to-end check, and the failure policy is `advisory`.',
+  advisoryHostE2EFailure: 'The failing check is the end-to-end check, no test failed in a step that checks the plugin\'s own part, and the failure policy is `advisory`.',
+  advisoryE2EFailure: 'The failing check is the end-to-end check and the failure policy is `advisory`.',
   characterizable: 'The end-to-end check is enabled and a source release is known.',
   publishesE2E: 'The end-to-end check is enabled, and an end-to-end baseline was recorded or the tree went through a review.',
   concludedIn: 'The migration concluded in the given state.',
@@ -117,6 +118,10 @@ export const migrationMachine = setup({
   actions: {
     /** Ask the engine for one activity. The body is empty: the engine reads the parameters. */
     run: (_, _params: ActivityRequest) => {},
+    /** The proposal says which end-to-end tests broke; the pull request shows where and how. */
+    warnE2E: assign({
+      warnings: ({ context }) => [...context.warnings, `end-to-end tests that passed before the migration fail now (advisory, see the checks): ${context.failure?.fingerprint ?? ''}`],
+    }),
     acceptReportCommand: assign({
       comments: ({ context, event }) => event.type === 'command.report' ? [...context.comments, event.comment] : context.comments,
       delivered: ({ context, event }) => event.type === 'command.report' && event.resend ? [] : context.delivered,
@@ -135,6 +140,7 @@ export const migrationMachine = setup({
     notReviewed: ({ context }) => !context.reviewed,
     canRepair: ({ context }) => context.attempts < context.input.settings.maxAttempts
       && context.failure?.fingerprint !== context.lastFingerprint,
+    advisoryHostE2EFailure: ({ context }) => context.failure?.check === 'e2e' && context.failure.blame !== 'plugin' && context.input.settings.e2eFailurePolicy === 'advisory',
     advisoryE2EFailure: ({ context }) => context.failure?.check === 'e2e' && context.input.settings.e2eFailurePolicy === 'advisory',
     characterizable: ({ context }) => context.input.settings.checks.e2e && context.input.source !== undefined,
     publishesE2E: ({ context }) => context.input.settings.checks.e2e && (context.e2eBaseline.length > 0 || context.reviewed),
@@ -295,15 +301,12 @@ export const migrationMachine = setup({
     },
     evaluating: {
       always: [
-        {
-          guard: 'advisoryE2EFailure',
-          target: 'concluding',
-          actions: assign({
-            warnings: ({ context }) => [...context.warnings, `end-to-end tests that passed before the migration fail now (advisory, see the checks): ${context.failure?.fingerprint ?? ''}`],
-          }),
-        },
+        // An advisory end-to-end failure on the way through the host's UI is reported, never worked on: no change to the plugin fixes a host whose UI moved.
+        { guard: 'advisoryHostE2EFailure', target: 'concluding', actions: 'warnE2E' },
         { guard: 'notReviewed', target: 'reviewing' },
         { guard: 'canRepair', target: 'repairing' },
+        // One in the plugin's part is repaired, and when the repairs do not fix it, reported: an advisory check never stops a migration.
+        { guard: 'advisoryE2EFailure', target: 'concluding', actions: 'warnE2E' },
         {
           target: 'failed',
           actions: assign({

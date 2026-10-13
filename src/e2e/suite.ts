@@ -121,9 +121,25 @@ export function publishSuite(input: { workdir: string; branch: string; dir: stri
 /** The part of Playwright's JSON report this reads: every test, by its title path, and its outcome. */
 interface ReportSuite {
   title?: string
-  specs?: Array<{ title: string; tests: Array<{ status: string; results?: Array<{ error?: { message?: string } }> }> }>
+  specs?: Array<{ title: string; tests: Array<{ status: string; results?: Array<{ error?: { message?: string }; steps?: ReportStep[] }> }> }>
   suites?: ReportSuite[]
 }
+
+interface ReportStep {
+  title: string
+  error?: { message?: string }
+  steps?: ReportStep[]
+}
+
+/**
+ * Where a test failed. A test of the suite walks two kinds of top-level step:
+ * \`reach: …\` through the host's UI to the plugin's part, then \`check: …\` on
+ * that part, the page-error tripwires included. A release that reworks the
+ * host's UI fails a test in a reach step, which no change to the plugin fixes;
+ * a failure in a check step is the plugin's. A failure outside any step
+ * cannot be placed.
+ */
+export type FailurePhase = 'reach' | 'check' | 'unplaced'
 
 export interface SuiteReport {
   /** Test ids, `file › describe › title`. */
@@ -131,6 +147,16 @@ export interface SuiteReport {
   failed: string[]
   /** The first error of each failed test that reported one. */
   errors: Record<string, string>
+  phases: Record<string, FailurePhase>
+}
+
+/** The phase of the top-level step that failed; Playwright marks a step failed when a step inside it did. */
+function phaseOf(steps: readonly ReportStep[]): FailurePhase {
+  const failing = steps.find(step => step.error !== undefined)
+  if (failing === undefined) return 'unplaced'
+  if (/^reach\b/i.test(failing.title)) return 'reach'
+  if (/^check\b/i.test(failing.title)) return 'check'
+  return 'unplaced'
 }
 
 /** The tests of a Playwright JSON report by outcome. */
@@ -145,6 +171,7 @@ export function readReport(json: string): SuiteReport | undefined {
   const passed: string[] = []
   const failed: string[] = []
   const errors: Record<string, string> = {}
+  const phases: Record<string, FailurePhase> = {}
   const walk = (suite: ReportSuite, path: string[]): void => {
     const here = suite.title === undefined || suite.title === '' ? path : [...path, suite.title]
     for (const spec of suite.specs ?? []) {
@@ -157,12 +184,13 @@ export function readReport(json: string): SuiteReport | undefined {
         failed.push(id)
         const message = spec.tests.flatMap(test => test.results ?? []).find(result => result.error?.message !== undefined)?.error?.message
         if (message !== undefined) errors[id] = inline(stripVTControlCharacters(message), 400)
+        phases[id] = phaseOf(spec.tests.flatMap(test => test.results ?? []).find(result => result.error !== undefined)?.steps ?? [])
       }
     }
     for (const child of suite.suites ?? []) walk(child, here)
   }
   for (const suite of report.suites) walk(suite, [])
-  return { passed, failed, errors }
+  return { passed, failed, errors, phases }
 }
 
 export interface SuiteRun extends SuiteReport {
@@ -172,7 +200,7 @@ export interface SuiteRun extends SuiteReport {
   output: string
 }
 
-const NO_TESTS: SuiteReport = { passed: [], failed: [], errors: {} }
+const NO_TESTS: SuiteReport = { passed: [], failed: [], errors: {}, phases: {} }
 
 /**
  * Install the suite's dependencies when they are missing and run it against a
@@ -222,6 +250,7 @@ Also keep "${input.suiteDir}/${INDEX_FILE}": { "features": [ { "id", "entry", "e
 Rules:
 - Cover what a user sees and does: every panel, menu, setting and command the plugins add.
 - Reach each feature by the shortest path the plugin itself offers. The host's own UI (its settings dialog, plugin list, navigation) changes between releases, and a test that walks through it fails for reasons the plugin cannot fix; go through it only where the feature has no other entry, and assert on the plugin's part, not the host's.
+- Split every test into top-level \`test.step\`s whose titles start with \`reach:\` or \`check:\`. Everything the host renders belongs to reach steps: its navigation, dialogs, settings pages, plugin list, menus and boot data, whether you click through them or read them. A check step asserts only on what the plugin itself renders and does (its panel, its menu entries, its settings fields, the effect of its commands) and on the console and pageerror tripwires, which go in a final check step. A failure in a reach step is read as the host's UI having moved, which the migration cannot fix; a failure in a check step as the plugin having broken, which it must. "The plugin appears in the host's plugin list" is a reach step, not a check.
 - Assert on ARIA roles, accessible names and text; never on the host's own data-* attributes or class names, which change between releases.
 - Never wait for network idle; poll until two consecutive reads agree. Add a console and pageerror tripwire to each spec.
 - A feature that needs a model answer cannot complete here; check that it is offered and reachable, not its answer.

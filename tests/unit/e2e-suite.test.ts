@@ -35,18 +35,23 @@ function suite(dir: string, spec = 'test("opens", () => {})\n'): void {
   writeFileSync(join(dir, 'node_modules', 'x', 'index.js'), '')
 }
 
-test('Playwright tests are read by their title path, a test is passing only when every run of it passed', () => {
+test('Playwright tests are read by their title path, a test passes only when every run of it passed, and a failure is placed by its step', () => {
   const report = JSON.stringify({
     suites: [{
       title: 'specs/panel.spec.ts',
       specs: [{ title: 'opens', tests: [{ status: 'expected' }] }, { title: 'is gone', tests: [{ status: 'skipped' }] }],
-      suites: [{ title: 'settings', specs: [{ title: 'saves', tests: [{ status: 'unexpected', results: [{ error: { message: '\u001b[31mError:\u001b[39m expect(locator).toBeVisible() failed\n\nLocator: getByRole(\'button\', { name: \'Save\' })' } }] }] }, { title: 'flakes', tests: [{ status: 'flaky' }] }] }],
+      suites: [{ title: 'settings', specs: [
+        { title: 'saves', tests: [{ status: 'unexpected', results: [{ error: { message: '\u001b[31mError:\u001b[39m expect(locator).toBeVisible() failed\n\nLocator: getByRole(\'button\', { name: \'Save\' })' }, steps: [{ title: 'reach: open the settings dialog' }, { title: 'check: the panel saves', error: { message: 'x' }, steps: [{ title: 'expect.toBeVisible', error: { message: 'x' } }] }] }] }] },
+        { title: 'opens', tests: [{ status: 'unexpected', results: [{ error: { message: 'y' }, steps: [{ title: 'reach: open the settings dialog', error: { message: 'y' } }] }] }] },
+        { title: 'flakes', tests: [{ status: 'flaky' }] },
+      ] }],
     }],
   })
   assert.deepEqual(readReport(report), {
     passed: ['specs/panel.spec.ts › opens'],
-    failed: ['specs/panel.spec.ts › settings › saves', 'specs/panel.spec.ts › settings › flakes'],
-    errors: { 'specs/panel.spec.ts › settings › saves': "Error: expect(locator).toBeVisible() failed Locator: getByRole('button', { name: 'Save' })" },
+    failed: ['specs/panel.spec.ts › settings › saves', 'specs/panel.spec.ts › settings › opens', 'specs/panel.spec.ts › settings › flakes'],
+    errors: { 'specs/panel.spec.ts › settings › saves': "Error: expect(locator).toBeVisible() failed Locator: getByRole('button', { name: 'Save' })", 'specs/panel.spec.ts › settings › opens': 'y' },
+    phases: { 'specs/panel.spec.ts › settings › saves': 'check', 'specs/panel.spec.ts › settings › opens': 'reach', 'specs/panel.spec.ts › settings › flakes': 'unplaced' },
   })
   assert.equal(readReport('Error: no config'), undefined)
 })

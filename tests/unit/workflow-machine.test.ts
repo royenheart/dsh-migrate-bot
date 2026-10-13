@@ -65,6 +65,7 @@ function answer(request: ActivityRequest, choices: Choices): MigrationEvent {
           outcome,
           fingerprint: outcome === 'fail' ? choices.pick(FINGERPRINTS) : '',
           detail: '',
+          ...(outcome === 'fail' && request.check === 'e2e' ? { blame: choices.pick(['plugin', 'host'] as const) } : {}),
         },
       }
     }
@@ -209,6 +210,9 @@ test('I4 nothing is concluded from a tree whose last checks failed, except an ad
       if (outcome !== 'fail') continue
       assert.equal(check, 'e2e', `${check} failed and the migration concluded`)
       assert.equal(run.input.settings.e2eFailurePolicy, 'advisory')
+      // A failure in the plugin's part concludes only once the repair loop has given up on it.
+      const { failure, attempts, lastFingerprint } = run.snapshot.context
+      if (failure?.blame === 'plugin') assert.ok(attempts >= run.input.settings.maxAttempts || failure.fingerprint === lastFingerprint, 'the plugin broke a test and the migration concluded with repairs left')
     }
   }), { numRuns: 1000 })
 })
@@ -222,13 +226,13 @@ test('a suite that recorded an end-to-end baseline is published once the migrati
   }), { numRuns: 1000 })
 })
 
-test('an advisory end-to-end failure starts no review and no repair attempt', () => {
+test('an advisory end-to-end failure on the way through the host starts no review and no repair attempt', () => {
   fc.assert(fc.property(runArbitrary, ([input, values, withErrors]) => {
     const run = drive(input, values, withErrors)
     if (run.input.settings.e2eFailurePolicy !== 'advisory') return
     // requests[i] answered by events[i] until the first wait for an outside event, which this prefix never reaches.
     for (const [index, event] of run.events.entries()) {
-      if (event.type !== 'check.done' || event.result.check !== 'e2e' || event.result.outcome !== 'fail') continue
+      if (event.type !== 'check.done' || event.result.check !== 'e2e' || event.result.outcome !== 'fail' || event.result.blame === 'plugin') continue
       const next = run.requests.slice(index + 1).find(request => request.activity !== 'check')
       assert.ok(next === undefined || next.activity !== 'session', `a session followed an advisory end-to-end failure: ${JSON.stringify(next)}`)
     }

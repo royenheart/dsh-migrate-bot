@@ -31,7 +31,7 @@ A consumer configures the Action in `.github/dsh-migrate.yml`. Every key is opti
 | `checks.e2e.enabled` | boolean | `true` | Record an end-to-end baseline on the source release, check it on the target, and keep the suite on its branch. |
 | `checks.e2e.branch` | string | `dsh-migrate/e2e` | Branch that holds the end-to-end suite and nothing else. |
 | `checks.e2e.dir` | string | `e2e` | Directory of the suite on its branch. |
-| `checks.e2e.failurePolicy` | `advisory` \| `blocking` | `advisory` | `advisory` reports a failing end-to-end test in the proposal and goes on, without a repair attempt; `blocking` repairs it like any failing check and fails the migration when the repairs do not fix it. |
+| `checks.e2e.failurePolicy` | `advisory` \| `blocking` | `advisory` | `advisory` never lets an end-to-end failure stop a migration: a test that failed on the way through the host's UI is reported at once, one that failed in the plugin's part is repaired and reported when the repairs do not fix it. `blocking` repairs every failure and fails the migration when the repairs do not fix it. |
 | `timeouts.agentMs` | integer | `3600000` | Watchdog for one agent session. |
 | `timeouts.commandMs` | integer | `1200000` | Watchdog for one mechanical command. |
 | `timeouts.checkoutMs` | integer | `600000` | Watchdog for the harness checkout. |
