@@ -1,0 +1,71 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "official-short-name",
+      "verdict": "pass",
+      "reason": "The candidate locates the plugin name greet and identifies it as a valid official short name under the baseline policy, explicitly distinguishing declared plugin name from package and noting that a publisher prefix is only a collision suggestion, not a required fix.",
+      "points": 25,
+      "awarded": 25
+    },
+    {
+      "id": "service-collision-advice",
+      "verdict": "pass",
+      "reason": "The unprefixed service search is located and correctly classified as a collision warning/recommendation rather than a compatibility error, with correct reasoning that strict mode would only produce nonzero exit for the warning.",
+      "points": 25,
+      "awarded": 25
+    },
+    {
+      "id": "shared-event-context",
+      "verdict": "pass",
+      "reason": "The event web-search/ready is identified as a shared channel where name matching alone does not establish conflict; the report correctly requires publisher schema compatibility and registry context, avoiding unsupported global-uniqueness claims.",
+      "points": 25,
+      "awarded": 25
+    },
+    {
+      "id": "coverage-and-registry-limits",
+      "verdict": "pass",
+      "reason": "Remaining surfaces are grouped with a justified 'needs registry context' verdict, registry occupancy/reservation/availability is stated as unknown/not checked, later verification is proposed without claiming it was run, private:true is not turned into an error, and reserved/all-clear claims are explicitly rejected.",
+      "points": 25,
+      "awarded": 25
+    }
+  ],
+  "caps": [
+    {
+      "id": "unsupported-all-clear",
+      "triggered": false,
+      "reason": "The report explicitly refuses to assert reservation or global availability and states registry status as unknown, so no unsupported blanket all-clear is made.",
+      "total": 30
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-ejcLlsv0u4IZlVhW9oncZ0p1",
+    "usage": {
+      "prompt_tokens": 2399,
+      "completion_tokens": 959,
+      "total_tokens": 3358,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 662
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "c4e0416a5e91a40a04d44c8ae75bfe18fe321714a8a26eca6020bf346efd601b",
+    "response_sha256": "d309d710b1b2ae3d4929e8c11ac644a404784586501f7e21ec1385d5f19d5010"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "8703651573fa6383e3c1497b2465aa5fad8fc84b60d10fddf1074b533564dbb6"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "dbbe4811c3b6c7632e166dc738b752c1e8a172a0f86863655cd1d784243a7485",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

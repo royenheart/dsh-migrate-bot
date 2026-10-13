@@ -1,0 +1,78 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "silent-break-attribution",
+      "verdict": "pass",
+      "reason": "Correctly identifies sessions.list.getSnapshot().current returning undefined on alpha.2, resolve() returning null, and onKeyDown exiting before preventDefault. Explains both silences accurately: the guard passes because all four presence probes check service members that still exist while only a field inside the snapshot vanished, and undefined was a legitimate no-session state the code quietly ignores. Grounded in the plugin source and type excerpts; does not claim the service was removed or throws.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "evidence-mapping",
+      "verdict": "pass",
+      "reason": "Maps the change from alpha.1 SessionListState.current to its absence in alpha.2 SessionListSnapshot, cites the 'navigation belongs to view owners' doc comment, and identifies the canonical replacement as uiSession.adapter.current (ObservableSnapshot<SessionBindingValue>) yielding { key, ctx, hooks, keyedHooks, props } with key replacing current and ctx replacing sessions.scope(id). Grounded in the type excerpts, not just the reference card.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "dual-host-migration",
+      "verdict": "pass",
+      "reason": "Provides fenced dual-host code: feature-detects ctx.uiSession and reads adapter.current.getSnapshot() key/ctx on alpha.2, falls back to legacy sessions.list.getSnapshot().current plus sessions.scope(id) on alpha.1, from one build. inject gains uiSession; conversation resolves via scope.get('conversation') and input.for receives the binding scope. Equivalent shape accepted; guard order acceptable.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "guard-hardening",
+      "verdict": "pass",
+      "reason": "Names the breakage class as field-level removal behind service-level stability, notes the guard runs once at activation while the break recurs per keystroke, and specifies a hardened guard that feature-detects the actual capability (assert the snapshot current field on alpha-1-shaped hosts, detect uiSession.adapter.current on alpha-2-shaped hosts) running lazily or per-use rather than only at activation.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "verification-and-prevention",
+      "verdict": "pass",
+      "reason": "Verification includes a temporary probe of adapter.current key with one session open, chord behavior on both hosts after the fix, and typechecking against alpha.2 published types as the pre-ship gate. Prevention proposes a deprecated getter that throws/warns on read or a runtime snapshot-shape contract, turning the silent removal into a loud failure.",
+      "points": 20,
+      "awarded": 20
+    }
+  ],
+  "caps": [
+    {
+      "id": "slot-reregistration-misdiagnosis",
+      "triggered": false,
+      "reason": "The final remedy is the current-session code fix through uiSession.adapter.current with a legacy fallback, not slot re-registration or inject re-declaration alone; inject change is correctly paired with the code change.",
+      "total": 40
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-lTQZJHNCzsUdqqmRysw4Efzs",
+    "usage": {
+      "prompt_tokens": 8339,
+      "completion_tokens": 789,
+      "total_tokens": 9128,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 230
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "a282f73cf68443ac4a672838e96d3574209eaac7d88c36498f2c8f2adcb81112",
+    "response_sha256": "7a396b267f001150df58683b2101c1d87fcc63ee2dbadfef19f1e77f4b33cd99"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "f4369b45ca171b96fd28c9a0483235f945cf4a39489b003ec695e42d76646680"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "94087f5970f8784e0bffdf86eda44bc7e6e713d858efc9b3624c6acf1468ee6e",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

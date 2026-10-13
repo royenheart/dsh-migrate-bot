@@ -1,0 +1,84 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "junction-deployment",
+      "verdict": "pass",
+      "reason": "Correctly cites profile-introspection.txt LinkType Junction, Target, and the cordis.patch.yml link marker to establish that the profile entry resolves to the repo working tree, that repo edits already are the installed copy, and that copying through the junction was unnecessary; explicitly contrasts with copied/registry installs.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "host-lock-and-client-cache",
+      "verdict": "pass",
+      "reason": "Attributes the EBUSY to the running dsh host holding loaded module handles, explains why closing the browser tab did not release it, and separately explains browser caching of client.js requiring host restart plus hard refresh. It does not conflate browser cache with a filesystem lock and does not overgeneralize to all DSH versions. Grounding in copy-session.txt and the maintainer thread is implicit but consistent with the evidence.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "rename-recovery",
+      "verdict": "pass",
+      "reason": "Explains that through the junction both paths are one directory, so renaming renamed the sole physical source files and broke the subsequent source copy. Recovery renames client.js.old2/index.js.old2 back to original names, preserves contents, runs node --check, and only then activates. The note that rename is allowed while handles are open is a reasonable Windows fact and matches the fixture's successful rename; no prohibited file recreation is advised.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "ordered-activation",
+      "verdict": "pass",
+      "reason": "Gives the correct dependency order: fully stop the host, restart dsh web, hard-refresh the browser to bypass cache, then verify the new feature/version and absence of load errors; explicitly states restarting only the browser is insufficient.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "install-mode-preflight",
+      "verdict": "pass",
+      "reason": "Prescribes inspecting the profile entry via Get-Item LinkType/Target or the cordis.patch.yml link marker before any file operation, choosing procedure per linked vs copied mode, and explains why generic copy-into-node_modules advice caused this incident.",
+      "points": 20,
+      "awarded": 20
+    }
+  ],
+  "caps": [
+    {
+      "id": "copy-through-junction",
+      "triggered": false,
+      "reason": "The report explicitly rejects copying through the junction as never necessary and an accident generator; no final advice copies onto the junction target or deletes the .old2 files.",
+      "total": 40
+    },
+    {
+      "id": "browser-only-activation",
+      "triggered": false,
+      "reason": "The report requires a full host stop and restart before browser hard refresh and explicitly states restarting only the browser is insufficient.",
+      "total": 40
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-d0tyZDQe7eYYZg2w1iLR9Oco",
+    "usage": {
+      "prompt_tokens": 4611,
+      "completion_tokens": 755,
+      "total_tokens": 5366,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 254
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "01141d3f0caf092c4efa6faeeb7f2ac2ee9273f79932e4ebd79fc41de3846cae",
+    "response_sha256": "9b498861cb94b6508201f390c3b17239cc9d86c0d4566752c72d129ebef01559"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "4db0c331f0d8943651080f8d70be12559623fa738af2f32b957dd4c1259ea65d"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "992a5dece3a1a15cfaff888e0cccd344ac0ef33ab7b4a6adffe5a1e794290f61",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

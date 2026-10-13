@@ -1,0 +1,71 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "published-version-evidence",
+      "verdict": "pass",
+      "reason": "The report grounds itself in package.json and the README, states alpha.1 was never published while alpha.2 was, and proposes per-package verification (npm view ... versions) while explicitly warning against inferring internal package availability from a dist-tag or the root package, matching the brief-supplied registry fact.",
+      "points": 25,
+      "awarded": 25
+    },
+    {
+      "id": "caret-resolution",
+      "verdict": "pass",
+      "reason": "It correctly explains the caret range expansion (>=0.1.2-alpha.1 <0.2.0-0), that install silently succeeds by resolving to the published 0.1.2-alpha.2, the resulting declaration/type-baseline drift, and the lack of compatibility guarantees across alpha prereleases. It does not claim all alphas are missing or that the caret guarantees alpha.1.",
+      "points": 25,
+      "awarded": 25
+    },
+    {
+      "id": "workable-baseline-plan",
+      "verdict": "pass",
+      "reason": "Two coherent plans are given: (A) check out an exact upstream alpha.1 source ref, build/pack, and pin the local tarball via overrides with a registry range for later; (B) exactly pin the published 0.1.2-alpha.2 while explicitly acknowledging this never validates alpha.1. Tradeoffs are stated for each, exceeding the one-plan minimum.",
+      "points": 25,
+      "awarded": 25
+    },
+    {
+      "id": "reproducibility-and-exit",
+      "verdict": "pass",
+      "reason": "The plan includes a committed lockfile with frozen install (npm ci / pnpm ci), a single consistent package manager (explicitly forbidding mixing), a tsc --noEmit typecheck gate, and an exit path for path A (delete the overrides once an official release exists and return to registry resolution). Registry facts are framed as to-be-verified rather than asserted, satisfying honest handling of unverified details.",
+      "points": 25,
+      "awarded": 25
+    }
+  ],
+  "caps": [
+    {
+      "id": "install-unpublished-registry-version",
+      "triggered": false,
+      "reason": "The report never prescribes installing the unpublished alpha.1 from npm; path A builds alpha.1 from a source tag into a local tarball and path B pins the published alpha.2, both of which are explicitly excluded from the cap.",
+      "total": 10
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-4QXPPqLbOV8A74pDNlmRfSh2",
+    "usage": {
+      "prompt_tokens": 2484,
+      "completion_tokens": 1127,
+      "total_tokens": 3611,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 676
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "6071dcdd381cb5bf3d4ddb4d760cf32f3e0cadca38b8601a48f805b36fc34f11",
+    "response_sha256": "88b56d60fa392617b0e75684a6c558bf8d2f8cb501b2694bd447abfeabf38976"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "254d627b3690088382e0ec87e6bb6be496a766fc1cb570fbccecd8fac815addc"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "8dc4521cfa894751ca9242c3748445dbb751de450eb1a1e96b36000cadd985ec",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

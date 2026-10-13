@@ -1,0 +1,84 @@
+{
+  "status": "scored",
+  "score": 80,
+  "max": 100,
+  "passed": false,
+  "decisions": [
+    {
+      "id": "metadata-chain-attribution",
+      "verdict": "pass",
+      "reason": "The candidate uses the symptom log and contrast probe correctly: the tab is claimed/titled but meta.status stays 'none', file-trace's own RPC reads the same file fine, so the fault is localized to the workspace-files resource-provider/RPC metadata delivery chain rather than disk or the external plugin renderer. It also notes static serving (62/62) does not prove activation, consistent with the declared host row.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "valid-probes-and-partitioning",
+      "verdict": "pass",
+      "reason": "Correctly distinguishes the valid per-module 62/62 sweep from the invalid all-in-one ~4-5 KB join 404, explains the real loader partitions requests under a ~3 KB URL cap, and states the oversized join must never be cited as 'modules missing'. The 60 vs 62 roster/probe discrepancy is not addressed, but the rubric only requires evidence-bounded treatment, and the core probe discipline is fully correct.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "distractors-and-tab-scope",
+      "verdict": "partial",
+      "reason": "The fold warnings are correctly separated as an unrelated warning family (the invented END-marker/fix-version detail is permitted extra, not penalized). However, the report entirely omits the boot-manifest-based analysis of textpreview→documentpreview and the new session-only canOpen scope, so it never explains the outside/absolute-address claim failure versus the session tab's stalled metadata.",
+      "points": 20,
+      "awarded": 10
+    },
+    {
+      "id": "ordered-mitigation",
+      "verdict": "pass",
+      "reason": "Gives the correct order: one host restart (citing the alpha.1 self-heal), then rollback to the verified 0.1.3-alpha.2 escape hatch, then upstream reporting, and explicitly rejects plugin-side rewrite/retry/fallback. It implicitly treats the alpha.1 roster mismatch as prior art by ruling out 'missing bytes' via the 62/62 sweep. Proposed actions suffice.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "upstream-forensics-and-fail-loud",
+      "verdict": "partial",
+      "reason": "The upstream package includes the per-module sweep, contrast reader, roster excerpt and invalid-join caveat, but omits versions/profile upgrade history, the exact session vs absolute addresses, and meta.status. The fail-loud proposal is only a roster-vs-served-bytes check, which the criterion explicitly notes is insufficient by itself; no provider-registration or metadata-RPC readiness diagnostic is proposed.",
+      "points": 20,
+      "awarded": 10
+    }
+  ],
+  "caps": [
+    {
+      "id": "invalid-probe-as-missing-bytes",
+      "triggered": false,
+      "reason": "The report explicitly states the joined-URL 404 must never be cited as 'modules missing' and uses the 62/62 sweep to rule out missing bytes.",
+      "total": 40
+    },
+    {
+      "id": "plugin-workaround-or-duplicate-insert",
+      "triggered": false,
+      "reason": "The report explicitly rejects plugin-side rewrite, retry, fallback and any repair of the service; mitigation is host restart, rollback, and upstream report.",
+      "total": 40
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-cjaffrzEIkDovhDnbml69ze0",
+    "usage": {
+      "prompt_tokens": 5672,
+      "completion_tokens": 2654,
+      "total_tokens": 8326,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 2048
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "5ec66c91a5c811ab5cffd6d60dfdfd5e7a6f8609635343860ae76ed552b85fd7",
+    "response_sha256": "55c4a07e260450717a1a7432ee2d4a57ca0eabffb78d1196f2f8f5ed6ff956cd"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "9b3f6a5c2ab2f8537e06b95820949fce558c6c27bbb2b159476187cb70f8c317"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "c55df9802e52247de0d01d444e8e366984769d2b288623a04da4c2bdb05fc32c",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

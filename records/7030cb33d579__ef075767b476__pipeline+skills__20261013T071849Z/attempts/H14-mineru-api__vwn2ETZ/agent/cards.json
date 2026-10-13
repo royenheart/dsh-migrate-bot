@@ -1,0 +1,388 @@
+{
+  "cards": [
+    {
+      "id": "DSH-0.1.1-R1-01",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": ["package.json", "cordis.patch.yml"],
+      "note": "Ships as an npm package whose dsh.bundle.patch inserts its own Loader row; no repository-plugins registry entry exists, so the single official profile path (dsh.profile.bundles) is the installation route."
+    },
+    {
+      "id": "DSH-0.1.1-R1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No legacy dshClient field and no dsh.plugin.json anywhere in the tree; the manifest already declares the merged dsh.client form."
+    },
+    {
+      "id": "DSH-0.1.1-R1-03",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "The browser half already declares dsh.client with platform web and a ./client export (package.json:16-25), so the client-modules scan finds it; the removed @deepseek-ai/dsh-client-runtime edge was dropped from dsh.client.inject."
+    },
+    {
+      "id": "DSH-0.1.1-R1-04",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": ["index.js:21", "client.js:41"],
+      "note": "Every consumed service is declared: the host half injects ['tools','connection'] and the browser half ['connection','locale']; there is no ctx.get(...) or undeclared property read."
+    },
+    {
+      "id": "DSH-0.1.1-R1-05",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No optional-service probe exists. connection is a hard dependency on purpose: the plugin's browser half cannot work without the channel registry, and the web profile that loads a dsh.client package always provides it."
+    },
+    {
+      "id": "DSH-0.1.1-R1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "The plugin subscribes to no session/event and derives no session state from event fields."
+    },
+    {
+      "id": "DSH-0.1.1-R1-07",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "The browser half reads/writes its own config over the plugin channel; it consumes no ctx.sessions and needs no host-side session aggregation."
+    },
+    {
+      "id": "DSH-0.1.1-R1-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No task/run output tailing; tasks.peek was never used."
+    },
+    {
+      "id": "DSH-0.1.1-R1-09",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No httpServer/tasks injection, ctx usage, or onTaskDone listener; the channel is reached through the connection service, whose own route registration is harness-owned."
+    },
+    {
+      "id": "DSH-0.1.1-R2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "The plugin has no ImageAttachmentRef schema or image metadata of its own."
+    },
+    {
+      "id": "DSH-0.1.1-R2-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "read_image is neither registered, wrapped, parsed, nor snapshot-tested here."
+    },
+    {
+      "id": "DSH-0.1.1-R2-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No LLM adapter, image interceptor, or upload cache; the plugin never touches DeepSeek image requests."
+    },
+    {
+      "id": "DSH-0.1.2-A1-01",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": ["index.js:31", "client.js:44", "package.json"],
+      "note": "The old call site was a type-only import of RpcResult from @deepseek-ai/dsh-host-apiproxy, not an apiProxy call; the result type now comes from @deepseek-ai/dsh-client-connection, the package that owns the channel, and the apiproxy dependency/peer is gone."
+    },
+    {
+      "id": "DSH-0.1.2-A1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "Target is alpha.2, not alpha.1, and the plugin produces no persisted session events; corridor net state is covered by A2-01 with no producer marker to delete and restore."
+    },
+    {
+      "id": "DSH-0.1.2-A1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No harness source patch and no internal session-view import; the plugin only uses public services (tools, connection, slots, locale)."
+    },
+    {
+      "id": "DSH-0.1.2-A1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No launcher wrapper or SDK/ACP integration, and no profile file is read directly; cordis.patch.yml is a bundle patch consumed by the Loader, not a profile composition."
+    },
+    {
+      "id": "DSH-0.1.2-A1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No headless invocation, process supervisor, or stdout/stderr parser in this repository."
+    },
+    {
+      "id": "DSH-0.1.2-A1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No tools.mode, PTC preset, dispatch waterfall, or related type is referenced."
+    },
+    {
+      "id": "DSH-0.1.2-A1-07",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "The plugin ships no permission, approval, WebFetch policy, or audit behavior."
+    },
+    {
+      "id": "DSH-0.1.2-A1-08",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": ["index.js:59"],
+      "note": "The custom loopback channel is registered through the Connection-owned carrier (ctx.connection.rpc.handle), so Connection applies its Host/Origin fence and browser-session authentication before dispatch; no ctx.webServer.register route or token handling exists. Verified live on the target: cookie 200, no cookie 401."
+    },
+    {
+      "id": "DSH-0.1.2-A1-09",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "Not a model provider plugin; nothing to register on the model settings page."
+    },
+    {
+      "id": "DSH-0.1.2-A1-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No custom i18n patch and no third-party language resource; the elided page would use its own locale namespace at most, not a new language."
+    },
+    {
+      "id": "DSH-0.1.2-A1-11",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "Not a subagent orchestration or selector plugin."
+    },
+    {
+      "id": "DSH-0.1.2-A1-12",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "Informational: when enabled in a deployment whose adapter reports plugin package names and versions, this package's name/version are attached by the host. No plugin code change; the opt-out is a deployment privacy decision."
+    },
+    {
+      "id": "DSH-0.1.2-A1-13",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No persistent-shell or Windows directory-picker compatibility workaround is maintained here."
+    },
+    {
+      "id": "DSH-0.1.2-A1-14",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "The plugin neither enables nor integrates session-log-deepseek; egress is a deployment decision."
+    },
+    {
+      "id": "DSH-0.1.2-A1-19",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No browser acceptance script or wrapper lives in this repository. The migration's own verification followed the recipe (isolated profile, printed token URL, cookie exchange, boot manifest entry by package name, advertised artifact) but added no script to the tree."
+    },
+    {
+      "id": "DSH-0.1.2-A1-20",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No structured-question answerer and no userQuestions usage."
+    },
+    {
+      "id": "DSH-0.1.2-A1-21",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No agent-preset inference and no agent-presets roots configuration."
+    },
+    {
+      "id": "DSH-0.1.2-A1-22",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No TPS/first-token computation and no StreamChunk handling."
+    },
+    {
+      "id": "DSH-0.1.2-A1-23",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "The package is a bundle, but its patch only inserts its own row; it does not reuse or restate the dsh-base composition, and the plugin has no telemetry privacy stance, so the FEEDBACK_ONLY default and the package-name reporting row are left to the deployment's own patch."
+    },
+    {
+      "id": "DSH-0.1.2-A1-24",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No direct @earendil-works/pi-ai dependency; the plugin registers no provider or auth surface."
+    },
+    {
+      "id": "DSH-0.1.2-A1-25",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": ["package.json", "client.js:44"],
+      "note": "The removed package is gone from peerDependencies, peerDependenciesMeta, and dsh.client.inject; the client context is the Cordis Context from @deepseek-ai/cordis and the wire type comes from the Connection package that owns it."
+    },
+    {
+      "id": "DSH-0.1.2-A1-26",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": ["client.js:32", "client.js:33", "package.json:2", "cordis.patch.yml:5"],
+      "note": "All three ids agree on the bare package name: the served ./client artifact registers via window.__ModuleLoader__.load with id @bench/dsh-bench-mineru-api, the boot manifest entry carries that id, and the bundle row names the same package. Verified against a live dsh web boot manifest."
+    },
+    {
+      "id": "DSH-0.1.2-A1-27",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No session timeline, message content, or conversation-node read."
+    },
+    {
+      "id": "DSH-0.1.2-A1-28",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No composer DOM manipulation, draft injection, history recall, or selection code."
+    },
+    {
+      "id": "DSH-0.1.2-A1-29",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "MarkdownText and fenced CodeBlocks are not rendered by this plugin."
+    },
+    {
+      "id": "DSH-0.1.2-A1-30",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "The browser half never used ctx.connection.api; it calls the surviving ctx.connection.rpc.call('/mineru-api', ...) face, so 'connection' correctly stays in inject and there is no dead type mirror to remove."
+    },
+    {
+      "id": "DSH-0.1.2-A1-31",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No subagent descriptor construction and no snapshotSubagentDescriptor consumer."
+    },
+    {
+      "id": "DSH-0.1.2-A1-32",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No workspaces or uiWorkspace usage; the settings page is root-scoped and navigates nothing."
+    },
+    {
+      "id": "DSH-0.1.2-A2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "The plugin produces no persisted session events, so the restored ignorable retention semantics have no producer to fix."
+    },
+    {
+      "id": "DSH-0.1.2-A2-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No ctx.remote call and no Remote failure handling; the plugin's own Connection RPC failures already use the <domain>/<reason> vocabulary (mineru/unknown-endpoint) instead of the legacy bare 'internal'."
+    },
+    {
+      "id": "DSH-0.1.2-A2-03",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No lockfile or peer override exists, and every declared peer is a type owner the two halves actually consume; the apiproxy/runtime peer pruning is recorded under A1-01 and A1-25. Nothing this release moved out of a peer is still imported."
+    },
+    {
+      "id": "DSH-0.1.2-A2-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No startup wrapper or CI matrix to clean up. The migration's live smoke ran on Node 24.21.0, outside the 24.0-24.11.1 failure window."
+    },
+    {
+      "id": "DSH-0.1.2-A2-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "pluginInventory/list is not consumed and PluginInventorySnapshot is not validated anywhere."
+    },
+    {
+      "id": "DSH-0.1.2-A2-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "host.describe is not called and no Host home/loopback fact is needed; the client uses only the Connection RPC face."
+    },
+    {
+      "id": "DSH-0.1.2-A2-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "The only package of that family in the peer set is @deepseek-ai/dsh-tools, the tools Service Definition, which at alpha.2 still injects only systemPrompt and gained no session-projection peer; the shipped dsh-base bundle already mounts session-projection."
+    },
+    {
+      "id": "DSH-0.1.2-A2-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "The plugin registers no official settings namespace and imports nothing from @deepseek-ai/dsh-settings; its settings page edits plugin config through its own /mineru-api channel."
+    }
+  ]
+}

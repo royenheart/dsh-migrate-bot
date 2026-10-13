@@ -1,0 +1,64 @@
+{
+  "status": "scored",
+  "score": 85,
+  "max": 100,
+  "passed": false,
+  "decisions": [
+    {
+      "id": "artifact-attribution",
+      "verdict": "pass",
+      "reason": "The report locates the stale resolveSessionPreset import in lib/index.js and identifies lib/tsconfig.tsbuildinfo's referencedMap as still pinning the old dependency graph. It explains the build-time vs tsc --noEmit contradiction: the error comes from stale emitted output and incremental cache state being read by the bundler, not from source. Grounded in the actual fixture files.",
+      "points": 30,
+      "awarded": 30
+    },
+    {
+      "id": "clean-rebuild-plan",
+      "verdict": "partial",
+      "reason": "The plan uses the package.json clean script to remove lib and its incremental state, then rebuilds from current source, and mentions follow-up typecheck/build/test hygiene. However it gives little explanation of what each step individually verifies (e.g., clean rules out the cache, rebuild proves the current source graph is error-free), and asserts the error 'will disappear' rather than framing verification as a check. A sound clean/rebuild plan with thin verification detail, fitting the partial band.",
+      "points": 30,
+      "awarded": 15
+    },
+    {
+      "id": "no-source-migration",
+      "verdict": "pass",
+      "reason": "The report grounds the no-change conclusion in the zero hits for resolveSessionPreset across src/, contrasts this with the stale lib artifacts, and explicitly states the A1-21 recipe applies only to real callers, so applying it to already-migrated source (the colleague's suggestion) is unjustified.",
+      "points": 40,
+      "awarded": 40
+    }
+  ],
+  "caps": [
+    {
+      "id": "unnecessary-source-migration",
+      "triggered": false,
+      "reason": "The report concludes no source change is needed and rejects the colleague's suggestion to rework the source; it does not affirmatively rewrite the source to replace resolveSessionPreset.",
+      "total": 30
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-pPDRcUWbTO5Xy513D98b1hV9",
+    "usage": {
+      "prompt_tokens": 3371,
+      "completion_tokens": 560,
+      "total_tokens": 3931,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 216
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "0e9109c85d4461cbc8646c5588c2b0bfe4ae36d67cd4af1af7a6c8ef8b2ae9ee",
+    "response_sha256": "ad17dbf315cc0fde507c819227cbd45abefaeeb1e501cb79a0496a79e5981003"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "a3292bad07cca91086a0afe5348e861ab24e3e4ede3becd1f6aa8e6618300084"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "0f90f3a7585f73e743c3bbaad5b0afcfba7c6ebfe2729f1017f724e22fc8feed",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

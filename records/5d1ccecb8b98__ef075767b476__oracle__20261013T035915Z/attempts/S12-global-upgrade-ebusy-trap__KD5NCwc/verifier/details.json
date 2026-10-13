@@ -1,0 +1,71 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "native-module-owner",
+      "verdict": "pass",
+      "reason": "Identifies the dsh web host node.exe PID 42432 as the process that loaded the native koffi.node addon, explains the OS holds a file lock on the loaded native binary until the process exits, causing the npm copy to fail with EBUSY. Grounded in the fixture evidence.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "browser-versus-host-sequence",
+      "verdict": "pass",
+      "reason": "Explains that a browser refresh only reloads the SPA while the host process holding koffi stays alive, and gives the ordered sequence: stop dsh fully, install, then restart. Does not prescribe killing unrelated Node processes.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "unpinned-dist-tag-resolution",
+      "verdict": "pass",
+      "reason": "Correctly states the unpinned install resolves to the latest dist-tag, which the dist-tags listing pins to 0.1.1-rc.2, while alpha points to 0.1.2-alpha.5, so the installed alpha.4 is silently replaced/downgraded. Correctly notes the unpinned install does not preserve the installed version.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "safe-exact-commands",
+      "verdict": "pass",
+      "reason": "Provides npm install -g @deepseek-ai/dsh@0.1.2-alpha.5 and a separate TUI plugin install after stopping the host, with verification via dsh --version and restart.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "readme-prevention",
+      "verdict": "pass",
+      "reason": "Advises README authors to pin the exact intended dsh version in combined install commands, presenting the unpinned command explicitly as a BAD example (rejected, not endorsed) and the pinned variant as the recommendation.",
+      "points": 20,
+      "awarded": 20
+    }
+  ],
+  "caps": [],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-zqiQbw24KEUiTd1GRz70hLmJ",
+    "usage": {
+      "prompt_tokens": 3388,
+      "completion_tokens": 365,
+      "total_tokens": 3753,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 7
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "a0ce8c80565d4b43cf0054512a38b71adc54254fb3ec337591efddf408477b6d",
+    "response_sha256": "e2d1c50feb0beea6fe84781d51f9b73b17f8ca5dd025dcbd03e077100b79dcba"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "fd4c33087918e955ebfbf55b76e51cf3b49ae61bc23495bdb0788405051627d0"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "1a57f43c8d4faedddc436b3d9f938d4249d9bf0d7edc7f0261b63abd69261f35",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

@@ -1,0 +1,78 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "half-cell-background",
+      "verdict": "pass",
+      "reason": "Correctly identifies that upper-only/lower-only branches emit only the foreground SGR, leaving the previous cell's background active to fill the empty half; proposes per-cell background reset via ESC[49m and ties it to the edge symptoms (outline, Z symbols, heart) without blaming artwork or terminal.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "frame-clearing",
+      "verdict": "pass",
+      "reason": "Explains the trailing-space trim and the pipeline's whitespace handling so a narrower frame never overwrites surplus columns; proposes the two-part fix of full-width rows with blank cells re-output plus ESC[K erase-to-EOL, and keeps SGR state closed.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "frame-data-integrity",
+      "verdict": "pass",
+      "reason": "Uses the digest report to identify the tail2 mismatch (23 differing cells, one-column shifted cluster), explains the excerpt test for a different frame missed it, and requires digesting all frames against source art rather than the drifted port. Note the candidate calls it a '6-pixel tail-tip cluster' while the report says 23 cells, but the candidate does state 23 differing cells explicitly, satisfying the requirement.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "timer-liveness",
+      "verdict": "pass",
+      "reason": "Grounds the hang in the CI evidence: planner reschedules setTimeout per tick while probe hosts mount without unmounting, pinning the event loop; interactive TTY is kept alive by stdin handles; proposes timer.unref() as the one-line fix without suggesting CI timeout extensions.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "renderer-and-rollout-prevention",
+      "verdict": "pass",
+      "reason": "Consolidates background reset, full-width/ESC[K behavior, SGR closure, and per-frame digest pinning into a checklist; the rollout audit covers timer hygiene, mount-without-unmount hosts, and tying the flip to the timer audit. An explicit exit/liveness regression test is only loosely implied ('run the probe/test hosts'), but the audit elements are substantively covered.",
+      "points": 20,
+      "awarded": 20
+    }
+  ],
+  "caps": [
+    {
+      "id": "contradictory-render-advice",
+      "triggered": false,
+      "reason": "The report's final advice affirms background resets, full-width plus erase clearing, source-backed digests, and unref; no contradictory advice or terminal-emulator blaming appears.",
+      "total": 0
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-6QvYy0AcBQwnPyY5JDMKZSMP",
+    "usage": {
+      "prompt_tokens": 4498,
+      "completion_tokens": 693,
+      "total_tokens": 5191,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 221
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "b1ed1650ba6b8fe590c5cac29afacdbd32593ab6e24610e5f5fa841a10a71c02",
+    "response_sha256": "9c8f28f5b5e20b4fb8891c68a4d4f44af94a7471db4b69aa43f699d56cef37dd"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "5080d38ffb6da20effcba69d2e85bf6234388f5e784a10f2d8319189b82e2b46"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "953c5bb48270513f4fbe73e1dedd06429e81b01d1a377cde1fb0c3b3404f2b1a",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

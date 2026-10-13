@@ -1,0 +1,17 @@
+PASS contract
+PASS typecheck
+PASS test
+PASS build
+FAIL boot: hmr (@deepseek-ai/dsh-hmr): Error: EMFILE: too many open files, watch '/tmp/judge-home-xloQoT/profiles/judge'
+      at FSWatcher.<computed> (node:internal/fs/watchers:323:19)
+      at watch (node:fs:2608:36)
+      at createFsWatchInstance (file:///usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/handler.js:126:16)
+      at setFsWatchListener (file:///usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/handler.js:171:19)
+      at NodeFsHandler._watchWithNodeFs (file:///usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/handler.js:325:22)
+      at NodeFsHandler._handleDir (file:///usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/handler.js:546:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async NodeFsHandler._addToNodeFs (file:///usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/handler.js:591:26)
+      at async file:///usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/index.js:343:25
+      at async Promise.all (index 0)
+  dsh web: http://127.0.0.1:40625/?token=<redacted>
+{"score":80,"max":100,"checks":{"contract":1,"typecheck":1,"test":1,"build":1,"boot":0}}

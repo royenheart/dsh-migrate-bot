@@ -1,0 +1,769 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 10bce69..095444a 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -2,8 +2,9 @@
+ 
+ Terminal-style prompt history navigation for the DSH composer
+ (ArrowUp/ArrowDown cycles through recently sent messages, persisted in
+-localStorage), written in the 0.1.1-era style. The host is moving to
+-dsh 0.1.2-alpha.2.
++localStorage). The host moved from the 0.1.1-era client runtime to
++dsh 0.1.2-alpha.2; the browser half now targets the Lexical composer and the
++alpha.2 provide/service seams.
+ 
+ Release procedure (internal):
+ 
+@@ -17,3 +18,52 @@ Distilled from `@huanlin/dsh-plugin-input-history` (adaptation commit
+ `06e4057`); the IME guard and caret-geometry helpers are elided — the exam
+ is the composer surface, the keydown listener placement, and the history
+ collection source.
++
++## Surface (dsh 0.1.2-alpha.2)
++
++Documented capabilities, as migrated:
++
++- **History navigation** — ArrowUp/ArrowDown over recently sent prompts in
++  the DSH composer; ArrowUp walks older entries, ArrowDown newer, and
++  ArrowDown past the newest restores the in-progress draft.
++- **Persistence** — `localStorage` FIFO store, 500 entries, deduplicated,
++  shared across sessions; quota/storage failures degrade to memory.
++- **Dock entry** — the `conversation.composer.dock` list slot (id
++  `bench-history-dock`, order 100) mounts the invisible anchor. Collection
++  reads the current Chat target through the `useChat` standard prop:
++  `ChatSnapshot.order` + `ChatSnapshot.nodes.get()`, taking the latest
++  `user`/`steering` node's text blocks.
++- **Apply-level keydown listener** — the document listener lives in
++  `apply()`, not in the dock component, so navigation survives hero/blank
++  mode where the session-scoped dock is suppressed. It stays in the bubble
++  phase and defers to any earlier consumer through `event.defaultPrevented`
++  (the shell composer keymap consumes an arrow an open slash/@ trigger menu
++  takes), then consumes a handled arrow with `preventDefault`.
++- **Input write** — `ctx.conversation.input.for(actx).setDraft(text)` (the
++  public per-session input facade) replaces the textarea native-setter path;
++  the same facade's `state` store supplies `draft`/`phase`.
++- **Arbitration and guards** — an arrow the shell composer keymap already
++  consumed (an open slash/@ trigger menu) keeps its handling; non-`plain`
++  input phases are left alone; IME composition events pass through;
++  ArrowUp/ArrowDown only fire at the first/last visual line, measured on the
++  contenteditable selection with the Range API.
++- **Bundle layer** — `cordis.patch.yml` inserts the plugin row with
++  `capacity: 500` (composition, not a host source patch).
++- **Client module** — `exports["./client"]` is the self-contained module-table
++  bundle: `window.__ModuleLoader__.load({ id: '@bench/dsh-bench-history-dock',
++  factory })` registers under the package name, which client-modules asserts
++  (a bundle that loads without registering its row id fails the boot).
++
++## Install (dsh 0.1.2-alpha.2)
++
++The package is a self-contained profile bundle: `dsh.bundle.patch` points at
++`cordis.patch.yml`, which inserts the plugin row. Install it through the one
++official profile path — a package name, git spec, or directory added to the
++profile's `dsh.profile.bundles` layer stack:
++
++```
++dsh plugin --profile web add <package|git|dir>
++```
++
++The row then takes effect with the bundle layer (restart the web host for a
++bundle-layer change).
+diff --git a/fixture/client.js b/fixture/client.js
+index c8cae4c..b78b1ac 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,231 +1,310 @@
+-// bench-history-dock — browser half (0.1.1-era cohort, pre v0.1.2-alpha).
++// bench-history-dock — browser half (dsh 0.1.2-alpha.2 cohort).
+ //
+-// The DSH composer (InputBar) is a <textarea>: the plugin locates it with
+-// document.querySelector('textarea') and feeds history text back through the
+-// native prototype value setter + a dispatched 'input' event, which fires
+-// InputBar's controlled-component onChange → keyboard.setDraft — the same
+-// path the user's typing takes.
++// The composer is a shell-owned Lexical contenteditable
++// (`[data-composer-input]` inside `[data-composer-card]`), not a <textarea>,
++// and the draft's only supported programmatic write is the input machine's
++// whole-draft `setDraft`. Two registrations keep the documented shape:
+ //
+-// Two registrations (distilled from the real PRE client sources):
+-//   - the conversation.composer.dock list entry (id `bench-history-dock`,
+-//     order 100) — the invisible dock that collects history from the
+-//     session's conversation-node slice (session.nodes) on every render;
+-//   - a document-level 'keydown' listener attached in the plugin's apply
+-//     body (NOT in the dock component), so the listener stays active in
+-//     hero/blank mode where the session-scoped dock is suppressed.
++//   - the `conversation.composer.dock` list entry (id `bench-history-dock`,
++//     order 100) collects prompt history from the session's Chat target
++//     through the `useChat` standard prop — alpha.2's replacement for the
++//     removed `session.nodes` slice;
++//   - a document-level `keydown` listener attached in the plugin's apply body
++//     (NOT in the dock component), so navigation stays active in hero/blank
++//     mode where the session-scoped dock is suppressed.
++//
++// Navigation resolves the current session's input facade through the public
++// `ctx.conversation.input.for(actx)` registry (`IConversation` is the outward
++// face other plugins may reach): `setDraft(text)` replaces the native
++// prototype setter + `input` event dance of the textarea era, and
++// `state.getSnapshot()` supplies `draft`/`phase` without slot props.
++//
++// The listener stays in the bubble phase: the shell's composer keymap runs
++// first and calls `preventDefault()` only for an arrow it consumed (an open
++// slash/@ trigger menu), so `event.defaultPrevented` still is the arbitration
++// signal the textarea-era handler documented. A plain arrow is not prevented,
++// which is what lets this handler take it.
+ //
+ // History is collected from user/steering nodes, persisted to localStorage
+ // (FIFO, 500 entries), and shared across all sessions in the browser profile.
+ //
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.1 era):
+-//   "The composer is still a <textarea> under the hood — only its styling
+-//    changed. Keep querySelector('textarea') and the apply-level keydown
+-//    listener so history navigation also works in hero mode; a session-
+-//    scoped listener would go dark exactly when the composer is on screen."
+-// ────────────────────────────────────────────────────────────
+-
+-export const name = 'bench-history-dock-client'
+-
+-/** Required services: slots + locale. */
+-export const inject = ['slots', 'locale']
+-
+-const NS = 'bench-history-dock'
+-const STORAGE_KEY = 'bench-history-dock:v1'
+-const CAPACITY = 500
+-
+-/** Navigation cursor + saved draft; module-scoped because the keydown
+- * listener is attached once in `apply` and persists across dock
+- * mount/unmount cycles. */
+-let navCursor = null
+-let savedDraft = null
+-
+-/**
+- * Client plugin body: register the dock + attach the document keydown
+- * listener.
+- *
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
+- */
+-export function apply(ctx) {
+-  ctx.effect(() => ctx.locale.register(NS, { zh: {}, en: {} }), 'bench-history-dock: dictionaries')
+-
+-  // The dock collects history from the session's conversation-node slice.
+-  // Session-scoped: DSH suppresses the dock in hero/blank mode (blank
+-  // sessions render as hero), so collection only runs in active sessions.
+-  ctx.slots.inject('conversation.composer.dock', () =>
+-    ctx.slots.register(
+-      { name: 'conversation.composer.dock', id: 'bench-history-dock', order: 100, locale: NS },
+-      HistoryDock,
+-    ),
+-  )
+-
+-  // Attach the document-level keydown listener. This lives in `apply` (not
+-  // in the dock component) so navigation stays active even when the dock is
+-  // suppressed in hero/blank mode. Bubble phase — the composer's own key
+-// handling runs first, and the handler below defers to it.
+-  ctx.effect(() => {
+-    if (typeof document === 'undefined') return undefined
+-    const handler = (event) => {
+-      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+-      if (isImeComposition(event)) return
+-      // Slash/@ menu arbitration: the 0.1.1-era heuristic — InputBar marks
+-      // menu-navigated arrows as handled, and this handler defers to any
+-      // earlier consumer via the defaultPrevented branch.
+-      if (event.defaultPrevented) return
+-      const textarea = findComposerTextarea(event.target)
+-      if (textarea === null || event.target !== textarea) return
+-      if (textarea.readOnly || textarea.disabled) return
+-
+-      const history = getHistoryStore().list
+-      const info = cursorLineInfo(textarea.value, textarea.selectionStart, textarea.selectionEnd)
+-      if (event.key === 'ArrowUp' && !info.atFirstLine) return
+-      if (event.key === 'ArrowDown' && !info.atLastLine) return
+-
+-      const dir = event.key === 'ArrowUp' ? 'up' : 'down'
+-      const next = nextIndex(navCursor, history.length, dir)
+-      if (next === null) {
+-        const saved = savedDraft
+-        navCursor = null
+-        if (saved !== null) {
+-          setNativeTextareaValue(textarea, saved)
+-          savedDraft = null
++// Bundle form: 0.1.2's client module table loads `exports["./client"]` as a
++// script and requires a factory registration whose id is the package name
++// (`client-modules: bundle … loaded without registering "<id>"`). `react` comes
++// from the shell's frozen platform seed table through the injected `require`.
++
++window.__ModuleLoader__.load({ id: "@bench/dsh-bench-history-dock", factory: (require) => {
++  const { createElement, useEffect } = require('react')
++
++  const NS = 'bench-history-dock'
++  const STORAGE_KEY = 'bench-history-dock:v1'
++  const CAPACITY = 500
++
++  /** Navigation cursor + saved draft; module-scoped because the keydown
++   * listener is attached once in `apply` and persists across dock
++   * mount/unmount cycles. */
++  let navCursor = null
++  let savedDraft = null
++
++  /**
++   * Client plugin body: register the dock + attach the document keydown
++   * listener.
++   *
++   * @param {import('@deepseek-ai/cordis').Context} ctx
++   */
++  function apply(ctx) {
++    ctx.effect(() => ctx.locale.register(NS, { zh: {}, en: {} }), 'bench-history-dock: dictionaries')
++
++    // The dock collects history from the current Chat target's keyed node
++    // store. Session-scoped: DSH suppresses the dock in hero/blank mode, so
++    // collection only runs once the session is docked — navigation itself
++    // stays in `apply` and covers the hero case.
++    ctx.slots.inject('conversation.composer.dock', () =>
++      ctx.slots.register(
++        { name: 'conversation.composer.dock', id: 'bench-history-dock', order: 100, locale: NS },
++        HistoryDock,
++      ),
++    )
++
++    // Attach the document-level keydown listener. This lives in `apply` (not
++    // in the dock component) so navigation stays active even when the dock is
++    // suppressed in hero/blank mode. Bubble phase: the composer's own keymap
++    // runs first, and the handler below defers to it through
++    // `defaultPrevented` — the documented arbitration for an open slash/@
++    // trigger menu (the shell keymap consumes those arrows).
++    ctx.effect(() => {
++      if (typeof document === 'undefined') return undefined
++      const handler = (event) => {
++        if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
++        if (isImeComposition(event)) return
++        // Slash/@ menu arbitration: the composer keymap already consumed the
++        // arrow, so this handler defers to it.
++        if (event.defaultPrevented) return
++        const editable = findComposerEditable(event.target)
++        if (editable === null || !editable.contains(event.target)) return
++
++        // Phase gate: adjudicating / claimed / submitting transactions are not
++        // ours to interrupt (the contenteditable check above covers the
++        // disabled/inert composer the textarea era read as readOnly).
++        const input = currentSessionInput(ctx)
++        if (input === null) return
++        const state = input.state.getSnapshot()
++        if (state.phase !== 'plain') return
++
++        const boundary = caretLineBoundary(editable)
++        if (boundary === null) return
++        if (event.key === 'ArrowUp' && !boundary.atFirstLine) return
++        if (event.key === 'ArrowDown' && !boundary.atLastLine) return
++
++        const history = getHistoryStore().list
++        const dir = event.key === 'ArrowUp' ? 'up' : 'down'
++        const next = nextIndex(navCursor, history.length, dir)
++        if (next === null) {
++          const saved = savedDraft
++          navCursor = null
++          if (saved !== null) {
++            input.setDraft(saved)
++            savedDraft = null
++          }
++          event.preventDefault()
++          return
+         }
++        if (navCursor === null && savedDraft === null) savedDraft = state.draft
++        const entry = entryAt(history, next)
++        if (entry === null) return
++        navCursor = next
++        input.setDraft(entry)
+         event.preventDefault()
+-        return
+       }
+-      if (navCursor === null && savedDraft === null) savedDraft = textarea.value
+-      const entry = entryAt(history, next)
+-      if (entry === null) return
+-      navCursor = next
+-      setNativeTextareaValue(textarea, entry)
+-      event.preventDefault()
++      document.addEventListener('keydown', handler, false)
++      return () => {
++        document.removeEventListener('keydown', handler, false)
++      }
++    }, 'bench-history-dock: keydown listener')
++  }
++
++  /**
++   * Resolve the current session's public input facade
++   * (`ctx.conversation.input.for(actx)` — `setDraft` + the InputState store),
++   * or null when no session is current.
++   *
++   * @param {import('@deepseek-ai/cordis').Context} ctx
++   */
++  function currentSessionInput(ctx) {
++    const current = ctx.sessions.list.getSnapshot().current
++    if (current === undefined) return null
++    const actx = ctx.sessions.scope(current)
++    if (actx === undefined) return null
++    return ctx.conversation.input.for(actx)
++  }
++
++  /**
++   * Locate the DSH composer surface: the Lexical contenteditable inside the
++   * composer card. The card/input data attributes are ui-conversation internals
++   * (stable today, undocumented); a rename lands here.
++   */
++  function findComposerEditable(from) {
++    if (typeof document === 'undefined') return null
++    const card = from instanceof Element ? from.closest('[data-composer-card]') : null
++    const scope = card ?? document
++    const editable = scope.querySelector('[data-composer-input]')
++    if (editable === null) return null
++    if (editable.getAttribute('contenteditable') === 'false') return null
++    return editable
++  }
++
++  /**
++   * Caret line information for the contenteditable surface: ArrowUp fires only
++   * on the first visual line, ArrowDown only on the last, so multi-line editing
++   * keeps its normal caret movement. Geometry unavailable (no layout
++   * environment) means "do not navigate" — never hijack the key.
++   */
++  function caretLineBoundary(editable) {
++    const selection = window.getSelection()
++    if (selection === null || selection.rangeCount === 0 || !selection.isCollapsed) return null
++    const range = selection.getRangeAt(0)
++    if (!editable.contains(range.startContainer)) return null
++    const caret = caretRect(range)
++    const lines = contentLineBoxes(editable)
++    if (caret === null || lines.length === 0) return null
++    const first = lines[0]
++    const last = lines[lines.length - 1]
++    const tolerance = Math.max(1, caret.height / 2)
++    return {
++      atFirstLine: caret.top - first.top <= tolerance && first.bottom - caret.bottom <= tolerance,
++      atLastLine: caret.bottom - last.bottom <= tolerance && last.top - caret.top <= tolerance,
+     }
+-    document.addEventListener('keydown', handler, false)
+-    return () => {
+-      document.removeEventListener('keydown', handler, false)
++  }
++
++  /** First client rect of a collapsed range, or null when layout is unavailable. */
++  function caretRect(range) {
++    const rects = range.getClientRects()
++    if (rects.length > 0) return rects[0]
++    const rect = range.getBoundingClientRect()
++    return rect.width > 0 || rect.height > 0 ? rect : null
++  }
++
++  /** Distinct visual line boxes of the editable's contents, top to bottom. */
++  function contentLineBoxes(editable) {
++    const range = document.createRange()
++    range.selectNodeContents(editable)
++    const byTop = new Map()
++    for (const rect of range.getClientRects()) {
++      if (rect.width === 0 && rect.height === 0) continue
++      const top = Math.round(rect.top)
++      const line = byTop.get(top)
++      if (line === undefined || rect.bottom > line.bottom) byTop.set(top, rect)
+     }
+-  }, 'bench-history-dock: keydown listener')
+-}
+-
+-/**
+- * Set the textarea value via the native prototype setter and dispatch an
+- * `input` event so React's controlled-component onChange fires — the same
+- * technique browser-automation libraries use on React controlled inputs.
+- */
+-function setNativeTextareaValue(textarea, value) {
+-  const descriptor = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')
+-  if (descriptor === undefined || descriptor.set === undefined) {
+-    textarea.value = value
+-    return
++    return [...byTop.values()].sort((a, b) => a.top - b.top)
+   }
+-  descriptor.set.call(textarea, value)
+-  textarea.dispatchEvent(new Event('input', { bubbles: true }))
+-}
+-
+-/**
+- * Locate the DSH composer textarea. The real locator scopes the query to the
+- * composer card's stable internal attribute; the distilled fixture keeps the
+- * document-level shape the exam anchors on.
+- */
+-function findComposerTextarea(from) {
+-  if (typeof document === 'undefined') return null
+-  if (from instanceof Element) {
+-    const card = from.closest('[data-composer-card]')
+-    if (card !== null) {
+-      const ta = card.querySelector('textarea')
+-      if (ta !== null) return ta
++
++  /** The pure decision: is this keyboard event part of an IME composition? */
++  function isImeComposition(event) {
++    return event.isComposing === true || event.keyCode === 229
++  }
++
++  /** Terminal-style cursor: ArrowUp walks to older entries, ArrowDown to newer.
++   * ArrowDown past the newest entry answers null so the handler restores the
++   * saved draft (the pre-migration copy returned an out-of-range index here and
++   * left the restore path unreachable). */
++  function nextIndex(cursor, length, dir) {
++    if (length === 0) return null
++    if (dir === 'up') return cursor === null ? length - 1 : cursor - 1
++    if (cursor === null) return null
++    return cursor + 1 < length ? cursor + 1 : null
++  }
++
++  /** The history entry at a cursor index, or null when out of bounds. */
++  function entryAt(history, index) {
++    return index >= 0 && index < history.length ? history[index] : null
++  }
++
++  /**
++   * The invisible dock entry: an anchor that feeds the history store from the
++   * session's Chat target. Collection rides the `useChat` standard prop
++   * (alpha.2's keyed ChatSnapshot: `order` + `nodes.get()`).
++   *
++   * @param {{ useChat?: Function }} props
++   */
++  function HistoryDock(props) {
++    // `useChat` is contributed by ui-chat; without it the dock degrades to a
++    // silent anchor instead of failing the whole slot entry.
++    if (typeof props.useChat !== 'function') return null
++    return createElement(HistoryCollector, { useChat: props.useChat })
++  }
++
++  /** Hooks live in their own component so the optional branch above never calls one conditionally. */
++  function HistoryCollector({ useChat }) {
++    const latest = useChat(snapshot => latestUserOrSteeringNode(snapshot))
++    useEffect(() => {
++      if (latest === undefined) return
++      const text = messageText(latest.data)
++      if (text !== null) getHistoryStore().append(text)
++    }, [latest])
++    return null // aria-hidden anchor elided in the fixture
++  }
++
++  /** Latest visible user/steering node from a Chat snapshot's keyed node store. */
++  function latestUserOrSteeringNode(snapshot) {
++    if (snapshot === undefined || snapshot === null) return undefined
++    for (let i = snapshot.order.length - 1; i >= 0; i--) {
++      const node = snapshot.nodes.get(snapshot.order[i])
++      if (node === undefined) continue
++      // Compaction/interruption hides a node the transcript no longer shows.
++      if (node.visibility === 'hidden') continue
++      if (node.kind !== 'user' && node.kind !== 'steering') continue
++      return node
+     }
++    return undefined
+   }
+-  return document.querySelector('textarea')
+-}
+-
+-/**
+- * The invisible dock entry: collects prompt history from the session's
+- * conversation-node slice (session.nodes) on every render. Session-scoped;
+- * suppressed in hero/blank mode.
+- *
+- * @param {{ session: { nodes: Array<{ kind: string, content?: Array<{ type: string, text?: string }> }> }}} props
+- */
+-function HistoryDock(props) {
+-  const lastText = latestUserOrSteeringText(props.session.nodes)
+-  if (lastText !== null) getHistoryStore().append(lastText)
+-  return null // aria-hidden anchor elided in the fixture
+-}
+-
+-/** Latest user/steering text from a conversation snapshot's nodes list. */
+-function latestUserOrSteeringText(nodes) {
+-  for (let i = nodes.length - 1; i >= 0; i--) {
+-    const node = nodes[i]
+-    if (node.kind !== 'user' && node.kind !== 'steering') continue
+-    if (node.content === undefined) continue
++
++  /** Concatenated text blocks of one conversation message record. */
++  function messageText(data) {
++    const content = data === undefined || data === null ? undefined : data.content
++    if (content === undefined || content === null) return null
+     let text = ''
+-    for (const block of node.content) {
+-      if (block.type === 'text' && typeof block.text === 'string') text += block.text
++    for (const block of content) {
++      if (block !== null && block.type === 'text' && typeof block.text === 'string') text += block.text
+     }
+     return text
+   }
+-  return null
+-}
+-
+-/** Caret line information for a multi-line textarea value. */
+-function cursorLineInfo(value, selectionStart, selectionEnd) {
+-  const end = selectionEnd ?? selectionStart
+-  const collapsed = selectionStart === end
+-  const totalLines = value.split('\n').length
+-  const currentLine = value.slice(0, selectionStart).split('\n').length - 1
+-  return {
+-    currentLine: Math.max(0, Math.min(currentLine, totalLines - 1)),
+-    totalLines,
+-    atFirstLine: collapsed && currentLine === 0,
+-    atLastLine: collapsed && currentLine === totalLines - 1,
+-  }
+-}
+-
+-/** The pure decision: is this keyboard event part of an IME composition? */
+-function isImeComposition(event) {
+-  return event.isComposing === true || event.keyCode === 229
+-}
+-
+-/** Terminal-style cursor: ArrowUp walks to older entries, ArrowDown to newer. */
+-function nextIndex(cursor, length, dir) {
+-  if (length === 0) return null
+-  if (dir === 'up') return cursor === null ? length - 1 : cursor - 1
+-  return cursor === null ? null : cursor + 1
+-}
+-
+-/** The history entry at a cursor index, or null when out of bounds. */
+-function entryAt(history, index) {
+-  return index >= 0 && index < history.length ? history[index] : null
+-}
+-
+-/** Module-scope history store: FIFO list of unique prompts in localStorage. */
+-let historyStore = null
+-function getHistoryStore() {
+-  if (historyStore === null) {
+-    const key = 'bench-history-dock:v1'
+-    let list = []
+-    try {
+-      list = JSON.parse(window.localStorage.getItem(key) ?? '[]')
+-    } catch {
+-      list = []
+-    }
+-    historyStore = {
+-      get list() {
+-        return list
+-      },
+-      append(prompt) {
+-        const trimmed = prompt.trim()
+-        if (trimmed === '') return
+-        const filtered = list.filter((item) => item !== trimmed)
+-        filtered.push(trimmed)
+-        list = filtered.slice(-500)
+-        try {
+-          window.localStorage.setItem(key, JSON.stringify(list))
+-        } catch {
+-          // Storage unavailable: degrade to the in-memory list.
+-        }
+-      },
++
++  /** Module-scope history store: FIFO list of unique prompts in localStorage. */
++  let historyStore = null
++  function getHistoryStore() {
++    if (historyStore === null) {
++      const key = STORAGE_KEY
++      let list = []
++      try {
++        list = JSON.parse(window.localStorage.getItem(key) ?? '[]')
++      } catch {
++        list = []
++      }
++      historyStore = {
++        get list() {
++          return list
++        },
++        append(prompt) {
++          const trimmed = prompt.trim()
++          if (trimmed === '') return
++          const filtered = list.filter((item) => item !== trimmed)
++          filtered.push(trimmed)
++          list = filtered.slice(-CAPACITY)
++          try {
++            window.localStorage.setItem(key, JSON.stringify(list))
++          } catch {
++            // Storage unavailable: degrade to the in-memory list.
++          }
++        },
++      }
+     }
++    return historyStore
++  }
++
++  return {
++    name: 'bench-history-dock-client',
++    // Required services: slots + locale for registration, sessions + conversation for the input facade.
++    inject: ['slots', 'locale', 'sessions', 'conversation'],
++    apply,
+   }
+-  return historyStore
+-}
++} });
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index 5c49f6d..b8a7fba 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -2,6 +2,11 @@
+ # (exam fixture, distilled from @huanlin/dsh-plugin-input-history; the IME
+ # guard and caret-geometry helpers are elided — the exam is the composer
+ # surface + the keydown listener placement + the history-collection slice)
++#
++# Composition only: this is the Loader overlay that inserts the row, not a
++# host source patch (the plugin ships zero dsh-side source changes).
++# The row name is the bare package name — the boot entry id, the client
++# bundle's __ModuleLoader__.load id, and package.json#name stay one identity.
+ - insert:
+     - id: bench-history-dock
+       name: '@bench/dsh-bench-history-dock'
+diff --git a/fixture/index.js b/fixture/index.js
+index c1dec70..34bf58e 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,10 +1,10 @@
+-// bench-history-dock — host plugin entry (0.1.1-era cohort).
++// bench-history-dock — host plugin entry (dsh 0.1.2-alpha.2 cohort).
+ //
+ // Client-only plugin: the host half has no runtime work. The browser half
+ // (./client.js) registers an invisible entry in `conversation.composer.dock`
+-// that collects prompt history from the session's conversation-node slice
+-// and implements terminal-style history navigation (ArrowUp/ArrowDown) over
+-// the composer textarea.
++// that collects prompt history from the session's Chat target (`useChat`
++// standard prop) and implements terminal-style history navigation
++// (ArrowUp/ArrowDown) over the composer's Lexical contenteditable.
+ 
+ export const name = 'bench-history-dock'
+ 
+@@ -18,5 +18,5 @@ export const inject = []
+  * @param {import('@deepseek-ai/cordis').Context} _ctx - host context (unused).
+  */
+ export function apply(_ctx, config) {
+-  console.error('[bench-history-dock] host apply(): client-only plugin (0.1.1-era cohort); no host-side resources')
++  console.error('[bench-history-dock] host apply(): client-only plugin (dsh 0.1.2-alpha.2 cohort); no host-side resources')
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..d442f74
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,52 @@
++{
++  "name": "@bench/dsh-bench-history-dock",
++  "version": "0.1.2",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-history-dock",
++      "version": "0.1.2",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-chat": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "react": "^18.2.0",
++        "react-dom": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-api-session-controller": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-chat": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-conversation": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-renderer": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        },
++        "react-dom": {
++          "optional": true
++        }
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index c0ec4de..f67a614 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,14 +1,21 @@
+ {
+   "name": "@bench/dsh-bench-history-dock",
+   "version": "0.1.2",
+-  "description": "Terminal-style prompt history navigation for the DSH composer: ArrowUp/ArrowDown cycles through recently sent messages (0.1.1-era cohort; exam material only)",
++  "description": "Terminal-style prompt history navigation for the DSH composer: ArrowUp/ArrowDown cycles through recently sent messages (0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+     ".": "./index.js",
+     "./client": "./client.js",
+-    "./cordis.patch.yml": "./cordis.patch.yml"
++    "./cordis.patch.yml": "./cordis.patch.yml",
++    "./package.json": "./package.json"
+   },
++  "files": [
++    "index.js",
++    "client.js",
++    "cordis.patch.yml",
++    "README.md"
++  ],
+   "dsh": {
+     "bundle": {
+       "patch": "./cordis.patch.yml"
+@@ -16,30 +23,33 @@
+     "client": {
+       "platform": "web",
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
++        "@deepseek-ai/dsh-api-session-controller",
+         "@deepseek-ai/dsh-client-locale",
+-        "@deepseek-ai/dsh-client-ui-slots",
+-        "@deepseek-ai/dsh-client-ui-conversation"
++        "@deepseek-ai/dsh-client-ui-chat",
++        "@deepseek-ai/dsh-client-ui-conversation",
++        "@deepseek-ai/dsh-client-ui-renderer"
+       ]
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/dsh-client-locale": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-conversation": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-invariants": "^0.0.1-rc.1",
+-    "@deepseek-ai/cordis": "^4.0.1-rc.1",
++    "@deepseek-ai/cordis": "^4.0.2",
++    "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-chat": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
++    "@deepseek-ai/cordis": { "optional": true },
++    "@deepseek-ai/dsh-api-session-controller": { "optional": true },
+     "@deepseek-ai/dsh-client-locale": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-chat": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-conversation": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+-    "@deepseek-ai/dsh-invariants": { "optional": true },
+-    "@deepseek-ai/cordis": { "optional": true },
+     "react": { "optional": true },
+     "react-dom": { "optional": true }
+   },

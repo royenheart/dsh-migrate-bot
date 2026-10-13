@@ -1,0 +1,156 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.8",
+              "version": "0.1.0-rc.8"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "cards": true,
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [
+          "e2e"
+        ],
+        "reviewed": true,
+        "attempts": 0,
+        "failure": {
+          "check": "e2e",
+          "outcome": "fail",
+          "fingerprint": "e2e: plugin-mounted.spec.ts \u203a the serving host composes bench-locale-pack and reports it as a mounted plugin",
+          "detail": "These tests passed on the source release and do not pass now:\n- plugin-mounted.spec.ts \u203a the serving host composes bench-locale-pack and reports it as a mounted plugin (failed in a reach step, on the way through the host's UI): Error: expect(locator).toBeVisible() failed Locator: getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: /bench-locale-pack/ }) Expected: visible Timeout: 15000ms Error: element(s) not found Call log: - Expect \"toBeVisible\" with timeout 15000ms - waiting for getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: /bench-locale-pack/ })\n\n",
+          "blame": "host"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [
+          "boot-console.spec.ts \u203a the browser application boots with the plugin served and reports no unexpected errors",
+          "plugin-mounted.spec.ts \u203a the serving host composes bench-locale-pack and reports it as a mounted plugin",
+          "settings-general.spec.ts \u203a the settings General section the plugin contributes to renders cleanly with the plugin mounted"
+        ],
+        "warnings": [
+          "end-to-end tests that passed before the migration fail now (advisory, see the checks): e2e: plugin-mounted.spec.ts \u203a the serving host composes bench-locale-pack and reports it as a mounted plugin"
+        ],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-13T08-00-29-532Z",
+      "startedAt": "2026-10-13T08:00:31.244Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.8",
+            "version": "0.1.0-rc.8"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "cards": true,
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [
+        "e2e"
+      ],
+      "reviewed": true,
+      "attempts": 0,
+      "failure": {
+        "check": "e2e",
+        "outcome": "fail",
+        "fingerprint": "e2e: plugin-mounted.spec.ts \u203a the serving host composes bench-locale-pack and reports it as a mounted plugin",
+        "detail": "These tests passed on the source release and do not pass now:\n- plugin-mounted.spec.ts \u203a the serving host composes bench-locale-pack and reports it as a mounted plugin (failed in a reach step, on the way through the host's UI): Error: expect(locator).toBeVisible() failed Locator: getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: /bench-locale-pack/ }) Expected: visible Timeout: 15000ms Error: element(s) not found Call log: - Expect \"toBeVisible\" with timeout 15000ms - waiting for getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: /bench-locale-pack/ })\n\n",
+        "blame": "host"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [
+        "boot-console.spec.ts \u203a the browser application boots with the plugin served and reports no unexpected errors",
+        "plugin-mounted.spec.ts \u203a the serving host composes bench-locale-pack and reports it as a mounted plugin",
+        "settings-general.spec.ts \u203a the settings General section the plugin contributes to renders cleanly with the plugin mounted"
+      ],
+      "warnings": [
+        "end-to-end tests that passed before the migration fail now (advisory, see the checks): e2e: plugin-mounted.spec.ts \u203a the serving host composes bench-locale-pack and reports it as a mounted plugin"
+      ],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-13T08-00-29-532Z",
+    "startedAt": "2026-10-13T08:00:31.244Z"
+  }
+}

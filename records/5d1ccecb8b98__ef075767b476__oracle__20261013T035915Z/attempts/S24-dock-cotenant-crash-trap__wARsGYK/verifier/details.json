@@ -1,0 +1,78 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "culprit-attribution",
+      "verdict": "pass",
+      "reason": "Correctly identifies plugin A (SessionProgressBar) as the only crashing plugin, citing the console error's stack frame at SessionProgressBar and its unconditional call to useSessionPendingInteraction. Grounds the alpha.1→alpha.2 contract change in the two slots-contract excerpts: useSessionPendingInteraction was dropped and replaced by useSessionStatus while useSessions stays. Explicitly notes plugin B renders no standard-kit hooks and throws nothing, and does not treat the symptoms as independent.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "cotenant-mechanism",
+      "verdict": "pass",
+      "reason": "Explains via dock-render-tree.md that the input.dock list slot mounts both entries under ONE shared DrawerErrorBoundary, so a child render throw unmounts the entire boundary subtree, taking B's chips down with A's strip. Correctly explains the attach button survives because conversation.input.left is a different slot under a different boundary, and links this to the render-tree note.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "experiment-reading",
+      "verdict": "pass",
+      "reason": "Interprets tried-notes.txt correctly: disabling A restoring B's chips proves render-crash coupling caused the unmount and that B can render once freed, while explicitly stating it does not prove B is fully alpha.2-compatible elsewhere nor that A's crash is the only dock defect. Explains reinstalling B was futile because B was never broken, and refutes the colleague's 'both plugins hit' theory by noting B uses no standard-kit hooks.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "degradation-fix",
+      "verdict": "pass",
+      "reason": "Provides corrected fenced component code that picks the pending hook by which seat the host supplies (useSessionStatus on alpha.2, falling back to useSessionPendingInteraction), uses optional chaining with stable module-level empty fallbacks, and never calls a missing seat. States that on a host with neither hook only the pending attention/subagent indicators degrade while running/todos/token/ETA keep working, and explains why degradation must be silent: a throw unmounts co-tenants whereas a missing indicator is merely cosmetic.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "verification-and-hygiene",
+      "verdict": "pass",
+      "reason": "Verification plan requires no host restart (refresh re-fetches the plugin client bundle), checks both entries render together, and includes the B-specific regression: paste, remove, re-paste with A enabled. Hygiene covers tenant-side defensive destructuring and optional local error boundaries, plus host-side per-entry boundaries with the nesting/layout coordination trade-off named.",
+      "points": 20,
+      "awarded": 20
+    }
+  ],
+  "caps": [
+    {
+      "id": "innocent-plugin-fix",
+      "triggered": false,
+      "reason": "The report's final remedy fixes only plugin A's component with graceful degradation; it explicitly rejects reinstalling or rewriting plugin B and does not present the two symptoms as independent bugs requiring parallel fixes.",
+      "total": 40
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-BxgMx1e3g90uemqkfTnoUiDD",
+    "usage": {
+      "prompt_tokens": 7810,
+      "completion_tokens": 883,
+      "total_tokens": 8693,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 302
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "924b607b54597649125c7a674bec8ad49035a7c21bbc5fb690303339c3aec44f",
+    "response_sha256": "7575c62769fce61781964554406a53ec8665d83719e59bcb7202cf67d1690c31"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "d495bcda33e88c719c0aceee4fc6a54d32a368a155aed8b2d7c489d6ebfe1646"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "e4af87dd11bfff055e1d436fd1e91e013bb309693e614b807eeb040d94b32a94",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

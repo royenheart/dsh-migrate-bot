@@ -1,0 +1,71 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "corridor-net-state",
+      "verdict": "pass",
+      "reason": "The report correctly lays out the corridor history: alpha.1 temporarily removed SessionEvent.ignorable (A1-02), alpha.2 restored the retention semantics across envelope/persistence/reload/transport (A2-01), and it applies the net state (remove-then-restore collapses to keeping the marker) to the fixture's produceExternalEvent rather than trusting the comment. History is explained in substance, so card IDs are not needed.",
+      "points": 25,
+      "awarded": 25
+    },
+    {
+      "id": "remove-marker-stripping",
+      "verdict": "pass",
+      "reason": "It locates the delete (event as any).ignorable statement and the obsolete comment in src/events.ts, explicitly recommends deleting both the defense line and its comment, and rejects the comment's claim that the stripping must be kept on alpha.2. It also distinguishes removing the stripping code from removing the marker itself by stating the producer should write ignorable: true instead of deleting it. The optional no-op observation is not required.",
+      "points": 25,
+      "awarded": 25
+    },
+    {
+      "id": "informational-producer",
+      "verdict": "pass",
+      "reason": "The report states that only informational events whose semantics an old reader can omit without breaking reconstruction may carry ignorable: true (thereby excluding required events), that the marker is not a consumer-side filtering directive, and that marked events remain in loaded events after reload. It applies this to the fixture's third-party/informational event, recommending an explicit marker while noting the live append limitation.",
+      "points": 25,
+      "awarded": 25
+    },
+    {
+      "id": "public-append-gap",
+      "verdict": "pass",
+      "reason": "It identifies that the public live Session.append(...) has no ignorable parameter, warns that ordinary plugins must not fake a public entry via a cast, and labels the producer seam a capability gap, deferring actual marker writing to the alpha.2 persistence/reload seam without inventing an undocumented successor API. It also proposes the retention/rejection/schema verification checks, which suffice for a static task.",
+      "points": 25,
+      "awarded": 25
+    }
+  ],
+  "caps": [
+    {
+      "id": "keep-stripping-marker",
+      "triggered": false,
+      "reason": "The report's final recommendation is to delete the alpha.1 defense (the delete statement and its comment) on alpha.2; it nowhere affirmatively keeps the stripping or continues deleting the marker.",
+      "total": 10
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-FvAD673qy54usoUAvOg1ZRmO",
+    "usage": {
+      "prompt_tokens": 3517,
+      "completion_tokens": 953,
+      "total_tokens": 4470,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 486
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "46c9dde48de9368d2ca5be42a8088cf9a3e7ae8a03e1904539ab273e666b603b",
+    "response_sha256": "7c8f355bbe848ec7a23ad2e8d8b40e393aa121fa0de146c430252b7bd479093a"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "48562db099f6d49abc6e10599a954fcadf918fba09c70c240074f51a912bc269"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "376a3b89e146ae644952c367f9a69c3c30dd0535f977e234d7f41f04fea11916",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

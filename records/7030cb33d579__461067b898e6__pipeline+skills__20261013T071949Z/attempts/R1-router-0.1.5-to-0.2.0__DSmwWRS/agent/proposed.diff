@@ -1,0 +1,1612 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index b71774f..e51b676 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -7,6 +7,7 @@
+   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-10b981?style=flat-square" alt="MIT license"></a>
+   <a href="https://www.npmjs.com/package/@deepseek-ai/dsh?activeTab=versions"><img alt="DSH 0.1.5" src="https://img.shields.io/badge/DSH-0.1.5-4d6bfe?style=flat-square" /></a>
+   <a href="https://www.npmjs.com/package/@deepseek-ai/dsh?activeTab=versions"><img alt="DSH 0.1.7-alpha.2 支持" src="https://img.shields.io/badge/DSH-0.1.7--alpha.2-e400dd?style=flat-square" /></a>
++  <a href="https://www.npmjs.com/package/@deepseek-ai/dsh?activeTab=versions"><img alt="DSH 0.2.0-rc.1 支持" src="https://img.shields.io/badge/DSH-0.2.0--rc.1-10b981?style=flat-square" /></a>
+   <a href="#agent-team-支持"><img alt="Agent Team" src="https://img.shields.io/badge/Agent%20Team-%E2%9C%93-10b981?style=flat-square" /></a>
+ </p>
+ 
+@@ -33,7 +34,8 @@ dsh-router 按**会话身份**亲和选号:同会话固定落同一个连接(前
+ 
+ ## 快速安装
+ 
+-需要 **DSH `0.1.5-rc.1` 及以上**(支持 `dsh plugin` profile 插件机制)、Node.js `>= 20`,以及 `web` profile。
++需要 **DSH `0.1.5-rc.1` 及以上**(支持 `dsh plugin` profile 插件机制;已在
++`0.1.5-rc.2`、`0.1.7-alpha.2`、`0.2.0-rc.1` 上验证)、Node.js `>= 20`,以及 `web` profile。
+ 
+ ```bash
+ dsh plugin --profile web add dsh-router-core
+@@ -99,8 +101,8 @@ team 测试就是多个会话交错发请求。dsh-router 原生适配这个场
+ > [`docs/pool-sticky-block.md`](docs/pool-sticky-block.md) §11。
+ >
+ > 版本适配:「路由」徽章只在 **DSH ≥ 0.1.7** 出现(0.1.5 的对应座位渲染位置
+-> 不同);0.1.5 与 0.1.7 的兼容差异(设置注册、tool 消息形态)统一按宿主版本号
+-> 判定。
++> 不同);0.1.5 与 0.1.7+(含 0.2.0)的兼容差异(设置注册、tool 消息形态、
++> `role:'developer'` 消息)统一按宿主版本号/消息形状判定。
+ 
+ ## 面板(设置 → 路由)
+ 
+@@ -346,7 +348,7 @@ curl -X POST http://localhost:3080/v1/chat/completions \
+   │    │    ├─ SupplierDetail    供应商详情:链接池 + 加链接 + 可用模型 + 模型测试
+   │    │    ├─ CombosTab / EndpointTab
+   │    │    └─ ExtTab → ExtDetail  扩展列表(只列已启用)与详情(优先渲染扩展自带的面板)
+-  │    └─ LastHitDock       「路由」徽章(composer.dock 座位,≥0.1.7;按会话显示最近命中)
++  │    └─ LastHitDock       「路由」徽章(conversation.composer.dock 座位,≥0.1.7;按会话显示最近命中)
+   ├─ 设置 → 插件(官方 plugins.detail.section 座位)
+   │    ├─ (原生「包含的组件」)  core patch 里声明的行:core 本体 + 内置供应商 + 内置扩展
+   │    │                        宿主管的开关,关一行 = loader 不 import 它
+@@ -359,7 +361,7 @@ curl -X POST http://localhost:3080/v1/chat/completions \
+                  │    └─ RouterAdapter(src/llm/adapter.ts)  OpenAI SSE → DSH StreamChunk
+                  │         (usage 经 toTokenUsage 转 DSH 契约,见 docs/suppliers.md)
+                  │         (带 x-dsh-router-session 头:宿主 sessionId → 会话亲和)
+-                 ├─ host-version(src/host-version.ts)  按宿主版本号适配 0.1.5 / 0.1.7
++                 ├─ host-version(src/host-version.ts)  按宿主版本号适配 0.1.5 / 0.1.7+(含 0.2.0)
+                  ├─ KeysStore(src/keys.ts)              密钥库 + requireApiKey
+                  └─ Router(路由器) → suppliers[]
+                       ├─ OpenCodeSupplier(lib/suppliers/opencode/index.js) 无账号直连(Zen 免费档,需 CLI 握手)
+@@ -404,8 +406,11 @@ curl -X POST http://localhost:3080/v1/chat/completions \
+ 
+ ## 前提
+ 
+-- **DSH 版本**:`0.1.5-rc.1` 及以上;插件内部按宿主版本号自动适配 0.1.5 / 0.1.7
+-  差异(设置注册方式、tool 消息形态、底部徽章);「路由」徽章需 **≥ 0.1.7**;
++- **DSH 版本**:`0.1.5-rc.1` 及以上(含 `0.2.0-rc.1`;peer 范围
++  `^0.1.5-rc.2 || ^0.2.0-rc.1`,低于下限的宿主会在启动兼容性预检里被拒);
++  插件内部按宿主版本号自动适配 0.1.5 / 0.1.7+ 差异(设置注册方式、tool 消息形态、
++  底部徽章);「路由」徽章需 **≥ 0.1.7**;0.2.0 起新增的 `role:'developer'` 消息
++  折成 system 更新,不落成空 user 消息;
+ - 凭证由 dsh-router 核心统一管(SQLite 库 `<dataDir>/auths/credentials.sqlite`);
+ - 供应商接入与开发见 [`docs/suppliers.md`](docs/suppliers.md);
+ - 重启 DSH 后 `/v1/*` 即生效;面板管理账号、模型与密钥。
+diff --git a/fixture/package.json b/fixture/package.json
+index b2987f6..59a4d1a 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "dsh-router-core",
+-  "version": "0.4.2",
++  "version": "0.4.3",
+   "description": "DSH plugin: a simplified 9router (AI routing gateway). Adds a 路由系统 (Routing System) sidebar entry beside 记忆系统; the panel shows suppliers, account pool, combos, and endpoint/API keys.",
+   "type": "module",
+   "repository": {
+@@ -100,11 +100,11 @@
+   },
+   "peerDependencies": {
+     "@deepseek-ai/cordis": "^4.0.2",
+-    "@deepseek-ai/dsh-client-locale": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-llm": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-settings": "^0.1.5-rc.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.5-rc.2 || ^0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.5-rc.2 || ^0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.2 || ^0.2.0-rc.1",
++    "@deepseek-ai/dsh-llm": "^0.1.5-rc.2 || ^0.2.0-rc.1",
++    "@deepseek-ai/dsh-settings": "^0.1.5-rc.2 || ^0.2.0-rc.1",
+     "cordis": "^4.0.0-rc.7",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+@@ -124,6 +124,11 @@
+     }
+   },
+   "devDependencies": {
++    "@deepseek-ai/dsh-client-locale": "0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-ui-primitives": "0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.1",
++    "@deepseek-ai/dsh-llm": "0.2.0-rc.1",
++    "@deepseek-ai/dsh-settings": "0.2.0-rc.1",
+     "@types/node": "^26.6.2",
+     "@types/react": "~19.3.0",
+     "@types/react-dom": "~19.3.0",
+diff --git a/fixture/pnpm-lock.yaml b/fixture/pnpm-lock.yaml
+index d550c5c..fb3377c 100644
+--- a/fixture/pnpm-lock.yaml
++++ b/fixture/pnpm-lock.yaml
+@@ -10,26 +10,26 @@ importers:
+     dependencies:
+       '@deepseek-ai/cordis':
+         specifier: ^4.0.2
+-        version: 4.0.2
++        version: 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
++      '@deepseek-ai/schemastery':
++        specifier: ^3.18.4
++        version: 3.18.4
++    devDependencies:
+       '@deepseek-ai/dsh-client-locale':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++        specifier: 0.2.0-rc.1
++        version: 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
+       '@deepseek-ai/dsh-client-ui-primitives':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.3(@deepseek-ai/cordis@4.0.2)
++        specifier: 0.2.0-rc.1
++        version: 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
+       '@deepseek-ai/dsh-client-ui-slots':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++        specifier: 0.2.0-rc.1
++        version: 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
+       '@deepseek-ai/dsh-llm':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)
++        specifier: 0.2.0-rc.1
++        version: 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
+       '@deepseek-ai/dsh-settings':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/schemastery@3.18.4)
+-      '@deepseek-ai/schemastery':
+-        specifier: ^3.18.4
+-        version: 3.18.4
+-    devDependencies:
++        specifier: 0.2.0-rc.1
++        version: 0.2.0-rc.1(ce490195879cd306887ac840d2ebee2d)
+       '@types/node':
+         specifier: ^26.6.2
+         version: 26.6.2
+@@ -56,13 +56,34 @@ importers:
+         version: 7.0.2
+       vite:
+         specifier: 8.3.0
+-        version: 8.3.0(@types/node@26.6.2)
++        version: 8.3.0(@types/node@26.6.2)(yaml@2.9.1)
+       vite-plugin-css-injected-by-js:
+         specifier: ^5.0.2
+-        version: 5.0.2(vite@8.3.0(@types/node@26.6.2))
++        version: 5.0.2(vite@8.3.0(@types/node@26.6.2)(yaml@2.9.1))
+ 
+ packages:
+ 
++  '@deepseek-ai/cordis-plugin-group@1.0.4':
++    resolution: {integrity: sha512-/7tuY5pMQetHava4v6QUeOa4CwZA+mleNvbIoj+iqEmzkYUtlXbLqhzJIcbnDa/Hxgr1jaCwROrI77nuLyeCFg==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
++
++  '@deepseek-ai/cordis-plugin-include@1.0.9':
++    resolution: {integrity: sha512-Xmekm7u5Kpeym6nABL4T1/Mg6aQYFZxsipB0WycmCctvX1DqAv8nCFwRmg2XMx/f7EbZgNEbXQwJfabcMu8zxQ==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
++
++  '@deepseek-ai/cordis-plugin-loader@1.0.5':
++    resolution: {integrity: sha512-200huL2ttWcjyeYllvPYn+qMR7I89qy8MhZasbHltPzB/KMrSfsyoCYKdCGc5KqPGj5iJugcmibQzjINMO9I+Q==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      node-addon-require-builtin: ^0.1.6
++    peerDependenciesMeta:
++      node-addon-require-builtin:
++        optional: true
++
+   '@deepseek-ai/cordis@4.0.2':
+     resolution: {integrity: sha512-asOnXP1TzFSFQlHb1iegDZp0z/8WD1c7YNrwJR/Tx2bzNuMXfcekE/I67Iv6SQXeLB4csxqCngzQKANP7gdw0g==}
+     hasBin: true
+@@ -78,85 +99,135 @@ packages:
+   '@deepseek-ai/cosmokit@1.8.5':
+     resolution: {integrity: sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==}
+ 
+-  '@deepseek-ai/dsh-brand@0.1.5-rc.2':
+-    resolution: {integrity: sha512-/+3TzQRYT4M8NINZ9OrsL5VWNyQSXof8mFLx3txiosWA7Bt0H6UcxUdKGXVwj6gCXhsQ74mzEHm2ucsflG0mYA==}
++  '@deepseek-ai/dsh-app-boot@0.2.0-rc.1':
++    resolution: {integrity: sha512-iHUYI+Tc3FlaYay0aLg4LsmZELi8wNWd6DSYrd46enUv0SWgm3qXVFLZivlcKqKWxcjuuvL5JxNemxGiMRIWxQ==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/cordis-plugin-group': ~1.0.4
++      '@deepseek-ai/cordis-plugin-include': ~1.0.9
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
++      '@deepseek-ai/dsh-home-paths': 0.2.0-rc.1
++      '@deepseek-ai/dsh-launch-environment': 0.2.0-rc.1
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.1
++
++  '@deepseek-ai/dsh-atomic-write@0.2.0-rc.1':
++    resolution: {integrity: sha512-xfqotH4A560oEQl+EzvyAJFjhiFF68ywiM/LuSuMQ2xvqLnaX50tJV/WCCBfVguM+4x/hObI0jz4oLDBs0d2Kg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-client-locale@0.1.5-rc.2':
+-    resolution: {integrity: sha512-kv56ki/WQWagsHt94wJAPzsiKnxa8KlmM33bZGgl2SgF4atlQ3iRCdkwJ3fQARXF4Ocnfutivoj5fu5usks1Sw==}
++  '@deepseek-ai/dsh-brand@0.2.0-rc.1':
++    resolution: {integrity: sha512-TPeMaUt/Xev0X2TfIf6pSVVGiWAbFHy+VWCIW+w8UkC0yH1ep9302JQOBqhUgefAM4s/3W1R8lra/PMbFhjx2w==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-client-ui-primitives@0.1.5-rc.3':
+-    resolution: {integrity: sha512-PnPSAppguOfDdtGRVLOtVynoZml3676GO/tveRuaA+tKhXog/35+JIpPewe7QQ+jwbxl+S/p66R6P19az3Cglw==}
++  '@deepseek-ai/dsh-client-locale@0.2.0-rc.1':
++    resolution: {integrity: sha512-4LNz28WCad8v3quEeuSTXOTHb6YHrMGkjIq73W+6+6zkEBbbmpfiz4FJ3MW9iE72DXLR9/IyUHNBpf6N/CVZ4Q==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-client-ui-slots@0.1.5-rc.2':
+-    resolution: {integrity: sha512-uUKIHBcNzWmJFtTlPkgn7hprsE5uU8lJf8Fw7jKwUouZWIwGnLdxuunrm1LOZWr7G+b4UfjVwD4LV12rhF/WLg==}
++  '@deepseek-ai/dsh-client-ui-primitives@0.2.0-rc.1':
++    resolution: {integrity: sha512-1CCpyIh5PJljyXS9zQP8ib6JAg2p6PELh+iZhD3VBjQC5ZZ5i/zdgNGVOGr6Uu+sUpU7BkjYPvUkhy7AZQJWYA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-invariants@0.1.5-rc.2':
+-    resolution: {integrity: sha512-oUxttB2yjAgkk47AiXOCxk9GwnfGvIEGsQfnMD7fukwIdD3KLJObU7+nz63tbFN80rjwMI8rg+p9QBQ10KU5+g==}
++  '@deepseek-ai/dsh-client-ui-slots@0.2.0-rc.1':
++    resolution: {integrity: sha512-GrQbf1KN9NGa63ZBocAKAA2W5aahRCOAQVYQoW2OLIvg5h2e1j30dqMx+nptni59YUvg0DmmLj6ggUXvFpzCQA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-llm@0.1.5-rc.1':
+-    resolution: {integrity: sha512-KPKJFTNLjURphuF4NlS8DRK94CUYL/dKB8Hzg/22jtxAFO2paX3ifL0vhdPq9xPbcyplaF7LYlf0+3+pXFTnTg==}
++  '@deepseek-ai/dsh-config-editor@0.2.0-rc.1':
++    resolution: {integrity: sha512-BGzv0pUgPELrWO073NrL0JbnjE1cXoUvaZIbG6Q9V0kZp46mg1BITtBvbD+p/pIu+SdbKwGeP1YxRyfdHG6ZKg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/cordis-plugin-include': ~1.0.9
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
++      '@deepseek-ai/dsh-app-boot': 0.2.0-rc.1
++      '@deepseek-ai/dsh-hmr': 0.2.0-rc.1
++    peerDependenciesMeta:
++      '@deepseek-ai/dsh-hmr':
++        optional: true
+ 
+-  '@deepseek-ai/dsh-llm@0.1.5-rc.2':
+-    resolution: {integrity: sha512-Z7BVsBkK24SE4EItQeow8PHms/9GP0DSTi337vTAa/RY7tNg2Snz3INcXUj6CPZfvntQr1in9op9wLI+rfNsqA==}
++  '@deepseek-ai/dsh-home-paths@0.2.0-rc.1':
++    resolution: {integrity: sha512-QWHegbfNY4J7qZgBdiWshhhcF6fgybua6XKUaMIhxj4J+mqR9KEQOJ7hRjOOg8Yub3nGbBTyqpH10C44EGGroA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-scope@0.1.5-rc.2':
+-    resolution: {integrity: sha512-JwItISje52iVIjlGMNayRVMZrvZU/0i3Gr0s+coND5nBp5lS+pOj9Zf1RQzA5cWjHYCWKmDuQc+m6zGlwmtAeQ==}
++  '@deepseek-ai/dsh-invariants@0.2.0-rc.1':
++    resolution: {integrity: sha512-sEeO6sRPGxgHChQsiU/V3LvelbVaLt7kb4WHVQqljZGgoAv3VZK0rzSlQaGfTCYJrThcoJ/a9mCT9pcZEZ3aDg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-session@0.1.5-rc.2':
+-    resolution: {integrity: sha512-y+klWiGAWR4m4cc4ylurA0cW63673B4N8cr2ANMimweDZAfxL4XVBC7WiD/5DT2DtIhYmVZhz/niyS/WbniUTA==}
++  '@deepseek-ai/dsh-launch-environment@0.2.0-rc.1':
++    resolution: {integrity: sha512-ADTbIFhcVnFSYmycI4Ln4q9GGv5YS+MRg0ahCbn0+rDLcYyx4TT9B9Xyiz856YRRPpYRbYwQqZ+o14kCDpicQA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-scope': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-settings@0.1.5-rc.2':
+-    resolution: {integrity: sha512-LI2Y6GkEs9ALMW+7S9jHPeEZDXHtG5X6cix1HdJ1rRxTEO5427QlYhMiz45rk7hqZ8ca2O4XFMW8IWXFZQLxmw==}
++  '@deepseek-ai/dsh-llm@0.2.0-rc.1':
++    resolution: {integrity: sha512-F5ZlBG8z8o5PfEWeEF/PN9t/A1N/oEErvqmpqE4J8f9mJR85DvBdV+rjDs7OjAbMJsJ8INjkbroruG5NNKDg5A==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-brand': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-session': ^0.1.5-rc.2
+-      '@deepseek-ai/schemastery': ^3.18.2
+-
+-  '@deepseek-ai/dsh-timeout@0.1.5-rc.2':
+-    resolution: {integrity: sha512-FgfaAw8Zt5X4Y6Ljh833B8Hy7h96FeR+yjNKI3iSyZSqREqOBgvDGXFfQlSu6V3Buvw/cbI/CJUQJvfRBKXOiA==}
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-package-manifest@0.2.0-rc.1':
++    resolution: {integrity: sha512-topsRB2Pr2pfyQgqIkcEnS0mjDWZUDS+inb7/FREv0UaxkB0ezIiQuSJVJk5PQ3KMyuMSz2oNH/URlKOGw35Sw==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-scope@0.2.0-rc.1':
++    resolution: {integrity: sha512-D1JeWIz40A62/nJIi7HwLsddmuDwdcxV9Lbx5IgBveWDZHGqPIP0/CPJ4o6XWr+C1qI/GBtdMkN2Z3F20Rlt7w==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.1
++
++  '@deepseek-ai/dsh-session@0.2.0-rc.1':
++    resolution: {integrity: sha512-KUDCUk8kmiJCwvV3gDbkUSpkyoGHdg36nIhKsEh6iBoYDuIQCuvX2htiVRXCm099XZO6rCBVInmm1193UoPYcA==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.1
++
++  '@deepseek-ai/dsh-settings@0.2.0-rc.1':
++    resolution: {integrity: sha512-kC7Cq6Ls6of8J9qY0/8oehLbf9AV62QVA9dL0YPOnvdvgaNJaRbLtXxwr+I36rjDVmOfUkqvW4nxBIjJmPSY/g==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.1
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.1
++      '@deepseek-ai/dsh-session': 0.2.0-rc.1
++      '@deepseek-ai/schemastery': ~3.18.4
++
++  '@deepseek-ai/dsh-system-prompt@0.2.0-rc.1':
++    resolution: {integrity: sha512-AZC0HBWaiopkVcJXh/WEzyyF19+/yBPnbuLrZoD7h+UJYF8iG8tlDabauWfMw+dvgoYe9hIiTV2EcFRv4AgJhw==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.1
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.1
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.1
++
++  '@deepseek-ai/dsh-timeout@0.2.0-rc.1':
++    resolution: {integrity: sha512-SQpvDLIPU0EJP1lbphfuEkLrvnX+CE9u9ym1+L5z/8dYe9BCPbhgjQoRvDnyzKZqFyoXVvZFdqdAADlc6DX7Ig==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-typert-protocol@0.1.5-rc.2':
+-    resolution: {integrity: sha512-zP8J20rBXa1AFjKL2i83JBeQcePZx8yal3pNojj4t7CCokMcoFMUbr50woa6fY1tRJ7qHxgypO3rH8Q6YWgmiA==}
++  '@deepseek-ai/dsh-typert-protocol@0.2.0-rc.1':
++    resolution: {integrity: sha512-MhpeimGP6E3MqSESLm32OmPgx5aNUG7yCJCgcIFw7XBWhQmKB9fU3CWuUxxbWZeC7eWkdJ93AG2ww/Qu6QWW9A==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-util-crypto@0.1.5-rc.2':
+-    resolution: {integrity: sha512-JR0aJEUL35RE8FVT89wMZMbPwMrbkjNcy+gE9pq70d/m2Zxw3a0iNer+BAxPAKYPbmy0xDDXReTwXiecKVy4sQ==}
++  '@deepseek-ai/dsh-util-crypto@0.2.0-rc.1':
++    resolution: {integrity: sha512-BLBQVRGBlzhNprSpREiMDi1JwX0X8jKdEPWiVRKBnttlG9d33j1pLsaiH9HHLY/D10lXX/NagGia/Zz9mW4FBA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-util-values@0.1.5-rc.2':
+-    resolution: {integrity: sha512-Cr0TkM6dFAD+Iy4sNXH/afJVMHwJXoOztivj+RflkYoACsOq+Ix0vdHn36hwW7mayU8OK3ZKIZUQ6BPo1fHvUg==}
++  '@deepseek-ai/dsh-util-values@0.2.0-rc.1':
++    resolution: {integrity: sha512-Eh1HH0LFvztBwU2xotdfW5oCwLlWGjK2ygCC5+PnC3tkSDh9gvVQpEf0ezK+Kk6vpLz117V7VPehhR1+gs90+Q==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+   '@deepseek-ai/schemastery@3.18.4':
+     resolution: {integrity: sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==}
+ 
++  '@eslint-community/regexpp@4.12.2':
++    resolution: {integrity: sha512-EriSTlt5OC9/7SXkRSCAhfSxxoSUgBm33OH+IkwbdpgoqsSsUg7y3uh+IICI/Qg4BBWr3U2i39RpmycbxMq4ew==}
++    engines: {node: ^12.0.0 || ^14.0.0 || >=16.0.0}
++
+   '@oxc-project/types@0.150.0':
+     resolution: {integrity: sha512-rDS5/31E9HfPl/CIzGrn0DOlvBbXFseQ5URJ9sYMfstbKLD/c6Gm9vmRzRGDdAXyOIL4zmO37lc9RIwYqVruZw==}
+ 
+@@ -400,137 +471,167 @@ packages:
+     resolution: {integrity: sha512-Oc2KInVkPfUjEB4PeV6X0NvIoyYTzDe/WmqFrTwBqKs6YKnz4A7XwWQvJTb7M0rLz9a6WgpUUiiS5QKaCi4O/g==}
+     cpu: [arm64]
+     os: [android]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-darwin-arm64@0.10.2':
+     resolution: {integrity: sha512-3H7eNPIHJndUJXZ4QUGBPq1zC6RGcUZfm7bymJes+/N7wTVWUn1bxZ9JcozYHpkWQNm9f23G8YWbaHD9aYH72A==}
+     cpu: [arm64]
+     os: [darwin]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-darwin-x64@0.10.2':
+     resolution: {integrity: sha512-AJOUpR2s3LF9AWiiub/Uyc/UoXNTWcq8hK3cVI6fUSXtwh34dG21J6hRuNlO6JVJFTo4o3ScVvZOrh/YFfUEAA==}
+     cpu: [x64]
+     os: [darwin]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-freebsd-x64@0.10.2':
+     resolution: {integrity: sha512-ms7DcZu87u5CiK/wMwvpKAvAmtaqKjCQIXNweMLypG6qbuiaOMQf1jpbB5+j46xBcgCovo8TQMcv0bCQLKIL9w==}
+     cpu: [x64]
+     os: [freebsd]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-linux-arm-gnu@0.10.2':
+     resolution: {integrity: sha512-xJDpYAsKV5+eaiBhTYl05fvT6sst4PsCeuIFMRu9b0/WCSrNQPfCDtAQ5/MS6xNpsdujdZEPR+gmfWk3ZG5i3A==}
+     cpu: [arm]
+     os: [linux]
+     libc: [glibc]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-linux-arm-musl@0.10.2':
+     resolution: {integrity: sha512-qfTkgd7AEx61l4K9VtXWCGTxc/fmXJ4ZheDz3i+/AAJUtg4sa0bPrc0VBxPggB/rayR8Z3+JfrBItuyanBJJ9Q==}
+     cpu: [arm]
+     os: [linux]
+     libc: [musl]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-linux-arm64-gnu@0.10.2':
+     resolution: {integrity: sha512-4e6Mifm/4UdjtU3D8mATIrvgP+xEiH8xtQOjd0zpd72XKWT7ug3sdyhq2utkkZFP6BvYp7SgZrI+aR4VeIOHdw==}
+     cpu: [arm64]
+     os: [linux]
+     libc: [glibc]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-linux-arm64-musl@0.10.2':
+     resolution: {integrity: sha512-RdsJrUfDYFVV3JOmWFUWwSu31fa1APn12xDeIKxgl/YWxrabwtxsDBNjF2561c7tmcbiewdCUvngqRs8AyGVLA==}
+     cpu: [arm64]
+     os: [linux]
+     libc: [musl]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-linux-x64-gnu@0.10.2':
+     resolution: {integrity: sha512-mVzWimEPPreaPyXIUvxsHoJzvO7ckZ5j0LgQFHz04zQIRwt9A9T2hA7K5/jYjJKkMxWG/U2VjhGNwVhtyU+uqg==}
+     cpu: [x64]
+     os: [linux]
+     libc: [glibc]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-linux-x64-musl@0.10.2':
+     resolution: {integrity: sha512-Y77fyISurmr2mvO1yeq3u+x/WJbACgPR4w+lzEVx30ViCxZzIGrZPRN1yEdZ9xUNPNsIO5thBHIdRNG+UGUG+Q==}
+     cpu: [x64]
+     os: [linux]
+     libc: [musl]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-win32-arm64@0.10.2':
+     resolution: {integrity: sha512-1+tGLyG0u5YYy0lev4ck7/0sd8xJ9SZde0dLut7qLDPZV5WVTV8x6OxNXUne/PGuHZyO1vK+txPQzzHOyXHGSw==}
+     cpu: [arm64]
+     os: [win32]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-codegen/binding-win32-x64@0.10.2':
+     resolution: {integrity: sha512-8a2SExRohRbwC0MY4VpOF0/RSckrJ2ASZqAor5/RYSJJaeadR93n10gZzcKT6pY9ukiSOIZCRKVRD2tH73T0qA==}
+     cpu: [x64]
+     os: [win32]
++    deprecated: yuku-codegen is pure JavaScript since 0.14
+ 
+   '@yuku-parser/binding-android-arm64@0.10.2':
+     resolution: {integrity: sha512-2VPBU9fRGRAQ2xPAvghnec3oou5Nrxm2Bezhf+13UMspAxQSkF/32r+ySKXSwIPA5/RivumDJDxAxc301Sgicw==}
+     cpu: [arm64]
+     os: [android]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-darwin-arm64@0.10.2':
+     resolution: {integrity: sha512-LD+PMZE51tCYTOss5HBkm3/AE39MvcMDBfWJx7A4yDcjfNbAQDnHZKtzSOuqrswx+TQHY0ws5xn6+fWOwtmfBA==}
+     cpu: [arm64]
+     os: [darwin]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-darwin-x64@0.10.2':
+     resolution: {integrity: sha512-mmZ8cND+AoIIMRERyMinlg5ApHxP23B9jH2B5wT7T+dliPa9rubLxneB/SUjFwyUjGaFnB5G7t4YvpfbO5zbkQ==}
+     cpu: [x64]
+     os: [darwin]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-freebsd-x64@0.10.2':
+     resolution: {integrity: sha512-gVIjaaIddbRfAhHlC8N809wQWml7mxfSVnzaLtzGXObTeFTPAg/YVnQXt1UOhPM1ah5eG/8Y0RUlNpB4GVe7eQ==}
+     cpu: [x64]
+     os: [freebsd]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-linux-arm-gnu@0.10.2':
+     resolution: {integrity: sha512-q/XPPQQAPdlw05aPj30ygBhekmQryGOwxVraBgApjKK8yY1kNQgqq6XCYLF1WHSee+lhxclrTO7W0/bt7dR1GA==}
+     cpu: [arm]
+     os: [linux]
+     libc: [glibc]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-linux-arm-musl@0.10.2':
+     resolution: {integrity: sha512-A+Cb0I1hFF4wilTQpWs79k1aNnj4B2tkrHx3zsuUNF9BtVY2zPZ4yeQEM/zjXrS/qJlNMZVK9NrWJjwdpnTrfg==}
+     cpu: [arm]
+     os: [linux]
+     libc: [musl]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-linux-arm64-gnu@0.10.2':
+     resolution: {integrity: sha512-aGNSzqIqqphFwAdIFwVvKIyXD1Iy3CxrEJVIZAT87Ecyi4vCmmDD2v2l9h+Gd3/wSy3JZlOI792LJbKAjyy9rQ==}
+     cpu: [arm64]
+     os: [linux]
+     libc: [glibc]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-linux-arm64-musl@0.10.2':
+     resolution: {integrity: sha512-Ddl1sF0rtuCXyHGSOV6dcmdx+ETv1iD+IVFqQuOjzkJZWclxJxdBWX6ZJMRtTiGqGUTbqLEKiTXxpR/Bvqk+2A==}
+     cpu: [arm64]
+     os: [linux]
+     libc: [musl]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-linux-x64-gnu@0.10.2':
+     resolution: {integrity: sha512-/nlcpR6IF5U+0m5L9wvAIXeQa2DT+BXuvqKDsTcOTlcc0B4dHNyqE5hTXsS4hAyimpy2ZK8A1zMNF5hTrjg2cg==}
+     cpu: [x64]
+     os: [linux]
+     libc: [glibc]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-linux-x64-musl@0.10.2':
+     resolution: {integrity: sha512-GX80dxTQD/M/OryyuxJcFzFENzry3cDFPvCFTyWogNWQH3fSHfMrNfpwpl1YzMos1eV9NygK5GSDG7VArQlb4w==}
+     cpu: [x64]
+     os: [linux]
+     libc: [musl]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-win32-arm64@0.10.2':
+     resolution: {integrity: sha512-agePQBV4VHewiGU0ACSjscZ/hJd283f9JfAF19Gf1rI5+wy5tTgx4GS36i0b3xim15AQ4RCpDRosEvhLZ4zAOw==}
+     cpu: [arm64]
+     os: [win32]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-parser/binding-win32-x64@0.10.2':
+     resolution: {integrity: sha512-s8//CMpgL5+y1lvDCdyh1rwGI5+ytDJywFJRe1vnhI7n0j+caxshNucurikYLLVeQ2SYFex6aPrzgQxkabBQRA==}
+     cpu: [x64]
+     os: [win32]
++    deprecated: yuku-parser runs on yuku-core since 0.14
+ 
+   '@yuku-toolchain/types@0.10.2':
+     resolution: {integrity: sha512-sSeo4SSSToiS+sSD+bwn/s94EEcaLJ7tG5LCp8gFYC1G5VzxzX7fqB6m9RU1yMD8KTpu6zdU/I1NlQf8hVBJ9Q==}
+ 
++  ajv@8.20.0:
++    resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
++
++  argparse@2.0.1:
++    resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
++
+   cac@7.0.0:
+     resolution: {integrity: sha512-tixWYgm5ZoOD+3g6UTea91eow5z6AAHaho3g0V9CNSNb45gM8SmflpAc+GRd1InC4AqN/07Unrgp56Y94N9hJQ==}
+     engines: {node: '>=20.19.0'}
+@@ -573,6 +674,12 @@ packages:
+     resolution: {integrity: sha512-AnfC1ATldl49/cvZdLPDjBfrRNwbDO05aibiOtzQu3qtlbJtomNLhF30HEtn/7iBz50dlMECqATo3fG0LrdEgw==}
+     engines: {node: '>=14'}
+ 
++  fast-deep-equal@3.1.3:
++    resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
++
++  fast-uri@3.1.8:
++    resolution: {integrity: sha512-GZMtZUTNRpOVIECoXwLNZS5xUGE+mVNbTB8h/7Rwh2TFWcBQiPzTgyZi05BF9UMZKkLJv8XBRJTlU7zg8+ZfMg==}
++
+   fdir@6.5.0:
+     resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
+     engines: {node: '>=12.0.0'}
+@@ -598,6 +705,13 @@ packages:
+     resolution: {integrity: sha512-vXoV9PjKHEednCUu01e98TkImxy67e3BJXbTIOmIq4Hyzw3IAwYRcuPkfeTzJzwyyts4kjuA73x+pWJLc4f86A==}
+     engines: {node: ^22.18.0 || >=24.0.0}
+ 
++  js-yaml@4.3.2:
++    resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
++    hasBin: true
++
++  json-schema-traverse@1.0.0:
++    resolution: {integrity: sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==}
++
+   lightningcss-android-arm64@1.33.0:
+     resolution: {integrity: sha512-gEpRTalKdosp4Bb8qWtc2iOgE5SeIHlpS1up9bFq2wAyYhl1UdTObYiHe98zEM9SQvSoqQZ1IQD0JNpg3Ml5pg==}
+     engines: {node: '>= 12.0.0'}
+@@ -677,6 +791,72 @@ packages:
+     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
+     hasBin: true
+ 
++  node-addon-native-custom-loader@0.1.9:
++    resolution: {integrity: sha512-Zh87aubSc1UF8CzZsRws1KtSwXiPDH0tbcg8V/2OA8Tcq9yGJRESFcEOC5NGLFama5IGfC3aJhubZbrj9Un2qA==}
++    engines: {node: '>=20'}
++
++  node-addon-require-builtin-darwin-arm64@0.1.9:
++    resolution: {integrity: sha512-n45xEILQVOLZ2hVhzRXesTMYS4odHquyI/B/IkPMPUCONa8PjNfBag6lYBH4wDrhgpLNNBwMsUD8d8O/13QPPA==}
++    engines: {node: '>=20'}
++    cpu: [arm64]
++    os: [darwin]
++
++  node-addon-require-builtin-darwin-x64@0.1.9:
++    resolution: {integrity: sha512-Sm4Liqh1uo9zgJB2F/pACPPZdHu+fj9Qniyr1Q99dDQB0v71VgZgkAgv3K0/E1iPQBlZq9rakFkY7MGUIfWc0A==}
++    engines: {node: '>=20'}
++    cpu: [x64]
++    os: [darwin]
++
++  node-addon-require-builtin-linux-arm64-gnu@0.1.9:
++    resolution: {integrity: sha512-ToU4wGtOD/069i2y4fJ3cjDJiiWtcjSQTZMf0YKlotb5BmTM7FjhR3X1aub8J/YjlOwl6665J/XAYuvCaDO5sA==}
++    engines: {node: '>=20'}
++    cpu: [arm64]
++    os: [linux]
++    libc: [glibc]
++
++  node-addon-require-builtin-linux-arm64-musl@0.1.9:
++    resolution: {integrity: sha512-85Z5Avp++wfa9iiTIH8LC/r6qvlC/CiwpifiwIz0gYQ9PzajTSkz06gX7YDqf1oUqWYxU9uwNEOmo7mktHOOfA==}
++    engines: {node: '>=20'}
++    cpu: [arm64]
++    os: [linux]
++    libc: [musl]
++
++  node-addon-require-builtin-linux-x64-gnu@0.1.9:
++    resolution: {integrity: sha512-fh3K3/JvBfSYwU8vEOpp4Wdp4N/jX0EnZYq5GsaftlQin1FVqgve/yDNoh+asxBMOQyHOG8F4dXlV1WCierrfg==}
++    engines: {node: '>=20'}
++    cpu: [x64]
++    os: [linux]
++    libc: [glibc]
++
++  node-addon-require-builtin-linux-x64-musl@0.1.9:
++    resolution: {integrity: sha512-B6fu/5xmbRxnifM7nWz0IESkYnUl8dwFZmRDMsxdhzv2nb+EtBRFAXg4lf73qhX3yoZD4SnWJILBQMlIAwBCzw==}
++    engines: {node: '>=20'}
++    cpu: [x64]
++    os: [linux]
++    libc: [musl]
++
++  node-addon-require-builtin-win32-arm64-msvc@0.1.9:
++    resolution: {integrity: sha512-FOQuzNe8B1BANu886rJgdbQuRxPGUQmewkykw87wSr32U0ibQ3AWGuUM/Gh7LG4RekjFaifj7gEI/tq2+6GU6g==}
++    engines: {node: '>=20'}
++    cpu: [arm64]
++    os: [win32]
++
++  node-addon-require-builtin-win32-ia32-msvc@0.1.9:
++    resolution: {integrity: sha512-N29P0kmIBT6hnkNNFYzxn+o9ydT6OYZe9RFAi8dSxV1rNSul1FlxtuKWYe8w2sQpbQGYuGDEtpOwdeFtq2iFTg==}
++    engines: {node: '>=20 <23'}
++    cpu: [ia32]
++    os: [win32]
++
++  node-addon-require-builtin-win32-x64-msvc@0.1.9:
++    resolution: {integrity: sha512-+i6N4A7m7txjbw8pDYESdWXiKO9EEVq0SzTzwPS0WZuV4F1MzQnaDJwJJnO7T6zAc0BvqHXBOkpharCrUjFhbQ==}
++    engines: {node: '>=20'}
++    cpu: [x64]
++    os: [win32]
++
++  node-addon-require-builtin@0.1.9:
++    resolution: {integrity: sha512-BCxXCMZDs/VLLh64SwKNw/me7Qx1I7Be4qxWwYVRRm8tJoOB8fL7qg6CmXhSXeUqsKt72t8RaKCX4EN+5nocVg==}
++    engines: {node: '>=20'}
++
+   obug@2.2.1:
+     resolution: {integrity: sha512-XrsrhT5sybtKI6wakr2SPOlGZWWYbUXZ7a0jT8/QOeAPau+1X/bSegNe5YR75oJmEZQbKningirmGOEJCIk61Q==}
+     engines: {node: '>=12.20.0'}
+@@ -708,9 +888,17 @@ packages:
+     resolution: {integrity: sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==}
+     engines: {node: '>=0.10.0'}
+ 
++  require-from-string@2.0.2:
++    resolution: {integrity: sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw==}
++    engines: {node: '>=0.10.0'}
++
+   resolve-pkg-maps@1.0.0:
+     resolution: {integrity: sha512-seS2Tj26TBVOC2NIc2rOe2y2ZO7efxITtLZcGSOnHHNOQ7CkiUBfw0Iw2ck6xkIhPwLhKNLS8BO+hEpngQlqzw==}
+ 
++  resolve.exports@2.0.3:
++    resolution: {integrity: sha512-OcXjMsGdhL4XnbShKpAcSqPMzQoYkYyhbEaeSko47MjRP9NfEQMhZkXL1DoFlt9LWQn4YttrdnV6X2OiyzBi+A==}
++    engines: {node: '>=10'}
++
+   rolldown-plugin-dts@0.28.6:
+     resolution: {integrity: sha512-qKrFtBfRfR2hP233m7Ic9zf3wv6MSYdZghWKMdEO6dRYZGlNfINJAa1P5ZVvyHh3mrcd7IJQvIY8L9vnm+v5rQ==}
+     engines: {node: ^22.18.0 || ^24.11.0 || >=26.0.0}
+@@ -741,6 +929,11 @@ packages:
+   scheduler@0.28.0:
+     resolution: {integrity: sha512-juorfCmIkIw8tT+p5BXSm6PJjQF/ycEYmKyzURCIt/RaZIhL+PulbQ9Yu2z1HdOJDdqDTlxA1+xKBmHXJsczAw==}
+ 
++  semver@7.8.5:
++    resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
++    engines: {node: '>=10'}
++    hasBin: true
++
+   source-map-js@1.2.1:
+     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
+     engines: {node: '>=0.10.0'}
+@@ -854,6 +1047,11 @@ packages:
+       yaml:
+         optional: true
+ 
++  yaml@2.9.1:
++    resolution: {integrity: sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==}
++    engines: {node: '>= 14.6'}
++    hasBin: true
++
+   yuku-ast@0.10.2:
+     resolution: {integrity: sha512-UnG9mA6giglCvSErft2/40TVFX750Sj1xgwddPLpG7J7rlr/P1wPADg9G2RK+d/1tNLtRVoLdMMOMVBB9561TQ==}
+ 
+@@ -868,100 +1066,176 @@ packages:
+ 
+ snapshots:
+ 
+-  '@deepseek-ai/cordis@4.0.2':
++  '@deepseek-ai/cordis-plugin-group@1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))(@deepseek-ai/cordis@4.0.2)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9)
++
++  '@deepseek-ai/cordis-plugin-include@1.0.9(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))(@deepseek-ai/cordis@4.0.2)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9)
++      '@deepseek-ai/cosmokit': 1.8.5
++      js-yaml: 4.3.2
++
++  '@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
++      '@deepseek-ai/cosmokit': 1.8.5
++      '@deepseek-ai/schemastery': 3.18.4
++    optionalDependencies:
++      node-addon-require-builtin: 0.1.9
++
++  '@deepseek-ai/cordis@4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))':
+     dependencies:
+       '@deepseek-ai/cosmokit': 1.8.5
+       '@standard-schema/spec': 1.1.0
++    optionalDependencies:
++      '@deepseek-ai/cordis-plugin-include': 1.0.9(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9)
+ 
+   '@deepseek-ai/cosmokit@1.8.5': {}
+ 
+-  '@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-app-boot@0.2.0-rc.1(@deepseek-ai/cordis-plugin-group@1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-home-paths@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-launch-environment@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-system-prompt@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
++      '@deepseek-ai/cordis-plugin-group': 1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis-plugin-include': 1.0.9(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9)
++      '@deepseek-ai/dsh-atomic-write': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/dsh-home-paths': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/dsh-launch-environment': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/dsh-package-manifest': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)))
++      '@eslint-community/regexpp': 4.12.2
++      ajv: 8.20.0
++      js-yaml: 4.3.2
++      node-addon-require-builtin: 0.1.9
++      resolve.exports: 2.0.3
++      semver: 7.8.5
++
++  '@deepseek-ai/dsh-atomic-write@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
+ 
+-  '@deepseek-ai/dsh-client-locale@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-brand@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
++
++  '@deepseek-ai/dsh-client-locale@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
+       '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/dsh-client-ui-primitives@0.1.5-rc.3(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-client-ui-primitives@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
+ 
+-  '@deepseek-ai/dsh-client-ui-slots@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-client-ui-slots@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
+ 
+-  '@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-config-editor@0.2.0-rc.1(12770675e9e65fcf0aca6d5326c91793)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/schemastery': 3.18.4
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
++      '@deepseek-ai/cordis-plugin-include': 1.0.9(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9)
++      '@deepseek-ai/dsh-app-boot': 0.2.0-rc.1(@deepseek-ai/cordis-plugin-group@1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-home-paths@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-launch-environment@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-system-prompt@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))))
++      '@deepseek-ai/dsh-atomic-write': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      js-yaml: 4.3.2
++      yaml: 2.9.1
++
++  '@deepseek-ai/dsh-home-paths@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
+ 
+-  '@deepseek-ai/dsh-llm@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-timeout': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-typert-protocol': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-crypto': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
+       '@deepseek-ai/schemastery': 3.18.4
+-      zod: 4.6.5
+ 
+-  '@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-launch-environment@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
++
++  '@deepseek-ai/dsh-llm@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-timeout': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-typert-protocol': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-crypto': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/dsh-timeout': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/dsh-typert-protocol': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/dsh-util-crypto': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
+       '@deepseek-ai/schemastery': 3.18.4
+       zod: 4.6.5
+ 
+-  '@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-package-manifest@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
++
++  '@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
+ 
+-  '@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))':
++  '@deepseek-ai/dsh-session@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-scope': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++
++  '@deepseek-ai/dsh-settings@0.2.0-rc.1(ce490195879cd306887ac840d2ebee2d)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9)
++      '@deepseek-ai/cosmokit': 1.8.5
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/dsh-config-editor': 0.2.0-rc.1(12770675e9e65fcf0aca6d5326c91793)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/dsh-session': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)))
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/schemastery': 3.18.4
++      yaml: 2.9.1
++    transitivePeerDependencies:
++      - '@deepseek-ai/cordis-plugin-include'
++      - '@deepseek-ai/dsh-app-boot'
++      - '@deepseek-ai/dsh-hmr'
++      - node-addon-require-builtin
+ 
+-  '@deepseek-ai/dsh-settings@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/schemastery@3.18.4)':
++  '@deepseek-ai/dsh-system-prompt@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-session': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2))
+       '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/dsh-timeout@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-timeout@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
+ 
+-  '@deepseek-ai/dsh-typert-protocol@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-typert-protocol@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)
+ 
+-  '@deepseek-ai/dsh-util-crypto@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-util-crypto@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
+ 
+-  '@deepseek-ai/dsh-util-values@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-util-values@0.2.0-rc.1(@deepseek-ai/cordis@4.0.2)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.2)(node-addon-require-builtin@0.1.9))
+ 
+   '@deepseek-ai/schemastery@3.18.4':
+     dependencies:
+       '@deepseek-ai/cosmokit': 1.8.5
+       '@standard-schema/spec': 1.1.0
+ 
++  '@eslint-community/regexpp@4.12.2': {}
++
+   '@oxc-project/types@0.150.0': {}
+ 
+   '@quansync/fs@1.1.0':
+@@ -1163,6 +1437,15 @@ snapshots:
+ 
+   '@yuku-toolchain/types@0.10.2': {}
+ 
++  ajv@8.20.0:
++    dependencies:
++      fast-deep-equal: 3.1.3
++      fast-uri: 3.1.8
++      json-schema-traverse: 1.0.0
++      require-from-string: 2.0.2
++
++  argparse@2.0.1: {}
++
+   cac@7.0.0: {}
+ 
+   cordis@4.0.0-rc.10:
+@@ -1182,6 +1465,10 @@ snapshots:
+ 
+   empathic@2.1.0: {}
+ 
++  fast-deep-equal@3.1.3: {}
++
++  fast-uri@3.1.8: {}
++
+   fdir@6.5.0(picomatch@4.0.7):
+     optionalDependencies:
+       picomatch: 4.0.7
+@@ -1197,6 +1484,12 @@ snapshots:
+ 
+   import-without-cache@0.4.1: {}
+ 
++  js-yaml@4.3.2:
++    dependencies:
++      argparse: 2.0.1
++
++  json-schema-traverse@1.0.0: {}
++
+   lightningcss-android-arm64@1.33.0:
+     optional: true
+ 
+@@ -1248,6 +1541,67 @@ snapshots:
+ 
+   nanoid@3.3.19: {}
+ 
++  node-addon-native-custom-loader@0.1.9: {}
++
++  node-addon-require-builtin-darwin-arm64@0.1.9:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.9
++    optional: true
++
++  node-addon-require-builtin-darwin-x64@0.1.9:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.9
++    optional: true
++
++  node-addon-require-builtin-linux-arm64-gnu@0.1.9:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.9
++    optional: true
++
++  node-addon-require-builtin-linux-arm64-musl@0.1.9:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.9
++    optional: true
++
++  node-addon-require-builtin-linux-x64-gnu@0.1.9:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.9
++    optional: true
++
++  node-addon-require-builtin-linux-x64-musl@0.1.9:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.9
++    optional: true
++
++  node-addon-require-builtin-win32-arm64-msvc@0.1.9:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.9
++    optional: true
++
++  node-addon-require-builtin-win32-ia32-msvc@0.1.9:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.9
++    optional: true
++
++  node-addon-require-builtin-win32-x64-msvc@0.1.9:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.9
++    optional: true
++
++  node-addon-require-builtin@0.1.9:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.9
++    optionalDependencies:
++      node-addon-require-builtin-darwin-arm64: 0.1.9
++      node-addon-require-builtin-darwin-x64: 0.1.9
++      node-addon-require-builtin-linux-arm64-gnu: 0.1.9
++      node-addon-require-builtin-linux-arm64-musl: 0.1.9
++      node-addon-require-builtin-linux-x64-gnu: 0.1.9
++      node-addon-require-builtin-linux-x64-musl: 0.1.9
++      node-addon-require-builtin-win32-arm64-msvc: 0.1.9
++      node-addon-require-builtin-win32-ia32-msvc: 0.1.9
++      node-addon-require-builtin-win32-x64-msvc: 0.1.9
++
+   obug@2.2.1: {}
+ 
+   obug@3.0.0: {}
+@@ -1271,8 +1625,12 @@ snapshots:
+ 
+   react@19.3.0: {}
+ 
++  require-from-string@2.0.2: {}
++
+   resolve-pkg-maps@1.0.0: {}
+ 
++  resolve.exports@2.0.3: {}
++
+   rolldown-plugin-dts@0.28.6(rolldown@1.2.9)(typescript@7.0.2):
+     dependencies:
+       dts-resolver: 3.0.0
+@@ -1310,6 +1668,8 @@ snapshots:
+ 
+   scheduler@0.28.0: {}
+ 
++  semver@7.8.5: {}
++
+   source-map-js@1.2.1: {}
+ 
+   tinyexec@1.3.1: {}
+@@ -1378,11 +1738,11 @@ snapshots:
+ 
+   verkit@0.4.1: {}
+ 
+-  vite-plugin-css-injected-by-js@5.0.2(vite@8.3.0(@types/node@26.6.2)):
++  vite-plugin-css-injected-by-js@5.0.2(vite@8.3.0(@types/node@26.6.2)(yaml@2.9.1)):
+     dependencies:
+-      vite: 8.3.0(@types/node@26.6.2)
++      vite: 8.3.0(@types/node@26.6.2)(yaml@2.9.1)
+ 
+-  vite@8.3.0(@types/node@26.6.2):
++  vite@8.3.0(@types/node@26.6.2)(yaml@2.9.1):
+     dependencies:
+       lightningcss: 1.33.0
+       picomatch: 4.0.7
+@@ -1392,6 +1752,9 @@ snapshots:
+     optionalDependencies:
+       '@types/node': 26.6.2
+       fsevents: 2.3.3
++      yaml: 2.9.1
++
++  yaml@2.9.1: {}
+ 
+   yuku-ast@0.10.2:
+     dependencies:
+diff --git a/fixture/pnpm-workspace.yaml b/fixture/pnpm-workspace.yaml
+index ad047d9..1a079f8 100644
+--- a/fixture/pnpm-workspace.yaml
++++ b/fixture/pnpm-workspace.yaml
+@@ -4,9 +4,11 @@ minimumReleaseAgeExclude:
+   - tinyexec@1.3.1
+   - tsdown@0.23.0
+   - '@deepseek-ai/dsh-brand@0.1.5-rc.1'
+-  - '@deepseek-ai/dsh-client-locale@0.1.5-rc.1 || 0.1.7-alpha.2'
+-  - '@deepseek-ai/dsh-client-ui-slots@0.1.5-rc.1 || 0.1.7-alpha.2'
+-  - '@deepseek-ai/dsh-llm@0.1.5-rc.1'
++  - '@deepseek-ai/dsh-client-locale@0.1.5-rc.1 || 0.1.7-alpha.2 || 0.2.0-rc.1'
++  - '@deepseek-ai/dsh-client-ui-slots@0.1.5-rc.1 || 0.1.7-alpha.2 || 0.2.0-rc.1'
++  - '@deepseek-ai/dsh-llm@0.1.5-rc.1 || 0.2.0-rc.1'
++  - '@deepseek-ai/dsh-settings@0.1.5-rc.2 || 0.2.0-rc.1'
++  - '@deepseek-ai/dsh-client-ui-primitives@0.1.5-rc.3 || 0.2.0-rc.1'
+   - '@deepseek-ai/dsh-timeout@0.1.5-rc.1'
+   - '@deepseek-ai/dsh-typert-protocol@0.1.5-rc.1'
+   - '@deepseek-ai/dsh-util-crypto@0.1.5-rc.1'
+diff --git a/fixture/src/llm/adapter.test.ts b/fixture/src/llm/adapter.test.ts
+index 62d5bbf..f85d771 100644
+--- a/fixture/src/llm/adapter.test.ts
++++ b/fixture/src/llm/adapter.test.ts
+@@ -11,6 +11,7 @@
+  */
+ import { test } from 'node:test'
+ import assert from 'node:assert/strict'
++import { readFileSync } from 'node:fs'
+ import { AssistantStreamAccumulator, EMPTY_RESPONSE_CODE } from '@deepseek-ai/dsh-llm'
+ import { toTokenUsage } from '../router/usage-tokens.ts'
+ import { RouterAdapter, translateSse } from './adapter.ts'
+@@ -553,6 +554,38 @@ test('wire：tool-result 新/旧两种形态都序列化为 role:"tool"（按形
+   assert.equal(ot.tool_call_id, 'c1')
+ })
+ 
++/**
++ * 0.2.0 新增 role:'developer'：工具集变化时 loop 追加（tool-addition / tool-removal
++ * 标记，可能带文本）并投影进请求历史。官方 llm-deepseek 把它折成 system 更新；
++ * 适配器必须同义处理 —— **不能落进 user/tool-result 分支**：那会在 assistant 后面
++ * 推一条空 user 消息，部分上游直接判非法请求。
++ */
++test('wire：0.2.0 developer 消息折成 system（不落成空 user，工具标记不进 wire）', async () => {
++  const body = await captureBody({
++    messages: [
++      { role: 'user', content: [{ type: 'text', text: 'hi' }] },
++      { role: 'developer', content: [{ type: 'tool-addition', toolName: 'read' }] },
++      { role: 'assistant', content: [{ type: 'text', text: 'ok' }] },
++    ],
++  })
++  const messages = body.messages as Array<{ role: string; content: unknown }>
++  const users = messages.filter((m) => m.role === 'user')
++  assert.equal(users.length, 1, 'developer 消息不能变成第二条 user')
++  assert.equal(users.some((m) => m.content === ''), false, '不能向上游发空 user 消息（部分上游判非法）')
++  assert.equal(JSON.stringify(messages).includes('tool-addition'), false, '工具变更标记在 OpenAI wire 上没有对应字段')
++})
++
++test('wire：developer 消息里的文本折成 system 更新（标记丢弃）', async () => {
++  const body = await captureBody({
++    messages: [
++      { role: 'user', content: [{ type: 'text', text: 'hi' }] },
++      { role: 'developer', content: [{ type: 'text', text: 'Tool set changed' }, { type: 'tool-removal', toolName: 'bash' }] },
++    ],
++  })
++  const messages = body.messages as Array<{ role: string; content: string }>
++  assert.deepEqual(messages.at(-1), { role: 'system', content: 'Tool set changed' }, 'developer 文本折成 system 更新')
++})
++
+ /**
+  * 为什么要有这一条：只不发 `block-end` **并不能**拦住残缺调用。
+  *
+@@ -692,11 +725,11 @@ test('resolveModel 透传组合的 contextWindow（自动压缩才能算阈值
+  * 于是插件侧传错字段没有任何测试会发现 —— 生产里图片静默降级成占位文本，跨两个
+  * 内测版本没人察觉（issue #8）。现在假 store 照宿主那样校验，字段写错会当场红。
+  */
+-function fakeAttachments(mediaType = 'image/png', data = new TextEncoder().encode('<png-bytes>')): {
++function fakeAttachments(mediaType = 'image/png', data = new TextEncoder().encode('<png-bytes>'), bytes = data.byteLength): {
+   readImageRequest: (
+     ref: { attachmentId: string; mediaType: string; bytes: number; width: number; height: number },
+     target: { width: number; height: number; maxBytes: number },
+-  ) => Promise<{ mediaType: string; data: Uint8Array }>
++  ) => Promise<{ mediaType: string; data: Uint8Array; bytes: number }>
+   /** 最近一次收到的请求目标，供断言检查。 */
+   lastTarget?: { width: number; height: number; maxBytes: number }
+ } {
+@@ -706,7 +739,7 @@ function fakeAttachments(mediaType = 'image/png', data = new TextEncoder().encod
+     readImageRequest: (
+       ref: { attachmentId: string; mediaType: string; bytes: number; width: number; height: number },
+       target: { width: number; height: number; maxBytes: number },
+-    ) => Promise<{ mediaType: string; data: Uint8Array }>
++    ) => Promise<{ mediaType: string; data: Uint8Array; bytes: number }>
+     lastTarget?: { width: number; height: number; maxBytes: number }
+   } = {
+     readImageRequest: async (_ref: unknown, target: { width: number; height: number; maxBytes: number }) => {
+@@ -721,7 +754,7 @@ function fakeAttachments(mediaType = 'image/png', data = new TextEncoder().encod
+         }
+       }
+       store.lastTarget = target
+-      return { mediaType, data }
++      return { mediaType, data, bytes }
+     },
+   }
+   return store
+@@ -857,6 +890,134 @@ test('wire：无 attachments 时图片回退占位文本，绝不静默丢图',
+   assert.ok(!text.includes('image_url'), '读不到字节时不能伪造图片 part')
+ })
+ 
++/* ---------------- 官方 image/offload 契约（DSH-0.1.6-A1-15 / A1-28） ---------------- */
++
++/**
++ * 这一组的判据来自卡片的验收口径：
++ *   - `offloaded: true` 的 occurrence（宿主持久 image/offload 决定）到任何 route
++ *     都只能以 `offloadedImageText` 占位文本出现，**不能再发字节**；
++ *   - 请求内联图片超预算时，route 不能自己丢图，必须抛
++ *     `IMAGE_OFFLOAD_REQUIRED` + `offloadImages`，让宿主的
++ *     compaction-image-offload 记决定后重试。
++ */
++test('offload：顶层 offloaded 图片只发占位文本、不再读附件字节（A1-28 required-on-read）', async () => {
++  let reads = 0
++  const store = {
++    readImageRequest: async () => {
++      reads += 1
++      throw new Error('offloaded occurrence must not be read')
++    },
++  }
++  const body = await captureBodyWith({
++    messages: [{
++      role: 'user',
++      content: [
++        { type: 'text', text: '看这张' },
++        {
++          type: 'image',
++          offloaded: true,
++          attachment: { attachmentId: 'sha256:off000000000000', mediaType: 'image/png', bytes: 11, width: 4, height: 2 },
++        },
++      ],
++    }],
++  }, store)
++  assert.equal(reads, 0, 'offloaded 的块不能再读字节')
++  const user = (body.messages as Array<{ role: string; content: unknown }>).find((m) => m.role === 'user')
++  const text = typeof user?.content === 'string' ? user.content : JSON.stringify(user?.content)
++  assert.ok(text.includes('image omitted to fit request image limits'), `必须是官方 offloadedImageText 占位，实际：${text}`)
++  assert.ok(text.includes('sha256:off000000000000'), '占位要带上附件身份，模型/用户能对上号')
++  assert.ok(!text.includes('image_url'), 'offloaded 的块绝不能以 image_url 发出')
++})
++
++test('offload：旧形态 tool-result 里嵌套的 offloaded 块同样只发占位文本（官方投影只走顶层）', async () => {
++  let reads = 0
++  const store = {
++    readImageRequest: async () => {
++      reads += 1
++      return { mediaType: 'image/png', data: new TextEncoder().encode('x'), bytes: 1 }
++    },
++  }
++  const body = await captureBodyWith({
++    messages: [{
++      role: 'user',
++      content: [{
++        type: 'tool-result',
++        toolCallId: 'c1',
++        content: [{
++          type: 'image',
++          offloaded: true,
++          attachment: { attachmentId: 'sha256:nest00000000000', mediaType: 'image/png', bytes: 11, width: 4, height: 2 },
++        }],
++      }],
++    }],
++  }, store)
++  assert.equal(reads, 0, '嵌套的 offloaded 块也不能读字节')
++  const text = JSON.stringify(body.messages)
++  assert.ok(text.includes('image omitted to fit request image limits'), `嵌套占位也要用官方文案，实际：${text}`)
++  assert.ok(!text.includes('image_url'), '嵌套 offloaded 块不能以 image_url 发出')
++})
++
++test('offload：多图累计超预算 → 抛 IMAGE_OFFLOAD_REQUIRED 且 offloadImages 是要省掉的张数（不自己丢图）', async () => {
++  // 单图 800_000 字节 → base64 1_066_668 ≤ 1_398_104（单图预算内）；两张累计
++  // 2_133_336 > 预算 → 官方 helper 要求省掉最老的一张。
++  const store = fakeAttachments('image/png', new TextEncoder().encode('<png-bytes>'), 800_000)
++  const adapter = new RouterAdapter('http://x', { comboModels: async () => [] }, () => store as never)
++  globalThis.fetch = (async () => new Response('data: [DONE]\n\n', { status: 200 })) as typeof fetch
++  const ref = (id: string): Record<string, unknown> => ({
++    attachmentId: id,
++    mediaType: 'image/png',
++    bytes: 800_000,
++    width: 1024,
++    height: 1024,
++  })
++  let failure: { code?: string; offloadImages?: number } = {}
++  try {
++    for await (const _c of adapter.stream({
++      model: 'm',
++      messages: [
++        { role: 'user', content: [{ type: 'image', attachment: ref('sha256:aaaa000000000000') }] },
++        { role: 'user', content: [{ type: 'image', attachment: ref('sha256:bbbb000000000000') }] },
++      ],
++      signal: AbortSignal.timeout(3000),
++    } as never)) { void _c }
++  } catch (err) {
++    const e = err as { code?: string; failure?: { offloadImages?: number } }
++    failure = { code: e.code, offloadImages: e.failure?.offloadImages }
++  }
++  assert.equal(failure.code, 'IMAGE_OFFLOAD_REQUIRED', '超预算必须走官方失败码，不能自己删图后静默发送')
++  assert.equal(failure.offloadImages, 1, '要告诉宿主只需再省掉最老的一张')
++})
++
++test('offload：单图（即便顶到单图字节上限）永不触发 offload —— 预算按 4/3 折算过', async () => {
++  // 1_048_576 正好是 readImageRequest 的 target.maxBytes；base64 膨胀后是
++  // 1_398_104，正好等于 MAX_INLINE_REQUEST_IMAGE_BYTES，不是「超过」。
++  const store = fakeAttachments('image/png', new TextEncoder().encode('<png-bytes>'), 1024 * 1024)
++  const body = await captureBodyWith({
++    messages: [{ role: 'user', content: [{
++      type: 'image',
++      attachment: { attachmentId: 'sha256:max000000000000', mediaType: 'image/png', bytes: 1024 * 1024, width: 2048, height: 2048 },
++    }] }],
++  }, store)
++  const text = JSON.stringify(body.messages)
++  assert.ok(text.includes('image_url'), `单图必须照常发送，实际：${text}`)
++  assert.ok(!text.includes('image omitted'), '单图不能被判成超预算')
++})
++
++test('0.1.5 兼容：dsh-llm 的命名导入不得含 0.1.6-only 导出（ESM 链接期会炸整个插件）', () => {
++  // 本插件运行时 import 的是**宿主**的 @deepseek-ai/dsh-llm（tsdown neverBundle）。
++  // ESM 命名导入是链接期校验：0.1.5 宿主的 dsh-llm 没有这三个导出，写成命名导入
++  // 会让整个插件以 "does not provide an export named …" 加载失败 ——
++  // host-version.ts 的版本分支根本没机会跑。所以它们必须经 namespace 判空。
++  // 这条测试锁住的正是「编译期看不出来、只有老宿主才炸」的那一类回归。
++  const source = readFileSync(new URL('./adapter.ts', import.meta.url), 'utf8')
++  const named = /import\s*\{([\s\S]*?)\}\s*from\s*'@deepseek-ai\/dsh-llm'/.exec(source)?.[1] ?? ''
++  for (const symbol of ['requiredImageOffload', 'projectOffloadedImages', 'IMAGE_OFFLOAD_REQUIRED_CODE']) {
++    assert.ok(!named.includes(symbol), `${symbol} 是 0.1.6 才有的导出，不能走命名导入`)
++  }
++  assert.match(source, /import \* as llmRuntime from '@deepseek-ai\/dsh-llm'/, '0.1.6-only 导出要走 namespace 访问')
++  assert.match(source, /const hasImageOffload = /, '缺 API 时要有运行时判空')
++})
++
+ test('wire：一步两个 read_image（每条一个 user 消息，同现场）→ tool 消息紧跟 assistant，图片合并到末尾', async () => {
+   const ref = {
+     attachmentId: 'sha256:abcdef1234567890',
+diff --git a/fixture/src/llm/adapter.ts b/fixture/src/llm/adapter.ts
+index 166c6a4..054b706 100644
+--- a/fixture/src/llm/adapter.ts
++++ b/fixture/src/llm/adapter.ts
+@@ -11,6 +11,14 @@
+  * 图片字节从 `ctx.attachments` 读取。读不到时按稳定占位文本降级（不让整条消息失败），
+  * 但**必须留痕**：降级原因走 adapter 的 `log` 出口打到宿主 logger。曾经这里是
+  * 一个空 `catch {}`，字段改名导致的读图失败静默了跨两个内测版本（issue #8）。
++ *
++ * 图片省额（0.1.6+ 官方 `image/offload` 契约，DSH-0.1.6-A1-15/A1-28）：
++ *   - **只读投影**：带 `offloaded: true` 的 occurrence（宿主已记过持久省略决定）
++ *     到任何 route 都只能以 `offloadedImageText` 占位文本出现，绝不重发字节；
++ *   - **不自己丢图**：请求内联图片超过本 route 的预算时，不算自己挑几张删掉，
++ *     而是 `requiredImageOffload()` 算出「还要再省几张」，抛
++ *     `IMAGE_OFFLOAD_REQUIRED` + `offloadImages`，由宿主的
++ *     `dsh-compaction-image-offload` 记决定后重试。
+  */
+ import {
+   EMPTY_RESPONSE_CODE,
+@@ -19,15 +27,35 @@ import {
+   ReasoningEffortId,
+   ToolCallId,
+   attributionHeaders,
++  offloadedImageText,
+   type GenerateOptions,
+   type LlmModelInfo,
+   type LlmReasoningEffortInfo,
+   type LlmResolvedModelInfo,
+   type ModelModality,
++  type RequestMessage,
+   type StreamChunk,
+ } from '@deepseek-ai/dsh-llm'
++import * as llmRuntime from '@deepseek-ai/dsh-llm'
+ import { mergeUsage, normalizeUsage, toTokenUsage, type UsageTokens } from '../router/usage-tokens.ts'
+ 
++/**
++ * 0.1.6 才有的 image/offload 导出（`projectOffloadedImages` /
++ * `requiredImageOffload` / `IMAGE_OFFLOAD_REQUIRED_CODE`）。
++ *
++ * **必须走 namespace + 运行时判空，不能用命名导入**：本插件在运行时 import 的
++ * 是**宿主**的 `@deepseek-ai/dsh-llm`（tsdown `neverBundle` 保留 @deepseek-ai/*）。
++ * ESM 的命名导入是**链接期**校验 —— 0.1.5 宿主上整个插件会因为
++ * `does not provide an export named 'requiredImageOffload'` 直接加载失败，
++ * 连 `host-version.ts` 的版本分支都跑不到。namespace 属性在缺失时是 `undefined`，
++ * 于是 0.1.5 上判空退回**迁移前行为**（照发图片），0.1.6+ 上走官方 image/offload。
++ *
++ * 注意 `offloadedImageText` 0.1.5 就有，所以它仍走命名导入。
++ */
++const hasImageOffload = typeof llmRuntime.projectOffloadedImages === 'function'
++  && typeof llmRuntime.requiredImageOffload === 'function'
++  && typeof llmRuntime.IMAGE_OFFLOAD_REQUIRED_CODE === 'string'
++
+ /**
+  * dsh-attachment 的最小本地切面：adapter 只依赖「读一张图片的请求版本」
+  * 这一行为，不引入对 dsh-attachment 包编译期/运行期的依赖（它是宿主注入的
+@@ -46,14 +74,28 @@ export interface RouterAttachmentStore {
+     ref: { attachmentId: string; mediaType: string; bytes: number; width: number; height: number },
+     target: { width: number; height: number; maxBytes: number },
+     signal?: AbortSignal,
+-  ): Promise<{ mediaType: string; data: Uint8Array }>
++  ): Promise<{ mediaType: string; data: Uint8Array; bytes: number }>
+ }
+ 
+ /** 送上游的请求图的像素预算（宽 × 高），沿用 0.1.5 时代 `maxPixels` 的意图。 */
+ const MAX_REQUEST_PIXELS = 64e4
+-/** 送上游的请求图的字节上限。 */
++/** 单张请求图的字节上限（`readImageRequest` 的 `target.maxBytes`，编码后字节）。 */
+ const MAX_REQUEST_BYTES = 1024 * 1024
+ 
++/**
++ * 一次请求内联图片的预算，单位是 base64 wire 表示（与 route 实际发出去的一致）。
++ *
++ * 取值 = 单张请求图上限的 base64 膨胀量（`ceil(n/3)*4`）。这样**单图请求永远
++ * 落在预算内**（读图阶段已按 `MAX_REQUEST_BYTES` 收口，语义与 0.1.5 时代的
++ * 单图字节上限完全一致）；只有多图累计超限时才触发官方 image/offload。
++ *
++ * 为什么需要这个常量：0.1.6 起 route **不能自己丢图/缩请求**，必须把
++ * 「还要再省几张」用 `IMAGE_OFFLOAD_REQUIRED` 报给
++ * `@deepseek-ai/dsh-compaction-image-offload`，由它记一条持久 `image/offload`
++ * 决定再重试（见 `assertRequestImagesFit`）。
++ */
++const MAX_INLINE_REQUEST_IMAGE_BYTES = Math.ceil(MAX_REQUEST_BYTES / 3) * 4
++
+ /**
+  * 把源图尺寸投影到「总像素 ≤ maxPixels」的请求目标（等比、只缩不放）。
+  *
+@@ -141,8 +183,21 @@ const TOOL_RESULT_IMAGE_TEXT = 'Tool result images'
+  */
+ const STREAM_IDLE_TIMEOUT_MS = 300_000
+ 
+-async function wireMessages(options: GenerateOptions, system: string | undefined, attachments: RouterAttachmentStore | undefined, log?: (msg: string) => void): Promise<Array<Record<string, unknown>>> {
++/** `wireMessages` 的产物：wire 消息 + 每张保留图的实际请求版本字节数（预算判据）。 */
++interface WireMessages {
++  messages: Array<Record<string, unknown>>
++  /** attachmentId → `readImageRequest` 返回的请求版本字节数（同一附件多次出现只记一次）。 */
++  imageBytes: Map<string, number>
++}
++
++async function wireMessages(options: GenerateOptions, system: string | undefined, attachments: RouterAttachmentStore | undefined, log?: (msg: string) => void): Promise<WireMessages> {
+   const out: Array<Record<string, unknown>> = []
++  /**
++   * 本次请求真的读出来的图片版本字节数，本 route 的图片预算判据用它：
++   * 读图失败而降级成占位文本的 occurrence 记 0（wire 上没有它的图片字节，
++   * 不能算进图片预算）。
++   */
++  const imageBytes = new Map<string, number>()
+   /**
+    * 攒着「tool-result 里带出来的图片」，等这一串 tool 消息**发完**再合并成一条
+    * user 消息补在后面。
+@@ -170,6 +225,18 @@ async function wireMessages(options: GenerateOptions, system: string | undefined
+       out.push({ role: 'system', content: flattenText(message.content) })
+       continue
+     }
++    if ((message.role as string) === 'developer') {
++      // 0.2.0 新增的消息角色：工具集变化时由 loop 追加（tool-addition / tool-removal
++      // 标记，可能带文本），并投影进请求历史。官方 llm-deepseek 把它折成 system
++      // 更新；这里同义处理 —— 文本进 system，标记丢弃（工具 schema 由
++      // `options.tools` 单独下发，OpenAI wire 上没有 tool_addition/tool_removal
++      // 对应字段）。**不能落进下面的 user 分支**：那会向上游推一条空 user 消息，
++      // 部分上游直接判非法请求。
++      flushToolImages()
++      const text = flattenText(message.content as ReadonlyArray<{ type: string; text?: string }>)
++      if (text !== '') out.push({ role: 'system', content: text })
++      continue
++    }
+     if (message.role === 'assistant') {
+       flushToolImages()
+       const text = flattenText(message.content)
+@@ -202,7 +269,7 @@ async function wireMessages(options: GenerateOptions, system: string | undefined
+       // 图片不能放进 tool 消息（实测模型会把两张不同图认成同一张），也不能插在两条 tool
+       // 之间（同样 400），所以先攒进 pending，等整串 tool 发完再补一条 user(图)。
+       const toolCallId = (message as { toolCallId?: unknown }).toolCallId
+-      const parts = await contentParts(message.content, attachments, options.signal, log)
++      const parts = await contentParts(message.content, attachments, options.signal, log, imageBytes)
+       const imageParts = parts.filter((p) => p.type !== 'text')
+       const text = parts
+         .filter((p) => p.type === 'text')
+@@ -215,13 +282,24 @@ async function wireMessages(options: GenerateOptions, system: string | undefined
+       continue
+     }
+     // user / tool-result
+-    const toolResults = message.content.filter((b) => b.type === 'tool-result')
++    // 类型面差异：0.2.0-rc.1 起宿主的 user content union 里**没有** 'tool-result'
++    // 块了（旧形态在类型上已是 never），但运行时仍要接住 0.1.5~0.1.7 迁移/重放
++    // 出来的旧形态（见上「两种形态都合法」）。所以这里按**本地宽松切面**收窄，
++    // 不跟着宿主 union 走 —— 否则在新宿主类型下这四行直接编译不过，而删掉旧
++    // 分支就等于把老会话的图与文本静默丢掉。
++    const legacyContent = message.content as unknown as ReadonlyArray<{ type: string }>
++    const toolResults = legacyContent.filter((b) => b.type === 'tool-result') as unknown as Array<{
++      type: 'tool-result'
++      toolCallId: string
++      content: ReadonlyArray<{ type: string }>
++    }>
+     // 这条消息自己的（非 tool-result 的）user 部分：文本 + 图片。
+     const ownParts = await contentParts(
+-      message.content.filter((b) => b.type !== 'tool-result'),
++      legacyContent.filter((b) => b.type !== 'tool-result'),
+       attachments,
+       options.signal,
+       log,
++      imageBytes,
+     )
+     // 有实质 user 内容（或压根没有 tool 结果）就先发这条 user 消息；
+     // 只有 tool 结果的「纯工具」消息不发空 user，图片留到 pending 里合并。
+@@ -235,7 +313,7 @@ async function wireMessages(options: GenerateOptions, system: string | undefined
+       // 11148「tool calls and tool results do not match」。
+       // 图片不能放进 tool 消息（实测模型会把两张不同的图认成同一张），
+       // 也不能插在两条 tool 之间（同样 400），所以先攒起来、发完整串再补一条 user。
+-      const parts = await contentParts(result.content, attachments, options.signal, log)
++      const parts = await contentParts(result.content, attachments, options.signal, log, imageBytes)
+       const imageParts = parts.filter((p) => p.type !== 'text')
+       const text = parts.filter((p) => p.type === 'text').map((p) => (p as { text?: string }).text ?? '').join('')
+       // 空结果就发空串，不要替换成 '(no output)' 之类的字面量 —— 模型会
+@@ -245,7 +323,7 @@ async function wireMessages(options: GenerateOptions, system: string | undefined
+     }
+   }
+   flushToolImages()
+-  return out
++  return { messages: out, imageBytes }
+ }
+ 
+ /**
+@@ -265,12 +343,18 @@ function compactUserContent(parts: Array<Record<string, unknown>>): string | Arr
+  * 一块 DSH user/tool-result 内容序列化成 OpenAI content parts（text + image_url）。
+  * 纯文本时返回空数组（上层走紧凑字符串路径）。图片转 base64 data URI；
+  * attachments 缺失或读取失败时回退稳定占位文本（绝不静默丢图）。
++ *
++ * `offloaded: true` 的图片块（宿主持久 image/offload 决定）在这里就地变成
++ * `offloadedImageText` 占位文本 —— 顶层的同类块已由 `projectOffloadedImages`
++ * 先行投影（见 `stream`），这里兜的是**旧形态 tool-result 嵌套图片**：官方
++ * visitImageBlocks/replaceOffloadedImages 只走顶层，嵌套块到不了那层投影。
+  */
+ async function contentParts(
+   blocks: ReadonlyArray<{ type: string }>,
+   attachments: RouterAttachmentStore | undefined,
+   signal: AbortSignal | undefined,
+   log?: (msg: string) => void,
++  imageBytes?: Map<string, number>,
+ ): Promise<Array<Record<string, unknown>>> {
+   const parts: Array<Record<string, unknown>> = []
+   for (const block of blocks) {
+@@ -280,12 +364,16 @@ async function contentParts(
+       continue
+     }
+     if (block.type === 'image') {
+-      const ref = (block as unknown as { attachment: RouterImgLike }).attachment
+-      parts.push(...(await imageParts(ref, attachments, signal, log)))
++      const image = block as unknown as { attachment: RouterImgLike; offloaded?: true }
++      if (image.offloaded === true) {
++        parts.push({ type: 'text', text: offloadedImageText(image.attachment as unknown as Parameters<typeof offloadedImageText>[0]) })
++        continue
++      }
++      parts.push(...(await imageParts(image.attachment, attachments, signal, log, imageBytes)))
+       continue
+     }
+     if (block.type === 'tool-result') {
+-      parts.push(...(await contentParts((block as unknown as { content: ReadonlyArray<{ type: string }> }).content, attachments, signal, log)))
++      parts.push(...(await contentParts((block as unknown as { content: ReadonlyArray<{ type: string }> }).content, attachments, signal, log, imageBytes)))
+     }
+     // 其它块（reasoning/tool-call）不属于 user content，忽略
+   }
+@@ -298,6 +386,7 @@ async function imageParts(
+   attachments: RouterAttachmentStore | undefined,
+   signal: AbortSignal | undefined,
+   log?: (msg: string) => void,
++  imageBytes?: Map<string, number>,
+ ): Promise<Array<Record<string, unknown>>> {
+   if (attachments === undefined) {
+     log?.('图片附件 store 不可用（ctx.attachments 未注入），该图降级为占位文本')
+@@ -308,6 +397,9 @@ async function imageParts(
+   const target = { ...projectImageDimensions(ref.width, ref.height, MAX_REQUEST_PIXELS), maxBytes: MAX_REQUEST_BYTES }
+   try {
+     const img = await attachments.readImageRequest(ref0, target, signal)
++    // 预算判据要的是**实际请求版本**的字节数（宿主返回的 bytes；老 store 不返回时
++    // 用 data 长度兜底），不是源图 ref.bytes。
++    imageBytes?.set(ref.attachmentId, typeof img.bytes === 'number' ? img.bytes : img.data.byteLength)
+     return [{ type: 'image_url', image_url: { url: `data:${img.mediaType};base64,${bytesToBase64(img.data)}` } }]
+   } catch (err) {
+     // 曾经这里是空 catch：宿主把请求目标从 maxPixels 换成 width/height 之后读图
+@@ -333,9 +425,47 @@ function imagePlaceholder(attachmentId: string): string {
+   return `[image omitted because the attached bytes could not be read; attachment ${attachmentId}]`
+ }
+ 
++/**
++ * 图片请求预算判据（0.1.6+ 的官方 image/offload 契约）。
++ *
++ * route **不能自己丢图**：超过预算时应当抛 `IMAGE_OFFLOAD_REQUIRED` 并把
++ * 「还要再省几张」放进 `offloadImages`，宿主的 `dsh-compaction-image-offload`
++ * 会记一条持久 `image/offload` 决定（选最老的输入 occurrence）然后重试 ——
++ * 下一轮这些块带着 `offloaded: true` 到达，由 `projectOffloadedImages` 变成
++ * 占位文本。自己挑几张删掉会让持久日志与模型看到的内容不一致：重放、导出、
++ * 缓存统计都会说谎。
++ *
++ * 只统计**输入侧**（user / tool）的 occurrence：assistant 输出图本就不进请求，
++ * 宿主的 `offloadOldestImages` 也只选 `user/message` 与 `tool/result` 事件；
++ * 把输出图算进去会让上报的张数与宿主实际能省掉的张数对不上。
++ *
++ * @param messages 已做 offloaded 投影的请求消息（本 route 真正要发的形态）
++ * @param imageBytes attachmentId → 请求版本字节数（读图失败按 0，wire 上没有它的字节）
++ * @throws LlmError `IMAGE_OFFLOAD_REQUIRED` + `offloadImages`，当预算不够时
++ */
++function assertRequestImagesFit(messages: readonly RequestMessage[], imageBytes: ReadonlyMap<string, number>): void {
++  // 0.1.5 宿主没有这套 API：退回迁移前行为（照发），不制造宿主无法处理的失败码。
++  if (!hasImageOffload) return
++  const input = messages.filter((message) => message.role === 'user' || message.role === 'tool')
++  const offloadImages = llmRuntime.requiredImageOffload(
++    input,
++    { representation: 'base64', maxBytes: MAX_INLINE_REQUEST_IMAGE_BYTES },
++    (block) => imageBytes.get(block.attachment.attachmentId) ?? 0,
++  )
++  if (offloadImages > 0) {
++    throw new LlmError(
++      `dsh-router request images exceed the ${MAX_INLINE_REQUEST_IMAGE_BYTES}-byte base64 budget; `
++        + `${offloadImages} more oldest occurrence(s) must be offloaded.`,
++      llmRuntime.IMAGE_OFFLOAD_REQUIRED_CODE,
++      { offloadImages },
++    )
++  }
++}
++
+ /** 组装 wire 请求体。图片序列化需要读 attachments，故为异步。 */
+ async function wireRequest(options: GenerateOptions, attachments: RouterAttachmentStore | undefined, log?: (msg: string) => void): Promise<Record<string, unknown>> {
+-  const messages = await wireMessages(options, options.system, attachments, log)
++  const { messages, imageBytes } = await wireMessages(options, options.system, attachments, log)
++  assertRequestImagesFit(options.messages, imageBytes)
+   const body: Record<string, unknown> = {
+     model: options.model,
+     messages,
+@@ -712,7 +842,19 @@ export class RouterAdapter extends LlmAdapter {
+   }
+ 
+   async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+-    const body = await wireRequest(options, this.resolveAttachments(), this.log)
++    // 先做 offloaded 投影再序列化：`image/offload` 是宿主的**持久决定**，被标记的
++    // occurrence 到任何 route 都只能以占位文本出现（DSH-0.1.6-A1-28 的
++    // required-on-read）。不投影 = 把已经决定省略的图片原样发上游，
++    // 与日志/缓存统计不一致。0.1.5 没有这套 API（也没有 offloaded 标记）：
++    // 判空跳过，行为不变。
++    const projectedMessages = hasImageOffload
++      ? llmRuntime.projectOffloadedImages(options.messages, (ref) => offloadedImageText(ref))
++      : options.messages
++    const body = await wireRequest(
++      { ...options, messages: [...projectedMessages] },
++      this.resolveAttachments(),
++      this.log,
++    )
+     const controller = new AbortController()
+     const onAbort = (): void => controller.abort()
+     options.signal?.addEventListener('abort', onAbort, { once: true })

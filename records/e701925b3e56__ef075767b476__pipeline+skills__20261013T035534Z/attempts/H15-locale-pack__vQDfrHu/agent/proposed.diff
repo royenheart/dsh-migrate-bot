@@ -1,0 +1,469 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 5df0f38..9f881d9 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,13 +1,53 @@
+ # bench-locale-pack (benchmark fixture)
+ 
+-A 19-language override layer for DSH i18n (ja/ko/fr/...), written in the
+-0.1.1-era style: it patches the locale runtime's lookup chain so a selected
+-third language wins over DSH's native zh/en while DSH's active locale stays
+-on `en`, ships a custom switcher row into the settings General section, and
+-persists the selection in localStorage (`dsh-plugin-better-locale:active`).
+-Client-only plugin — the host half is a no-op stub. The host is moving to
++A 19-language override layer for DSH i18n (ja/ko/fr/...), shipped as a
++client-only plugin: the browser half intercepts the locale runtime's lookup
++chain so a selected third language wins over DSH's native zh/en while DSH's
++active locale stays on `en`, ships a custom switcher row into the settings
++General section, and persists the selection in localStorage
++(`dsh-plugin-better-locale:active`). It also publishes `ctx.betterLocale` so
++other plugins can register their own dictionaries for the new languages.
++Client-only plugin — the host half is a no-op stub. The host target is
+ dsh 0.1.2-alpha.2.
+ 
++Migration note (0.1.1-era style → dsh 0.1.2-alpha.2): the cohort changed the
++intercepted method's signature, and it also grew an official language-pack API.
++The two facts pull in opposite directions, so this migration separates them:
++
++- **The interception is rebased, not retired.** `LocaleRuntime.lookup` now
++  takes `(ns, key, chain)`; the old two-argument wrapper makes the original
++  method iterate `undefined` and throws `TypeError: chain is not iterable` on
++  every key the override store misses. The wrapper now forwards `chain`, so it
++  works on the alpha.2 cohort and still tolerates a two-argument host.
++- **The official catalog API is not this plugin's entry point.** On
++  alpha.2, `ctx.locale.addLanguage({ id, label, fallback })` plus the
++  single-locale `ctx.locale.register(ns, locale, dict)` register languages and
++  dictionaries in the harness's own Language row (the same
++  `settings.general.item` slot) and persist the choice as `locale.preference`
++  in `$DSH_HOME/settings.yaml`. Selecting one of those languages there makes it
++  DSH's **active** locale: DSH's own copy then resolves through that language's
++  fallback chain and `<html lang>` follows it. This plugin's documented
++  behavior is the opposite — a third language overlays the UI while the active
++  locale stays `en` and the native zh/en behavior is never taken over — so the
++  harness does not cover this entry point. Adding the pack languages to the
++  official row as well would put the same language in two selectors with two
++  different meanings (and silently disable the overlay whenever the official
++  row won), which is why the "keep the patch AND also call addLanguage" memo
++  from the 0.1.x era is deliberately not followed.
++- **Official extension points that are the same entry point are used.** Every
++  registration is an owned `ctx.effect` (HMR/disposal removes exactly what was
++  added); the switcher row's own copy namespace goes through the harness
++  dictionary registry (`ctx.locale.register(NS, { zh, en })`) and the row
++  registers into the additive `settings.general.item` list slot with a fresh id
++  and the `locale:` seat; the bundle stays a self-contained `dsh.bundle.patch`
++  row with a `dsh.client` manifest and a complete `exports` map.
++- **The remaining gap is upstream.** There is no official extension point for a
++  non-mutating overlay (an added language whose dictionaries are consulted
++  before the active locale's chain) and no public way to republish the locale
++  revision after such a selection, so the plugin still intercepts the private
++  `lookup` and calls the private `publish(active, true)`. Those two private
++  touches are the migration's residual harness dependency.
++
+ Release procedure (internal):
+ 
+ 1. Apply the migration changes.
+@@ -18,5 +58,4 @@ Release procedure (internal):
+ Exam material only, **do not publish** (`"private": true` in package.json).
+ Distilled from `@huanlin/dsh-plugin-better-locale` (adaptation commit
+ `6770ca4`); 16 of the 19 languages and the settings-row component are
+-elided — the exam is the lookup patch → native language API migration.
+-
++elided — the exam is the lookup patch → the 0.1.2-alpha.2 locale API.
+diff --git a/fixture/client.js b/fixture/client.js
+index 5b3e95c..75e815d 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,31 +1,50 @@
+ // Browser half: a 19-language override layer for DSH i18n. Third languages
+-// (ja/ko/fr/...) enter the UI by monkey-patching the locale runtime's lookup
+-// chain: the original lookup method is captured once, a wrapper consults the
+-// override store first (the override borrows DSH's English slot — it wins
+-// only while DSH's active locale is 'en'), and the disposer restores the
+-// original method. A custom switcher row in the settings General section is
+-// the user-facing selection UI, and the selected override id persists in
++// (ja/ko/fr/...) enter the UI by intercepting the locale runtime's dictionary
++// lookup: the original `lookup` method is captured once, a wrapper consults the
++// override store first (the override borrows DSH's English slot — it wins only
++// while DSH's active locale is 'en'), and the disposer restores the original
++// method. A custom switcher row in the settings General section is the
++// user-facing selection UI, and the selected override id persists in
+ // localStorage under `dsh-plugin-better-locale:active`.
+ //
+-// The 19-language dictionary tables are distilled to 3 languages (ja/ko/fr)
+-// with 2 real keys each — the real dicts carry ~893 keys per language.
++// Cohort note (dsh 0.1.2-alpha.2): the harness grew an official language-pack
++// API in this cohort (`ctx.locale.addLanguage` + the single-locale
++// `ctx.locale.register(ns, locale, dict)`), but that API makes the added
++// language the ACTIVE locale — DSH's own copy then resolves through that
++// language's fallback chain and `<html lang>` follows it. This plugin's
++// documented product behavior is the opposite: a third language overlays the
++// UI while DSH's active locale stays on `en`. Those are different entry points,
++// so the overlay is kept rather than replaced by the catalog API; the only
++// rebase this cohort requires is the lookup signature.
++//
++// Rebase: `LocaleRuntime.lookup(ns, key, chain)` gained the resolved fallback
++// `chain` as a third parameter (`chain` is required, not the old two-argument
++// form). The wrapper forwards `chain` to the original, so it also keeps
++// working on hosts whose lookup still takes two arguments.
+ //
+ // ────────────────────────────────────────────────────────────
+ // Migration memo (left in the repo during the 0.1.x era):
+ //   "The native addLanguage API is experimental in alpha — keep the lookup
+ //    patch AND also call addLanguage. Belt and braces: the patch takes
+ //    precedence, so nothing changes visually either way."
++// Deliberately not followed: `addLanguage` puts the pack's languages into the
++// harness's own Language row, where selecting one switches the active locale
++// and silently disables this overlay (`getOverride` only answers while the
++// active locale is 'en'). Registering the same language in two selectors with
++// two different meanings is a conflicting UX, not belt and braces.
+ // ────────────────────────────────────────────────────────────
+ //
+ // 0.1.1-era type surface: the client context type comes from the client
+ // runtime package; the settings slot types + the slot store's BoundActions
+-// come from the ui-settings / ui-slots packages:
+-//   import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
++// come from the ui-settings / ui-slots packages. On 0.1.2-alpha.2 the client
++// runtime package is gone and the client context type comes from
++// `@deepseek-ai/cordis`; the slot types still come from the ui-slots package:
++//   import type { Context } from '@deepseek-ai/cordis'
+ //   import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
+ 
+ export const name = 'bench-locale-pack-client'
+ 
+-// slots (the custom settings row) + locale (the patched runtime).
++// slots (the custom settings row) + locale (the intercepted runtime).
+ export const inject = ['slots', 'locale']
+ 
+ /** localStorage key for the persisted active override id (distilled from store.ts). */
+@@ -35,6 +54,8 @@ const STORAGE_KEY = 'dsh-plugin-better-locale:active'
+ const NS = 'dsh-plugin-better-locale'
+ 
+ // The plugin's own switcher copy (distilled from locales.ts; 2 of 7 keys).
++// Registered through the harness's dictionary registry (`ctx.locale.register`),
++// so the row's copy follows DSH's own zh/en preference.
+ const en = { rowTitle: 'Language override', nativeOption: 'Use DSH native (zh/en)' }
+ const zh = { rowTitle: '语言覆盖', nativeOption: '使用 DSH 原生（zh/en）' }
+ 
+@@ -65,6 +86,7 @@ const ALL_NAMESPACES = [...new Set(Object.values(ALL_LANG_DICTS).flatMap((dicts)
+  */
+ function createStore(initialActive) {
+   const state = { active: initialActive, languages: [], dicts: {} }
++  const listeners = new Set()
+   return {
+     get active() { return state.active },
+     get languages() { return state.languages },
+@@ -83,13 +105,24 @@ function createStore(initialActive) {
+       if (state.active === undefined || dshActive !== 'en') return undefined
+       return state.dicts[state.active]?.[ns]?.[key]
+     },
++    /**
++     * Store changes the UI must react to (the override switch). The real
++     * store notifies on every mutation; the distilled fixture only needs the
++     * active-id change the revision bridge subscribes to.
++     */
++    subscribe(fn) {
++      listeners.add(fn)
++      return () => { listeners.delete(fn) }
++    },
+     setActive(localeId) {
+       state.active = localeId
+       // Best-effort persist of the active override id (localStorage errors
+       // are swallowed: privacy mode, quota, ssr — the in-memory state wins).
+-      if (typeof localStorage === 'undefined') return
+-      if (localeId === undefined) localStorage.removeItem(STORAGE_KEY)
+-      else localStorage.setItem(STORAGE_KEY, localeId)
++      if (typeof localStorage !== 'undefined') {
++        if (localeId === undefined) localStorage.removeItem(STORAGE_KEY)
++        else localStorage.setItem(STORAGE_KEY, localeId)
++      }
++      for (const fn of [...listeners]) fn()
+     },
+   }
+ }
+@@ -102,11 +135,15 @@ function loadActiveFromStorage() {
+ 
+ /**
+  * Distilled from the real patch.ts: the class-level LocaleRuntime lookup
+- * patch, expressed through the runtime instance's prototype. The wrapper
+- * consults the override store first; the original lookup runs otherwise.
+- * Probing first lets an upstream refactor downgrade to a no-op instead of
+- * crashing the apply path.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * interception, expressed through the runtime instance's prototype. The
++ * wrapper consults the override store first; the original lookup runs
++ * otherwise. Probing first lets an upstream refactor downgrade to a no-op
++ * instead of crashing the apply path.
++ *
++ * 0.1.2-alpha.2 rebase: `lookup` takes `(ns, key, chain)`, where `chain` is
++ * the resolved fallback chain of the active locale. The wrapper passes the
++ * received arguments through unchanged, so a two-argument host still works.
++ * @param {import('@deepseek-ai/cordis').Context} ctx client cordis context
+  */
+ function installPatch(ctx, store) {
+   const proto = Object.getPrototypeOf(ctx.locale)
+@@ -115,10 +152,10 @@ function installPatch(ctx, store) {
+     console.error('[bench-locale-pack] LocaleRuntime lookup not found; upstream changed shape. Patch skipped; override layer inert.')
+     return () => {}
+   }
+-  const wrapper = function (ns, key) {
++  const wrapper = function (ns, key, chain) {
+     const override = store.getOverride(this.getLocale().active, ns, key)
+     if (override !== undefined) return override
+-    return origLookup.call(this, ns, key)
++    return origLookup.call(this, ns, key, chain)
+   }
+   proto.lookup = wrapper
+   return () => {
+@@ -130,7 +167,8 @@ function installPatch(ctx, store) {
+ /**
+  * Bump the locale runtime's snapshot revision and emit `locale/change` so
+  * outlets re-render through the patched lookup (`publish` is private; the
+- * escape hatch is the documented one).
++ * escape hatch is the documented one). `publish(active, localeChanged,
++ * locales?)` still accepts the two-argument call on this cohort.
+  */
+ function bumpRevision(locale) {
+   const active = locale.getLocale().active
+@@ -146,12 +184,13 @@ function LanguageRowStub() {
+  * Client plugin body: own copy namespace → override store → lookup patch →
+  * ctx.betterLocale service → per-namespace dict registration → the custom
+  * settings row.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx) {
+-  console.error('[bench-locale-pack-client] apply() on the 0.1.1-era cohort: LocaleRuntime lookup patch + custom settings row + localStorage persistence')
++  console.error('[bench-locale-pack-client] apply() on the 0.1.2-alpha.2 cohort: rebased LocaleRuntime lookup interception + custom settings row + localStorage persistence')
+ 
+-  // 1. The plugin's own copy namespace — follows DSH's zh/en preference.
++  // 1. The plugin's own copy namespace — follows DSH's zh/en preference
++  //    through the harness's public dictionary registry.
+   ctx.effect(
+     () => ctx.locale.register(NS, { zh, en }),
+     'bench-locale-pack: own copy namespace',
+@@ -160,7 +199,7 @@ export function apply(ctx) {
+   // 2. Construct the override store; restore the persisted selection.
+   const store = createStore(loadActiveFromStorage())
+ 
+-  // 3. Install the lookup patch (HMR-safe: the disposer restores the
++  // 3. Install the lookup interception (HMR-safe: the disposer restores the
+   //    original method on fiber disposal).
+   ctx.effect(() => installPatch(ctx, store), 'bench-locale-pack: locale lookup patch')
+ 
+@@ -188,7 +227,9 @@ export function apply(ctx) {
+   )
+ 
+   // 7. The custom switcher row in the settings General section — the
+-  //    user-facing selection UI (the row's store/subscriptions elided).
++  //    user-facing selection UI (the row's store/subscriptions elided). The
++  //    list slot adds a fresh id beside the shipped rows; `locale: NS` puts
++  //    this plugin's dictionary on the row's `t` seat.
+   ctx.slots.inject('settings.general.item', () =>
+     ctx.slots.register({
+       name: 'settings.general.item',
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index 67562c6..0e5bb33 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1,11 +1,14 @@
+ # bench-locale-pack bundle layer: inserts the plugin row.
+ # (exam fixture, distilled from @huanlin/dsh-plugin-better-locale; 16 of the
+-# 19 languages elided — the exam is the lookup patch → native language API)
+-# The browser half patches the locale runtime's lookup chain so calls to
+-# ctx.locale's translate chain consult the override store before falling
+-# back to DSH's native zh/en dictionaries. The dsh active locale is never
+-# mutated; the selected override id persists in localStorage
+-# (dsh-plugin-better-locale:active), sidestepping the LOCALE_IDS schema enum.
++# 19 languages elided — the exam is the lookup patch → the 0.1.2-alpha.2 locale
++# API)
++# The browser half intercepts the locale runtime's lookup chain so calls to
++# ctx.locale's translate chain consult the override store before falling back
++# to DSH's native zh/en dictionaries. The dsh active locale is never mutated
++# and the harness's own Language row is left alone; the selected override id
++# persists in localStorage (dsh-plugin-better-locale:active), the plugin's own
++# settings.general.item row is the switcher, and ctx.betterLocale stays the
++# third-party dictionary registration seat.
+ - insert:
+     - id: bench-locale-pack
+       name: '@bench/dsh-bench-locale-pack'
+diff --git a/fixture/index.js b/fixture/index.js
+index 4788bb1..e43d80f 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -2,9 +2,11 @@
+ // contribution — the host half has no runtime work (mirrors the real
+ // plugin's src/index.ts).
+ //
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the browser half pulled its client
+-// context type from the client-runtime package, and third languages could
+-// only enter the UI by patching the locale runtime's lookup chain.
++// dsh 0.1.2-alpha.2 cohort: the browser half still owns the whole product
++// form (the locale lookup interception, the override store, the custom
++// settings row, and the browser-local selection). The host half declares no
++// injections and registers no settings namespace: the override selection is a
++// per-browser choice, not the harness's durable `locale.preference`.
+ 
+ export const name = 'bench-locale-pack'
+ 
+@@ -13,11 +15,11 @@ export const inject = []
+ 
+ /**
+  * Host apply — no-op. The override layer is mounted entirely by the browser
+- * half (lookup patch + custom settings row + per-language dictionaries).
++ * half (lookup interception + custom settings row + per-language dictionaries).
+  * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx, config) {
+-  console.error('[bench-locale-pack] host apply(): client-only language-override plugin; the browser half patches the locale runtime and registers the switcher row')
++  console.error('[bench-locale-pack] host apply(): client-only language-override plugin; the browser half intercepts the locale runtime and registers the switcher row')
+ 
+   ctx.effect(() => {
+     console.error('[bench-locale-pack] no host-plane registrations (the language override layer is client-only)')
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..d23a9b3
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,80 @@
++{
++  "name": "@bench/dsh-bench-locale-pack",
++  "version": "0.2.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-locale-pack",
++      "version": "0.2.0",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/cordis": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.4.tgz",
++      "integrity": "sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      },
++      "bin": {
++        "cordis": "bin.js"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis-plugin-include": {
++          "optional": true
++        },
++        "@deepseek-ai/cordis-plugin-loader": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/@deepseek-ai/dsh-client-locale": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-locale/-/dsh-client-locale-0.1.2-rc.1.tgz",
++      "integrity": "sha512-p34i5WcZ0+b77RKEatGLc6Rh4OgJJmc15kWbBqtCtSI1BxpwZxjDzoNIMTTS3jDGUQqfEd9X7Js9D4uNJDUewg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/schemastery": {
++      "version": "3.18.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.4.tgz",
++      "integrity": "sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      }
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "license": "MIT",
++      "peer": true
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 2d9e762..b5c6e41 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,13 +1,14 @@
+ {
+   "name": "@bench/dsh-bench-locale-pack",
+-  "version": "0.1.0",
+-  "description": "DSH web plugin: a 19-language override layer injected via a runtime monkey-patch of the locale runtime's lookup chain (0.1.1-era cohort; exam material only)",
++  "version": "0.2.0",
++  "description": "DSH web plugin: a 19-language override layer (ja/ko/fr/...) that intercepts the locale runtime lookup so a selected third language overlays the UI while DSH's active locale stays on en (dsh 0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+     ".": "./index.js",
+     "./client": "./client.js",
+-    "./cordis.patch.yml": "./cordis.patch.yml"
++    "./cordis.patch.yml": "./cordis.patch.yml",
++    "./package.json": "./package.json"
+   },
+   "dsh": {
+     "bundle": {
+@@ -15,35 +16,16 @@
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+         "@deepseek-ai/dsh-client-locale",
+-        "@deepseek-ai/dsh-client-ui-primitives",
+-        "@deepseek-ai/dsh-client-ui-settings",
+-        "@deepseek-ai/dsh-client-ui-slots"
++        "@deepseek-ai/dsh-client-ui-renderer",
++        "@deepseek-ai/dsh-client-ui-settings"
+       ],
+       "platform": "web"
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-locale": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-ui-settings": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-invariants": "^0.1.0-rc.8",
+-    "react": "^18.2.0",
+-    "react-dom": "^18.2.0"
+-  },
+-  "peerDependenciesMeta": {
+-    "@deepseek-ai/dsh-client-locale": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+-    "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
+-    "@deepseek-ai/dsh-client-ui-settings": { "optional": true },
+-    "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+-    "@deepseek-ai/dsh-invariants": { "optional": true },
+-    "react": { "optional": true },
+-    "react-dom": { "optional": true }
++    "@deepseek-ai/cordis": "^4.0.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2"
+   },
+   "private": true
+ }

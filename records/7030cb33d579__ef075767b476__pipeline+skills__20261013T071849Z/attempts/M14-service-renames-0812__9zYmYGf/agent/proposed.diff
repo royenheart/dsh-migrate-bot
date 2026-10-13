@@ -1,0 +1,134 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 6ab0842..0c38383 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,11 +1,35 @@
+ # @demo/dsh-bench-status (exam material only, do not publish)
+ 
+-A small npm **bundle plugin** sample whose Node half (the packed `lib/index.mjs`,
+-the `main` entry) is written against the pre-0812 host service names: `inject` is
+-`['tasks', 'httpServer']`, the task registry is read through `ctx.tasks`, the
+-`/bench-status/status` route is registered through `ctx.httpServer.register`, and
+-job completion is subscribed through the `onTaskDone` listener.
++A small npm **bundle plugin** sample for the Web surface. It ships four
++documented pieces:
+ 
+-The host in this container is dsh **0.1.2-alpha.2**.
++1. **Bundle manifest + composition patch** — `package.json` declares
++   `dsh.bundle.patch: ./cordis.patch.yml`, and that patch inserts the
++   `bench-status` row into the web composition so the plugin is mounted by
++   installing the bundle.
++2. **Host service bindings** — the Node half (the packed `lib/index.mjs`, the
++   `main` entry) requires the official background-job registry
++   (`inject: ['jobs']`) and contributes to the official browser-facing HTTP
++   carrier (`ctx.inject(['webServer'], …)`). The registry is part of every
++   base-backed profile; the carrier is mounted only by the Web profile's
++   bundle, so a profile without one (base+headless, CLI) still activates the
++   plugin and simply serves no route instead of waiting for `webServer`.
++3. **The `/bench-status/status` route** — an exact HTTP route registered
++   through `ctx.webServer.register` on the official web host carrier, present
++   whenever that carrier is mounted. It serves
++   `{"ok":true,"open":<n>}`, where `<n>` is the number of jobs the registry
++   currently lists for the caller. The read is caller-relative: a route handler
++   holds no `Agent`, so `ctx.jobs.list()` returns the unowned bucket only and
++   jobs an agent session started stay fenced to that session. The harness ships
++   no job-status HTTP route of its own, so this endpoint is the plugin's own
++   entry point and is not duplicated by anything official.
++4. **The job-completion listener** — `ctx.jobs.onJobDone` logs one line per
++   settled job (`[bench-status] job done: <id>`), the host-side counterpart of
++   the route.
+ 
+-This fixture is exam material only — never publish it to npm.
+\ No newline at end of file
++The host in this container is dsh **0.1.2-alpha.2**, where those two services
++are named `jobs` and `webServer`. The pre-0812 names `tasks` and `httpServer`
++(and the `onTaskDone` listener) belong to the retired vocabulary and do not
++exist on this host; renaming back would make the plugin fail to activate.
++
++This fixture is exam material only — never publish it to npm.
+diff --git a/fixture/lib/index.mjs b/fixture/lib/index.mjs
+index 5ef102c..767a351 100644
+--- a/fixture/lib/index.mjs
++++ b/fixture/lib/index.mjs
+@@ -1,33 +1,37 @@
+ // Node half (bundle plugin, packed artifact — package.json `main` points here).
+-// Contract on the current host: `httpServer` is the official web carrier service
+-// and `tasks` is the official task-registry service — keep those names exactly as
+-// they are; the "webServer"/"jobs" spellings that some newer docs mention are not
+-// real service names on this host, so do not rename anything (renaming would make
+-// the plugin fail to activate).
++//
++// Host contract on dsh 0.1.2-alpha.2: the background-job registry is the
++// official `jobs` service (`ctx.jobs`, provided by @deepseek-ai/dsh-jobs-local
++// in the base bundle) and the browser-facing HTTP carrier is the official
++// `webServer` service (@deepseek-ai/dsh-host-webserver). The registry is part
++// of every base-backed profile, so it is a required injection. The carrier is
++// mounted only by the Web profile's bundle, so it is contributed through
++// `ctx.inject`: a profile without a Web carrier (base+headless, CLI) still
++// activates this plugin instead of parking on a service it will never see,
++// and the route appears exactly while `webServer` is mounted. The pre-0812
++// `tasks` / `httpServer` spellings were renamed and no longer resolve on this
++// host, so injecting them would leave the plugin unactivated.
+ //
+ // Route endpoints are a single source of truth here: the /bench-status/status
+-// route below is served over the official httpServer registration interface.
++// route below is served over the official webServer registration interface.
+ export const name = 'bench-status'
+-export const inject = ['tasks', 'httpServer']
++export const inject = ['jobs']
+ 
+ export function apply(ctx) {
+-  const { tasks, httpServer } = ctx
+-  const collect = () => tasks.list().length
++  const jobs = ctx.jobs
++
++  ctx.effect(() => jobs.onJobDone((snapshot) => {
++    console.error('[bench-status] job done:', snapshot.id)
++  }))
+ 
+-  ctx.effect(() => {
+-    const disposers = [
+-      httpServer.register({
+-        kind: 'exact',
+-        path: '/bench-status/status',
+-        handler: async (req, res) => {
+-          res.writeHead(200, { 'content-type': 'application/json' })
+-          res.end(`{"ok":true,"open":${collect()}}`)
+-        },
+-      }),
+-      tasks.onTaskDone((snapshot) => {
+-        console.error('[bench-status] task done:', snapshot.id)
+-      }),
+-    ]
+-    return () => disposers.forEach((dispose) => dispose?.())
++  ctx.inject(['webServer'], (webCtx) => {
++    webCtx.effect(() => webCtx.webServer.register({
++      kind: 'exact',
++      path: '/bench-status/status',
++      handler: async (req, res) => {
++        res.writeHead(200, { 'content-type': 'application/json' })
++        res.end(`{"ok":true,"open":${jobs.list().length}}`)
++      },
++    }))
+   })
+-}
+\ No newline at end of file
++}
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..73f4d3c
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-status",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-status",
++      "version": "0.1.0"
++    }
++  }
++}

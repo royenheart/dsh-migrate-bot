@@ -1,0 +1,998 @@
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..8260174
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,95 @@
++{
++  "name": "@demo/dsh-optional-bench",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-optional-bench",
++      "version": "0.1.0",
++      "optionalDependencies": {
++        "@deepseek-ai/dsh-util-time": "0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/cordis": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.4.tgz",
++      "integrity": "sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==",
++      "license": "MIT",
++      "optional": true,
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      },
++      "bin": {
++        "cordis": "bin.js"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis-plugin-include": {
++          "optional": true
++        },
++        "@deepseek-ai/cordis-plugin-loader": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "license": "MIT",
++      "optional": true,
++      "peer": true
++    },
++    "node_modules/@deepseek-ai/dsh-invariants": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-invariants/-/dsh-invariants-0.1.2-rc.1.tgz",
++      "integrity": "sha512-zSjuFJYcEB94kPwn7SicqAV1dfVWZkjt1I8luDboxtjfp5CN6ziwJhLv3KaB+Dh9tgkyGY4mvo886W/HhE9L9g==",
++      "license": "MIT",
++      "optional": true,
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-time": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-time/-/dsh-util-time-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-BhVWSkq/GisaTDRIjg8MeUG9CaltZ2KlmcNO23gWo3ns+SEF7W8DpmHpcVXWLRILvcq4J+w9gfcw2leSnPuGCg==",
++      "license": "MIT",
++      "optional": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/schemastery": {
++      "version": "3.18.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.4.tgz",
++      "integrity": "sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==",
++      "license": "MIT",
++      "optional": true,
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      }
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "license": "MIT",
++      "optional": true,
++      "peer": true
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 0a77328..269a309 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -14,7 +14,7 @@
+     }
+   },
+   "optionalDependencies": {
+-    "@deepseek-ai/dsh-util-time": "0.1.2-alpha.1"
++    "@deepseek-ai/dsh-util-time": "0.1.2-alpha.2"
+   },
+   "private": true
+ }
+diff --git a/fixture/patches/0001-verify-bundle-optional-imports.patch b/fixture/patches/0001-verify-bundle-optional-imports.patch
+new file mode 100644
+index 0000000..85b3d81
+--- /dev/null
++++ b/fixture/patches/0001-verify-bundle-optional-imports.patch
+@@ -0,0 +1,848 @@
++diff --git a/packages/boot/app-boot/README.i18n.yaml b/packages/boot/app-boot/README.i18n.yaml
++index b980e35..968fb1a 100644
++--- a/packages/boot/app-boot/README.i18n.yaml
+++++ b/packages/boot/app-boot/README.i18n.yaml
++@@ -2,5 +2,5 @@
++ # side as of the last confirmed-consistent state. Both languages carry equal authority;
++ # after editing either side, bring the other along and re-record with:
++ #   pnpm run verify-translation-pairing --write packages/boot/app-boot/README.md
++-README.md: 9094950a7b154d0feb0d8bd0b76e1f06ff2a10fb
++-README.zh.md: 3a3ef6c82182d23a50dfa460591b20e9ebfd291e
+++README.md: 441be5c9e3381f6bc9c3ab40557816e68bf94f99
+++README.zh.md: 99f717ed5fafd614af2716ecc3607acd7673e24f
++diff --git a/packages/boot/app-boot/README.md b/packages/boot/app-boot/README.md
++index 9094950..441be5c 100644
++--- a/packages/boot/app-boot/README.md
+++++ b/packages/boot/app-boot/README.md
++@@ -45,7 +45,7 @@ With that entry point, success looks like a running app with every plugin active
++ <a id="profiles"></a>
++ ### Profiles
++ 
++-A profile is how one dsh installation ships different app surfaces: `web`, `headless`, `acp`, `sdk`, and `sdk-minimal` start distinct compositions from the same launcher. A profile lives at `$DSH_HOME/profiles/<name>` and combines installable bundles, its own `cordis.patch.yml`, and `patchReload: live | startup`; omitted reload policy keeps the historical `live` default for custom profiles. The shipped `web` template uses live reload, while the other shipped templates apply patches only at startup. `sdk-minimal` names only its standalone bundle; the other templates retain base-plus-mode stacks. `dsh plugin` creates custom profiles, and a missing bundle or one without a patch declaration fails startup loudly.
+++A profile is how one dsh installation ships different app surfaces: `web`, `headless`, `acp`, `sdk`, and `sdk-minimal` start distinct compositions from the same launcher. A profile lives at `$DSH_HOME/profiles/<name>` and combines installable bundles, its own `cordis.patch.yml`, and `patchReload: live | startup`; omitted reload policy keeps the historical `live` default for custom profiles. The shipped `web` template uses live reload, while the other shipped templates apply patches only at startup. `sdk-minimal` names only its standalone bundle; the other templates retain base-plus-mode stacks. `dsh plugin` creates custom profiles, and a missing bundle or one without a patch declaration fails startup loudly. A bundle whose own manifest marks a dependency optional (`optionalDependencies`, or an optional peer) while a module its patch rows load imports that package statically also fails composition loudly, naming the file and line: an absent package would otherwise take the whole plugin tree down with `ERR_MODULE_NOT_FOUND`. Import such a package as a type, declare it under `dependencies` when the bundle requires it, or restructure so module scope does not need it.
++ 
++ Your machine-local preferences also live in the Harness home:
++ 
++@@ -96,6 +96,7 @@ The exports each own one stage of the boot: config resolution and snapshot repla
++ |---|---|
++ | [`src/index.ts`](src/index.ts) | Boot helpers: config resolution, environment loading, fail-loud guard, activation audit, patch parsing, config dump, harness-source section |
++ | [`src/profile.ts`](src/profile.ts) | Profile discovery, initialization, bundle resolution, module fallback |
+++| [`src/optional-imports.ts`](src/optional-imports.ts) | Bundle module-scope optional-dependency verification |
++ | [`src/invariant.ts`](src/invariant.ts) | Invariant companion (no runtime invariant; boundary and replay tests cover the protocol mapping) |
++ 
++ </details>
++diff --git a/packages/boot/app-boot/README.zh.md b/packages/boot/app-boot/README.zh.md
++index 3a3ef6c..99f717e 100644
++--- a/packages/boot/app-boot/README.zh.md
+++++ b/packages/boot/app-boot/README.zh.md
++@@ -45,7 +45,7 @@ const ctx = await boot('dsh', resolveConfigPath(argv[2], process.env.DSH_SNAPSHO
++ <a id="profiles"></a>
++ ### Profile
++ 
++-profile 是同一套 dsh 安装提供不同应用界面的方式：`web`、`headless`、`acp`、`sdk` 与 `sdk-minimal` 从同一 launcher 启动不同组合。profile 位于 `$DSH_HOME/profiles/<name>`，由可安装 bundle、自身 `cordis.patch.yml` 与 `patchReload: live | startup` 组成；自定义 profile 省略 reload 策略时保留历史 `live` 默认值。随产品交付的 `web` 模板实时重载，其他随附模板只在启动时应用 patch。`sdk-minimal` 只列出自身的独立 bundle，其他模板保留 base 加模式 bundle 的栈。`dsh plugin` 创建自定义 profile；缺失 bundle 或未声明 patch 的 bundle 会让启动明确失败。
+++profile 是同一套 dsh 安装提供不同应用界面的方式：`web`、`headless`、`acp`、`sdk` 与 `sdk-minimal` 从同一 launcher 启动不同组合。profile 位于 `$DSH_HOME/profiles/<name>`，由可安装 bundle、自身 `cordis.patch.yml` 与 `patchReload: live | startup` 组成；自定义 profile 省略 reload 策略时保留历史 `live` 默认值。随产品交付的 `web` 模板实时重载，其他随附模板只在启动时应用 patch。`sdk-minimal` 只列出自身的独立 bundle，其他模板保留 base 加模式 bundle 的栈。`dsh plugin` 创建自定义 profile；缺失 bundle 或未声明 patch 的 bundle 会让启动明确失败。当某个 bundle 自己的 manifest 把某个依赖标为可选（`optionalDependencies`，或可选 peer），而它的 patch 行所加载的某个模块又静态 import 该包时，组合同样会明确失败，并指出文件与行号：否则该包一旦缺失，整棵插件树都会因 `ERR_MODULE_NOT_FOUND` 一起失败。请把该包改为类型导入，在 bundle 确实需要它时声明到 `dependencies`，或重构到模块作用域不再需要它。
++ 
++ 你的机器本地偏好同样位于 harness home 中：
++ 
++@@ -96,6 +96,7 @@ profile 是同一套 dsh 安装提供不同应用界面的方式：`web`、`head
++ |---|---|
++ | [`src/index.ts`](src/index.ts) | 启动 helper：配置解析、环境加载、会明确报错的保护机制、激活审计、patch 解析、配置 dump、harness 源码段落 |
++ | [`src/profile.ts`](src/profile.ts) | profile 发现、初始化、组合包解析、模块后备机制 |
+++| [`src/optional-imports.ts`](src/optional-imports.ts) | 组合包模块作用域可选依赖校验 |
++ | [`src/invariant.ts`](src/invariant.ts) | 不变式伴生插件（无运行时不变式；边界与回放测试覆盖其协议映射） |
++ 
++ </details>
++diff --git a/packages/boot/app-boot/src/index.ts b/packages/boot/app-boot/src/index.ts
++index 85e25eb..75f9177 100644
++--- a/packages/boot/app-boot/src/index.ts
+++++ b/packages/boot/app-boot/src/index.ts
++@@ -51,6 +51,15 @@ export {
++   type ProfilePatchReload,
++   type ProfileTemplate,
++ } from './profile.ts'
+++export {
+++  bundleModuleSources,
+++  collectOptionalModuleScopeLoads,
+++  moduleScopeLoads,
+++  optionalDeclarations,
+++  verifyBundleOptionalImports,
+++  type OptionalDeclaration,
+++  type OptionalModuleScopeLoad,
+++} from './optional-imports.ts'
++ 
++ /**
++  * Resolve the config to boot. Replay swaps a `cordis.yml` basename for
++diff --git a/packages/boot/app-boot/src/optional-imports.ts b/packages/boot/app-boot/src/optional-imports.ts
++new file mode 100644
++index 0000000..8670789
++--- /dev/null
+++++ b/packages/boot/app-boot/src/optional-imports.ts
++@@ -0,0 +1,528 @@
+++/**
+++ * Reject a profile bundle that loads one of its own optional dependencies at
+++ * module scope.
+++ *
+++ * A dependency in `optionalDependencies`, or a peer carrying
+++ * `peerDependenciesMeta.<name>.optional`, may be absent from an installed
+++ * tree — that absence is what "optional" promises a consumer. A static import
+++ * is evaluated when the importing module loads, so one absent package stops
+++ * being "this capability is unavailable" and becomes a load failure for
+++ * everything that reaches the importing module: the Loader imports every
+++ * plugin row, so the whole profile tree fails with it.
+++ *
+++ * The repository's own packages are covered by
+++ * `scripts/verify-optional-dependency-imports.ts`, which reads the workspace
+++ * TypeScript programs. A bundle installed into a profile from outside the
+++ * repository is outside those programs, so this module applies the same rule
+++ * to the bundle's shipped files at the profile boundary, before boot.
+++ *
+++ * The scan is deliberately conservative: it reads only the files the bundle's
+++ * own patch rows and export map can load, tokenizes JavaScript directly
+++ * (comments, strings, and template literals are skipped; the specifier must
+++ * follow `import`/`export` at a statement boundary), and reports a load only
+++ * when the specifier names a package that bundle's own manifest declares
+++ * optional. A clause that binds only types emits nothing and is not a load,
+++ * matching the in-repo gate's `import type {}`, `import {}`, and inline
+++ * `type` allowances; a named binding the compiler would elide because it
+++ * resolves to a type is still reported, because the boot path has no bound
+++ * Program to resolve it. A dynamic `import()` is not a module-scope load and
+++ * is not reported; reaching for one to dodge this check signals the
+++ * dependency is not optional.
+++ * @module @deepseek-ai/dsh-app-boot/optional-imports
+++ */
+++
+++import { existsSync, readFileSync, statSync } from 'node:fs'
+++import { dirname, relative, resolve, sep } from 'node:path'
+++import { resolve as resolveExport } from 'resolve.exports'
+++
+++/** How a manifest marked a dependency optional. */
+++export type OptionalDeclaration = 'optionalDependencies' | 'peerDependenciesMeta'
+++
+++/** One module-scope load of a package its own manifest allows to be absent. */
+++export interface OptionalModuleScopeLoad {
+++  /** Bundle-relative path of the file holding the import or re-export. */
+++  file: string
+++  /** 1-based line of the import or re-export statement. */
+++  line: number
+++  /** The package specifier, as written. */
+++  specifier: string
+++  /** How the bundle's manifest marked the package optional. */
+++  declaration: OptionalDeclaration
+++}
+++
+++/** One shipped module of a bundle, with the source the check scans. */
+++interface BundleModule {
+++  /** Bundle-relative path, for the diagnostic. */
+++  file: string
+++  /** Absolute path. */
+++  path: string
+++  /** File content. */
+++  source: string
+++}
+++
+++/** The manifest fields `resolve.exports` needs to name a runtime entry. */
+++interface ResolvableManifest {
+++  name: string
+++  exports?: unknown
+++  main?: string
+++}
+++
+++/** The largest relative-import closure one bundle is scanned through. */
+++const MAX_BUNDLE_MODULES = 128
+++
+++const IDENTIFIER_START = /[A-Za-z_$]/
+++const IDENTIFIER_PART = /[A-Za-z0-9_$]/
+++
+++/** The package name a module specifier resolves to. */
+++function packageOf(specifier: string): string {
+++  const parts = specifier.split('/')
+++  return specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0] ?? specifier
+++}
+++
+++/** Read a manifest field as a record. */
+++function record(value: unknown, field: string): Record<string, unknown> {
+++  if (value === null || typeof value !== 'object' || Array.isArray(value)) return {}
+++  const found = (value as Record<string, unknown>)[field]
+++  if (found === null || typeof found !== 'object' || Array.isArray(found)) return {}
+++  return found as Record<string, unknown>
+++}
+++
+++/**
+++ * The dependencies one bundle manifest allows to be absent.
+++ * @param manifest - the bundle's parsed package.json.
+++ * @returns each optional package name and how the manifest marked it.
+++ */
+++export function optionalDeclarations(manifest: unknown): Map<string, OptionalDeclaration> {
+++  const optional = new Map<string, OptionalDeclaration>()
+++  for (const name of Object.keys(record(manifest, 'optionalDependencies'))) {
+++    optional.set(name, 'optionalDependencies')
+++  }
+++  const peers = record(manifest, 'peerDependencies')
+++  for (const [name, meta] of Object.entries(record(manifest, 'peerDependenciesMeta'))) {
+++    if (meta === null || typeof meta !== 'object') continue
+++    if ((meta as Record<string, unknown>).optional !== true) continue
+++    if (!(name in peers)) continue
+++    optional.set(name, 'peerDependenciesMeta')
+++  }
+++  return optional
+++}
+++
+++/** Count the newlines in one skipped range, to keep line numbers exact. */
+++function countNewlines(source: string, start: number, end: number): number {
+++  let count = 0
+++  for (let index = start; index < end; index += 1) {
+++    if (source[index] === '\n') count += 1
+++  }
+++  return count
+++}
+++
+++/** The index just past a quoted string or template literal starting at `start`. */
+++function afterQuoted(source: string, start: number): number {
+++  const quote = source[start]!
+++  let index = start + 1
+++  while (index < source.length) {
+++    const char = source[index]!
+++    if (char === '\\') {
+++      index += 2
+++      continue
+++    }
+++    index += 1
+++    if (char === quote) break
+++    // A single- or double-quoted string ends at the line end; an unterminated
+++    // one must not swallow the rest of the file.
+++    if (char === '\n' && quote !== '`') break
+++  }
+++  return index
+++}
+++
+++/** The index just past a block comment starting at `start` (which begins `/*`). */
+++function afterBlockComment(source: string, start: number): number {
+++  const end = source.indexOf('*/', start + 2)
+++  return end === -1 ? source.length : end + 2
+++}
+++
+++/**
+++ * Whether a `type` token at `index` is a type-only clause modifier rather
+++ * than the imported binding itself.
+++ *
+++ * The two positions disambiguate differently. At statement level,
+++ * `import type from 'x'` binds the default export to a local named `type` —
+++ * TypeScript keeps that reading for compatibility — so only a following
+++ * `from` or specifier string means a value clause. Inside a named-binding
+++ * list, `type` is the modifier only when an imported name follows; `{ type }`
+++ * and `{ type as x }` still name a binding.
+++ * @param source - the module source.
+++ * @param index - index just past the `type` identifier.
+++ * @param element - true inside a `{ ... }` named-binding list.
+++ * @returns true when the `type` token marks the clause type-only.
+++ */
+++function typeModifierAt(source: string, index: number, element: boolean): boolean {
+++  let at = index
+++  while (at < source.length) {
+++    const char = source[at]!
+++    if (char === ' ' || char === '\t' || char === '\r' || char === '\n') {
+++      at += 1
+++      continue
+++    }
+++    if (char === '/' && source[at + 1] === '/') return !element
+++    if (char === '/' && source[at + 1] === '*') {
+++      at = afterBlockComment(source, at)
+++      continue
+++    }
+++    break
+++  }
+++  const char = source[at]
+++  if (char === undefined) return !element
+++  if (char === '"' || char === "'") return element
+++  if (!IDENTIFIER_START.test(char)) return !element
+++  const start = at
+++  while (at < source.length && IDENTIFIER_PART.test(source[at]!)) at += 1
+++  const word = source.slice(start, at)
+++  return element ? word !== 'as' : word !== 'from'
+++}
+++
+++/**
+++ * The string a module-scope `import` or `export` statement loads, when the
+++ * statement carries one.
+++ *
+++ * A clause that binds only types emits nothing, so it is not a load: the
+++ * statement-level `type` modifier, an empty named-binding list, and a list
+++ * whose every element carries the inline `type` modifier all return
+++ * undefined. A `type` used as the imported binding itself is a value.
+++ * @param source - the module source.
+++ * @param keyword - `import` or `export`, whose token ends at `from`.
+++ * @param from - index just past the keyword.
+++ * @returns the raw specifier, or undefined for `import()`, `import.meta`,
+++ * type-only clauses, and statements with no module specifier.
+++ */
+++function moduleSpecifierAfter(source: string, keyword: 'import' | 'export', from: number): string | undefined {
+++  let index = from
+++  let sawFrom = false
+++  let atClauseStart = true
+++  let braced = false
+++  let elementStart = false
+++  let elementTypeOnly = false
+++  let typeOnly = false
+++  let bindsValue = false
+++  while (index < source.length) {
+++    const char = source[index]!
+++    if (char === ' ' || char === '\t' || char === '\r' || char === '\n') {
+++      index += 1
+++      continue
+++    }
+++    if (char === '{') {
+++      braced = true
+++      atClauseStart = false
+++      elementStart = true
+++      elementTypeOnly = false
+++      index += 1
+++      continue
+++    }
+++    if (char === '}') {
+++      braced = false
+++      elementStart = false
+++      index += 1
+++      continue
+++    }
+++    if (char === ',') {
+++      elementStart = braced
+++      elementTypeOnly = false
+++      index += 1
+++      continue
+++    }
+++    if (char === '*') {
+++      if (!braced) bindsValue = true
+++      atClauseStart = false
+++      index += 1
+++      continue
+++    }
+++    if (char === '/') {
+++      if (source[index + 1] === '/') return undefined
+++      if (source[index + 1] === '*') {
+++        index = afterBlockComment(source, index)
+++        continue
+++      }
+++      return undefined
+++    }
+++    if (char === '"' || char === "'") {
+++      const end = afterQuoted(source, index)
+++      if (braced) {
+++        // A quoted imported name (`import { "a-b" as ab }`), not the module.
+++        elementStart = false
+++        if (!elementTypeOnly) bindsValue = true
+++        index = end
+++        continue
+++      }
+++      if (sawFrom) {
+++        if (typeOnly || !bindsValue) return undefined
+++        return source.slice(index + 1, end - 1)
+++      }
+++      // `import 'x'` is the side-effect form; `export 'x'` is not a statement.
+++      return keyword === 'import' && atClauseStart && !typeOnly ? source.slice(index + 1, end - 1) : undefined
+++    }
+++    if (IDENTIFIER_START.test(char)) {
+++      const start = index
+++      while (index < source.length && IDENTIFIER_PART.test(source[index]!)) index += 1
+++      const word = source.slice(start, index)
+++      if (braced) {
+++        if (!elementStart) continue
+++        elementStart = false
+++        if (word === 'type' && typeModifierAt(source, index, true)) {
+++          elementTypeOnly = true
+++          continue
+++        }
+++        bindsValue = true
+++        continue
+++      }
+++      if (atClauseStart) {
+++        atClauseStart = false
+++        if (word === 'type' && typeModifierAt(source, index, false)) {
+++          typeOnly = true
+++          continue
+++        }
+++        bindsValue = true
+++        continue
+++      }
+++      if (word === 'from') {
+++        sawFrom = true
+++        continue
+++      }
+++      bindsValue = true
+++      continue
+++    }
+++    // `(`, `.`, `=`, `:`, `;` and every other token end the statement without
+++    // a specifier.
+++    return undefined
+++  }
+++  return undefined
+++}
+++
+++/**
+++ * Every static module-scope load of a bare package specifier in one source.
+++ *
+++ * The scan tokenizes JavaScript without executing it: comments, strings, and
+++ * template literals are skipped, and a specifier counts only when it follows
+++ * `import` or `export` at a statement boundary (start of file, or after `;`,
+++ * `{`, or `}`). A clause that binds only types survives no emit and is
+++ * skipped. Relative and `node:` specifiers are returned too; the caller
+++ * decides which matter.
+++ * @param source - the module source.
+++ * @returns each specifier with the 1-based line that loads it.
+++ */
+++export function moduleScopeLoads(source: string): { specifier: string; line: number }[] {
+++  const loads: { specifier: string; line: number }[] = []
+++  let index = 0
+++  let line = 1
+++  let statementStart = true
+++  while (index < source.length) {
+++    const char = source[index]!
+++    if (char === '\n' || char === ' ' || char === '\t' || char === '\r') {
+++      // A newline ends a statement too: shipped bundles put one import per line.
+++      if (char === '\n') {
+++        line += 1
+++        statementStart = true
+++      }
+++      index += 1
+++      continue
+++    }
+++    if (char === '/' && source[index + 1] === '/') {
+++      const end = source.indexOf('\n', index)
+++      index = end === -1 ? source.length : end
+++      continue
+++    }
+++    if (char === '/' && source[index + 1] === '*') {
+++      const end = afterBlockComment(source, index)
+++      line += countNewlines(source, index, end)
+++      index = end
+++      continue
+++    }
+++    if (char === '"' || char === "'" || char === '`') {
+++      const end = afterQuoted(source, index)
+++      line += countNewlines(source, index, end)
+++      index = end
+++      statementStart = false
+++      continue
+++    }
+++    if (!IDENTIFIER_START.test(char)) {
+++      statementStart = char === ';' || char === '{' || char === '}'
+++      index += 1
+++      continue
+++    }
+++    const start = index
+++    while (index < source.length && IDENTIFIER_PART.test(source[index]!)) index += 1
+++    const word = source.slice(start, index)
+++    if ((word === 'import' || word === 'export') && statementStart && source[start - 1] !== '.') {
+++      const specifier = moduleSpecifierAfter(source, word, index)
+++      if (specifier !== undefined) loads.push({ specifier, line })
+++      statementStart = false
+++      continue
+++    }
+++    statementStart = false
+++  }
+++  return loads
+++}
+++
+++/**
+++ * The module-scope loads in one bundle's shipped files that name a package
+++ * the same bundle's manifest allows to be absent.
+++ * @param manifest - the bundle's parsed package.json.
+++ * @param modules - the shipped files to scan, in bundle-relative order.
+++ * @returns one entry per violation.
+++ */
+++export function collectOptionalModuleScopeLoads(
+++  manifest: unknown, modules: readonly { file: string; source: string }[],
+++): OptionalModuleScopeLoad[] {
+++  const optional = optionalDeclarations(manifest)
+++  if (optional.size === 0) return []
+++  const violations: OptionalModuleScopeLoad[] = []
+++  for (const module of modules) {
+++    for (const load of moduleScopeLoads(module.source)) {
+++      if (load.specifier.startsWith('.') || load.specifier.startsWith('/') || load.specifier.startsWith('#')) continue
+++      const declaration = optional.get(packageOf(load.specifier))
+++      if (declaration === undefined) continue
+++      violations.push({ file: module.file, line: load.line, specifier: load.specifier, declaration })
+++    }
+++  }
+++  return violations
+++}
+++
+++/** The file one path names, trying the extensions a shipped bundle uses. */
+++function firstFile(base: string): string | undefined {
+++  for (const candidate of [base, `${base}.js`, `${base}.mjs`, `${base}.cjs`, resolve(base, 'index.js')]) {
+++    if (existsSync(candidate) && statSync(candidate).isFile()) return candidate
+++  }
+++  return undefined
+++}
+++
+++/** The file a relative specifier names. */
+++function resolveRelative(from: string, specifier: string): string | undefined {
+++  return firstFile(resolve(dirname(from), specifier))
+++}
+++
+++/** The file one of the bundle's own export subpaths resolves to. */
+++function resolveBundleExport(
+++  packageDir: string, manifest: ResolvableManifest, subpath: string,
+++): string | undefined {
+++  let candidates: readonly (string | null)[] | void
+++  try {
+++    candidates = resolveExport({ name: manifest.name, exports: manifest.exports, main: manifest.main }, subpath)
+++  } catch {
+++    // An unknown subpath or condition set is the Loader's diagnostic to raise.
+++    return undefined
+++  }
+++  for (const candidate of candidates ?? []) {
+++    if (typeof candidate !== 'string' || !candidate.startsWith('./')) continue
+++    const target = resolve(packageDir, candidate)
+++    const inside = relative(packageDir, target)
+++    if (inside.startsWith(`..${sep}`) || inside === '..') continue
+++    const file = firstFile(target)
+++    if (file !== undefined) return file
+++  }
+++  // A package without an `exports` map loads its `main` for the root subpath.
+++  if (subpath === '.' && typeof manifest.main === 'string') {
+++    const target = resolve(packageDir, manifest.main)
+++    const inside = relative(packageDir, target)
+++    if (!inside.startsWith(`..${sep}`) && inside !== '..') return firstFile(target)
+++  }
+++  return undefined
+++}
+++
+++/** Every `name` a patch list mounts, at any nesting depth. */
+++function patchRowSpecifiers(value: unknown, into: Set<string>): void {
+++  if (Array.isArray(value)) {
+++    for (const item of value) patchRowSpecifiers(item, into)
+++    return
+++  }
+++  if (value === null || typeof value !== 'object') return
+++  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+++    if (key === 'name' && typeof child === 'string') into.add(child)
+++    else patchRowSpecifiers(child, into)
+++  }
+++}
+++
+++/**
+++ * Read the shipped modules a bundle's patch rows and export map can load,
+++ * following relative imports inside the bundle. Nothing outside `packageDir`
+++ * is read, and the closure is bounded by {@link MAX_BUNDLE_MODULES}.
+++ * @param packageDir - the bundle's package root.
+++ * @param manifest - the bundle's parsed package.json.
+++ * @param packageNames - the names the bundle answers to (the profile's bundle entry and its own manifest name).
+++ * @param patches - the parsed patch list the profile mounts for this bundle.
+++ * @returns each module's bundle-relative path and source.
+++ */
+++export function bundleModuleSources(
+++  packageDir: string, manifest: unknown, packageNames: readonly string[], patches: unknown,
+++): BundleModule[] {
+++  if (optionalDeclarations(manifest).size === 0) return []
+++  const fields = manifest !== null && typeof manifest === 'object' ? manifest as Record<string, unknown> : {}
+++  const resolvable: ResolvableManifest = {
+++    name: packageNames[0] ?? 'bundle',
+++    exports: fields.exports,
+++    main: typeof fields.main === 'string' ? fields.main : undefined,
+++  }
+++  const roots = new Set<string>()
+++  const specifiers = new Set<string>()
+++  patchRowSpecifiers(patches, specifiers)
+++  for (const specifier of specifiers) {
+++    const owner = packageNames.find(name => specifier === name || specifier.startsWith(`${name}/`))
+++    if (owner === undefined) continue
+++    const subpath = specifier === owner ? '.' : `.${specifier.slice(owner.length)}`
+++    const file = resolveBundleExport(packageDir, { ...resolvable, name: owner }, subpath)
+++    if (file !== undefined) roots.add(file)
+++  }
+++  for (const owner of packageNames) {
+++    const entry = resolveBundleExport(packageDir, { ...resolvable, name: owner }, '.')
+++    if (entry !== undefined) roots.add(entry)
+++  }
+++  const modules: BundleModule[] = []
+++  const seen = new Set<string>()
+++  const queue = [...roots]
+++  while (queue.length > 0 && modules.length < MAX_BUNDLE_MODULES) {
+++    const path = queue.shift()!
+++    if (seen.has(path)) continue
+++    seen.add(path)
+++    const source = readFileSync(path, 'utf8')
+++    modules.push({ file: relative(packageDir, path), path, source })
+++    for (const load of moduleScopeLoads(source)) {
+++      if (!load.specifier.startsWith('.')) continue
+++      const next = resolveRelative(path, load.specifier)
+++      if (next !== undefined && !seen.has(next)) queue.push(next)
+++    }
+++  }
+++  return modules
+++}
+++
+++/**
+++ * Fail loud when a bundle the profile is about to mount loads one of its own
+++ * optional dependencies at module scope. Runs before the Loader imports any
+++ * row, so an absent optional package is reported as the bundle's manifest
+++ * mistake instead of a module-resolution crash for the whole tree.
+++ * @param binName - the diagnostic prefix on the thrown error.
+++ * @param packageName - the bundle's name from `dsh.profile.bundles`.
+++ * @param packageDir - the bundle's package root.
+++ * @param manifest - the bundle's parsed package.json.
+++ * @param patches - the parsed patch list the profile mounts for this bundle.
+++ * @throws when one of the bundle's shipped modules statically imports a
+++ * package its own manifest declares optional.
+++ */
+++export function verifyBundleOptionalImports(
+++  binName: string, packageName: string, packageDir: string, manifest: unknown, patches: unknown,
+++): void {
+++  const names = [packageName]
+++  const own = manifest !== null && typeof manifest === 'object'
+++    ? (manifest as { name?: unknown }).name
+++    : undefined
+++  if (typeof own === 'string' && own !== packageName) names.push(own)
+++  const modules = bundleModuleSources(packageDir, manifest, names, patches)
+++  const violations = collectOptionalModuleScopeLoads(manifest, modules)
+++  if (violations.length === 0) return
+++  const lines = violations.map(violation =>
+++    `  ${violation.file}:${String(violation.line)} loads ${violation.specifier},`
+++    + ` declared optional in ${violation.declaration}`)
+++  throw new Error(
+++    `${binName}: profile bundle ${JSON.stringify(packageName)} loads an optional dependency at module scope:\n`
+++    + `${lines.join('\n')}\n`
+++    + 'import it as a type, move it to dependencies when the bundle requires it,'
+++    + ' or restructure so module scope does not need it',
+++  )
+++}
++diff --git a/packages/boot/app-boot/src/profile.ts b/packages/boot/app-boot/src/profile.ts
++index 52e8bcf..13c9e1e 100644
++--- a/packages/boot/app-boot/src/profile.ts
+++++ b/packages/boot/app-boot/src/profile.ts
++@@ -36,6 +36,7 @@ import { applyEntryPatches, type PatchOptions } from '@deepseek-ai/cordis-plugin
++ import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
++ import { resolve as resolvePackage, type Package as ResolvePackageManifest } from 'resolve.exports'
++ import { loadOverlayPatches } from './index.ts'
+++import { verifyBundleOptionalImports } from './optional-imports.ts'
++ 
++ /** Directory under the Harness home holding every profile. */
++ export const PROFILES_DIR = 'profiles'
++@@ -792,7 +793,9 @@ export function resolveBundleDir(
++  * Load a profile: resolve every `dsh.profile.bundles` entry to its patch
++  * layer and parse the profile's own patch file. A listed bundle without a
++  * `dsh.bundle` manifest fails loud — naming a bundle-less package as a layer
++- * is a misconfiguration, not "no patches".
+++ * is a misconfiguration, not "no patches" — and so does a bundle whose
+++ * shipped modules load one of its own optional dependencies at module scope
+++ * ({@link verifyBundleOptionalImports}), before the Loader imports any row.
++  * @param binName - the diagnostic prefix on thrown errors.
++  * @param name - the profile name.
++  * @param installAnchor - absolute path of the dsh app's package.json (first resolution anchor).
++@@ -834,7 +837,9 @@ export function loadProfile(
++       throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no dsh.bundle in its package.json`)
++     }
++     const patchPath = join(packageDir, declared)
++-    return { packageName, packageDir, patchPath, patches: loadOverlayPatches(binName, patchPath) }
+++    const patches = loadOverlayPatches(binName, patchPath)
+++    verifyBundleOptionalImports(binName, packageName, packageDir, bundleManifest, patches)
+++    return { packageName, packageDir, patchPath, patches }
++   })
++   const patchPath = join(dir, PROFILE_PATCH_FILENAME)
++   const patches = options.userLayer !== false && existsSync(patchPath)
++diff --git a/packages/boot/app-boot/tests/optional-imports.spec.ts b/packages/boot/app-boot/tests/optional-imports.spec.ts
++new file mode 100644
++index 0000000..6cafb3d
++--- /dev/null
+++++ b/packages/boot/app-boot/tests/optional-imports.spec.ts
++@@ -0,0 +1,200 @@
+++/**
+++ * `verifyBundleOptionalImports`: a bundle whose shipped modules statically
+++ * import a package its own manifest allows to be absent must fail profile
+++ * composition with a named diagnostic, before the Loader imports any row. The
+++ * scan follows only what the bundle's patch rows and export map can load, and
+++ * it must not report dynamic imports, type-only imports and re-exports, or
+++ * import-like text inside comments, strings, and template literals.
+++ */
+++
+++import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+++import { tmpdir } from 'node:os'
+++import { dirname, join } from 'node:path'
+++import { describe, expect, it } from 'vitest'
+++import {
+++  moduleScopeLoads,
+++  optionalDeclarations,
+++  verifyBundleOptionalImports,
+++} from '../src/index.ts'
+++
+++const OPTIONAL = '@deepseek-ai/dsh-util-time'
+++const NAME = 'dsh-test-bin'
+++
+++/** Stage one bundle package directory and return its parsed manifest. */
+++function stageBundle(
+++  manifest: Record<string, unknown>,
+++  files: Record<string, string>,
+++): { dir: string; manifest: Record<string, unknown> } {
+++  const dir = mkdtempSync(join(tmpdir(), 'dsh-optional-imports-'))
+++  const parsed = { name: '@demo/plug', version: '1.0.0', type: 'module', main: './index.js', ...manifest }
+++  writeFileSync(join(dir, 'package.json'), JSON.stringify(parsed))
+++  for (const [file, source] of Object.entries(files)) {
+++    mkdirSync(dirname(join(dir, file)), { recursive: true })
+++    writeFileSync(join(dir, file), source)
+++  }
+++  return { dir, manifest: parsed }
+++}
+++
+++/** The patch list that mounts one bundle row by package name. */
+++function row(name: string): unknown[] {
+++  return [{ insert: [{ id: 'plug', name }] }]
+++}
+++
+++describe('verifyBundleOptionalImports', () => {
+++  it('reports a top-level import of an optionalDependencies package', () => {
+++    const { dir, manifest } = stageBundle(
+++      { optionalDependencies: { [OPTIONAL]: '0.1.2-alpha.2' } },
+++      { 'index.js': `import { canonicalClientTimeZone } from '${OPTIONAL}'\n` },
+++    )
+++    expect(() => { verifyBundleOptionalImports(NAME, '@demo/plug', dir, manifest, row('@demo/plug')) })
+++      .toThrow(`index.js:1 loads ${OPTIONAL}, declared optional in optionalDependencies`)
+++  })
+++
+++  it('reports an optional peer and a side-effect import', () => {
+++    const { dir, manifest } = stageBundle({
+++      peerDependencies: { [OPTIONAL]: '^0.1.2' },
+++      peerDependenciesMeta: { [OPTIONAL]: { optional: true } },
+++    }, { 'index.js': `import '${OPTIONAL}'\n` })
+++    expect(() => { verifyBundleOptionalImports(NAME, '@demo/plug', dir, manifest, row('@demo/plug')) })
+++      .toThrow(`declared optional in peerDependenciesMeta`)
+++  })
+++
+++  it('follows relative imports inside the entry closure', () => {
+++    const { dir, manifest } = stageBundle(
+++      { optionalDependencies: { [OPTIONAL]: '0.1.2-alpha.2' } },
+++      {
+++        'index.js': "import './helper.js'\n",
+++        'helper.js': `export { canonicalClientTimeZone } from '${OPTIONAL}'\n`,
+++      },
+++    )
+++    expect(() => { verifyBundleOptionalImports(NAME, '@demo/plug', dir, manifest, row('@demo/plug')) })
+++      .toThrow('helper.js:1')
+++  })
+++
+++  it('accepts a required declaration for the same import', () => {
+++    const { dir, manifest } = stageBundle(
+++      { dependencies: { [OPTIONAL]: '0.1.2-alpha.2' } },
+++      { 'index.js': `import '${OPTIONAL}'\n` },
+++    )
+++    expect(() => { verifyBundleOptionalImports(NAME, '@demo/plug', dir, manifest, row('@demo/plug')) })
+++      .not.toThrow()
+++  })
+++
+++  it('does not report a dynamic import', () => {
+++    const { dir, manifest } = stageBundle(
+++      { optionalDependencies: { [OPTIONAL]: '0.1.2-alpha.2' } },
+++      { 'index.js': `export const load = () => import('${OPTIONAL}')\n` },
+++    )
+++    expect(() => { verifyBundleOptionalImports(NAME, '@demo/plug', dir, manifest, row('@demo/plug')) })
+++      .not.toThrow()
+++  })
+++
+++  it('scans only what the bundle patch rows can load', () => {
+++    const { dir, manifest } = stageBundle({
+++      optionalDependencies: { [OPTIONAL]: '0.1.2-alpha.2' },
+++      exports: { '.': './index.js', './unused': './unused.js' },
+++    }, {
+++      'index.js': 'export const name = "plug"\n',
+++      'unused.js': `import '${OPTIONAL}'\n`,
+++    })
+++    expect(() => { verifyBundleOptionalImports(NAME, '@demo/plug', dir, manifest, row('@demo/plug')) })
+++      .not.toThrow()
+++    expect(() => { verifyBundleOptionalImports(NAME, '@demo/plug', dir, manifest, row('@demo/plug/unused')) })
+++      .toThrow('unused.js:1')
+++  })
+++
+++  it('resolves a subpath row through the bundle export map', () => {
+++    const { dir, manifest } = stageBundle({
+++      optionalDependencies: { [OPTIONAL]: '0.1.2-alpha.2' },
+++      exports: { '.': './index.js', './startup': './startup.js' },
+++    }, {
+++      'index.js': 'export const name = "plug"\n',
+++      'startup.js': `import '${OPTIONAL}'\n`,
+++    })
+++    expect(() => { verifyBundleOptionalImports(NAME, '@demo/plug', dir, manifest, row('@demo/plug/startup')) })
+++      .toThrow('startup.js:1')
+++  })
+++
+++  it('treats import-like text in comments and strings as inert', () => {
+++    const noise = [
+++      `// import '${OPTIONAL}'`,
+++      `/* import '${OPTIONAL}' */`,
+++      `const text = "import x from '${OPTIONAL}'"`,
+++      `const dynamic = () => import('${OPTIONAL}')`,
+++    ].join('\n')
+++    const { dir, manifest } = stageBundle(
+++      { optionalDependencies: { [OPTIONAL]: '0.1.2-alpha.2' } },
+++      { 'index.js': `${noise}\n` },
+++    )
+++    expect(() => { verifyBundleOptionalImports(NAME, '@demo/plug', dir, manifest, row('@demo/plug')) })
+++      .not.toThrow()
+++  })
+++
+++  it('accepts the type-only remedy and still reports a mixed value clause', () => {
+++    const typed = stageBundle(
+++      { optionalDependencies: { [OPTIONAL]: '0.1.2-alpha.2' } },
+++      {
+++        'index.js': [
+++          `import type { T } from '${OPTIONAL}'`,
+++          `export type { U } from '${OPTIONAL}'`,
+++          'export const name = "plug"',
+++        ].join('\n'),
+++      },
+++    )
+++    expect(() => {
+++      verifyBundleOptionalImports(NAME, '@demo/plug', typed.dir, typed.manifest, row('@demo/plug'))
+++    }).not.toThrow()
+++    const mixed = stageBundle(
+++      { optionalDependencies: { [OPTIONAL]: '0.1.2-alpha.2' } },
+++      { 'index.js': `import { type T, canonicalClientTimeZone } from '${OPTIONAL}'\n` },
+++    )
+++    expect(() => {
+++      verifyBundleOptionalImports(NAME, '@demo/plug', mixed.dir, mixed.manifest, row('@demo/plug'))
+++    }).toThrow('declared optional in optionalDependencies')
+++  })
+++})
+++
+++describe('moduleScopeLoads', () => {
+++  it('keeps value statement forms and skips type-only clauses, import.meta, and dynamic imports', () => {
+++    expect(moduleScopeLoads([
+++      'export { a } from "alpha"',
+++      'import "beta"',
+++      'export * from "gamma"',
+++      'import type { T } from "delta"',
+++      'export type { U } from "epsilon"',
+++      'import {} from "zeta"',
+++      'import { type V } from "eta"',
+++      'import { type W, w } from "theta"',
+++      'import defer * as ns from "iota"',
+++      'import type from "kappa"',
+++      'const dynamic = await import("lambda")',
+++      'const meta = import.meta.url',
+++      'export default 1',
+++    ].join('\n'))).toEqual([
+++      { specifier: 'alpha', line: 1 },
+++      { specifier: 'beta', line: 2 },
+++      { specifier: 'gamma', line: 3 },
+++      { specifier: 'theta', line: 8 },
+++      { specifier: 'iota', line: 9 },
+++      { specifier: 'kappa', line: 10 },
+++    ])
+++  })
+++})
+++
+++describe('optionalDeclarations', () => {
+++  it('classifies optional dependencies and optional peers only', () => {
+++    const declared = optionalDeclarations({
+++      optionalDependencies: { one: '1' },
+++      peerDependencies: { two: '1', three: '1' },
+++      peerDependenciesMeta: {
+++        two: { optional: true },
+++        three: { optional: false },
+++        four: { optional: true },
+++      },
+++    })
+++    expect([...declared]).toEqual([
+++      ['one', 'optionalDependencies'],
+++      ['two', 'peerDependenciesMeta'],
+++    ])
+++  })
+++})
+diff --git a/fixture/patches/README.md b/fixture/patches/README.md
+new file mode 100644
+index 0000000..fd22d55
+--- /dev/null
++++ b/fixture/patches/README.md
+@@ -0,0 +1,24 @@
++# Harness patches
++
++These patches carry the general-purpose dsh-side changes this plugin still needs; a
++patch stays here (and is rebased on each harness release) while the capability has no
++official extension point.
++
++## 0001-verify-bundle-optional-imports.patch
++
++**Against:** `dsh-v0.1.2-alpha.2` (`.dsh-migrate/harness`, HEAD `0a53fb5`).
++**Why:** the plugin's documented failure mode is "static install and typecheck stay
++green and only the cold boot crashes" when a bundle statically imports a package its
++own manifest declares optional. The harness documents that rule and enforces it for
++its own packages (`scripts/verify-optional-dependency-imports.ts`), but not for
++bundles installed into a profile. The patch applies the same rule at profile
++composition, before the Loader imports any row, and follows the in-repo gate's
++type-phase allowances (a clause that binds only types is not a load).
++
++Apply from the harness checkout root:
++
++```sh
++git apply /path/to/plugin/patches/0001-verify-bundle-optional-imports.patch
++```
++
++Full proposal, evidence, and open questions: [`../.dsh-migrate/patch-reports/bundle-optional-import-verification/report.md`](../.dsh-migrate/patch-reports/bundle-optional-import-verification/report.md).

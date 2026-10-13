@@ -1,0 +1,92 @@
+{
+  "cards": [
+    {
+      "id": "DSH-0.1.7-A1-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/client/icons.tsx"],
+      "note": "No named import from @deepseek-ai/dsh-client-ui-primitives anywhere in src or package.json; the browser half vendors its own glyphs (src/client/icons.tsx copies the SVG paths), so the *16 -> *Regular/*Medium export rename cannot hit it."
+    },
+    {
+      "id": "DSH-0.1.7-A1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/routes/catalog-data.ts"],
+      "note": "No workspaceFiles Remote or service call anywhere in src: the hub reads skills from ctx.skills and its own skillfs; the only workspace read is the storages/workspace.json file, whose table shape is unchanged at 0.1.7."
+    },
+    {
+      "id": "DSH-0.1.7-A1-03",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": ["src/index.ts:49", "src/index.ts:73", "src/index.ts:173", "src/index.ts:297", "src/client/index.tsx:93", "src/legacy-config.ts", "src/protocol/config.ts"],
+      "note": "ctx.settings.register/settingsScope retired: the card's fields are declared on the plugin's own volatile Config (src/index.ts:49/73), settings writes go through ctx.settings.mutate (src/index.ts:173), the browser card binds ctx.configForms.get('skill-hub') (src/client/index.tsx:93), and values the host's one-time settings.yaml import cannot map (namespace dsh-skill-hub != entry skill-hub) are recovered by src/legacy-config.ts and written once via ctx.settings.update (src/index.ts:297)."
+    },
+    {
+      "id": "DSH-0.1.7-A1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/provider.ts"],
+      "note": "The plugin ships no agent presets and authors none in the legacy preset directory; preset mentions are comments about preset-owned skill discovery, which the global provider intentionally does not duplicate."
+    },
+    {
+      "id": "DSH-0.1.7-A1-05",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/stats/scan.ts:126", "src/stats/persistence.ts"],
+      "note": "Condition (direct raw-log parsing) is not met: stats read SessionEvent[] through the host sessionQuery/sessionPersistence seams (src/stats/persistence.ts), whose 0.1.7 type surface is unchanged, so V4 stays a host implementation detail."
+    },
+    {
+      "id": "DSH-0.1.7-A1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["cordis.patch.yml"],
+      "note": "The bundle patch inserts one bare plugin row (skill-hub) and configures no LLM provider, so the removed DeepSeek protocol key cannot be present."
+    },
+    {
+      "id": "DSH-0.1.7-A1-07",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": ["src/index.ts:73", "src/index.ts:252", "package.json"],
+      "note": "No-reload fields declared: every editable Config field is .volatile() (src/index.ts:73) and the running host re-reads them and re-syncs on loader/volatile-update (src/index.ts:252), so card edits commit without a remount; the bundle patch stays a single ordered file (package.json dsh.bundle.patch) because it does not need splitting."
+    },
+    {
+      "id": "DSH-0.1.7-A1-08",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json", "src/index.ts:37"],
+      "note": "Informational: no plugin action. Because an unreadable bundle now loads as MISSING instead of aborting the profile, the migration verified the row is present and activated on a real 0.1.7-alpha.1 boot (GET /api/skill-hub/config answered 200) rather than assuming a crash-free boot means loaded."
+    },
+    {
+      "id": "DSH-0.1.7-A1-09",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json"],
+      "note": "Optional display metadata: the Plugin Manager renders the package name/description today and the plugin carries no local workaround for it, so the additive package.json icon and exported locale/ title-description files are not adopted in this migration."
+    },
+    {
+      "id": "DSH-0.1.7-A1-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/stats/scan.ts"],
+      "note": "The plugin stores no attachment payloads in session events; it only counts existing user/message and tool/call events, so no attachment carrier moves out of the export path."
+    },
+    {
+      "id": "DSH-0.1.7-A1-11",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/client/index.tsx:116"],
+      "note": "The plugin extends the settings panel through settings.section only; it neither contributes the sidebar account launcher nor the Models sign-in step, and it carries no workaround those seats would replace."
+    }
+  ]
+}

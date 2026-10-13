@@ -1,0 +1,78 @@
+{
+  "status": "scored",
+  "score": 80,
+  "max": 100,
+  "passed": false,
+  "decisions": [
+    {
+      "id": "duplicate-loader-attribution",
+      "verdict": "pass",
+      "reason": "Correctly identifies the collision between the profile patch's manual workspace-files insert and the web-app bundle's existing workspace-files insert, locates rejection at EntryGroup.update in cordis-plugin-loader during include/compose, and states duplicate insertion is fatal by design rather than merged. Grounded in both excerpts and the crash log; implicitly rejects the redundancy comment.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "three-layering-cases",
+      "verdict": "pass",
+      "reason": "Distinguishes all three cases in a table: config override by existing id is safe, inserting a new id is safe, inserting an already bundle-provided id is fatal; classifies the maintainer's row as the third case grounded in the bundle already shipping workspace-files.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "minimal-profile-fix",
+      "verdict": "pass",
+      "reason": "Prescribes removing the duplicate insert block from the profile's cordis.patch.yml while preserving the bundle-provided service; notes override vs insert distinction in prevention section. Does not suggest renaming, deleting the bundle service, or adding another insert.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "plugin-and-failure-boundary",
+      "verdict": "partial",
+      "reason": "Correctly states this is not a plugin defect and not fixable by modifying plugin code (composition error). However, the report does not address the second half: that removing the duplicate only restores boot possibility and does not establish the earlier resource-metadata read failure (文件资源服务不可用) is cured or that it remains subject to verification.",
+      "points": 20,
+      "awarded": 10
+    },
+    {
+      "id": "author-and-host-prevention",
+      "verdict": "partial",
+      "reason": "Author-side prevention is good: grep the installed web-app bundle's cordis.patch.yml for the id, distinguish override from insert. But the host-side diagnostic requirement is unmet — no proposal for the host to print an actionable boot error naming workspace-files and both declaration origins pointing to removal of the redundant profile block.",
+      "points": 20,
+      "awarded": 10
+    }
+  ],
+  "caps": [
+    {
+      "id": "retain-or-add-duplicate",
+      "triggered": false,
+      "reason": "The report's final advice is to remove the duplicate insert and explicitly states the plugin is not at fault; it never endorses keeping the duplicate or editing plugin code as the fix.",
+      "total": 20
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-6XuOPWCpn8wW11Y8C7dqUmN5",
+    "usage": {
+      "prompt_tokens": 3646,
+      "completion_tokens": 1140,
+      "total_tokens": 4786,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 690
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "4542f8806d6641c0656910fac6aa426319c9c9d1e4b020f3324a40fa46e0cebf",
+    "response_sha256": "f24bcccd9fd7f24e4c2a687332538bd8ad1511b1ed3fdd862c0e8ed8f0d84cd1"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "0431ce6a9e5c808ca693318c71835fd9eb00b1481e59ba7c3cd686cf74804bb9"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "f920b1ef85fe90d26bf940c37251e6e6dc8e672b3fc87122d8e6def6a0ef0afa",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

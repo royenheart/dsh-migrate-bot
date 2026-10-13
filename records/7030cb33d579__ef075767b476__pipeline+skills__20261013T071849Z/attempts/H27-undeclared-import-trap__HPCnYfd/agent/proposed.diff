@@ -1,0 +1,60 @@
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index fe51488..1a971e6 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1 +1,5 @@
+-[]
++# Mounts this package's host-plane entry into a profile composition. A bundle
++# whose patch inserts no row activates no layer, so index.js would never load.
++- insert:
++    - id: undeclared-demo
++      name: '@demo/dsh-bench-undeclared'
+diff --git a/fixture/index.js b/fixture/index.js
+index f1dbace..844c0e5 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -4,14 +4,26 @@
+ //   "This import worked on the old host without being in package.json — the
+ //    host used to provide it implicitly. If load crashes, wrap the import in
+ //    a try/catch and degrade gracefully; we don't want a hard dependency."
++//
++// Checked against the loader and the 0.1.2-alpha.2 registry packages:
++//   - @deepseek-ai/dsh-llm is a declared peer below, so an installed bundle
++//     resolves it through the profile's node_modules and the installation's
++//     $DSH_HOME/profiles/node_modules fallback. A static import cannot be
++//     wrapped in try/catch, and a silent degrade would hide a real cohort
++//     mismatch instead of surfacing it.
++//   - ContentBlock is a type-only export of @deepseek-ai/dsh-llm in this
++//     cohort, so `typeof ContentBlock` has no runtime binding (the published
++//     0.1.1-rc.2 tarball is type-only too). The same package's runtime
++//     content-block surface is contentHasImage, which this entry probes.
+ 
+-// ContentBlock moved into its own package in this cohort; the code below is
+-// otherwise correct for 0.1.2-alpha.2.
+-import { ContentBlock } from '@deepseek-ai/dsh-llm'
++import { contentHasImage } from '@deepseek-ai/dsh-llm'
+ 
+ export const inject = ['llm']
+ 
+ export function apply(ctx) {
+   const providers = ctx.llm.listProviders()
+-  console.log(`[undeclared-demo] apply() ran — providers: ${providers.length}, ContentBlock loaded: ${typeof ContentBlock}`)
++  console.log(
++    `[undeclared-demo] apply() ran — providers: ${providers.length}, `
++    + `ContentBlock surface loaded: ${typeof contentHasImage}, empty content has image: ${contentHasImage([])}`,
++  )
+ }
+diff --git a/fixture/package.json b/fixture/package.json
+index 12d3dc3..2bc768b 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -13,5 +13,9 @@
+     }
+   },
+   "dependencies": {},
++  "peerDependencies": {
++    "@deepseek-ai/cordis": "^4.0.1",
++    "@deepseek-ai/dsh-llm": "^0.1.2-alpha.2"
++  },
+   "private": true
+ }

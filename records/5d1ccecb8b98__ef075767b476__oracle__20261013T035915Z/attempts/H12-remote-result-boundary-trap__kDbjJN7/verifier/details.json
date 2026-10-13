@@ -1,0 +1,87 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "root-cause",
+      "verdict": "pass",
+      "reason": "Explains that ordinary unary failures resolve with ok:false/error and never enter catch, while the current code treats resolution as success; correctly notes the RemoteResult shape predates alpha.2 (exists since rc.2). Grounds the diagnosis in the fixture's result.ok/result.value expressions, which unambiguously identify the renameSession body.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "current-problems",
+      "verdict": "pass",
+      "reason": "Identifies four distinct, explained defects anchored in fixture expressions: reading result.value unchecked, misusing catch as the business-failure path, cross-realm instanceof RemoteError, and converting genuine rejects into a retry loop.",
+      "points": 10,
+      "awarded": 10
+    },
+    {
+      "id": "corrected-implementation",
+      "verdict": "pass",
+      "reason": "The fenced ts block awaits the remote call, branches on !result.ok, handles result.error and returns before ever reading result.value — correct discriminated control flow.",
+      "points": 25,
+      "awarded": 25
+    },
+    {
+      "id": "resolved-control-flow",
+      "verdict": "pass",
+      "reason": "States success as ok:true/value, ordinary failure as ok:false/error, and that catch is not on the ordinary failure route; no code-renaming distraction.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "reject-boundary",
+      "verdict": "pass",
+      "reason": "Correctly scopes genuine rejects to assembly/programming faults with concrete examples (wrong arity, unmounted method, missing Context adapter) and requires propagation/exposure rather than swallowing or retrying; does not conflate business failures with these faults.",
+      "points": 15,
+      "awarded": 15
+    },
+    {
+      "id": "error-discrimination",
+      "verdict": "pass",
+      "reason": "Rejects instanceof across bundles/workers/realms, requires structural code-based discrimination on the failed result, and confines isRemoteFailure to a genuine thrown boundary rather than replacing the result discriminant check.",
+      "points": 10,
+      "awarded": 10
+    }
+  ],
+  "caps": [
+    {
+      "id": "ordinary-failures-reject",
+      "triggered": false,
+      "reason": "The report affirmatively states ordinary failures resolve with ok:false and do not enter catch — the opposite of the misconception.",
+      "total": 30
+    },
+    {
+      "id": "unsafe-corrected-code",
+      "triggered": false,
+      "reason": "The proposed fix discriminates on result.ok before reading value, uses no instanceof, and contains no retry or swallowing of genuine rejects.",
+      "total": 60
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-rYDLmxmceVuAyAFWLrxvgi6M",
+    "usage": {
+      "prompt_tokens": 5810,
+      "completion_tokens": 918,
+      "total_tokens": 6728,
+      "completion_tokens_details": {
+        "reasoning_tokens": 469
+      }
+    },
+    "request_sha256": "a8e8f43fa8d51d4119574670214b316dc745373dfac32eab565c5fc36efc6054",
+    "response_sha256": "28a2a5a7a7af012afb75f78547f1935d9bc735d8463022ede3ed21d6184637d6"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "73a765f706f7b502775a825d9e6f677a7dd587bd55bca505a3d77f74ff0f8a05"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "bba91f18695f5a3b00971e0cf4f7865a86b506bcd4ce103688d1f46cc0fe7043",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

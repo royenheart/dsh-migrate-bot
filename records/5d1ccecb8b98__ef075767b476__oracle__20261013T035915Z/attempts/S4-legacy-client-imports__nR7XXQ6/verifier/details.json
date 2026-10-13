@@ -1,0 +1,104 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "runtime-removal",
+      "verdict": "pass",
+      "reason": "Locates the ClientContext import at src/client/index.ts:1, identifies Web Client/plugin impact, maps DSH-0.1.2-A1-25, and directs removing the deleted-package import in favor of importing Context from the target owning package with type-only augmentation, deferring the exact package name — consistent with the sealed reference.",
+      "points": 25,
+      "awarded": 25
+    },
+    {
+      "id": "registration-id",
+      "verdict": "pass",
+      "reason": "Compares the loader id 'pet-legacy-bundle' with package.json name dsh-pet-session-bench, maps A1-26, requires exact name alignment and boot verification. The line citation (5) is imprecise (declaration vs. call site) but the actual code is unambiguously identified; per instructions, obsolete line numbers near a correct diagnosis do not cause rejection.",
+      "points": 25,
+      "awarded": 25
+    },
+    {
+      "id": "session-content",
+      "verdict": "pass",
+      "reason": "Locates useSession/nodes at index.ts:12-13, maps A1-27, requires replacing the removed flat snapshot with a supported content-reading surface (durable event window/public selectors) with ordering preserved per the target snapshot, and does not claim the old API remains supported. Notes Pet.tsx has no touchpoints.",
+      "points": 25,
+      "awarded": 25
+    },
+    {
+      "id": "connection-face",
+      "verdict": "pass",
+      "reason": "Locates ctx.connection.api.agentPresets.list at index.ts:11, maps A1-30, and requires replacing the deleted face with alpha.2 Remote/public access surfaces, marking unknown key names as unconfirmed — a defensible direction without inventing exact successor names.",
+      "points": 25,
+      "awarded": 25
+    }
+  ],
+  "caps": [
+    {
+      "id": "invented-migration",
+      "triggered": false,
+      "reason": "The report never asserts that apply must move to setup/activate or that inject generally must move into a manifest; it only references the standard lifecycle names without endorsing the unsupported replacements.",
+      "total": 70
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-wpLiQgCOYu5gE0W6g3ACVKsO",
+    "usage": {
+      "prompt_tokens": 7901,
+      "completion_tokens": 619,
+      "total_tokens": 8520,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 228
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "b79d0b7df3fa4c7966ff7f4aeb6e5bc27593d2d93f9e5434c639726d15c66eb9",
+    "response_sha256": "5d724435d73e7d45fb233ce41acc0d7161cc902304a1acc47cd4b08a2e84cf4e"
+  },
+  "citation_audit": [
+    {
+      "report": "report.md",
+      "citation": "src/client/index.ts:1",
+      "path": "src/client/index.ts",
+      "start": 1,
+      "end": 1,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "src/client/index.ts:5",
+      "path": "src/client/index.ts",
+      "start": 5,
+      "end": 5,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "src/client/index.ts:12-13",
+      "path": "src/client/index.ts",
+      "start": 12,
+      "end": 13,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "src/client/index.ts:11",
+      "path": "src/client/index.ts",
+      "start": 11,
+      "end": 11,
+      "valid": true
+    }
+  ],
+  "reports": {
+    "report.md": "2bdceecb62595071a02e4184a3031faa97b0f65847f568553a920794e65ef3e8"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "b5a07ad6a7c55303fe4e52f532e4819eeeb697f6d54a48130111ff07455d3f56",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

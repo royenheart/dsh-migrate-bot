@@ -1,0 +1,78 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "split-chunk-attribution",
+      "verdict": "pass",
+      "reason": "Grounds the diagnosis in console-split-chunks.txt: entry chunk returns 200 but sibling hashed imports 404 because they were never shipped, failing the whole dynamic import; fix is a single self-contained bundle with code splitting disabled.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "windows-containment-attribution",
+      "verdict": "pass",
+      "reason": "Uses chunk-route.ts and ci-note.md precisely: LIB_DIR keeps uppercase E:\\ while realpathSync returns lowercase e:\\, so case-sensitive startsWith rejects a contained file; Linux passes because casing is consistent, and it correctly rejects the 'Windows is unreliable' folklore.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "safe-route-fix",
+      "verdict": "pass",
+      "reason": "Proposes path.relative with non-empty/non-'..'/non-absolute acceptance on canonical paths, keeps realpath as defense-in-depth against symlink escapes, and retains the JavaScript MIME requirement.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "modal-event-ownership",
+      "verdict": "pass",
+      "reason": "Explains both pane capture-phase Ctrl+wheel font handler and modal zoom handler act on one gesture; gives modal exclusive ownership with preventDefault/stopPropagation plus pane standing down, noting stopPropagation cannot undo an earlier ancestor capture listener.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "incident-regressions",
+      "verdict": "pass",
+      "reason": "Covers all three incidents: fallback-to-code-block on chunk failure, case-differing contained path served while traversal is refused, single-file artifact assertion, and modal Ctrl+wheel zooms diagram without altering pane font.",
+      "points": 20,
+      "awarded": 20
+    }
+  ],
+  "caps": [
+    {
+      "id": "unsafe-containment",
+      "triggered": false,
+      "reason": "The report strengthens containment with path.relative plus realpath defense-in-depth; it never proposes disabling the guard or serving paths outside the plugin root.",
+      "total": 40
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-INDzpdaVWVqT5TgN1OzRHMQJ",
+    "usage": {
+      "prompt_tokens": 4439,
+      "completion_tokens": 634,
+      "total_tokens": 5073,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 270
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "36dfea2e4d29bf923a9a2c2af09e53b2d87273b0e224af87d78847b48dfda09c",
+    "response_sha256": "a95024b4ab8a1ddcc164a55b8a65c12d2b7fe4c3d59ebacc8e72608b91f535b6"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "64b5eb3f297c5e2b719d3428178d22042e0085ea618b18cfc2b0ca226b59f950"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "692d3ff3b63eb0f209687494b322befa20c89afb8c95f4eef3c1caad326a8ba4",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

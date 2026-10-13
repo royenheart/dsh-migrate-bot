@@ -1,0 +1,126 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.8",
+              "version": "0.1.0-rc.8"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "cards": true,
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 0,
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "fail",
+          "fingerprint": "exit1: EMFILE: too many open files, watch '<path>'",
+          "detail": "[peer-bench] apply() executed\nnode:internal/fs/watchers:323\n    const error = new UVException({\n                  ^\n\nError: EMFILE: too many open files, watch '/tmp/dsh-migrate-probe-UUatGw/profiles/probe'\n    at FSWatcher.<computed> (node:internal/fs/watchers:323:19)\n    at watch (node:fs:2608:36)\n    at createFsWatchInstance (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/handler.js:126:16)\n    at setFsWatchListener (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/handler.js:171:19)\n    at NodeFsHandler._watchWithNodeFs (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/handler.js:325:22)\n    at NodeFsHandler._handleDir (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/handler.js:546:27)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async NodeFsHandler._addToNodeFs (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/handler.js:591:26)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/index.js:343:25\n    at async Promise.all (index 0) {\n  errno: -24,\n  syscall: 'watch',\n  code: 'EMFILE',\n  path: '/tmp/dsh-migrate-probe-UUatGw/profiles/probe',\n  filename: '/tmp/dsh-migrate-probe-UUatGw/profiles/probe'\n}\n\nNode.js v24.21.0"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "pass",
+          "fingerprint": "",
+          "detail": "[peer-bench] apply() executed\ndsh: TRANSPORT: DeepSeek API request to http://127.0.0.1:9/v1 failed"
+        },
+        "e2eBaseline": [],
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-13T13-00-22-732Z",
+      "startedAt": "2026-10-13T13:00:24.226Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.8",
+            "version": "0.1.0-rc.8"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "cards": true,
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 0,
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "fail",
+        "fingerprint": "exit1: EMFILE: too many open files, watch '<path>'",
+        "detail": "[peer-bench] apply() executed\nnode:internal/fs/watchers:323\n    const error = new UVException({\n                  ^\n\nError: EMFILE: too many open files, watch '/tmp/dsh-migrate-probe-UUatGw/profiles/probe'\n    at FSWatcher.<computed> (node:internal/fs/watchers:323:19)\n    at watch (node:fs:2608:36)\n    at createFsWatchInstance (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/handler.js:126:16)\n    at setFsWatchListener (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/handler.js:171:19)\n    at NodeFsHandler._watchWithNodeFs (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/handler.js:325:22)\n    at NodeFsHandler._handleDir (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/handler.js:546:27)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async NodeFsHandler._addToNodeFs (file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/handler.js:591:26)\n    at async file:///tmp/dsh-migrate-bench/plugin/.dsh-migrate/dsh/dsh-0.1.0-rc.8/lib/node_modules/@deepseek-ai/dsh/node_modules/chokidar/esm/index.js:343:25\n    at async Promise.all (index 0) {\n  errno: -24,\n  syscall: 'watch',\n  code: 'EMFILE',\n  path: '/tmp/dsh-migrate-probe-UUatGw/profiles/probe',\n  filename: '/tmp/dsh-migrate-probe-UUatGw/profiles/probe'\n}\n\nNode.js v24.21.0"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "pass",
+        "fingerprint": "",
+        "detail": "[peer-bench] apply() executed\ndsh: TRANSPORT: DeepSeek API request to http://127.0.0.1:9/v1 failed"
+      },
+      "e2eBaseline": [],
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-13T13-00-22-732Z",
+    "startedAt": "2026-10-13T13:00:24.226Z"
+  }
+}

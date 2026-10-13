@@ -1,0 +1,196 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "source-patch",
+      "verdict": "pass",
+      "reason": "Locates the patch declaration in cordis.patch.yml and patch.yml (target src/session/view/SessionView.ts, renderSessionView rename) plus scripts/apply-patch.mjs, explicitly contrasts source patching with ordinary plugin composition, and explains the private host-path/exact-text coupling needing revalidation against the target tag.",
+      "points": 10,
+      "awarded": 10
+    },
+    {
+      "id": "events",
+      "verdict": "pass",
+      "reason": "Locates the producer (ignorable:true informational event) and consumer at src/index.ts:15-22, correctly explains the corridor folding (A1-02 removal, A2-01 restoration, net state = keep the marker), clarifies it is omission-safe informational semantics not a required-event whitelist, and explicitly warns against assuming Session.append can persist the marker.",
+      "points": 10,
+      "awarded": 10
+    },
+    {
+      "id": "host-services",
+      "verdict": "pass",
+      "reason": "Locates both ctx.get('apiProxy') call sites (session.rename, llm.providers) at src/index.ts:25-32, notes apiProxy's removal, and correctly distinguishes host-plane domain-service injection (ctx.llm.listProviders) from the client-plane ctx.remote path without prescribing a nonexistent host remote service.",
+      "points": 10,
+      "awarded": 10
+    },
+    {
+      "id": "host-path",
+      "verdict": "pass",
+      "reason": "Locates the hard-coded homedir/.dsh/profiles/default path at src/index.ts:35-38, recommends runtime DSH_HOME/profile as source of truth, and correctly states --profile already existed before alpha.1 rather than being introduced by it.",
+      "points": 10,
+      "awarded": 10
+    },
+    {
+      "id": "ui",
+      "verdict": "pass",
+      "reason": "Locates both the private SessionView internal import (line 10) and the contributes.registerCommand registration (lines 41-43), and explains verifying owning modules/exports and public registration seams after the split, with pending-confirmation fallback instead of guessing new internal paths.",
+      "points": 10,
+      "awarded": 10
+    },
+    {
+      "id": "channel",
+      "verdict": "pass",
+      "reason": "Locates the loopback HTTP server (127.0.0.1:43121/api/legacy) at src/index.ts:47-54, explains that loopback binding does not exempt it from the bootstrap-token/cookie auth model, and distinguishes a raw createServer route from a host-managed authenticated Connection/Gateway channel.",
+      "points": 10,
+      "awarded": 10
+    },
+    {
+      "id": "subprocess",
+      "verdict": "pass",
+      "reason": "Locates both dsh --profile headless subprocess wrappers with stdout JSON.parse (src/index.ts:57-65 and scripts/apply-patch.mjs:11-18), explains stdout final text vs stderr reasoning/diagnostics separation, and correctly frames the JSONL assumption as a pre-existing wrapper bug rather than a new alpha.2 stdout change.",
+      "points": 10,
+      "awarded": 10
+    },
+    {
+      "id": "mapping",
+      "verdict": "pass",
+      "reason": "All located couplings are mapped to the correct cards: A1-03 for #1 and #5, A1-02+A2-01 for #2 with net-state folding, A1-01 for #3, A1-04 for #4 and the profile aspect of #7, A1-05 for the stdout aspect of #7, and A1-08 for #6 — each mapping is grounded in specific located code, not a bare list.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "limits",
+      "verdict": "pass",
+      "reason": "Explicitly states all seven categories hit with no no-hit remainder, acknowledges static-scan limits (no dependency-graph/config-surface proof), and proposes target-version build/typecheck, an isolated cold boot, and a core functional path without requiring execution of the fixture.",
+      "points": 10,
+      "awarded": 10
+    }
+  ],
+  "caps": [],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-9N3bILNaKYUdcXWweDXOAorq",
+    "usage": {
+      "prompt_tokens": 11291,
+      "completion_tokens": 1086,
+      "total_tokens": 12377,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 361
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "2462f984696af3b282aab4b3271998e9eb4503a6422338f3ecd041577497238a",
+    "response_sha256": "2769b095921071f0c0f5c24cdef5427f5f3117b05d62689dff02232b76c90af7"
+  },
+  "citation_audit": [
+    {
+      "report": "report.md",
+      "citation": "patch.yml:3-6",
+      "path": "patch.yml",
+      "start": 3,
+      "end": 6,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "cordis.patch.yml:2-6",
+      "path": "cordis.patch.yml",
+      "start": 2,
+      "end": 6,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "scripts/apply-patch.mjs:5-9",
+      "path": "scripts/apply-patch.mjs",
+      "start": 5,
+      "end": 9,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "src/index.ts:15-22",
+      "path": "src/index.ts",
+      "start": 15,
+      "end": 22,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "src/index.ts:25-32",
+      "path": "src/index.ts",
+      "start": 25,
+      "end": 32,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "src/index.ts:35-38",
+      "path": "src/index.ts",
+      "start": 35,
+      "end": 38,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "src/index.ts:10",
+      "path": "src/index.ts",
+      "start": 10,
+      "end": 10,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "src/index.ts:47-54",
+      "path": "src/index.ts",
+      "start": 47,
+      "end": 54,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "src/index.ts:57-65",
+      "path": "src/index.ts",
+      "start": 57,
+      "end": 65,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "scripts/apply-patch.mjs:11-18",
+      "path": "scripts/apply-patch.mjs",
+      "start": 11,
+      "end": 18,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "src/index.ts:20-22",
+      "path": "src/index.ts",
+      "start": 20,
+      "end": 22,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "src/index.ts:47-54",
+      "path": "src/index.ts",
+      "start": 47,
+      "end": 54,
+      "valid": true
+    }
+  ],
+  "reports": {
+    "report.md": "927f9717ff6dd76d0014f6e1b819994a12a2ee98be07c5e11c931eac27f68e12"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "eef702a513f80d606f41340e0c473f6867b80e50d66a71942135871666220f02",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

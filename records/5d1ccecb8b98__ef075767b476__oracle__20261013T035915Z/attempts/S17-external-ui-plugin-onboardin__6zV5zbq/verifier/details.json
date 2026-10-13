@@ -1,0 +1,78 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "whole-combo-attribution",
+      "verdict": "pass",
+      "reason": "Correctly ties the top-level ESM import in plugin/lib/client.js to the boot log's single classic-script combo (53 entries) and the browser compile failure: one syntax error fails compilation of the entire concatenated script so no entries register, and the named typert-registry entry is merely the first awaited victim, not the faulty bundle. Grounds the diagnosis in the boot log, browser error text, and the plugin bundle without overgeneralizing that ESM is invalid in all contexts.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "diagnosis-and-packaging",
+      "verdict": "pass",
+      "reason": "Recommends bisecting the cordis.patch.yml insert rows and statically parsing the suspect bundle as a classic script via vm.Script, explicitly noting node --check is insufficient because it accepts module syntax. Describes the ModuleLoader.load({id, factory}) wrapper with package-name id, host-provided React through require inside the factory, and inject/apply exports, matching the working-plugin-excerpt contract.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "cross-entry-slot-registration",
+      "verdict": "pass",
+      "reason": "Uses the apply-time error to explain that settings.section is declared by another entry and that cross-entry apply ordering is undefined, so a bare register races the declaration. Shows the exact deferred form ctx.slots.inject('settings.section', () => ctx.slots.register(...)) and correctly states registrants supply name/id/order (optional label) while kind/scope belong to the declaring entry and must not be re-specified.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "boot-restart-discipline",
+      "verdict": "pass",
+      "reason": "Grounds in host-boot-log.txt and restart-notes.txt that the combo is assembled once at boot with no rebuild on file edits or refresh, requires full host stop/start per iteration plus hard refresh, and explains EADDRINUSE as the orphaned node process tree retaining the port, remedied by taskkill /PID <pid> /T /F. The minor suggestion of verifying with dsh --version is inoffensive and does not undermine the core answer.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "host-and-author-prevention",
+      "verdict": "pass",
+      "reason": "Proposes host-side per-bundle classic-script validation before concatenation with culprit attribution in the boot log instead of blaming the first awaited entry, plus a clearer slot error hint. The authoring template/checklist covers the ModuleLoader wrapper, require-based React, inject/apply exports, deferred cross-entry slot registration, and full restart with Windows tree-kill discipline.",
+      "points": 20,
+      "awarded": 20
+    }
+  ],
+  "caps": [
+    {
+      "id": "contradictory-operational-advice",
+      "triggered": false,
+      "reason": "The report advises against bare top-level ESM, mandates slots.inject for cross-entry registration, forbids kind/scope on the registrant, and requires full host restarts rather than refresh/HMR; no contradictory affirmative advice appears.",
+      "total": 0
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-w2vXUyhFhzsKVnetzxZP6xhz",
+    "usage": {
+      "prompt_tokens": 4963,
+      "completion_tokens": 1049,
+      "total_tokens": 6012,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 462
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "45ea1bd3ad54c5022a063a940e3677856121def976ed9a70d68816eb554303a7",
+    "response_sha256": "ca7feccc4229cca206b458c9fedd6c76850f52f23194888c158c2965a403f71c"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "72a94255d102ce7fbf6c950efae3d3453b9d4c6b5b6d9725cb07fc9110f77793"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "c64101e573c8a79aa969c4d1a9a43b60cbdd5eed3a621d1b811f5f997de2884c",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

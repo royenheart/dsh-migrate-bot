@@ -1,0 +1,28 @@
+# Overlay on dsh-base + dsh-headless for the migrate profile.
+# Whole-row patches restated (cordis replaces config by id).
+- id: agent-default-model
+  config:
+    provider: !!js process.env.DSH_MIGRATE_PROVIDER || 'deepseek-official'
+    model: !!js process.env.DSH_MIGRATE_MODEL || 'deepseek-v4-flash'
+
+- id: llm-deepseek
+  config:
+    thinking: !!js process.env.DSH_MIGRATE_THINKING || 'enabled'
+    reasoningEffort: !!js process.env.DSH_MIGRATE_EFFORT || 'max'
+
+- id: headless-runner
+  disabled: true
+
+# The request decoration that sends the active plugin inventory to the model
+# provider. A migration session does not need it, and leaving it out keeps the
+# request smaller.
+- id: plugin-package-inventory-deepseek
+  config:
+    enabled: false
+
+- insert:
+    - id: dsh-migrate-runner
+      name: './migrate-runner.js'
+      inject: [headlessStartup]
+      config:
+        task: !!js ctx.headlessStartup.task

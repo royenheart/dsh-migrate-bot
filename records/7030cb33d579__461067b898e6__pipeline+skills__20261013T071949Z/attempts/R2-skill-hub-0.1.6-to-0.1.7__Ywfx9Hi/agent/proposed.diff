@@ -1,0 +1,4024 @@
+diff --git a/fixture/CONTRIBUTING.md b/fixture/CONTRIBUTING.md
+index edf7348..da85452 100644
+--- a/fixture/CONTRIBUTING.md
++++ b/fixture/CONTRIBUTING.md
+@@ -9,10 +9,17 @@ Thanks for considering a contribution to **dsh-skill-hub**. This project is a
+ 
+ Please keep both halves on official APIs — no dsh source patches.
+ 
++`patches/` is the exception that proves the rule: it holds *proposed upstream*
++harness changes for extension points this plugin still needs (the requests,
++evidence, and discussion links live in `.dsh-migrate/patch-reports/`). Those
++proposals are not applied by the plugin and are not prerequisites — every
++shipped surface keeps working through its documented fallback — so a release
++must build, typecheck, and pass its tests against an unpatched harness.
++
+ ## Layout
+ 
+ ```
+-src/index.ts            cordis plugin entry (config schema, settings namespace, stats wiring)
++src/index.ts            cordis plugin entry (volatile Config schema, settings presentation, stats wiring)
+ src/routes.ts           route-family aggregator (wraps every domain handler in the shared fences)
+ src/routes/             one file per domain + shared layers:
+                         http.ts (fences/JSON/error mapping), deps.ts (route deps + writable-skill
+@@ -20,6 +27,7 @@ src/routes/             one file per domain + shared layers:
+                         (origin collections), route-state.ts (throttles + import-job table),
+                         helpers.ts (barrel)
+ src/store.ts            sidecar store barrel (paths / migrate / store)
++src/legacy-config.ts    one-time read of the removed global settings.yaml hub section
+ src/skillfs.ts          writable-root file ops + barrel (skillfs/paths.ts, frontmatter.ts, scan.ts)
+ src/repo.ts             GitHub repo helpers barrel (repo/types.ts, discovery.ts, api.ts, install.ts,
+                         github-client.ts = shared request layer)
+diff --git a/fixture/README.md b/fixture/README.md
+index bfff686..d9b8171 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -24,9 +24,9 @@ dsh plugin --profile web add dsh-skill-hub
+ # restart dsh web → Settings → 技能 → Market → scan → import
+ ```
+ 
+-Requires `Node ^22.19 || >=24` + dsh web `>=0.1.6-alpha.2 <0.2`.
++Requires `Node ^22.19 || >=24` + dsh web `>=0.1.7-alpha.1 <0.2`.
+ 
+-Two surfaces — the hub panel lives at **Settings → 技能**, and the plugin's settings card lives on the plugin's own page in the **Plugins manager** (sidebar → 插件 → dsh-skill-hub). The card moved there in dsh `0.1.6-alpha.2`, when the Plugins manager replaced the old Settings → 插件 list; this plugin registers into the new location only.
++Two surfaces — the hub panel lives at **Settings → 技能**, and the plugin's settings card lives on the plugin's own page in the **Plugins manager** (sidebar → 插件 → dsh-skill-hub). The card moved there in dsh `0.1.6-alpha.2`, when the Plugins manager replaced the old Settings → 插件 list; since dsh `0.1.7-alpha.1` the card edits the plugin's own profile entry configuration (volatile Config fields, saved into the active profile's `cordis.patch.yml`), so it reads and writes the same values the host runs with.
+ 
+ ## Features
+ 
+@@ -77,7 +77,7 @@ GitHub repo ──scan/import──▶ ~/.dsh/skills
+                     /api/skill-hub/* ──▶ Panel (Settings → 技能)
+ ```
+ 
+-Host uses only `ctx.skills.snapshot/get`, `ctx.webServer.register`, `ctx.systemPrompt.section`. Loopback-only routes (`127.0.0.1`/`localhost`), JSON.
++Host uses only `ctx.skills.snapshot/get`, `ctx.webServer.register`, `ctx.systemPrompt.section`, and the plugin's own volatile profile Config. Loopback-only routes (`127.0.0.1`/`localhost`), JSON.
+ 
+ ## HTTP API
+ 
+@@ -119,8 +119,8 @@ npm run build      # tsc + tsdown → lib/index.js + lib/client.js
+ - `duplicate loader entry id: skill-hub` — remove the duplicate install (keep one `dsh plugin add` method).
+ - Skill missing — check the diagnostics section (frontmatter / name mismatch / short description).
+ - Empty source group — its skills were deleted, or their disabled records were lost (sidecar restored/hand-edited). Startup reconciles `.disabled` files on disk; source groups with no visible member are no longer rendered.
+-- Dots missing in `/` menu — dsh internals changed; catalog still works.
+-- Settings card missing — it lives in the Plugins manager (sidebar → 插件 → dsh-skill-hub), not under Settings. On dsh older than `0.1.6-alpha.2` this plugin contributes no config surface at all.
++- Dots missing in `/` menu — the core `/skill` trigger source could not be located (renamed or reshaped by a dsh update); the panel, catalog, toggles, and the menu itself still work. The dot rides the official candidate `icon` field, so only the source lookup can fail.
++- Settings card missing — it lives in the Plugins manager (sidebar → 插件 → dsh-skill-hub), not under Settings. On dsh older than `0.1.7-alpha.1` this plugin contributes no config surface at all (the profile-entry settings store it is built on arrived in that release).
+ 
+ ## Community
+ 
+diff --git a/fixture/README.zh.md b/fixture/README.zh.md
+index 80b5151..9221104 100644
+--- a/fixture/README.zh.md
++++ b/fixture/README.zh.md
+@@ -24,9 +24,9 @@ dsh plugin --profile web add dsh-skill-hub
+ # 重启 dsh web → 设置 → 技能 → 市场 → 扫描 → 导入
+ ```
+ 
+-要求 `Node ^22.19 || >=24` + dsh web `>=0.1.6-alpha.2 <0.2`。
++要求 `Node ^22.19 || >=24` + dsh web `>=0.1.7-alpha.1 <0.2`。
+ 
+-两个界面 —— 管理面板在 **设置 → 技能**；本插件的设置卡片在 **插件管理页** 的插件自有页面上（侧边栏「插件」→ dsh-skill-hub）。该卡片于 dsh `0.1.6-alpha.2` 迁到此处 —— 插件管理页取代了旧的「设置 → 插件」列表，本插件只注册到新位置。
++两个界面 —— 管理面板在 **设置 → 技能**；本插件的设置卡片在 **插件管理页** 的插件自有页面上（侧边栏「插件」→ dsh-skill-hub）。该卡片于 dsh `0.1.6-alpha.2` 迁到此处 —— 插件管理页取代了旧的「设置 → 插件」列表；自 dsh `0.1.7-alpha.1` 起卡片编辑的是插件自身在 profile 条目上的配置（volatile Config 字段，落盘到当前 profile 的 `cordis.patch.yml`），因此读写的就是宿主实际运行的同一份值。
+ 
+ ## 功能
+ 
+@@ -77,7 +77,7 @@ GitHub 仓库 ──扫描/导入──▶ ~/.dsh/skills
+                   /api/skill-hub/* ──▶ 面板（设置 → 技能）
+ ```
+ 
+-宿主仅用 `ctx.skills.snapshot/get`、`ctx.webServer.register`、`ctx.systemPrompt.section`。路由仅回环（`127.0.0.1`/`localhost`），JSON。
++宿主仅用 `ctx.skills.snapshot/get`、`ctx.webServer.register`、`ctx.systemPrompt.section`，以及本插件自己的 volatile profile Config。路由仅回环（`127.0.0.1`/`localhost`），JSON。
+ 
+ ## HTTP API
+ 
+@@ -119,8 +119,8 @@ npm run build      # tsc + tsdown → lib/index.js + lib/client.js
+ - `duplicate loader entry id: skill-hub` — 删掉重复安装（只留一种 `dsh plugin add`）。
+ - 技能不出现 — 看诊断区（缺 frontmatter / 名称不一致 / 描述过短）。
+ - 来源组空壳 — 组内技能已被删除、或禁用记录丢失（状态文件被恢复/手改）。启动时自动对账磁盘上的 `.disabled` 文件补记录；无可见成员的来源组不再渲染。
+-- `/` 菜单圆点消失 — dsh 内部触发源变更，目录功能不受影响。
+-- 找不到设置卡片 — 它在插件管理页（侧边栏「插件」→ dsh-skill-hub），不在「设置」里；dsh 低于 `0.1.6-alpha.2` 时本插件不提供任何配置入口。
++- `/` 菜单圆点消失 — 未能定位核心 `/skill` 触发源（dsh 更新后更名或改形）；面板、目录、开关与菜单本身均不受影响。圆点走官方候选 `icon` 字段，因此只可能卡在来源查找这一步。
++- 找不到设置卡片 — 它在插件管理页（侧边栏「插件」→ dsh-skill-hub），不在「设置」里；dsh 低于 `0.1.7-alpha.1` 时本插件不提供任何配置入口（卡片依赖的 profile 条目设置存储自该版本才有）。
+ 
+ ## 社区
+ 
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+index 77fff15..dbdef44 100644
+--- a/fixture/package-lock.json
++++ b/fixture/package-lock.json
+@@ -9,25 +9,26 @@
+       "version": "0.3.14",
+       "license": "MIT",
+       "dependencies": {
+-        "js-yaml": "^4.1.0",
+-        "schemastery": "^3.18.0"
++        "js-yaml": "^4.1.0"
+       },
+       "devDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-client-connection": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-client-locale": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-client-store": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-client-ui-input-trigger": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-client-ui-plugin-manager": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-client-ui-settings": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-client-ui-slots": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-host-webserver": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-query": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-settings": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-skill": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2",
++        "@deepseek-ai/cordis-plugin-loader": "^1.0.4",
++        "@deepseek-ai/dsh-client-connection": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-client-locale": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-client-store": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-client-ui-input-trigger": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-client-ui-plugin-manager": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-client-ui-settings": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-host-webserver": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-session": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-session-query": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-settings": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-skill": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.7-alpha.1",
++        "@deepseek-ai/schemastery": "^3.18.3",
+         "@types/js-yaml": "^4.0.9",
+         "@types/node": "^22.20.0",
+         "@types/react": "~18.3.1",
+@@ -36,7 +37,6 @@
+         "lightningcss": "1.32.0",
+         "react": "^18.3.1",
+         "react-dom": "^18.3.1",
+-        "schemastery": "^3.18.0",
+         "tsdown": "0.22.2",
+         "typescript": "~5.7.2",
+         "vitest": "^3.0.0",
+@@ -46,27 +46,24 @@
+         "node": "^22.19.0 || >=24.0.0"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.1 || ^4.0.2",
+-        "@deepseek-ai/dsh-client-connection": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-locale": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-runtime": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-store": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-ui-settings": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-ui-slots": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-host-webserver": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-session": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-session-query": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-settings": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-skill": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-system-prompt": ">=0.1.6-alpha.2 <0.2.0-0",
++        "@deepseek-ai/cordis": "^4.0.1",
++        "@deepseek-ai/dsh-client-connection": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-client-locale": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-client-store": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-client-ui-settings": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-client-ui-slots": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-host-webserver": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-session": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-session-query": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-settings": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-skill": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-system-prompt": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/schemastery": "^3.18.3",
+         "react": "^18.2.0",
+         "react-dom": "^18.2.0"
+       },
+       "peerDependenciesMeta": {
+-        "@deepseek-ai/dsh-client-runtime": {
+-          "optional": true
+-        },
+         "@deepseek-ai/dsh-client-store": {
+           "optional": true
+         }
+@@ -91,9 +88,9 @@
+       }
+     },
+     "node_modules/@babel/helper-string-parser": {
+-      "version": "8.0.0",
+-      "resolved": "https://registry.npmjs.org/@babel/helper-string-parser/-/helper-string-parser-8.0.0.tgz",
+-      "integrity": "sha512-6mJgmFFFIIO82vvoLt9XtRC7/TkzXfts1t/SpRX4IHSzMgqoPYCWesVu1udUPUWioAE/2fcG6WuI8zrkE1gwrg==",
++      "version": "8.0.6",
++      "resolved": "https://registry.npmjs.org/@babel/helper-string-parser/-/helper-string-parser-8.0.6.tgz",
++      "integrity": "sha512-+6HYEBnsDRZHJtUTAEfMQd0zMDqdFHS7C+5vAsEZqBUr3vEMWOWlHJ0Jz1gS8jJIlCvLsuA6ivmeoqzH936YcA==",
+       "dev": true,
+       "license": "MIT",
+       "engines": {
+@@ -127,23 +124,23 @@
+       }
+     },
+     "node_modules/@babel/types": {
+-      "version": "8.0.5",
+-      "resolved": "https://registry.npmjs.org/@babel/types/-/types-8.0.5.tgz",
+-      "integrity": "sha512-eVdMqi3ej5aHhyQ2Si6yD2cAWeV8FJK9UrhK5aL0Sd8hu5GhT+YswhVNbVheOGVYMg8kuGuMaUpkB3stjj4z8A==",
++      "version": "8.0.6",
++      "resolved": "https://registry.npmjs.org/@babel/types/-/types-8.0.6.tgz",
++      "integrity": "sha512-c+xgSWboV2pdwXP67BUWDVRHi2BO5Q3KwxyFVs7taVTY+fsK47/L51ZXQoV9rozHJDNHvJ4v4WEsI/IlxV2l2A==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@babel/helper-string-parser": "^8.0.0",
+-        "@babel/helper-validator-identifier": "^8.0.4"
++        "@babel/helper-string-parser": "^8.0.6",
++        "@babel/helper-validator-identifier": "^8.0.6"
+       },
+       "engines": {
+         "node": "^22.18.0 || >=24.11.0"
+       }
+     },
+     "node_modules/@babel/types/node_modules/@babel/helper-validator-identifier": {
+-      "version": "8.0.4",
+-      "resolved": "https://registry.npmjs.org/@babel/helper-validator-identifier/-/helper-validator-identifier-8.0.4.tgz",
+-      "integrity": "sha512-4wFaiLd0bVo4cIoTXI3zKI038NIWE/cr3jvBjejOVYVxV/m8Ltav1USiGzG1fmS5J2RhgEOgXNNK46cRPnRsrg==",
++      "version": "8.0.6",
++      "resolved": "https://registry.npmjs.org/@babel/helper-validator-identifier/-/helper-validator-identifier-8.0.6.tgz",
++      "integrity": "sha512-HYx0YmuchRxRSpnjvcNffnPS8DCauKNmnumIuHG3jnQAVewRA7kfJGwF13ayEpSZs7s4R/oBH4eppuXcAQd5JQ==",
+       "dev": true,
+       "license": "MIT",
+       "engines": {
+@@ -151,21 +148,21 @@
+       }
+     },
+     "node_modules/@deepseek-ai/cordis": {
+-      "version": "4.0.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.2.tgz",
+-      "integrity": "sha512-asOnXP1TzFSFQlHb1iegDZp0z/8WD1c7YNrwJR/Tx2bzNuMXfcekE/I67Iv6SQXeLB4csxqCngzQKANP7gdw0g==",
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.4.tgz",
++      "integrity": "sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/cosmokit": "^1.8.3",
++        "@deepseek-ai/cosmokit": "~1.8.5",
+         "@standard-schema/spec": "^1.1.0"
+       },
+       "bin": {
+         "cordis": "bin.js"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis-plugin-include": "^1.0.7",
+-        "@deepseek-ai/cordis-plugin-loader": "^1.0.3"
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
+       },
+       "peerDependenciesMeta": {
+         "@deepseek-ai/cordis-plugin-include": {
+@@ -176,417 +173,590 @@
+         }
+       }
+     },
++    "node_modules/@deepseek-ai/cordis-plugin-group": {
++      "version": "1.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis-plugin-group/-/cordis-plugin-group-1.0.4.tgz",
++      "integrity": "sha512-/7tuY5pMQetHava4v6QUeOa4CwZA+mleNvbIoj+iqEmzkYUtlXbLqhzJIcbnDa/Hxgr1jaCwROrI77nuLyeCFg==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      }
++    },
++    "node_modules/@deepseek-ai/cordis-plugin-include": {
++      "version": "1.0.9",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis-plugin-include/-/cordis-plugin-include-1.0.9.tgz",
++      "integrity": "sha512-Xmekm7u5Kpeym6nABL4T1/Mg6aQYFZxsipB0WycmCctvX1DqAv8nCFwRmg2XMx/f7EbZgNEbXQwJfabcMu8zxQ==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "js-yaml": "^4.1.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      }
++    },
++    "node_modules/@deepseek-ai/cordis-plugin-loader": {
++      "version": "1.0.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis-plugin-loader/-/cordis-plugin-loader-1.0.5.tgz",
++      "integrity": "sha512-200huL2ttWcjyeYllvPYn+qMR7I89qy8MhZasbHltPzB/KMrSfsyoCYKdCGc5KqPGj5iJugcmibQzjINMO9I+Q==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@deepseek-ai/schemastery": "~3.18.4"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "~4.0.4",
++        "node-addon-require-builtin": "^0.1.6"
++      },
++      "peerDependenciesMeta": {
++        "node-addon-require-builtin": {
++          "optional": true
++        }
++      }
++    },
+     "node_modules/@deepseek-ai/cosmokit": {
+-      "version": "1.8.3",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.3.tgz",
+-      "integrity": "sha512-qBo+ronVM6Eu2WNVJXi8JcMiqZ19T9BRIpV+5qJUFPXjGH/Z0QKcQMC/IZJ7L394YTOtJgcovbk9qP0w2GsBXQ==",
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
+       "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/@deepseek-ai/dsh-agent": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-agent/-/dsh-agent-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-XEOytfXmJG6dyHld3Np0IYRrVPJnuoKKx2yQ+o74a7cN89k+J61c33D7zIcDG5rLkF7sMNM608ZkhfCWJuTcjg==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-agent/-/dsh-agent-0.1.7-rc.2.tgz",
++      "integrity": "sha512-9U/zHZvZqRR5S2FD9fjjAuoMh+WfDan+bE/cLBLSLpqftjZ0FhIlEBK99yonUkNkGemyHiH/lL3jCKYw35ahJA==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-typert-protocol": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-invariants": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-scope": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-projection": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-system-prompt": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-typert-protocol": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-workspace": "0.1.7-rc.2"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/dsh-workspace": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-app-boot": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-app-boot/-/dsh-app-boot-0.1.7-rc.2.tgz",
++      "integrity": "sha512-d0QWMMXxT6kICO9QRrXTqJRKP6bWNes7SVGJK6OOEzX6Ua9mzCx1KghPIf7tjW/ZmX0b8n1FoySr4IHElBkrOg==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-atomic-write": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-package-manifest": "0.1.7-rc.2",
++        "@eslint-community/regexpp": "^4.12.2",
++        "ajv": "^8.20.0",
++        "js-yaml": "^4.2.0",
++        "node-addon-require-builtin": "^0.1.6",
++        "resolve.exports": "^2.0.3",
++        "semver": "^7.8.5"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/cordis-plugin-group": "~1.0.4",
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5",
++        "@deepseek-ai/dsh-home-paths": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-launch-environment": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-system-prompt": "0.1.7-rc.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-atomic-write": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-atomic-write/-/dsh-atomic-write-0.1.7-rc.2.tgz",
++      "integrity": "sha512-gdUVkVv5DXBgnEDB1Dh/lL+HV/8mKR3AGUqNjLhQJSEqE9MIYyiHC+3zwzaWjeWhiTdLXd5rkA4HVCiS3KIcUg==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-attachment": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-attachment/-/dsh-attachment-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-dv3s/FrFuZwmcBfWzWozj9khlb8LrFSCgz/spGsEg6l9zka1Wu3ZkHDcE+CRsM+fyCD/z/jTClMOkQ2DIMw5wQ==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-attachment/-/dsh-attachment-0.1.7-rc.2.tgz",
++      "integrity": "sha512-g2SQ12Ki1l28T/H+fZKtSWDFF5Y1gavcKVBb2X4eOVX5uT5Jwumx+9Svelp1pHaknuAE1N2Yt9tMwj2quMkhDg==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-brand": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-brand": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-brand/-/dsh-brand-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-Fx+GKwkTjTVf6drn888j7vF5ak0/6mxHDF1bYH4FBsRI+h/8UmPAgIV5fAfT63GqBSXdgmVe/hdzdmXS2nq6Eg==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-brand/-/dsh-brand-0.1.7-rc.2.tgz",
++      "integrity": "sha512-cvcvlNRuiFqZNNqyxdu7wcpiBjd9xa/0MpuhRvee43zBp9uED2p5JolZr5/2EKJf57gYx9k9bedb+Zbyiqnpkw==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-connection": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-connection/-/dsh-client-connection-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-M/5WNKgxrPm+Y5C2tDTQDGMmFRpk7jMdlKD2Hkg4HmzdTXr/O2VzCXdCiBHvB/AZEkvZa2FSNPa3fqcLkPdvyg==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-connection/-/dsh-client-connection-0.1.7-rc.2.tgz",
++      "integrity": "sha512-Wc2ANM5NO3Ri+p8wBoVnPxTYxz++zYSuEoVOhd498WMY779w0RCgWfRzHekPY5ftJX/G02qzWNHe0yBIoTpXXw==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-credentials": "^0.1.6-alpha.2",
+-        "@deepseek-ai/schemastery": "^3.18.2",
++        "@deepseek-ai/dsh-credentials": "0.1.7-rc.2",
++        "@deepseek-ai/schemastery": "~3.18.4",
+         "zod": "^4.4.3"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-scope": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-locale": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-locale/-/dsh-client-locale-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-n22prMdNVl+d7Bx/E16zhtTEXZqk9fUBRY7DScNem0kXftIwxuQCXQkOmDraNrbLUtA3WHPe6/4+8UpQ+1xIuA==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-locale/-/dsh-client-locale-0.1.7-rc.2.tgz",
++      "integrity": "sha512-zkRt/JrBvS7w1TPi/dOo0QCqjkcAApq7nNoeIL2lX0VlzwHD86Hrg/n/YJJlg1i0nvOEtZDibR9FGwa/X2wpvA==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/schemastery": "^3.18.2"
++        "@deepseek-ai/schemastery": "~3.18.4"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-store": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-store/-/dsh-client-store-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-TUAfEQkptbd41uDXlmrjqA4e4lQ/AFRZYXHSNSwkOZApfPUk4drJOGFlHBseWGwrjcS6kWknia28ubUM9WZdEw==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-store/-/dsh-client-store-0.1.7-rc.2.tgz",
++      "integrity": "sha512-8nF4gqy/3yvSN3KsuHX61DVP1Z2YjC93wkB2uGVS5xg4iyD1KgCqWB2S+fVAdQ7END9PDzWhZTk71AYnkSh7LA==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-ui-input-trigger": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-input-trigger/-/dsh-client-ui-input-trigger-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-vC1/xY8/abiZG/F/6ikGamqSiF/fQ/fbKy0SPPiHhqG3SSLQmYUs+Hk00fgufwUZnRkLOclR9w09afO08+gKdA==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-input-trigger/-/dsh-client-ui-input-trigger-0.1.7-rc.2.tgz",
++      "integrity": "sha512-m2uKSOFijUI7gW66LjsThuPbHt67ezvL+nfKL+IpoBSc5596/WFcj6HysFdiGBv0bv7Gd0pNXUVTOJ2Z6Jhg4Q==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-ui-plugin-manager": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-plugin-manager/-/dsh-client-ui-plugin-manager-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-DJuN13Jo5UN9LKjZLsOTAGMEQsRM7NSPW9/mBS8oCJUvbPSwqi1N1mNn1bHzNmiOCjPNBlNcH2XnZiT+BTRseg==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-plugin-manager/-/dsh-client-ui-plugin-manager-0.1.7-rc.2.tgz",
++      "integrity": "sha512-y2BlSTNqiFKxvtx86r/xaskWhjc6OYfHmtbJGI6BVfquqrHBhKeHJ7D1vNURamOFdouJjurWdc6UclrM/6D4OA==",
+       "dev": true,
+       "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/dsh-timeout": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-typert-protocol": "0.1.7-rc.2",
++        "@deepseek-ai/schemastery": "~3.18.4",
++        "zod": "^4.4.3"
++      },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-ui-settings": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings/-/dsh-client-ui-settings-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-90hotMS5Cdk2pYuOC/E4K9Giffze/UTGekXyB9yzsV2DSEaFAD0s0/Ie/NnVe8xmdTrLgFd2fxKTi6xDQIwooQ==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings/-/dsh-client-ui-settings-0.1.7-rc.2.tgz",
++      "integrity": "sha512-RAZXUt25mVibi2fnZyHhRArAtmNYIbyEUcAx/nc0i01V8dabnZkUCuGDRLjUeB4X6aPAOrlqLCliNcATuHD+hw==",
+       "dev": true,
+       "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/schemastery": "~3.18.4"
++      },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-ui-settings-plugins": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings-plugins/-/dsh-client-ui-settings-plugins-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-fQKzLhjdfRsN6kulAOdFF1wliyAPT1J19dgT1tMFRlO5RMZCpXHgh+O1cVh3o5hl3K/xGTHlWsQL3XtNB1hjmQ==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings-plugins/-/dsh-client-ui-settings-plugins-0.1.7-rc.2.tgz",
++      "integrity": "sha512-eLljHiQ6fR0K/yXDiHeyiWkCsmg1eQucoMAKcwerh8sjtyKPTpqLFQDmOn/O7znJz+b/V89yshkyyHw8ZvC38Q==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-ui-slots": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-slots/-/dsh-client-ui-slots-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-yvmMjjwcVgy+PuOPljdYcMuqrhL0fNzwjT7Ar0pPZ5Jv8WcRFJGeo7s8vrW6/V1dcQyhgvPGvz+ozSu8MUmwUw==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-slots/-/dsh-client-ui-slots-0.1.7-rc.2.tgz",
++      "integrity": "sha512-83cd5owHfNMGIc5THEkMw1L6iKj/tl2m3thQhVGWp2p3Y+QAPh2hIrIQCNI+i97cH+7SsIsUIoCIoB0mu51aqQ==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-commands": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-commands/-/dsh-commands-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-u90h9UUy5maUzmNZJn3jRjqFXKzvWMIX6RtD4YDy0sJsEFBkZTupBO4cITNd8w4s3tYBKSUAltZqxgxSE4Ngaw==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-commands/-/dsh-commands-0.1.7-rc.2.tgz",
++      "integrity": "sha512-wVAHwHNDLDNBKXJZU2rHnwc+e3mhi6EuazAfJmqtbzU/ldQVEoJ9f5eXqesBcdQbRIrWQlpjfjdlw3nCJfK2HQ==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-crypto": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-util-crypto": "0.1.7-rc.2",
+         "zod": "^4.4.3"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-attachment": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-typert-protocol": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-agent": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-attachment": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-brand": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-invariants": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-scope": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-typert-protocol": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-compaction": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-compaction/-/dsh-compaction-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-jS580ZgaBOX9XjcEXetcSowuUeNK249HUuxJMpNL7JjPz2q+IwQYE4UDRNjAyBaArMp24rc2RhGJYdfse8k1ZA==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-compaction/-/dsh-compaction-0.1.7-rc.2.tgz",
++      "integrity": "sha512-NOrFYDM6EdvO+UBioNcpiZ+Klv5v2xvOxLXDWKtA0rjKKW8IvW7Rui2hBnOpchsWe5So5vwBvu4lNjTdl5/2CA==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-commands": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-brand": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-commands": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-invariants": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-compaction-image-offload": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-compaction-image-offload/-/dsh-compaction-image-offload-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-mYJjxjbq48nHeExbvdsDuXlxG9FnA8wtS4zqH2TP/d6AiMYIZOVkEpVA6Fk94Vcr310XcALPwv4pl5PU0GHE3w==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-compaction-image-offload/-/dsh-compaction-image-offload-0.1.7-rc.2.tgz",
++      "integrity": "sha512-IraXZq6uR88RbJcxkK7vfDViIB4WCxm8Kf9s43VWoias9Tr//w0s8oHZWTfNuy8kVgpw4cBze6DeExZooMALrw==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-compaction": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-agent": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-compaction": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-config-editor": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-config-editor/-/dsh-config-editor-0.1.7-rc.2.tgz",
++      "integrity": "sha512-UgNqOUqI9ZNABnb7TvoJ9d6EbaScVymL54YV/s8rU06cl4bTKuz/ahA8uLclyutCoRANkwh/eMiA+othLyhooA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/dsh-atomic-write": "0.1.7-rc.2",
++        "js-yaml": "^4.1.0",
++        "yaml": "^2.8.1"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5",
++        "@deepseek-ai/dsh-app-boot": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-hmr": "0.1.7-rc.2"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/dsh-hmr": {
++          "optional": true
++        }
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-credentials": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-credentials/-/dsh-credentials-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-xfUX30VlsXCLX+5/99AXIKQXEUXaW1pe1wJXKohj+OnMZWYBZGXpSlEpquiUaINgifs129lHCCFGbLWhr3wmWA==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-credentials/-/dsh-credentials-0.1.7-rc.2.tgz",
++      "integrity": "sha512-Zi5MCL+o2bphuvWcfFsaRmg6eIafkjCa758+DVB2ac2tt5hzXLoKhwSku4YVhvhZYJan8TP87abIzyGr5z1X5g==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-brand": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-invariants": "0.1.7-rc.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-home-paths": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-home-paths/-/dsh-home-paths-0.1.7-rc.2.tgz",
++      "integrity": "sha512-LafnefS9IttUziet9cQfCNfyBVce+aCPBGFrZGxsQJZYZXvkDQH94QHzDIxOIJfwwHuKC36fP5riD+Eajpx5jw==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-host-webserver": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-host-webserver/-/dsh-host-webserver-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-lq4BAR25yg3N6niq3kujWvxrYrcAqvZF/Xz3AuHbJPUiZkYQ5P3lWPl5LxmWpnPh8FJwW4yHNXg93gvV7l99iQ==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-host-webserver/-/dsh-host-webserver-0.1.7-rc.2.tgz",
++      "integrity": "sha512-0ex5NsJFvpqchfnar/IPtNOG5Tx7PmtUO3/zVptT4MJs5OOrvtjNYHpZ6DGntmnpupgXnci1cUsQJIfG3D+U+Q==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/schemastery": "^3.18.2",
++        "@deepseek-ai/schemastery": "~3.18.4",
+         "compression": "^1.8.1",
+         "negotiator": "^1.0.0"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-invariants": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-invariants/-/dsh-invariants-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-YS4DysoPqwFx02istRp2FHN8XmJPRoPDc+pu56b/UtHovqIFzcX4QepQ4yRESDQ4SOO44KZBg72RxXma/9ziVw==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-invariants/-/dsh-invariants-0.1.7-rc.2.tgz",
++      "integrity": "sha512-GY2lY2TUUH2Qk1ZnrB3Q5+lXSh4webn1kbt5nQfhojVmNbist/f3dJC8JJa7XXOUNvqAgqRN9IZ4egbDZ9LLxQ==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/schemastery": "^3.18.2"
++        "@deepseek-ai/schemastery": "~3.18.4"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-launch-environment": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-launch-environment/-/dsh-launch-environment-0.1.7-rc.2.tgz",
++      "integrity": "sha512-i8U15ebCS4tWtL2mnuhfl0h5XXBagtbiGO63/OMeHpfWb5sHUvTYBNWTDxmlMjLDkTNQgPsXmRl0UrbWKCSJwg==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-llm": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-llm/-/dsh-llm-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-kIQoqnD6jN3Z2qQ+gd0TrIwkEDfUZAPC3kkTUUv2yQm1GeDjB7JULwT1vGAKTbEqOhOpVfKhdp4wItpG5PclfA==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-llm/-/dsh-llm-0.1.7-rc.2.tgz",
++      "integrity": "sha512-hNT3ovFnbNDQ8g544bh2Q9ORX40aI6Y+jhjer1lETeHS4g0jTjqUUVfARCTA7uAFvHucSBg2rFgbisIktmJCxw==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-timeout": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-typert-protocol": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-util-crypto": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2",
+-        "@deepseek-ai/schemastery": "^3.18.2",
++        "@deepseek-ai/dsh-brand": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-timeout": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-typert-protocol": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-util-crypto": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2",
++        "@deepseek-ai/schemastery": "~3.18.4",
+         "zod": "^4.4.3"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-package-manifest": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-package-manifest/-/dsh-package-manifest-0.1.7-rc.2.tgz",
++      "integrity": "sha512-oS6OD0emk+HD25B8FomvuAkqCg0aEooQEs/Tk7sZj9ww0uMXwYtU69Wnh4rFBQzp8pkZBYv9HeIzw67iBwDH0w==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-ptc-runtime": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-ptc-runtime/-/dsh-ptc-runtime-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-A5WjgPaEGqjzbe3Qq6Q4Dxh7FMmiki6beFEDmR9M64n6+g97eHPWF7jA7HRTEJ3rYD0kOno6bRWd84tngA5NWQ==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-ptc-runtime/-/dsh-ptc-runtime-0.1.7-rc.2.tgz",
++      "integrity": "sha512-zRFwSSUgTpKuFQTVwnuNO4067Gyi//4C4RRLaUntXaHkZv3z1S07f1fTaYwX4+ubIIAuAVeEsczxf6tPgZ8P5g==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-sandbox": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-sandbox": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-sandbox": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-sandbox/-/dsh-sandbox-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-WQ718npnJI1htC++wGxBll7iFlaOfgS1PpN+SoVzL39BcYuqp6zGP5CuLlxIIjz4uMs8bMbeQkk3MSl/mBV72g==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-sandbox/-/dsh-sandbox-0.1.7-rc.2.tgz",
++      "integrity": "sha512-7aP893mtTvnuZfCKD6hUN5gYchi6Wogn4W3mg/rGMvogmhbWgrCs00boJx/eHK4KvVJmEW1e8kO5N+GtsesptA==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-sandbox-policy": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-sandbox-policy/-/dsh-sandbox-policy-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-yeLbgxCuCl5xUA1/eAzduBl82/WQuBNmNqYddMMNgSp79Vpb6YcvDY8Q0DC00Uaviz8rpPgQ91K60biU4p4FAQ==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-sandbox-policy/-/dsh-sandbox-policy-0.1.7-rc.2.tgz",
++      "integrity": "sha512-pIhCaOEqYjNoKy/c7dYYgYzK+zp8/FxnEeaBA5e6fTmNROb+/qSFsC4hY3Qu+PVU9IdbH/4fa6TbT2jnqoDPQw==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/schemastery": "^3.18.2",
++        "@deepseek-ai/schemastery": "~3.18.4",
+         "zod": "^4.4.3"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-sandbox": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-agent": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-invariants": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-sandbox": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-projection": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-system-prompt": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-scope": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-scope/-/dsh-scope-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-nbh9kxekeiZPYVG2Up3ufJsDZRHrXaBqOGutERMBw1IfFjE8EXZReDQV9F8qP1hQKIF1xkxFcGaPcFPbxJwDAw==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-scope/-/dsh-scope-0.1.7-rc.2.tgz",
++      "integrity": "sha512-rk/OM5ej6/V8pCNczEqQ3BkKx3DuPeFGzNUsEZo8hF+tnkF/EhsxMWSXC/yP/uLKeNkSsVHzjFpaQR0qr0J3gQ==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-invariants": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session/-/dsh-session-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-WQNriZEQb0ykg+SDvqvNbp/AmG/DnydY5YdkTm5u3ST+PNXSQDLkaFzlY2YFU6hEuzs1h0yGCw6qPVpVGDAm1g==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session/-/dsh-session-0.1.7-rc.2.tgz",
++      "integrity": "sha512-0dXv1t4Zox/yHkZ4PfPNSBWJfIc72PDqOvjz43EMoHpbmoKTVpit2UpUI+yTtX01e4MVBbDMxBZ95oJW/Oydnw==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-brand": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-scope": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-format": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format/-/dsh-session-format-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-KM1VvrasXgi3Hs5Y1d2NhIVetUnP9wzaecghsXTsGH1NfZ12bYvMB5nmtVgqp2vYrnqZVn8IuOJHSR8AlBa7yQ==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format/-/dsh-session-format-0.1.7-rc.2.tgz",
++      "integrity": "sha512-ayk2VoX3r7m8U9rVc+F70qx76Eq3Mi3ToLySi29hDZPFLy8ujjSOO5LVCC1xmon8uukfcnScvElNPoP/mKTkBg==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-format-catalog": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-catalog/-/dsh-session-format-catalog-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-+++F17ZVq1FaH/vMlAUfs2P0eQHvBpntrCbfTcjkUd6wt6bmgXwtLS3rJhtyOeZ/+9yaBg5kJF7nn2Rm3PdNDA==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-catalog/-/dsh-session-format-catalog-0.1.7-rc.2.tgz",
++      "integrity": "sha512-PMwm6M713ZWMqV0NVRFGeP0eYoBBCe0n4l5k8g1sRI+e2wD5xVoTEn8ZduG0vxnrVrGneJRDPQjZ4TiMi/fgDw==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-compaction-image-offload": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format-v0-to-v1": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format-v1-to-v2": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format-v2-to-v3": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-compaction-image-offload": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v0-to-v1": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v1-to-v2": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v2-to-v3": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v3-to-v4": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-format-v0-to-v1": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v0-to-v1/-/dsh-session-format-v0-to-v1-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-ICKbie7Db+FgjYkdUTx8gD0M4UjDMXdrvxIyIEbxggfG9s92bMEG9m6l9vd+yCeKWiguJNsL21fZfAAU8aeRcw==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v0-to-v1/-/dsh-session-format-v0-to-v1-0.1.7-rc.2.tgz",
++      "integrity": "sha512-2JjUnl5+00N8/eda1s47VXP8wEl0HFqLRKk3MgEcRb6PEH3NH3Mvxb6jmkF6EeH0mMLLvzYHbpfDazOhECkXRg==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-session-format": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-format-v1-to-v2": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v1-to-v2/-/dsh-session-format-v1-to-v2-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-Gx4ucbohIyFsdtXvKofN8hBe1Wp7nL2L7BeUH9JA4U6k417MhFTCu7fx3cTEbGl7keVLz2vjnshjNqhhotpLbg==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v1-to-v2/-/dsh-session-format-v1-to-v2-0.1.7-rc.2.tgz",
++      "integrity": "sha512-a7Rsv7z2zeIyWpwRWkdtbi1T8r9zBGvbcoQVQEPpmpMFH9qu5hZmzYUGNFS1qRW5KW2cZoOU+qRxHwRoKI0dcQ==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format-v0-to-v1": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v0-to-v1": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-format-v2-to-v3": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v2-to-v3/-/dsh-session-format-v2-to-v3-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-eLpl5/mBOBsF6iIUQgegr5wLx50BdST31fDPlf1FwelqTVcIPybQftsjrz2Ezb0JSVRscVwvh2gqI6Pn3Qb2IA==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v2-to-v3/-/dsh-session-format-v2-to-v3-0.1.7-rc.2.tgz",
++      "integrity": "sha512-che+x4X57f4MPWYWjj3UkcDs4qU0sQspUvy0Ie8w+iMFPkH0C7f/629l6ubZXRFrGF/k6djbyLR/NYH7nArZaA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/dsh-session-format": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v0-to-v1": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v1-to-v2": "0.1.7-rc.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "~4.0.4"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session-format-v3-to-v4": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v3-to-v4/-/dsh-session-format-v3-to-v4-0.1.7-rc.2.tgz",
++      "integrity": "sha512-PpGsFntVbc6HEnIlTRMluk55YPAFGmbz7SSyYMXDaz7N+jzWTa54AuMg9gUthHxPwZyj7KF2QtJAJnSQ2+GPGw==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format-v0-to-v1": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format-v1-to-v2": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-session-format": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v2-to-v3": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-projection": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-projection/-/dsh-session-projection-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-ig+XpRxv5N+gSpfy3IajvG5AlFm2UKfTKqqtem4DXwxCHIPoRbZnYWgwd/qFIl1bNNJHL6z1zjnOGGNeO640GA==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-projection/-/dsh-session-projection-0.1.7-rc.2.tgz",
++      "integrity": "sha512-s5T8oHBEh+GeOTJ+wehD4CGZkTiWgczZZA+NDbfbqUO0k5L+dk0kk3fN+/srAg77rhR7UeeDSR8ZNcpYx/VUdw==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+@@ -594,29 +764,29 @@
+         "zod": "^4.4.3"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-query": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-query/-/dsh-session-query-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-rB/Kss4VtN4H+MZx1n/nToppl95+0lihrnJw3cJqN8mRz9ytqcpHPhoQh7P6LQlM6R9nI5ou6XUr79hsDPkqog==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-query/-/dsh-session-query-0.1.7-rc.2.tgz",
++      "integrity": "sha512-dS9+GFdXBS0UWiSMiloD6IpSb7cDy7ig//h0LaGZAro8xcfs+rY+78Eu5JKrTObTCTL4p6x70cxAJdbRaIxzGw==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-session-format-catalog": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-session-format-catalog": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-persistence": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-projection-cache": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-title": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-tool-todo": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-brand": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-persistence": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-projection": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-projection-cache": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-title": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-tool-todo": "0.1.7-rc.2"
+       },
+       "peerDependenciesMeta": {
+         "@deepseek-ai/dsh-session-persistence": {
+@@ -631,191 +801,198 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-title": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-title/-/dsh-session-title-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-NZnEDIAUBEn8CFYFtZ+vB7SruoCAaLrZ9Xhqpbl8e/6/glx3jm7ZOlwdwVh9FhM/69yfOgfscuT4a+mV4dqG7g==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-title/-/dsh-session-title-0.1.7-rc.2.tgz",
++      "integrity": "sha512-UsbFH2ESc8lY2YgSb9OPsXOBryOc7qq0f57FYccb3yOAez27afERWwvcPGZY8D9YTJKZCf0Q3ae/NZMQU15AJA==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2",
+-        "@deepseek-ai/schemastery": "^3.18.2",
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2",
++        "@deepseek-ai/schemastery": "~3.18.4",
+         "zod": "^4.4.3"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-agent": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-brand": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-invariants": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-projection": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-settings": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-settings/-/dsh-settings-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-ty9zaulN2ceHJHahQ+D42fIpFCOxluY+AFVWJbkMJukdFcZEiWGucRxDwmgsoUt8ob/pkRnk0BBCTG0TI/FdIQ==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-settings/-/dsh-settings-0.1.7-rc.2.tgz",
++      "integrity": "sha512-xS48//SMs3xp5qI+brj0T4BsJ1vgcv2LteZO6lW4X0YZVUOIe6H9aS2sRPh2OAWTFHrzPep4NwVkAOCD8NvBzQ==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5",
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@deepseek-ai/dsh-config-editor": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2",
++        "yaml": "^2.8.1"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/schemastery": "^3.18.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-brand": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-invariants": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2",
++        "@deepseek-ai/schemastery": "~3.18.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-skill": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-skill/-/dsh-skill-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-Ycq+5JrKDd1gU3KErnra6s6mL5qaXGdJX66+A9085M6JxSCBMqsb/Fhgh2nnk/D5vV6p7XSE8CEYPISMtXo/TA==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-skill/-/dsh-skill-0.1.7-rc.2.tgz",
++      "integrity": "sha512-m1SFnBjx8F4upZObk13d3MC6QsiNA3kWHJ5dOZu+Z9oB5BudzNnFJWXZf2gcZclWai9lOiKxCb1ibPio1inwUg==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2",
+-        "@deepseek-ai/schemastery": "^3.18.2"
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2",
++        "@deepseek-ai/schemastery": "~3.18.4"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-scope": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-system-prompt": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-system-prompt/-/dsh-system-prompt-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-nP+gpLPy4S1c8Rv3uZpmYB6J7gnMBwmehYWd/3oqPTWtcezj0L5opFkdfzrCrwEQLPgnTRgmr99OnBaJy2vZSQ==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-system-prompt/-/dsh-system-prompt-0.1.7-rc.2.tgz",
++      "integrity": "sha512-vxKcADh7XOuWJOfa0WeEOhvFiUbMOdoK4w6M7KVCI0S99c9ktxrgY4wKdmAxap+nQjwTEPme3QuOlY3Na+cz9w==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/schemastery": "^3.18.2"
++        "@deepseek-ai/schemastery": "~3.18.4"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-invariants": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-scope": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-timeout": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-timeout/-/dsh-timeout-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-Hdcv+GMyfJVENm7CFEjztwbpDfsND10HZ+Q/9Nnw5UqlCkyQd8alhW+I2xIDTZQVvlDnRcu6l8ix1k2OOmiFSA==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-timeout/-/dsh-timeout-0.1.7-rc.2.tgz",
++      "integrity": "sha512-YunLoLZSF8Ld9eYwyvKoBnxgy3GZrIQpw98HfFS15ZfZlqcFiZcchFhYmStLtUbtX+gjhoeXc8Xz913YbVifNA==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-tool-todo": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tool-todo/-/dsh-tool-todo-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-iPQW6ahvKzDKwTrPUNb0qqZ2Gxzp2hfT9yErIdTPVMyh/njBeT0Zv/PML0Iul5uieYhr8lFqksNlvphXMfyMzQ==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tool-todo/-/dsh-tool-todo-0.1.7-rc.2.tgz",
++      "integrity": "sha512-W5H6XKw7C9MzEtq+tliiAe2cI8hkbg1QA/yJLpRnm2z0xPZwaaX3I3o76gJa6tQPY7TvkFu8WQYOwtToAI8fwA==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/schemastery": "^3.18.2",
++        "@deepseek-ai/schemastery": "~3.18.4",
+         "zod": "^4.4.3"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-tools": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-agent": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-invariants": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-projection": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-tools": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-tools": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tools/-/dsh-tools-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-twRy/AffES124neGEpDLHjOTgcmWi8HtisTdTIm1b144LdEUBfU604A5N65muE+GfECDzyDKK/jJeLGuosMx2w==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tools/-/dsh-tools-0.1.7-rc.2.tgz",
++      "integrity": "sha512-c3dTdKnslKxVTgjjPLwMKLqGUMwnZH5P8RUsucMQlWn2GViyFW/+5AIUuZHBjjE6Y7NAYl+lVVE/R4LgTp5KWA==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2",
+-        "@deepseek-ai/schemastery": "^3.18.2"
++        "@deepseek-ai/dsh-brand": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2",
++        "@deepseek-ai/schemastery": "~3.18.4"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-ptc-runtime": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-sandbox": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-sandbox-policy": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-user-approval": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-agent": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-invariants": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-ptc-runtime": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-sandbox": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-sandbox-policy": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-scope": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-system-prompt": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-user-approval": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-typert-protocol": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-typert-protocol/-/dsh-typert-protocol-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-rC0XtllnwXXr+956y5r9E1CQIe/BA7AoNVZVW3+4srF7i4BoH90j64g4c3U+KsNLFC4dCOufNJ15kXKrMLMauQ==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-typert-protocol/-/dsh-typert-protocol-0.1.7-rc.2.tgz",
++      "integrity": "sha512-oJm03zqMQlvt16Ejw7VWy3/gqlJGrBCZj3Z4KL8ydLJeeTToKIR49WVCxMbJTlH0F9QFljruLtHguA5B99AeUQ==",
+       "dev": true,
+       "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "0.1.7-rc.2"
++      },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-user-approval": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-user-approval/-/dsh-user-approval-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-PMV8LOBoO3xwXpxDHBhh7PHHSqxHCn8YmzTMeGA2VNCSsL4e4KHLuVMUKyhpsny6KdP8Y2GjBHaKg2ZxLuEbnA==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-user-approval/-/dsh-user-approval-0.1.7-rc.2.tgz",
++      "integrity": "sha512-RQ6GB+C4G6VY/eJrFfS89+89DfHFAJ5G1abhmutfKBhZcYSnGNZyPIzpr5mKbl2xNMIhvCJOb9WiFz2fUPW2HA==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/schemastery": "^3.18.2"
++        "@deepseek-ai/schemastery": "~3.18.4"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-agent": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-brand": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-invariants": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-scope": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-system-prompt": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-util-crypto": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-crypto/-/dsh-util-crypto-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-Jn+3w5pp+rBOSFekvtNWQAx2+M08ZxJmlVYn7OI6l5Gd9ISq4/T0v4yE07O9s7uU5zr7yZ9nq5CTUpcXCrBrxw==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-crypto/-/dsh-util-crypto-0.1.7-rc.2.tgz",
++      "integrity": "sha512-BGc55/bSj/1LcDTQ5fpok4U24X9SFyN+TB23/hBlbe2TBUKVuwO8+X5FFKKje2MLO8PWYEDkXv/LrV6jRVKZEg==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-util-values": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-9p+4ffFjq7OIeYqvHlIhKs85MZrirdu9QYi+vknOwkgszZXAgoRbPnX0ZzhsTneFSqQgLEfBXtUHUtOI1iiB/Q==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.7-rc.2.tgz",
++      "integrity": "sha512-UX8nh5SbtZcPVVEvjd+9PCPcbybA6OpVzJGgFxYn59ao/7QQGyYbByS8KXr+THU5JtqmDDVb9xGUSJaF2IYmeQ==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/schemastery": {
+-      "version": "3.18.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.2.tgz",
+-      "integrity": "sha512-njDtZsznjYxok7KLLlHOPyuv2efdWVbSflAHgztSfbMsg+CVraEoRe2DjOCgClYv3ZCSm7WXoaUkbB/+RY7tWQ==",
++      "version": "3.18.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.4.tgz",
++      "integrity": "sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/cosmokit": "^1.8.3",
++        "@deepseek-ai/cosmokit": "~1.8.5",
+         "@standard-schema/spec": "^1.1.0"
+       }
+     },
+@@ -1295,6 +1472,17 @@
+         "node": ">=18"
+       }
+     },
++    "node_modules/@eslint-community/regexpp": {
++      "version": "4.12.2",
++      "resolved": "https://registry.npmjs.org/@eslint-community/regexpp/-/regexpp-4.12.2.tgz",
++      "integrity": "sha512-EriSTlt5OC9/7SXkRSCAhfSxxoSUgBm33OH+IkwbdpgoqsSsUg7y3uh+IICI/Qg4BBWr3U2i39RpmycbxMq4ew==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
++      }
++    },
+     "node_modules/@jridgewell/gen-mapping": {
+       "version": "0.3.13",
+       "resolved": "https://registry.npmjs.org/@jridgewell/gen-mapping/-/gen-mapping-0.3.13.tgz",
+@@ -1342,6 +1530,9 @@
+         "x64"
+       ],
+       "dev": true,
++      "libc": [
++        "glibc"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1352,9 +1543,9 @@
+       }
+     },
+     "node_modules/@napi-rs/wasm-runtime": {
+-      "version": "1.2.4",
+-      "resolved": "https://registry.npmjs.org/@napi-rs/wasm-runtime/-/wasm-runtime-1.2.4.tgz",
+-      "integrity": "sha512-AJxoUD2/15ESHbvpcyjU274nsAPLuOtPHCk0vKJM5pj//Fg/B1FXNWjPnXTT9PymCYYiHo4zPj0ZomXBKhoy7g==",
++      "version": "1.2.5",
++      "resolved": "https://registry.npmjs.org/@napi-rs/wasm-runtime/-/wasm-runtime-1.2.5.tgz",
++      "integrity": "sha512-HshSvXzmBxNzqejd3k/KemgQ3hdREUYFRRrgxOZ+gPljDIsO2SDZrVZMd4Z/HsxudQbE62OVyVFE8z9BCurfjA==",
+       "dev": true,
+       "license": "MIT",
+       "optional": true,
+@@ -1489,6 +1680,9 @@
+         "arm64"
+       ],
+       "dev": true,
++      "libc": [
++        "glibc"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1506,6 +1700,9 @@
+         "arm64"
+       ],
+       "dev": true,
++      "libc": [
++        "musl"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1523,6 +1720,9 @@
+         "ppc64"
+       ],
+       "dev": true,
++      "libc": [
++        "glibc"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1540,6 +1740,9 @@
+         "s390x"
+       ],
+       "dev": true,
++      "libc": [
++        "glibc"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1557,6 +1760,9 @@
+         "x64"
+       ],
+       "dev": true,
++      "libc": [
++        "glibc"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1574,6 +1780,9 @@
+         "x64"
+       ],
+       "dev": true,
++      "libc": [
++        "musl"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1661,9 +1870,9 @@
+       "license": "MIT"
+     },
+     "node_modules/@rollup/rollup-android-arm-eabi": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-android-arm-eabi/-/rollup-android-arm-eabi-4.63.3.tgz",
+-      "integrity": "sha512-w3Jnvi1ocaVm/c7yVPpfB98XeSRBMyzp6njL5MVVbGyXjpmUkN+s6Hp4t0PqhGCCaI1ZHMKXt/w0lA1RCaLVcw==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-android-arm-eabi/-/rollup-android-arm-eabi-4.64.5.tgz",
++      "integrity": "sha512-MrfgRQSpD5hkkRg6XI16B6EDLb+6+xp8xje6bpdSwkYw+qxrBKbUVrRAQu9h82UT+QumSIVQ8HXsXjPd2dlhqw==",
+       "cpu": [
+         "arm"
+       ],
+@@ -1675,9 +1884,9 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-android-arm64": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-android-arm64/-/rollup-android-arm64-4.63.3.tgz",
+-      "integrity": "sha512-uI/ESiaIbbRYAEhzy8PCUWDp1hB0bjAqM06mW9flOoNO4Q8DQpeoREhBR5Hegfl+wpXiguyJv6XSPzEN7OxyHQ==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-android-arm64/-/rollup-android-arm64-4.64.5.tgz",
++      "integrity": "sha512-+uu2p/R9Tzn8GpoQyX1pAo5dmKT1DhXevfaCzqzmPFhnLjHLWw7uWkaVGlxmhwYoRiYYhsGfRcD5cTBpL7rgSw==",
+       "cpu": [
+         "arm64"
+       ],
+@@ -1689,9 +1898,9 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-darwin-arm64": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-darwin-arm64/-/rollup-darwin-arm64-4.63.3.tgz",
+-      "integrity": "sha512-oxhrd1jmXLwWZ83eQYDXxuqRdkqkzrjR3JobKeuUyfdNZo11FuQIvqEOZhyIT7OBHxXoGslDDjN0cQcM6T0TqQ==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-darwin-arm64/-/rollup-darwin-arm64-4.64.5.tgz",
++      "integrity": "sha512-17dys+YEmzwzzFVHQAVDONg5FALXY9kd99HFEpfk4gJVHYxoh5bGea3D4t1fXXnwkTcOe25wPyd6nWS0I8IdLQ==",
+       "cpu": [
+         "arm64"
+       ],
+@@ -1703,9 +1912,9 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-darwin-x64": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-darwin-x64/-/rollup-darwin-x64-4.63.3.tgz",
+-      "integrity": "sha512-7/YiIMghVE8DrxKvNdorAaJVdriOFgOIpdStnPx8ppx5zfTwC3jBCSEAIzB7JD5404m65THl6H93UTTVUvypmg==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-darwin-x64/-/rollup-darwin-x64-4.64.5.tgz",
++      "integrity": "sha512-wg0zQEKkEvFZf1UaaX1UELOoPs//OSKUG7D+yITuqOsAvza7LvHTv5Wu4nmMfzNG7EYI2jp2PJC7Id6OETmsYQ==",
+       "cpu": [
+         "x64"
+       ],
+@@ -1717,9 +1926,9 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-freebsd-arm64": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-freebsd-arm64/-/rollup-freebsd-arm64-4.63.3.tgz",
+-      "integrity": "sha512-GXFZRRoMAytaI5z6N3Zhfw0WL18Q0M8r95D5hlC4GqE/lGk8pbSJNUBoOWDfbm6dTciqHj2nU87tI5f6XhQiOg==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-freebsd-arm64/-/rollup-freebsd-arm64-4.64.5.tgz",
++      "integrity": "sha512-CoJmWcpEMuwin+TZ/ev/H9uDyF/uxUKQSWXdmIPn/UBx/uGV9+4ebMp0FwnlhWR9PE1AdzYsKf3bZevhif38+A==",
+       "cpu": [
+         "arm64"
+       ],
+@@ -1731,9 +1940,9 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-freebsd-x64": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-freebsd-x64/-/rollup-freebsd-x64-4.63.3.tgz",
+-      "integrity": "sha512-77W+8X3ddYgPxUpB8nZFQs2Mq+wc4HVlcSRtApXLjYBcnPMkttrSnU8VwKQjeWYhMsITHFs5cWBQ8vz1Q+5RHQ==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-freebsd-x64/-/rollup-freebsd-x64-4.64.5.tgz",
++      "integrity": "sha512-PxZnLAaTUAL5xG0W2BXLeYPKrK2b3LIASV2/e/Kf7PZvSLI1iAQIm9B9aJD+YyFIT7hc6qaMV3+OOO35R28LfA==",
+       "cpu": [
+         "x64"
+       ],
+@@ -1745,13 +1954,16 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-linux-arm-gnueabihf": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-arm-gnueabihf/-/rollup-linux-arm-gnueabihf-4.63.3.tgz",
+-      "integrity": "sha512-FVkwK+iUC+mq+GipVK46rRVticfAPtvPUNlqlGXUDxdVk/UGjQiiiUVPUrEXdSpU2ufU0XxLGyTqDtBidDOVmg==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-arm-gnueabihf/-/rollup-linux-arm-gnueabihf-4.64.5.tgz",
++      "integrity": "sha512-uPo3IvnONjhbFXwWgroBeFwOicuhT7ZwQrnzkzmOtBJzeQbkUJUE1SJDfDI31ijQ5+ZUIA6sPrdUMxTSnxUWAg==",
+       "cpu": [
+         "arm"
+       ],
+       "dev": true,
++      "libc": [
++        "glibc"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1759,13 +1971,16 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-linux-arm-musleabihf": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-arm-musleabihf/-/rollup-linux-arm-musleabihf-4.63.3.tgz",
+-      "integrity": "sha512-+aGU1t3398yQOVj1Bz8o3e+KtswxAPvO+mtxtNdfXYMkXIHu7XhhkCD7/DEH9q8tF8uhDnMWvfpUKI8y1sZJsg==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-arm-musleabihf/-/rollup-linux-arm-musleabihf-4.64.5.tgz",
++      "integrity": "sha512-ywI8Jyuc4LyHYTjC0mw4yA1ulvZBkHusdpWnoiEBsmBuHvSnt90btTBGCZ+s/2y+YNNfVAEKy33nPo5UI9zTmg==",
+       "cpu": [
+         "arm"
+       ],
+       "dev": true,
++      "libc": [
++        "musl"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1773,13 +1988,16 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-linux-arm64-gnu": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-arm64-gnu/-/rollup-linux-arm64-gnu-4.63.3.tgz",
+-      "integrity": "sha512-cR0kjpRXR2KJ2oQK8E2KTPtphs+b9hZ8IhTZubNryt/RsqgdOZBQ2Zq0q5UedtiIi0rs3jVhJh55RE1ZHUVGUA==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-arm64-gnu/-/rollup-linux-arm64-gnu-4.64.5.tgz",
++      "integrity": "sha512-tmuXJoQ/3ovSr637aykZMdQteU/CB2APAz2CrvsbibuoHZi1BS1Db13cVViBdEARGwXCLn1DSJ8wsjoThLJPGA==",
+       "cpu": [
+         "arm64"
+       ],
+       "dev": true,
++      "libc": [
++        "glibc"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1787,13 +2005,16 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-linux-arm64-musl": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-arm64-musl/-/rollup-linux-arm64-musl-4.63.3.tgz",
+-      "integrity": "sha512-y1RYi4Q3/9ByVWSSt9kX2ustE0B7kFYbJ6zZdVZVyqopZs3yhCTwRfrjIX4vezUJInma/Gs6BOFDJg7yZmJ0IQ==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-arm64-musl/-/rollup-linux-arm64-musl-4.64.5.tgz",
++      "integrity": "sha512-5FMjSYNcUOHx7oW8Qu9KB6jGPpvF/8sG7+BDHwU/Ihh1/6FMJ9ySmsFG4tJ1qbNRuP8OLzCBDso4sF0mQaLuFQ==",
+       "cpu": [
+         "arm64"
+       ],
+       "dev": true,
++      "libc": [
++        "musl"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1801,13 +2022,16 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-linux-loong64-gnu": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-loong64-gnu/-/rollup-linux-loong64-gnu-4.63.3.tgz",
+-      "integrity": "sha512-DNhEA5viIj3Z5bZLE4z4oV8N5ozWqDwyt7T6KG7VdLDJ0nW+rNOYlphBl4/3HQkK75qipPLsVOfStHHOwN9WSg==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-loong64-gnu/-/rollup-linux-loong64-gnu-4.64.5.tgz",
++      "integrity": "sha512-K8ZJ+neLDbUkIrL8dqF/5LtuVCrKwo27kREgOlxjBEjlOXwHvDnHLU8Z/UKv/B49qi7e8hsSDOyoJwhwqhvX4w==",
+       "cpu": [
+         "loong64"
+       ],
+       "dev": true,
++      "libc": [
++        "glibc"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1815,13 +2039,16 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-linux-loong64-musl": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-loong64-musl/-/rollup-linux-loong64-musl-4.63.3.tgz",
+-      "integrity": "sha512-17gQCqrIpXBX2Cmi9/TygnVOqGbzsba/iaqcYSL8FY7lNugg+7AiYNs5c5nKWD+NRQha36Sa0CqkJqH4XVHwnQ==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-loong64-musl/-/rollup-linux-loong64-musl-4.64.5.tgz",
++      "integrity": "sha512-NlVxsq7PFPv0DBKGuNWRDKixQYQCjM53zl04mxEcKMBmJbCBIUm1JdPfIWDRHyOOFzzYPmLQzfeEwh4716ayQg==",
+       "cpu": [
+         "loong64"
+       ],
+       "dev": true,
++      "libc": [
++        "musl"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1829,13 +2056,16 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-linux-ppc64-gnu": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-ppc64-gnu/-/rollup-linux-ppc64-gnu-4.63.3.tgz",
+-      "integrity": "sha512-6LwVnZRIyINpdku/yOcI8Tm9YqLmhHK5emmlOOnW9tO0SYEm1FmKPcsSAGp0NBlqR2P04xaND4jvN6sTHqhq8A==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-ppc64-gnu/-/rollup-linux-ppc64-gnu-4.64.5.tgz",
++      "integrity": "sha512-ARhRHJYs5eCFet5azfrHD97vOkD8OzNW2RSMlvo5CcBqXaTOLfp0OHDtUQh7/K5AL5fUYoFp2fgC9KDg4vVYMQ==",
+       "cpu": [
+         "ppc64"
+       ],
+       "dev": true,
++      "libc": [
++        "glibc"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1843,13 +2073,16 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-linux-ppc64-musl": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-ppc64-musl/-/rollup-linux-ppc64-musl-4.63.3.tgz",
+-      "integrity": "sha512-xMUqkTXlEUtI/p5AAukMwBRr1enU3efsTeF+bskeFfk8t1C9rcC8sLREcZXmTfAXEbvRdJVSonVJez3TMlbR3w==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-ppc64-musl/-/rollup-linux-ppc64-musl-4.64.5.tgz",
++      "integrity": "sha512-atSgreM5C7jpxd9aEXN+6vJ5wTd05iYw+S3FiQpw7VsoEl8B90llbq35ARON+GOHj5QlVQEq2vOKWCHTob/BSQ==",
+       "cpu": [
+         "ppc64"
+       ],
+       "dev": true,
++      "libc": [
++        "musl"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1857,13 +2090,16 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-linux-riscv64-gnu": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-riscv64-gnu/-/rollup-linux-riscv64-gnu-4.63.3.tgz",
+-      "integrity": "sha512-S3E94co9F9WRRqEaUoQZ38K1gCz6KiM+nL7/3ijq7fDGF3OznjS5TasgYITlvl27GQKtu4lOAOsr5MFwkijvOA==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-riscv64-gnu/-/rollup-linux-riscv64-gnu-4.64.5.tgz",
++      "integrity": "sha512-vmlmwBFGnjVWxSRoVabNkyYuscSmg52Pd0fM8jEbNT3Jmka4A6HcB84x4uAmuumznWfBVaxKOqU6jbEgomWKCA==",
+       "cpu": [
+         "riscv64"
+       ],
+       "dev": true,
++      "libc": [
++        "glibc"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1871,13 +2107,16 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-linux-riscv64-musl": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-riscv64-musl/-/rollup-linux-riscv64-musl-4.63.3.tgz",
+-      "integrity": "sha512-1QtRDwG42x5BJI3s9mxu5rEjDnfbSnk20HQ9/ylTAYnSwYwxMVb+Vgu34wzzTQ7ogqBybebgQNUDAvZVQ38DbA==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-riscv64-musl/-/rollup-linux-riscv64-musl-4.64.5.tgz",
++      "integrity": "sha512-hhJrP6S9WkbsbcHgUkvCBS5Cn8IdsG8XjlLZyxjnv9+NdoYfbbZE4TWJYr8apdaj1M5t5Y1id2StnEslxpNFyA==",
+       "cpu": [
+         "riscv64"
+       ],
+       "dev": true,
++      "libc": [
++        "musl"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1885,13 +2124,16 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-linux-s390x-gnu": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-s390x-gnu/-/rollup-linux-s390x-gnu-4.63.3.tgz",
+-      "integrity": "sha512-BQhejF6ZXOpxbngiNTP12GCGQeaDVL2QXGeBVViKIYzFHM5RKxTxwUMB1fr1BeNFphFMpnRqC5QSXFSa4z6UQw==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-s390x-gnu/-/rollup-linux-s390x-gnu-4.64.5.tgz",
++      "integrity": "sha512-NNVCyN9pGrwFmQa4bf+Cnf5aVH3g6ZpnlOg1Cs/H9swIHT9bRixijfzUqyEIWm1WtiAuR1LJ+rJH6zpBm8kgQA==",
+       "cpu": [
+         "s390x"
+       ],
+       "dev": true,
++      "libc": [
++        "glibc"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1899,13 +2141,16 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-linux-x64-gnu": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-x64-gnu/-/rollup-linux-x64-gnu-4.63.3.tgz",
+-      "integrity": "sha512-SXagRwnI2Wlwlitllu59UK/nGVbD1CKPcNqDplHwIC4BqJcpXFjD32d1R/RbuISa95HdQrZM3/7v4bKiowFaLA==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-x64-gnu/-/rollup-linux-x64-gnu-4.64.5.tgz",
++      "integrity": "sha512-dR9nd6OKnvSS60Ifz/L7Mj5zzYyoqyRn2NwTuaOONKaa3xsVGXyp8YusMbvFyEOR94DxnwgcbgsFqkHd29ZSzQ==",
+       "cpu": [
+         "x64"
+       ],
+       "dev": true,
++      "libc": [
++        "glibc"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1913,13 +2158,16 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-linux-x64-musl": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-x64-musl/-/rollup-linux-x64-musl-4.63.3.tgz",
+-      "integrity": "sha512-2IPozoEALRCziGqE8O9KMK60PMu5TS1huv4fwoeCexj+WjmcwFtX9CTOVbfXCUqcELAubEwRFPYlzb/WvwY2HQ==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-linux-x64-musl/-/rollup-linux-x64-musl-4.64.5.tgz",
++      "integrity": "sha512-1tzsMjaqhsh3bAO6SJiJqh8hIr9sSPRd+i2vPPxJHod8/XYnf9TEnK0z/u3r1z1AkI347X0KbRSg9dWcxeGahw==",
+       "cpu": [
+         "x64"
+       ],
+       "dev": true,
++      "libc": [
++        "musl"
++      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1927,9 +2175,9 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-openbsd-x64": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-openbsd-x64/-/rollup-openbsd-x64-4.63.3.tgz",
+-      "integrity": "sha512-AoxqosUHT9IX54hFn2TiN6A7d6ZKTtE6pd2bqWtqkkNJ6HJGaU6FRouGX8L1O7R/ZwsnCnpQrHzb4pDEx+UHRQ==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-openbsd-x64/-/rollup-openbsd-x64-4.64.5.tgz",
++      "integrity": "sha512-01mWMQblKoXXsmk28KXtpbA96w7g/aOWUoV3AC16fdHdqkykGalqyyM+5u8M7uP5/MEMiiPv69Hv7iv/hEH/dA==",
+       "cpu": [
+         "x64"
+       ],
+@@ -1941,9 +2189,9 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-openharmony-arm64": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-openharmony-arm64/-/rollup-openharmony-arm64-4.63.3.tgz",
+-      "integrity": "sha512-d+CaftKgmkFBzCwezMqqy1d0QNNYugqLCMcYVQWBy5SS2YfeMP8Q8ripkgx9O8IyBXXLHrJ+aaCV4U96usv6Yg==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-openharmony-arm64/-/rollup-openharmony-arm64-4.64.5.tgz",
++      "integrity": "sha512-trdnMPb/DNm4V/CgsaoGgr90HfQQ071wfK0KoIs4YpLvjBgVQGXhGabg2Z6nK4EcYNilrb9ZZPcsP6+zpJIdxQ==",
+       "cpu": [
+         "arm64"
+       ],
+@@ -1955,9 +2203,9 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-win32-arm64-msvc": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-win32-arm64-msvc/-/rollup-win32-arm64-msvc-4.63.3.tgz",
+-      "integrity": "sha512-xXlDF6nR1eOuXbdDy5Hl5fmtY7teUDevF/k0O7IPoZe4Tpmdv+lgdE5JRsnhQtt37ql9P0VF2kAN9a0OCZdo+Q==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-win32-arm64-msvc/-/rollup-win32-arm64-msvc-4.64.5.tgz",
++      "integrity": "sha512-x2LxZlfdfsw99T6/qb9EqE/Qi84JWzibjyOJyhJsgFJy6CafaTiqIXCCnslCGrV5XWNh7fwrS3FbRENcuKnooA==",
+       "cpu": [
+         "arm64"
+       ],
+@@ -1969,9 +2217,9 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-win32-ia32-msvc": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-win32-ia32-msvc/-/rollup-win32-ia32-msvc-4.63.3.tgz",
+-      "integrity": "sha512-YtXAgLN+JP7Ay6qG3eWhc7IHMQPzLc8r3uvhAvlJIoCz/4Q32+Bl9Fmnywidh8v1GOIMmymjovfqY9ETAtysvA==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-win32-ia32-msvc/-/rollup-win32-ia32-msvc-4.64.5.tgz",
++      "integrity": "sha512-/Qd/9aDQIo0+jmItgBmPIs8195YVbDxRRApn47GyufgbutCDOh7eP5vSKKlI4QNFeaI+wKQAkSMsPnF3EuMpaA==",
+       "cpu": [
+         "ia32"
+       ],
+@@ -1983,9 +2231,9 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-win32-x64-gnu": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-win32-x64-gnu/-/rollup-win32-x64-gnu-4.63.3.tgz",
+-      "integrity": "sha512-WuWtSJRNo549vzcfZyEgfqb6zeSgn1F+UE5kQ+BCjzz0W4MGCjntUHkZVc1VRuAM7+ULaSyhiPxD1spyewFvkQ==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-win32-x64-gnu/-/rollup-win32-x64-gnu-4.64.5.tgz",
++      "integrity": "sha512-ngUJ/XvOWrqbd2IMsfXfh2xXFLTP3sY7sCKvxbGvYdBZ1KmXFd3ewDZ9n3/GNzAUgzRuhLT/UvJRivbNoAQRBw==",
+       "cpu": [
+         "x64"
+       ],
+@@ -1997,9 +2245,9 @@
+       ]
+     },
+     "node_modules/@rollup/rollup-win32-x64-msvc": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/@rollup/rollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.63.3.tgz",
+-      "integrity": "sha512-+lIKX7O0+IGe7WuhATaAMMeT7B76vfhXH/l9wLQL+nvyhbw2ohYCKIdWL56JfDu75CWt5oKRP4QFH/jkMtBquA==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/@rollup/rollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.64.5.tgz",
++      "integrity": "sha512-IhV6ew/DuzUWwHaYmlh7MrPCV3lKFUq/amTEwysi4r/mwNPAEfAMh5dYWeTSPTeMy2pFHGMEWYtPkHzfX3tG5A==",
+       "cpu": [
+         "x64"
+       ],
+@@ -2068,9 +2316,9 @@
+       "license": "MIT"
+     },
+     "node_modules/@types/node": {
+-      "version": "22.20.3",
+-      "resolved": "https://registry.npmjs.org/@types/node/-/node-22.20.3.tgz",
+-      "integrity": "sha512-DZmzkmwHzXrLPAXPyKNDzlIwMMUZCVacoD25ywdy5YTKGbOx/2ld+Q38Im2zJ0vBuZP5Prd3VZutKZyXwkOS8A==",
++      "version": "22.20.5",
++      "resolved": "https://registry.npmjs.org/@types/node/-/node-22.20.5.tgz",
++      "integrity": "sha512-U2+DNr+wSjpsTS/wZGYHq7GcwfuSmKiKvoPvK22zwTlRhU91yOniN4qRR5KhIjvif7ysw/dz/hKmfDH0Ris4aA==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+@@ -2220,6 +2468,24 @@
+         "url": "https://opencollective.com/vitest"
+       }
+     },
++    "node_modules/ajv": {
++      "version": "8.20.0",
++      "resolved": "https://registry.npmjs.org/ajv/-/ajv-8.20.0.tgz",
++      "integrity": "sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "fast-deep-equal": "^3.1.3",
++        "fast-uri": "^3.0.1",
++        "json-schema-traverse": "^1.0.0",
++        "require-from-string": "^2.0.2"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/epoberezkin"
++      }
++    },
+     "node_modules/ansis": {
+       "version": "4.4.0",
+       "resolved": "https://registry.npmjs.org/ansis/-/ansis-4.4.0.tgz",
+@@ -2265,13 +2531,13 @@
+       }
+     },
+     "node_modules/ast-kit/node_modules/@babel/parser": {
+-      "version": "8.0.5",
+-      "resolved": "https://registry.npmjs.org/@babel/parser/-/parser-8.0.5.tgz",
+-      "integrity": "sha512-51RXvQNFakaS0bTpYiGkxNbUVwkPO4kONv6EVLorZABxsx+KZ6Z7uSYvi/wmKS/+X+rfj9RvOw0/ZNh+cmI0Rw==",
++      "version": "8.0.7",
++      "resolved": "https://registry.npmjs.org/@babel/parser/-/parser-8.0.7.tgz",
++      "integrity": "sha512-UkDwEbPO1px2JQSrdh4qIgaH1JgG7GO/pFeJkpxhDxIETkT/QvGpnigXIw75ViHYPtIgKITmVUJqLjiO+JuWjA==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@babel/types": "^8.0.5"
++        "@babel/types": "^8.0.6"
+       },
+       "bin": {
+         "parser": "bin/babel-parser.js"
+@@ -2301,9 +2567,9 @@
+       }
+     },
+     "node_modules/cac": {
+-      "version": "7.0.0",
+-      "resolved": "https://registry.npmjs.org/cac/-/cac-7.0.0.tgz",
+-      "integrity": "sha512-tixWYgm5ZoOD+3g6UTea91eow5z6AAHaho3g0V9CNSNb45gM8SmflpAc+GRd1InC4AqN/07Unrgp56Y94N9hJQ==",
++      "version": "7.1.0",
++      "resolved": "https://registry.npmjs.org/cac/-/cac-7.1.0.tgz",
++      "integrity": "sha512-LMDU/U2yA4IPIY8KT0NsNPWEYZvAMkbgyspxJ6btJaYV+WMDOHAZCmB0lsTObiHaRS1V/ztKAl7+TSkTqXyeoA==",
+       "dev": true,
+       "license": "MIT",
+       "engines": {
+@@ -2398,13 +2664,6 @@
+         "url": "https://opencollective.com/express"
+       }
+     },
+-    "node_modules/cosmokit": {
+-      "version": "1.8.1",
+-      "resolved": "https://registry.npmjs.org/cosmokit/-/cosmokit-1.8.1.tgz",
+-      "integrity": "sha512-PDBv4l90xZKrUsZ0vtoycgZpO/j4iFsqJXrAxsyBDsnQRI7ZMJXIjgDJsKNjd5L8jnVnnlrDCdhkFbTncgCVjQ==",
+-      "dev": true,
+-      "license": "MIT"
+-    },
+     "node_modules/csstype": {
+       "version": "3.2.3",
+       "resolved": "https://registry.npmjs.org/csstype/-/csstype-3.2.3.tgz",
+@@ -2482,9 +2741,9 @@
+       }
+     },
+     "node_modules/empathic": {
+-      "version": "2.0.1",
+-      "resolved": "https://registry.npmjs.org/empathic/-/empathic-2.0.1.tgz",
+-      "integrity": "sha512-YGRs8knHhKHVShLkFET/rWAU8kmHbOV5LwN938RHI0pljAJ1Gf6SzXsSmRaEzcXTtOOmVqJ5+WtQPL5uigY50Q==",
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/empathic/-/empathic-2.1.0.tgz",
++      "integrity": "sha512-AnfC1ATldl49/cvZdLPDjBfrRNwbDO05aibiOtzQu3qtlbJtomNLhF30HEtn/7iBz50dlMECqATo3fG0LrdEgw==",
+       "dev": true,
+       "license": "MIT",
+       "engines": {
+@@ -2560,6 +2819,32 @@
+         "node": ">=12.0.0"
+       }
+     },
++    "node_modules/fast-deep-equal": {
++      "version": "3.1.3",
++      "resolved": "https://registry.npmjs.org/fast-deep-equal/-/fast-deep-equal-3.1.3.tgz",
++      "integrity": "sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/fast-uri": {
++      "version": "3.1.8",
++      "resolved": "https://registry.npmjs.org/fast-uri/-/fast-uri-3.1.8.tgz",
++      "integrity": "sha512-GZMtZUTNRpOVIECoXwLNZS5xUGE+mVNbTB8h/7Rwh2TFWcBQiPzTgyZi05BF9UMZKkLJv8XBRJTlU7zg8+ZfMg==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "github",
++          "url": "https://github.com/sponsors/fastify"
++        },
++        {
++          "type": "opencollective",
++          "url": "https://opencollective.com/fastify"
++        }
++      ],
++      "license": "BSD-3-Clause",
++      "peer": true
++    },
+     "node_modules/fdir": {
+       "version": "6.5.0",
+       "resolved": "https://registry.npmjs.org/fdir/-/fdir-6.5.0.tgz",
+@@ -2682,6 +2967,14 @@
+         "node": ">=6"
+       }
+     },
++    "node_modules/json-schema-traverse": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/json-schema-traverse/-/json-schema-traverse-1.0.0.tgz",
++      "integrity": "sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true
++    },
+     "node_modules/lightningcss": {
+       "version": "1.32.0",
+       "resolved": "https://registry.npmjs.org/lightningcss/-/lightningcss-1.32.0.tgz",
+@@ -2825,6 +3118,9 @@
+         "arm64"
+       ],
+       "dev": true,
++      "libc": [
++        "glibc"
++      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -2846,6 +3142,9 @@
+         "arm64"
+       ],
+       "dev": true,
++      "libc": [
++        "musl"
++      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -2867,6 +3166,9 @@
+         "x64"
+       ],
+       "dev": true,
++      "libc": [
++        "glibc"
++      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -2888,6 +3190,9 @@
+         "x64"
+       ],
+       "dev": true,
++      "libc": [
++        "musl"
++      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -2991,9 +3296,9 @@
+       "license": "MIT"
+     },
+     "node_modules/nanoid": {
+-      "version": "3.3.19",
+-      "resolved": "https://registry.npmjs.org/nanoid/-/nanoid-3.3.19.tgz",
+-      "integrity": "sha512-Y2tUNy4ouw6tq5oDSKeQYGOyhkUBhNOcGV/02KC+6kd9eDGqdZd++mjMiIDilrBYvjEnCYvVtsuHCuP+okSfug==",
++      "version": "3.3.20",
++      "resolved": "https://registry.npmjs.org/nanoid/-/nanoid-3.3.20.tgz",
++      "integrity": "sha512-uKdg2G3GNCKQn9byYOpxbGqrT2fGO5KRt5J/8b3pok8rT6qxGWF6hxMyJiEYtAf+FVyYuD9hRaDqX5uPFYJ4ZQ==",
+       "dev": true,
+       "funding": [
+         {
+@@ -3026,6 +3331,243 @@
+         "url": "https://opencollective.com/express"
+       }
+     },
++    "node_modules/node-addon-native-custom-loader": {
++      "version": "0.1.9",
++      "resolved": "https://registry.npmjs.org/node-addon-native-custom-loader/-/node-addon-native-custom-loader-0.1.9.tgz",
++      "integrity": "sha512-Zh87aubSc1UF8CzZsRws1KtSwXiPDH0tbcg8V/2OA8Tcq9yGJRESFcEOC5NGLFama5IGfC3aJhubZbrj9Un2qA==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/node-addon-require-builtin": {
++      "version": "0.1.9",
++      "resolved": "https://registry.npmjs.org/node-addon-require-builtin/-/node-addon-require-builtin-0.1.9.tgz",
++      "integrity": "sha512-BCxXCMZDs/VLLh64SwKNw/me7Qx1I7Be4qxWwYVRRm8tJoOB8fL7qg6CmXhSXeUqsKt72t8RaKCX4EN+5nocVg==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "node-addon-native-custom-loader": "0.1.9"
++      },
++      "engines": {
++        "node": ">=20"
++      },
++      "optionalDependencies": {
++        "node-addon-require-builtin-darwin-arm64": "0.1.9",
++        "node-addon-require-builtin-darwin-x64": "0.1.9",
++        "node-addon-require-builtin-linux-arm64-gnu": "0.1.9",
++        "node-addon-require-builtin-linux-arm64-musl": "0.1.9",
++        "node-addon-require-builtin-linux-x64-gnu": "0.1.9",
++        "node-addon-require-builtin-linux-x64-musl": "0.1.9",
++        "node-addon-require-builtin-win32-arm64-msvc": "0.1.9",
++        "node-addon-require-builtin-win32-ia32-msvc": "0.1.9",
++        "node-addon-require-builtin-win32-x64-msvc": "0.1.9"
++      }
++    },
++    "node_modules/node-addon-require-builtin-darwin-arm64": {
++      "version": "0.1.9",
++      "resolved": "https://registry.npmjs.org/node-addon-require-builtin-darwin-arm64/-/node-addon-require-builtin-darwin-arm64-0.1.9.tgz",
++      "integrity": "sha512-n45xEILQVOLZ2hVhzRXesTMYS4odHquyI/B/IkPMPUCONa8PjNfBag6lYBH4wDrhgpLNNBwMsUD8d8O/13QPPA==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "peer": true,
++      "dependencies": {
++        "node-addon-native-custom-loader": "0.1.9"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/node-addon-require-builtin-darwin-x64": {
++      "version": "0.1.9",
++      "resolved": "https://registry.npmjs.org/node-addon-require-builtin-darwin-x64/-/node-addon-require-builtin-darwin-x64-0.1.9.tgz",
++      "integrity": "sha512-Sm4Liqh1uo9zgJB2F/pACPPZdHu+fj9Qniyr1Q99dDQB0v71VgZgkAgv3K0/E1iPQBlZq9rakFkY7MGUIfWc0A==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "peer": true,
++      "dependencies": {
++        "node-addon-native-custom-loader": "0.1.9"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/node-addon-require-builtin-linux-arm64-gnu": {
++      "version": "0.1.9",
++      "resolved": "https://registry.npmjs.org/node-addon-require-builtin-linux-arm64-gnu/-/node-addon-require-builtin-linux-arm64-gnu-0.1.9.tgz",
++      "integrity": "sha512-ToU4wGtOD/069i2y4fJ3cjDJiiWtcjSQTZMf0YKlotb5BmTM7FjhR3X1aub8J/YjlOwl6665J/XAYuvCaDO5sA==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "libc": [
++        "glibc"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "peer": true,
++      "dependencies": {
++        "node-addon-native-custom-loader": "0.1.9"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/node-addon-require-builtin-linux-arm64-musl": {
++      "version": "0.1.9",
++      "resolved": "https://registry.npmjs.org/node-addon-require-builtin-linux-arm64-musl/-/node-addon-require-builtin-linux-arm64-musl-0.1.9.tgz",
++      "integrity": "sha512-85Z5Avp++wfa9iiTIH8LC/r6qvlC/CiwpifiwIz0gYQ9PzajTSkz06gX7YDqf1oUqWYxU9uwNEOmo7mktHOOfA==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "libc": [
++        "musl"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "peer": true,
++      "dependencies": {
++        "node-addon-native-custom-loader": "0.1.9"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/node-addon-require-builtin-linux-x64-gnu": {
++      "version": "0.1.9",
++      "resolved": "https://registry.npmjs.org/node-addon-require-builtin-linux-x64-gnu/-/node-addon-require-builtin-linux-x64-gnu-0.1.9.tgz",
++      "integrity": "sha512-fh3K3/JvBfSYwU8vEOpp4Wdp4N/jX0EnZYq5GsaftlQin1FVqgve/yDNoh+asxBMOQyHOG8F4dXlV1WCierrfg==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "libc": [
++        "glibc"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "peer": true,
++      "dependencies": {
++        "node-addon-native-custom-loader": "0.1.9"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/node-addon-require-builtin-linux-x64-musl": {
++      "version": "0.1.9",
++      "resolved": "https://registry.npmjs.org/node-addon-require-builtin-linux-x64-musl/-/node-addon-require-builtin-linux-x64-musl-0.1.9.tgz",
++      "integrity": "sha512-B6fu/5xmbRxnifM7nWz0IESkYnUl8dwFZmRDMsxdhzv2nb+EtBRFAXg4lf73qhX3yoZD4SnWJILBQMlIAwBCzw==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "libc": [
++        "musl"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "peer": true,
++      "dependencies": {
++        "node-addon-native-custom-loader": "0.1.9"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/node-addon-require-builtin-win32-arm64-msvc": {
++      "version": "0.1.9",
++      "resolved": "https://registry.npmjs.org/node-addon-require-builtin-win32-arm64-msvc/-/node-addon-require-builtin-win32-arm64-msvc-0.1.9.tgz",
++      "integrity": "sha512-FOQuzNe8B1BANu886rJgdbQuRxPGUQmewkykw87wSr32U0ibQ3AWGuUM/Gh7LG4RekjFaifj7gEI/tq2+6GU6g==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "peer": true,
++      "dependencies": {
++        "node-addon-native-custom-loader": "0.1.9"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/node-addon-require-builtin-win32-ia32-msvc": {
++      "version": "0.1.9",
++      "resolved": "https://registry.npmjs.org/node-addon-require-builtin-win32-ia32-msvc/-/node-addon-require-builtin-win32-ia32-msvc-0.1.9.tgz",
++      "integrity": "sha512-N29P0kmIBT6hnkNNFYzxn+o9ydT6OYZe9RFAi8dSxV1rNSul1FlxtuKWYe8w2sQpbQGYuGDEtpOwdeFtq2iFTg==",
++      "cpu": [
++        "ia32"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "peer": true,
++      "dependencies": {
++        "node-addon-native-custom-loader": "0.1.9"
++      },
++      "engines": {
++        "node": ">=20 <23"
++      }
++    },
++    "node_modules/node-addon-require-builtin-win32-x64-msvc": {
++      "version": "0.1.9",
++      "resolved": "https://registry.npmjs.org/node-addon-require-builtin-win32-x64-msvc/-/node-addon-require-builtin-win32-x64-msvc-0.1.9.tgz",
++      "integrity": "sha512-+i6N4A7m7txjbw8pDYESdWXiKO9EEVq0SzTzwPS0WZuV4F1MzQnaDJwJJnO7T6zAc0BvqHXBOkpharCrUjFhbQ==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "peer": true,
++      "dependencies": {
++        "node-addon-native-custom-loader": "0.1.9"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
+     "node_modules/obug": {
+       "version": "2.2.1",
+       "resolved": "https://registry.npmjs.org/obug/-/obug-2.2.1.tgz",
+@@ -3088,9 +3630,9 @@
+       }
+     },
+     "node_modules/postcss": {
+-      "version": "8.5.28",
+-      "resolved": "https://registry.npmjs.org/postcss/-/postcss-8.5.28.tgz",
+-      "integrity": "sha512-RRuzqDtt5Y9h3quz5hWhK+TPnsmVs6WwSU6LkJMeY4HstUEDuYTG8UJSdawMRzmzAtV+KEoG8N3Qg2qLy5vM/A==",
++      "version": "8.5.30",
++      "resolved": "https://registry.npmjs.org/postcss/-/postcss-8.5.30.tgz",
++      "integrity": "sha512-zkd+e9S1AQHhmaBKye9zlFHWjOwVgqXl1q3ECYy8561K7qxR2cREf/STLskulBFd78k6AOFeA+ff1TtEzk9bAA==",
+       "dev": true,
+       "funding": [
+         {
+@@ -3108,9 +3650,9 @@
+       ],
+       "license": "MIT",
+       "dependencies": {
+-        "nanoid": "^3.3.18",
++        "nanoid": "^3.3.20",
+         "picocolors": "^1.1.1",
+-        "source-map-js": "^1.2.1"
++        "source-map-js": "^1.2.2"
+       },
+       "engines": {
+         "node": "^10 || ^12 || >=14"
+@@ -3160,6 +3702,17 @@
+         "react": "^18.3.1"
+       }
+     },
++    "node_modules/require-from-string": {
++      "version": "2.0.2",
++      "resolved": "https://registry.npmjs.org/require-from-string/-/require-from-string-2.0.2.tgz",
++      "integrity": "sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
+     "node_modules/resolve-pkg-maps": {
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/resolve-pkg-maps/-/resolve-pkg-maps-1.0.0.tgz",
+@@ -3170,6 +3723,17 @@
+         "url": "https://github.com/privatenumber/resolve-pkg-maps?sponsor=1"
+       }
+     },
++    "node_modules/resolve.exports": {
++      "version": "2.0.4",
++      "resolved": "https://registry.npmjs.org/resolve.exports/-/resolve.exports-2.0.4.tgz",
++      "integrity": "sha512-zepuGL0ulf+nt+XaFrlKeaiTJeyPFPLLY62+ncq1/VTHBdt3HsfXOH60priZ6tnXQozdGcDeIF5JVTanvIcYWQ==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">=10"
++      }
++    },
+     "node_modules/rolldown": {
+       "version": "1.1.5",
+       "resolved": "https://registry.npmjs.org/rolldown/-/rolldown-1.1.5.tgz",
+@@ -3249,9 +3813,9 @@
+       }
+     },
+     "node_modules/rollup": {
+-      "version": "4.63.3",
+-      "resolved": "https://registry.npmjs.org/rollup/-/rollup-4.63.3.tgz",
+-      "integrity": "sha512-1i2XreiAoMMXuPGD6Msj2xWrMMkHojNRKivInxGQcg7/1KuPuYlfUutLyh4drnOxUTHX9cHI4wFoat8D/NKaBw==",
++      "version": "4.64.5",
++      "resolved": "https://registry.npmjs.org/rollup/-/rollup-4.64.5.tgz",
++      "integrity": "sha512-EAP5ZHcz2ijbgCWwPkpI7zh6bfsri2Ez5FtCy2dCp1k62duXzfG7DLGGh7RU2QQXWwavT+u4qpvDF/TWOiiGTw==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+@@ -3266,31 +3830,31 @@
+       },
+       "optionalDependencies": {
+         "@napi-rs/lzma-linux-x64-gnu": "1.5.1",
+-        "@rollup/rollup-android-arm-eabi": "4.63.3",
+-        "@rollup/rollup-android-arm64": "4.63.3",
+-        "@rollup/rollup-darwin-arm64": "4.63.3",
+-        "@rollup/rollup-darwin-x64": "4.63.3",
+-        "@rollup/rollup-freebsd-arm64": "4.63.3",
+-        "@rollup/rollup-freebsd-x64": "4.63.3",
+-        "@rollup/rollup-linux-arm-gnueabihf": "4.63.3",
+-        "@rollup/rollup-linux-arm-musleabihf": "4.63.3",
+-        "@rollup/rollup-linux-arm64-gnu": "4.63.3",
+-        "@rollup/rollup-linux-arm64-musl": "4.63.3",
+-        "@rollup/rollup-linux-loong64-gnu": "4.63.3",
+-        "@rollup/rollup-linux-loong64-musl": "4.63.3",
+-        "@rollup/rollup-linux-ppc64-gnu": "4.63.3",
+-        "@rollup/rollup-linux-ppc64-musl": "4.63.3",
+-        "@rollup/rollup-linux-riscv64-gnu": "4.63.3",
+-        "@rollup/rollup-linux-riscv64-musl": "4.63.3",
+-        "@rollup/rollup-linux-s390x-gnu": "4.63.3",
+-        "@rollup/rollup-linux-x64-gnu": "4.63.3",
+-        "@rollup/rollup-linux-x64-musl": "4.63.3",
+-        "@rollup/rollup-openbsd-x64": "4.63.3",
+-        "@rollup/rollup-openharmony-arm64": "4.63.3",
+-        "@rollup/rollup-win32-arm64-msvc": "4.63.3",
+-        "@rollup/rollup-win32-ia32-msvc": "4.63.3",
+-        "@rollup/rollup-win32-x64-gnu": "4.63.3",
+-        "@rollup/rollup-win32-x64-msvc": "4.63.3",
++        "@rollup/rollup-android-arm-eabi": "4.64.5",
++        "@rollup/rollup-android-arm64": "4.64.5",
++        "@rollup/rollup-darwin-arm64": "4.64.5",
++        "@rollup/rollup-darwin-x64": "4.64.5",
++        "@rollup/rollup-freebsd-arm64": "4.64.5",
++        "@rollup/rollup-freebsd-x64": "4.64.5",
++        "@rollup/rollup-linux-arm-gnueabihf": "4.64.5",
++        "@rollup/rollup-linux-arm-musleabihf": "4.64.5",
++        "@rollup/rollup-linux-arm64-gnu": "4.64.5",
++        "@rollup/rollup-linux-arm64-musl": "4.64.5",
++        "@rollup/rollup-linux-loong64-gnu": "4.64.5",
++        "@rollup/rollup-linux-loong64-musl": "4.64.5",
++        "@rollup/rollup-linux-ppc64-gnu": "4.64.5",
++        "@rollup/rollup-linux-ppc64-musl": "4.64.5",
++        "@rollup/rollup-linux-riscv64-gnu": "4.64.5",
++        "@rollup/rollup-linux-riscv64-musl": "4.64.5",
++        "@rollup/rollup-linux-s390x-gnu": "4.64.5",
++        "@rollup/rollup-linux-x64-gnu": "4.64.5",
++        "@rollup/rollup-linux-x64-musl": "4.64.5",
++        "@rollup/rollup-openbsd-x64": "4.64.5",
++        "@rollup/rollup-openharmony-arm64": "4.64.5",
++        "@rollup/rollup-win32-arm64-msvc": "4.64.5",
++        "@rollup/rollup-win32-ia32-msvc": "4.64.5",
++        "@rollup/rollup-win32-x64-gnu": "4.64.5",
++        "@rollup/rollup-win32-x64-msvc": "4.64.5",
+         "fsevents": "~2.3.2"
+       }
+     },
+@@ -3325,17 +3889,6 @@
+         "loose-envify": "^1.1.0"
+       }
+     },
+-    "node_modules/schemastery": {
+-      "version": "3.18.0",
+-      "resolved": "https://registry.npmjs.org/schemastery/-/schemastery-3.18.0.tgz",
+-      "integrity": "sha512-Jw2uxjoyyqc/yeurmChUEc/jbi8GsrdXV/KmqRUDZXJAXAmrJiPsz8vKa17l/VckyzljHZ9oGaul443CQiXxtA==",
+-      "dev": true,
+-      "license": "MIT",
+-      "dependencies": {
+-        "@standard-schema/spec": "^1.1.0",
+-        "cosmokit": "^1.8.1"
+-      }
+-    },
+     "node_modules/semver": {
+       "version": "7.8.5",
+       "resolved": "https://registry.npmjs.org/semver/-/semver-7.8.5.tgz",
+@@ -3357,9 +3910,9 @@
+       "license": "ISC"
+     },
+     "node_modules/source-map-js": {
+-      "version": "1.2.1",
+-      "resolved": "https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.1.tgz",
+-      "integrity": "sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==",
++      "version": "1.2.2",
++      "resolved": "https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.2.tgz",
++      "integrity": "sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==",
+       "dev": true,
+       "license": "BSD-3-Clause",
+       "engines": {
+@@ -3611,9 +4164,9 @@
+       }
+     },
+     "node_modules/vite": {
+-      "version": "7.3.6",
+-      "resolved": "https://registry.npmjs.org/vite/-/vite-7.3.6.tgz",
+-      "integrity": "sha512-4XP60spRGjSZFf1qYH+dJIkK2znL3zQfl9KkOV9MkkRR/3Dls0dxaBsQPTloEc5BLXWPL9vsOxopxyKoMmDueg==",
++      "version": "7.3.7",
++      "resolved": "https://registry.npmjs.org/vite/-/vite-7.3.7.tgz",
++      "integrity": "sha512-AHEzTORMbi7/7aXp7w7KZ5+DCUdSeLsJz0grY8xHpc9DHdYb0vQu6DqJfm2tOw3gDExNgPgnJTXxM6syYFHaCA==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+@@ -3865,10 +4418,26 @@
+         "node": ">=8"
+       }
+     },
++    "node_modules/yaml": {
++      "version": "2.9.1",
++      "resolved": "https://registry.npmjs.org/yaml/-/yaml-2.9.1.tgz",
++      "integrity": "sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==",
++      "dev": true,
++      "license": "ISC",
++      "bin": {
++        "yaml": "bin.mjs"
++      },
++      "engines": {
++        "node": ">= 14.6"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/eemeli"
++      }
++    },
+     "node_modules/zod": {
+-      "version": "4.6.5",
+-      "resolved": "https://registry.npmjs.org/zod/-/zod-4.6.5.tgz",
+-      "integrity": "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==",
++      "version": "4.6.7",
++      "resolved": "https://registry.npmjs.org/zod/-/zod-4.6.7.tgz",
++      "integrity": "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==",
+       "dev": true,
+       "license": "MIT",
+       "funding": {
+diff --git a/fixture/package.json b/fixture/package.json
+index 08bee0a..c5fbf34 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -61,7 +61,7 @@
+     ],
+     "compatibility": {
+       "dshVersions": [
+-        "0.1.6-alpha.2"
++        "0.1.7-alpha.1"
+       ]
+     },
+     "capability": {
+@@ -78,51 +78,49 @@
+     }
+   },
+   "dependencies": {
+-    "js-yaml": "^4.1.0",
+-    "schemastery": "^3.18.0"
++    "js-yaml": "^4.1.0"
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.1 || ^4.0.2",
+-    "@deepseek-ai/dsh-client-connection": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-locale": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-runtime": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-store": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-ui-settings": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-ui-slots": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-host-webserver": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-session": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-session-query": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-settings": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-skill": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-system-prompt": ">=0.1.6-alpha.2 <0.2.0-0",
++    "@deepseek-ai/cordis": "^4.0.1",
++    "@deepseek-ai/dsh-client-connection": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-client-locale": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-client-store": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-client-ui-settings": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-client-ui-slots": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-host-webserver": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-session": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-session-query": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-settings": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-skill": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-system-prompt": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/schemastery": "^3.18.3",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
+-    "@deepseek-ai/dsh-client-runtime": {
+-      "optional": true
+-    },
+     "@deepseek-ai/dsh-client-store": {
+       "optional": true
+     }
+   },
+   "devDependencies": {
+     "@deepseek-ai/cordis": "^4.0.2",
+-    "@deepseek-ai/dsh-client-connection": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-client-locale": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-client-store": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-client-ui-input-trigger": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-client-ui-plugin-manager": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-client-ui-settings": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-host-webserver": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-session-query": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-settings": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-skill": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2",
++    "@deepseek-ai/cordis-plugin-loader": "^1.0.4",
++    "@deepseek-ai/dsh-client-connection": "^0.1.7-alpha.1",
++    "@deepseek-ai/dsh-client-locale": "^0.1.7-alpha.1",
++    "@deepseek-ai/dsh-client-store": "^0.1.7-alpha.1",
++    "@deepseek-ai/dsh-client-ui-input-trigger": "^0.1.7-alpha.1",
++    "@deepseek-ai/dsh-client-ui-plugin-manager": "^0.1.7-alpha.1",
++    "@deepseek-ai/dsh-client-ui-settings": "^0.1.7-alpha.1",
++    "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.7-alpha.1",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.7-alpha.1",
++    "@deepseek-ai/dsh-host-webserver": "^0.1.7-alpha.1",
++    "@deepseek-ai/dsh-session": "^0.1.7-alpha.1",
++    "@deepseek-ai/dsh-session-query": "^0.1.7-alpha.1",
++    "@deepseek-ai/dsh-settings": "^0.1.7-alpha.1",
++    "@deepseek-ai/dsh-skill": "^0.1.7-alpha.1",
++    "@deepseek-ai/dsh-system-prompt": "^0.1.7-alpha.1",
++    "@deepseek-ai/schemastery": "^3.18.3",
+     "@types/js-yaml": "^4.0.9",
+     "@types/node": "^22.20.0",
+     "@types/react": "~18.3.1",
+@@ -131,7 +129,6 @@
+     "lightningcss": "1.32.0",
+     "react": "^18.3.1",
+     "react-dom": "^18.3.1",
+-    "schemastery": "^3.18.0",
+     "tsdown": "0.22.2",
+     "typescript": "~5.7.2",
+     "vitest": "^3.0.0",
+diff --git a/fixture/patches/0001-settings-section-icon-option.patch b/fixture/patches/0001-settings-section-icon-option.patch
+new file mode 100644
+index 0000000..a5c60a3
+--- /dev/null
++++ b/fixture/patches/0001-settings-section-icon-option.patch
+@@ -0,0 +1,200 @@
++diff --git a/packages/client/ui-settings-general/README.md b/packages/client/ui-settings-general/README.md
++index 266fe83..2c97199 100644
++--- a/packages/client/ui-settings-general/README.md
+++++ b/packages/client/ui-settings-general/README.md
++@@ -63,7 +63,7 @@ The shell owns the chrome and the projections; it contributes the Developer tool
++ 
++ ### Ledger projections
++ 
++-The navigation is a projection of the `settings.section` ledger; nav labels may be locale-following thunks, resolved through `resolveSlotLabel` and re-rendered on the section ledger bump or the locale revision (an optional `ctx.get('locale')` read; no hard locale dependency). The onboarding ledger projects in ascending order; the active registrant receives its id, `complete()`, and an `openSection(id)` callback, and completing or skipping transfers ownership to the next entry.
+++The navigation is a projection of the `settings.section` ledger; nav labels may be locale-following thunks, resolved through `resolveSlotLabel` and re-rendered on the section ledger bump or the locale revision (an optional `ctx.get('locale')` read; no hard locale dependency). A section may declare an optional `icon` token; the shell resolves the closed token table to a library glyph and otherwise keeps its id map and gear fallback, so a contributed page never disappears behind the same generic icon as an unrelated one. The onboarding ledger projects in ascending order; the active registrant receives its id, `complete()`, and an `openSection(id)` callback, and completing or skipping transfers ownership to the next entry.
++ 
++ ### Connection recovery
++ 
++diff --git a/packages/client/ui-settings-general/src/client/SettingsRoot.tsx b/packages/client/ui-settings-general/src/client/SettingsRoot.tsx
++index 7a1f4fb..82fb556 100644
++--- a/packages/client/ui-settings-general/src/client/SettingsRoot.tsx
+++++ b/packages/client/ui-settings-general/src/client/SettingsRoot.tsx
++@@ -11,11 +11,12 @@
++  * to the step, so a mounted-but-deciding step paints nothing here.
++  */
++ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+++import type { ComponentType } from 'react'
++ import clsx from 'clsx'
++ import {
++   ConnectionIndicator,
++-  IconAgentPresetOutlineMedium, IconArchiveOutlineMedium, IconCloseOutlineRegular, IconDataOutlineMedium,
++-  IconPersonalizationOutlineMedium, IconSettingsOutlineMedium, IconUserOutlineMedium,
+++  IconAgentPresetOutlineMedium, IconApiOutlineMedium, IconArchiveOutlineMedium, IconCloseOutlineRegular, IconDataOutlineMedium,
+++  IconPersonalizationOutlineMedium, IconSettingsOutlineMedium, IconSkillOutlineMedium, IconUserOutlineMedium,
++ } from '@deepseek-ai/dsh-client-ui-primitives'
++ import type { ConnectionIndicatorState } from '@deepseek-ai/dsh-client-ui-primitives'
++ import type { SettingsRootComponentProps, SettingsSectionRow } from './shell-contract.ts'
++@@ -27,6 +28,23 @@ const RECOVERY_CONFIRMATION_MS = 2_000
++ /** Minimum visible time for the connecting pill; shorter attempts read as flicker. */
++ const CONNECTING_MIN_VISIBLE_MS = 800
++ 
+++/**
+++ * Registrant-declarable nav icon tokens → library glyphs. The vocabulary is
+++ * closed because register options stay inspectable data (client-runner catalog,
+++ * HMR), so a registrant names a glyph instead of passing a component. Extend
+++ * this table when a new distinguishable glyph earns its place; the shipped id
+++ * map below stays for the sections that predate the option. `skill` is the
+++ * skill catalog glyph already in `ui-primitives`, so a skill-management page
+++ * no longer has to embed its own SVG to be distinguishable.
+++ */
+++const NAV_ICON_TOKENS: Readonly<Record<string, ComponentType<{ className?: string; size?: number }>>> = {
+++  api: IconApiOutlineMedium,
+++  archive: IconArchiveOutlineMedium,
+++  'agent-preset': IconAgentPresetOutlineMedium,
+++  personalization: IconPersonalizationOutlineMedium,
+++  skill: IconSkillOutlineMedium,
+++}
+++
++ /** Nav glyph by section id; unknown ids fall back to the settings gear. */
++ function navIcon(id: string) {
++   if (id === 'account') return <IconUserOutlineMedium className={css.navIcon} size={16} />
++@@ -37,6 +55,13 @@ function navIcon(id: string) {
++   return <IconSettingsOutlineMedium className={css.navIcon} size={16} />
++ }
++ 
+++/** Resolve a row's glyph: its declared token first, then the shipped id map. */
+++function navIconFor(row: SettingsSectionRow) {
+++  const Icon = NAV_ICON_TOKENS[row.icon ?? '']
+++  if (Icon !== undefined) return <Icon className={css.navIcon} size={16} />
+++  return navIcon(row.id)
+++}
+++
++ type PanelProps = {
++   rows: readonly SettingsSectionRow[]
++   renderSlot: SettingsRootComponentProps['renderSlot']
++@@ -83,7 +108,7 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
++                 aria-current={row.id === active ? 'true' : undefined}
++                 onClick={() => { onSelect(row.id) }}
++               >
++-                {navIcon(row.id)}
+++                {navIconFor(row)}
++                 <span className={css.navLabel}>{row.label}</span>
++               </button>
++             ))}
++diff --git a/packages/client/ui-settings-general/src/client/index.ts b/packages/client/ui-settings-general/src/client/index.ts
++index a2d63df..eb83383 100644
++--- a/packages/client/ui-settings-general/src/client/index.ts
+++++ b/packages/client/ui-settings-general/src/client/index.ts
++@@ -135,6 +135,7 @@ export function apply(ctx: ClientContext): void {
++                 id: e.options.id ?? '',
++                 order: e.options.order ?? 0,
++                 label: resolveSlotLabel(e.options.label) ?? '',
+++                ...(e.options.icon === undefined ? {} : { icon: e.options.icon }),
++               }))
++               .sort((a, b) => a.order - b.order)
++           }
++diff --git a/packages/client/ui-settings-general/src/client/shell-contract.ts b/packages/client/ui-settings-general/src/client/shell-contract.ts
++index 734b00a..58e10f7 100644
++--- a/packages/client/ui-settings-general/src/client/shell-contract.ts
+++++ b/packages/client/ui-settings-general/src/client/shell-contract.ts
++@@ -22,6 +22,12 @@ export interface SettingsSectionRow {
++   id: string
++   order: number
++   label: string
+++  /**
+++   * Optional icon token the registrant declared in its register options. The
+++   * shell resolves it to a library glyph; an absent or unknown token leaves the
+++   * shell's own id map and gear fallback in place.
+++   */
+++  icon?: string
++ }
++ 
++ /** One ordered onboarding step projected from a slot registration. */
++diff --git a/packages/client/ui-settings-general/tests/shell.client.spec.ts b/packages/client/ui-settings-general/tests/shell.client.spec.ts
++index 9088845..bebb7b3 100644
++--- a/packages/client/ui-settings-general/tests/shell.client.spec.ts
+++++ b/packages/client/ui-settings-general/tests/shell.client.spec.ts
++@@ -109,6 +109,18 @@ describe('ui-settings-general shell', () => {
++     off()
++   })
++ 
+++  it('projects a declared section icon token and leaves absent tokens off the row', async ({ start }) => {
+++    const c = await start()
+++    const { sections } = injectedOf(c).hooks
+++    c.ctx.slots.register({ name: 'settings.section', id: 'hub', order: 1_001, label: 'Hub', icon: 'api' } as never, () => null)
+++    c.ctx.slots.register({ name: 'settings.section', id: 'bare', order: 1_002, label: 'Bare' } as never, () => null)
+++    const rows = sections.getSnapshot()
+++    expect(rows.find(row => row.id === 'hub')).toEqual({ id: 'hub', order: 1_001, label: 'Hub', icon: 'api' })
+++    // A row without a token keeps the projection's four-key default, so the
+++    // shell's id map and gear fallback stay the only glyph source for it.
+++    expect(rows.find(row => row.id === 'bare')).not.toHaveProperty('icon')
+++  })
+++
++   it('shows Account first in Desktop while signed in and removes it on sign-out', async ({ start }) => {
++     vi.stubGlobal('dshDesktop', {})
++     onTestFinished(() => { vi.unstubAllGlobals() })
++diff --git a/packages/client/ui-settings/src/client/contract/slots.ts b/packages/client/ui-settings/src/client/contract/slots.ts
++index 9015a1e..fea216d 100644
++--- a/packages/client/ui-settings/src/client/contract/slots.ts
+++++ b/packages/client/ui-settings/src/client/contract/slots.ts
++@@ -49,7 +49,10 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
++      * position), `label` (registrant-localized display text — the registrant
++      * re-registers with fresh text on locale change, so the shell never
++      * subscribes locale state; the ledger bump doubles as the shell's
++-     * re-render trigger). Sections render inside the panel content column.
+++     * re-render trigger), and `icon` (an optional semantic token from the
+++     * shell's token table, so a contributed page is distinguishable in the nav;
+++     * absent or unknown tokens keep the shell's id map and gear fallback).
+++     * Sections render inside the panel content column.
++      * (`settings.general.item`, declared by ui-settings-general's General
++      * entry, is typed in the locale package — the common dependency of every
++      * item registrant; the shell neither declares nor renders it.)
++diff --git a/packages/client/ui-slots/src/index.ts b/packages/client/ui-slots/src/index.ts
++index 6e94643..c23e835 100644
++--- a/packages/client/ui-slots/src/index.ts
+++++ b/packages/client/ui-slots/src/index.ts
++@@ -759,7 +759,7 @@ export type SlotLabel = string | (() => string)
++ 
++ /**
++  * Kind shape fields carried in register options (keyed dispatch key; list
++- * id/order/label; chain select/priority; non-chain priority = cell shadowing rank).
+++ * id/order/label/icon; chain select/priority; non-chain priority = cell shadowing rank).
++  */
++ export type KindOptions<
++   K extends keyof SlotMap & string,
++@@ -775,6 +775,14 @@ export type KindOptions<
++       id: string
++       order?: number
++       label?: SlotLabel
+++      /**
+++       * Optional semantic icon token for owners that render a glyph beside the
+++       * label (nav rows, tabs). A token, never a component: stored options stay
+++       * inspectable data for the client-runner catalog and HMR. The owner's
+++       * contract names the accepted tokens; an absent or unknown token leaves
+++       * the owner's own fallback in place.
+++       */
+++      icon?: string
++       /** Cell shadowing rank (ascending, default 0, lowest renders; same id + same priority throws — see {@link SlotCore.register}). */
++       priority?: number
++     }
++@@ -840,7 +848,7 @@ type BaseOptions<
++  */
++ export interface StoredEntry {
++   component: unknown
++-  options: { key?: string; id?: string; order?: number; label?: SlotLabel; priority?: number }
+++  options: { key?: string; id?: string; order?: number; label?: SlotLabel; icon?: string; priority?: number }
++   /** Chain routing selector (type-erased like `inject`; present exactly on chain-slot entries). */
++   select?: ((owner: never) => unknown) | undefined
++   /** Registrant business face; positional params derive from the declaration (sessionId?, actions?). */
++@@ -878,6 +886,7 @@ interface ErasedOptions {
++   id?: string | undefined
++   order?: number | undefined
++   label?: SlotLabel | undefined
+++  icon?: string | undefined
++   select?: ((owner: never) => unknown) | undefined
++   priority?: number | undefined
++   children?: Record<string, SlotSpec<SlotEntryDef>> | undefined
++@@ -1265,6 +1274,7 @@ export class SlotCore {
++         ...(options.id !== undefined ? { id: options.id } : {}),
++         ...(options.order !== undefined ? { order: options.order } : {}),
++         ...(options.label !== undefined ? { label: options.label } : {}),
+++        ...(options.icon !== undefined ? { icon: options.icon } : {}),
++         ...(options.priority !== undefined ? { priority: options.priority } : {}),
++       },
++       ...(options.select !== undefined ? { select: options.select } : {}),
+diff --git a/fixture/patches/0002-input-trigger-source-registry.patch b/fixture/patches/0002-input-trigger-source-registry.patch
+new file mode 100644
+index 0000000..ff5b9ff
+--- /dev/null
++++ b/fixture/patches/0002-input-trigger-source-registry.patch
+@@ -0,0 +1,97 @@
++diff --git a/packages/client/ui-input-trigger/README.md b/packages/client/ui-input-trigger/README.md
++index 10c0f8d..3904762 100644
++--- a/packages/client/ui-input-trigger/README.md
+++++ b/packages/client/ui-input-trigger/README.md
++@@ -41,7 +41,7 @@ A source may implement `openReference(session, reference)` to open a draft refer
++ <details>
++ <summary>Implementation internals — click to expand</summary>
++ 
++-`src/core/` is the pure core — trigger detection, menu reduction, and exact match, with zero React/DOM/cordis — while `src/client/service.ts` wires the core to the menu snapshot store, the per-hit candidate fetch (generation-gated, `AbortSignal`-superseded, failed sources dropping silently with a console record), and the pick paths. One `InputTriggerController` resolves per session scope (`sessionOf`); the conversation wiring layer drives `track`/`arbitrate`/`onSpace`/`adjudicate` on the controller. A source is warmed into every session controller it can reach; sources whose `lexicon` rolls change after warm implement `subscribeLexicon` and the controller re-polls on each notification. `MenuView` self-registers into `conversation.input.overlay` (list kind, session scope) and renders null while closed. The `listbox` role sits on its scrolling viewport rather than the bounded shell, because a breadcrumb header is not an option and a listbox may not carry one; crumbs ride their own snapshot store beside the menu store, so the frozen reducer stays unaware of them. The overlay SlotMap merge lives here because the dependency direction (ui-conversation → ui-input-trigger) admits no reverse type import.
+++`src/core/` is the pure core — trigger detection, menu reduction, and exact match, with zero React/DOM/cordis — while `src/client/service.ts` wires the core to the menu snapshot store, the per-hit candidate fetch (generation-gated, `AbortSignal`-superseded, failed sources dropping silently with a console record), and the pick paths. One `InputTriggerController` resolves per session scope (`sessionOf`); the conversation wiring layer drives `track`/`arbitrate`/`onSpace`/`adjudicate` on the controller. Registration is unique per trigger/name pair, and `sources()` reads the roster in menu-group order so a plugin that decorates another registrant's candidates resolves that source instead of registering a duplicate group. A source is warmed into every session controller it can reach; sources whose `lexicon` rolls change after warm implement `subscribeLexicon` and the controller re-polls on each notification. `MenuView` self-registers into `conversation.input.overlay` (list kind, session scope) and renders null while closed. The `listbox` role sits on its scrolling viewport rather than the bounded shell, because a breadcrumb header is not an option and a listbox may not carry one; crumbs ride their own snapshot store beside the menu store, so the frozen reducer stays unaware of them. The overlay SlotMap merge lives here because the dependency direction (ui-conversation → ui-input-trigger) admits no reverse type import.
++ 
++ </details>
++ 
++diff --git a/packages/client/ui-input-trigger/src/client/contract.ts b/packages/client/ui-input-trigger/src/client/contract.ts
++index 2918442..2099d0b 100644
++--- a/packages/client/ui-input-trigger/src/client/contract.ts
+++++ b/packages/client/ui-input-trigger/src/client/contract.ts
++@@ -1,7 +1,7 @@
++ /**
++  * Frozen service contract of the slash pipeline. Types only. The
++  * InputTriggerService implementation publishes this face as `ctx.inputTriggers`; sources
++- * see registerSource alone, the conversation wiring layer resolves its
+++ * see registerSource and sources, the conversation wiring layer resolves its
++  * per-session controller through sessionOf.
++  */
++ import type { Context as ClientContext } from '@deepseek-ai/cordis'
++@@ -16,6 +16,16 @@ export interface InputTriggerServiceContract {
++    * @returns effect disposer removing this source.
++    */
++   registerSource(src: InputTriggerSource): () => void
+++  /**
+++   * Read the registered sources in registration = menu-group order. A plugin
+++   * that decorates another registrant's candidates (adding a leading glyph, a
+++   * section, an annotation) resolves that source here instead of registering a
+++   * duplicate trigger/name pair; the returned array is a fresh snapshot while
+++   * its source objects stay live and registrant-owned, so a decorator wraps the
+++   * callback it needs and must not mutate any other field.
+++   * @returns the current sources, in registration order.
+++   */
+++  sources(): readonly InputTriggerSource[]
++   /**
++    * Resolve the lazy controller owned by one session scope.
++    * @param actx - session-scoped Client context.
++diff --git a/packages/client/ui-input-trigger/src/client/service.ts b/packages/client/ui-input-trigger/src/client/service.ts
++index 44e759a..a73f4d7 100644
++--- a/packages/client/ui-input-trigger/src/client/service.ts
+++++ b/packages/client/ui-input-trigger/src/client/service.ts
++@@ -76,6 +76,18 @@ export class InputTriggerService extends Service implements InputTriggerServiceC
++     }
++   }
++ 
+++  /**
+++   * Read the registered sources in registration = menu-group order. The
+++   * snapshot is fresh on every read while each source object stays live and
+++   * owned by its registrant; a decorator of another source's candidates
+++   * resolves that source here.
+++   * @returns the current sources, in registration order.
+++   */
+++  sources(): readonly InputTriggerSource[] {
+++    const { live } = this
+++    return [...live.sources]
+++  }
+++
++   /**
++    * Resolve the per-session controller for one session scope (lazy; the
++    * scope disposer removes and disposes it). Construction warms the source
++diff --git a/packages/client/ui-input-trigger/tests/service.client.spec.ts b/packages/client/ui-input-trigger/tests/service.client.spec.ts
++index 93602bf..69d0f1d 100644
++--- a/packages/client/ui-input-trigger/tests/service.client.spec.ts
+++++ b/packages/client/ui-input-trigger/tests/service.client.spec.ts
++@@ -104,6 +104,26 @@ async function serviceBench() {
++   return { root, inputTriggers, mint }
++ }
++ 
+++describe('sources', () => {
+++  it('reads the roster in registration order as a fresh snapshot the caller cannot mutate', async () => {
+++    const { inputTriggers } = await serviceBench()
+++    const command = readySource('/', 'command', []).source
+++    const files = readySource('@', 'file', []).source
+++    inputTriggers.registerSource(command)
+++    const dispose = inputTriggers.registerSource(files)
+++
+++    const first = inputTriggers.sources()
+++    expect(first).toEqual([command, files])
+++    // A decorator works on its own copy: dropping a row from the snapshot must
+++    // not unregister anything from the live roster.
+++    ;(first as InputTriggerSource[]).pop()
+++    expect(inputTriggers.sources()).toEqual([command, files])
+++
+++    dispose()
+++    expect(inputTriggers.sources()).toEqual([command])
+++  })
+++})
+++
++ describe('registerSource', () => {
++   it('throws on a duplicate (trigger, name); same name across triggers is fine', async () => {
++     const { inputTriggers } = await serviceBench()
+diff --git a/fixture/src/client/index.tsx b/fixture/src/client/index.tsx
+index 45232e2..c200c74 100644
+--- a/fixture/src/client/index.tsx
++++ b/fixture/src/client/index.tsx
+@@ -6,11 +6,9 @@
+  * surfaces, both through official slots (no DOM injection):
+  *  - a plugin-management card in the `plugins.bundle.config` slot, keyed by the
+  *    bundle package name, rendered on the plugin's own page in the Plugins
+- *    manager (sidebar → 插件 → dsh-skill-hub), bound through the official
+- *    settings transport (the Host serves every registered namespace to the web
+- *    client, and the manager dispatches that key with `view: 'page'`) — the
+- *    family-bucket card pattern (PluginSettingsCard + CardForm vendored from
+- *    dsh-task-board);
++ *    manager (sidebar → 插件 → dsh-skill-hub), editing the entry's own profile
++ *    configuration through `ctx.configForms` — the family-bucket card pattern
++ *    (PluginSettingsCard + CardForm vendored from dsh-task-board);
+  *  - a top-level Settings section (Settings → 技能) hosting the skill hub
+  *    panel: catalog, search, enable/disable, diagnostics, new-skill form.
+  *
+@@ -26,7 +24,7 @@
+ import type { Context as ClientContext } from '@deepseek-ai/cordis'
+ // Type-only: pulls the locale plugin's Context merge (ctx.locale).
+ import type {} from '@deepseek-ai/dsh-client-locale/client'
+-// Type-only: pulls the settings-scope service merge and the settings.section slot.
++// Type-only: pulls the configForms service merge and the settings.section slot.
+ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+ // Type-only: pulls the LocaleNamespaceMap merge table.
+ import type {} from '@deepseek-ai/dsh-client-ui-slots'
+@@ -45,6 +43,7 @@ declare module '@deepseek-ai/cordis' {
+   }
+ }
+ import type { HubSettingsValue } from '../protocol.ts'
++import { SETTINGS_ENTRY_ID } from '../protocol.ts'
+ import { SkillHubApi } from './api.ts'
+ import { en, zh, type HubKey } from './locales.ts'
+ import { applySettingsNavIcon } from './settings-nav-icon.ts'
+@@ -64,12 +63,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
+ 
+ /**
+  * Required services (fiber inject waiting — the runtime must be up first).
+- * `connection`/`remote` are the settings transport's own prerequisites
+- * (`ctx.settingsScope.bind` resolves them on the caller's fiber), and
+- * `settingsScope` is the namespace-scope binder itself; mirror the official
+- * settings-plugins inject list.
++ * `configForms` is the settings transport's shared form service (it resolves
++ * `remote`/`remote.settings` on its own providing fiber), and `inputTriggers`
++ * is the composer menu the dots decorate.
+  */
+-export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope', 'inputTriggers']
++export const inject = ['slots', 'locale', 'configForms', 'inputTriggers']
+ 
+ /** Type-only surface (export discipline: no value exports beyond the plugin contract). */
+ export type { SkillHubPanelProps } from './panel/SkillHubPanel.tsx'
+@@ -85,18 +83,19 @@ export function apply(ctx: ClientContext): void {
+   const t = ctx.locale.bind(NS)
+   const api = new SkillHubApi()
+ 
+-  // The card edits the hub's settings namespace through the official settings
+-  // transport: the Plugins manager dispatches the card by the bundle package
+-  // name, and the Host serves every registered namespace — that pairing is
+-  // what makes the card appear (and stay in sync).
+-  // Single scope instance reused for both the card and slash-dots to avoid
++  // The card edits the plugin's own profile entry through the shared
++  // configuration form: the Host serves the entry's volatile Config fields and
++  // the form carries the revision-fenced writes. The form is keyed by the
++  // profile entry id, which the bundle patch declares and the host constant
++  // mirrors.
++  // Single form instance reused for both the card and slash-dots to avoid
+   // duplicate subscriptions (review #3).
+-  const scope = ctx.settingsScope.bind<HubSettingsValue>({ namespace: NS })
+-  const settingsCard = new SkillHubSettingsCardController(scope)
++  const form = ctx.configForms.get<HubSettingsValue>(SETTINGS_ENTRY_ID)
++  const settingsCard = new SkillHubSettingsCardController(form)
+ 
+   // Chat `/` 菜单技能圆点：为每个候选行加可调用性圆点（蓝=模型可调，绿=仅用户），颜色与面板图例同步；仅装饰，不自动预填 "/"
+   // inject 含 inputTriggers 保证 fiber 就绪后再 wrap，slash-dots 内的 undefined 防御仅用于单元测试 mock
+-  ctx.effect(() => setupSkillSlashDots(ctx, api, scope), 'dsh-skill-hub: slash dots')
++  ctx.effect(() => setupSkillSlashDots(ctx, api, form), 'dsh-skill-hub: slash dots')
+ 
+   // Plugin configuration: the hub renders its own form on the bundle's page in
+   // the Plugins manager (sidebar → 插件 → dsh-skill-hub), keyed by the bundle's
+diff --git a/fixture/src/client/settings-form.ts b/fixture/src/client/settings-form.ts
+index 34c95a5..8e3fdca 100644
+--- a/fixture/src/client/settings-form.ts
++++ b/fixture/src/client/settings-form.ts
+@@ -1,16 +1,17 @@
+ /**
+  * Settings-card form machinery, vendored from the dsh-web-ui family bucket
+  * (packages/dsh-task-board/src/client/settings-form.ts) and re-typed. Stages
+- * one card's edits over one settings namespace and writes them on save.
++ * one card's edits over one profile entry's configuration form and writes them
++ * on save.
+  *
+  * The Host is the only authority on whether a value was accepted — its
+- * validators own the constraints no schema can express — so the outcome is
+- * read back from the section rather than predicted here. A save that did not
+- * land keeps its drafts, so the user can correct them instead of retyping.
++ * validators own the constraints no schema can express — so a write's own
++ * result is the acceptance signal, and a non-secret write additionally reads
++ * the stored user layer back. A save that did not land keeps its drafts, so the
++ * user can correct them instead of retyping.
+  */
+ 
+ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+ 
+ /** One staged field: its draft text plus the clear/reset marker. */
+ interface StagedEdit {
+@@ -23,6 +24,12 @@ export interface FieldSpec {
+   field: string
+   format: (value: unknown) => string
+   parse: (text: string) => { kind: 'set'; value: unknown } | { kind: 'clear' } | undefined
++  /**
++   * Whether this field's stored value never rides a response (a `role('secret')`
++   * Config field): the user layer cannot be read back, so acceptance is the
++   * write's own result.
++   */
++  secret?: boolean
+ }
+ 
+ /** A boolean field, edited through true/false draft text. */
+@@ -58,6 +65,7 @@ export function colorField(field: string): FieldSpec {
+ export function secretField(field: string): FieldSpec {
+   return {
+     field,
++    secret: true,
+     format: () => '',
+     parse: (text) => {
+       const trimmed = text.trim()
+@@ -107,12 +115,16 @@ export interface FieldState {
+   invalid: boolean
+ }
+ 
+-/** The settings scope face the form consumes (subset of SettingsScope<T>). */
++/**
++ * The configuration-form face the card consumes: the subset of the official
++ * `ConfigForm<T>` that this form reads and writes. `set`/`unset` resolve to
++ * whether the Host accepted the write.
++ */
+ export interface FormScope {
+   subscribe(listener: () => void): () => void
+   getSnapshot(): { status: string; writable: boolean; value?: Record<string, unknown>; base?: unknown; user?: unknown }
+-  set(field: string, value: unknown): Promise<void>
+-  unset(field: string): Promise<void>
++  set(field: string, value: unknown): Promise<boolean>
++  unset(field: string): Promise<boolean>
+ }
+ 
+ /** Stages one card's edits and writes them through the settings transport. */
+@@ -203,7 +215,9 @@ export class CardForm {
+     for (const [field, staged] of this.staged) {
+       const spec = this.specOf(field)
+       if (staged.clear) {
+-        if (this.stored(field)) plan.push({ field, run: () => this.clear(field) })
++        // A redacted secret never shows in the user layer, so a staged reset is
++        // the only evidence the field should be cleared.
++        if (spec.secret === true || this.stored(field)) plan.push({ field, run: () => this.clear(field) })
+         continue
+       }
+       if (staged.text === spec.format(this.sectionValue(field))) continue
+@@ -216,13 +230,17 @@ export class CardForm {
+   }
+ 
+   private async clear(field: string): Promise<boolean> {
+-    await this.scope.unset(field)
+-    return !this.stored(field)
++    const accepted = await this.scope.unset(field)
++    if (!accepted) return false
++    // A secret's stored value is redacted, so nothing can be read back: the
++    // Host's acceptance is the whole answer.
++    return this.specOf(field).secret === true || !this.stored(field)
+   }
+ 
+   private async store(field: string, value: unknown): Promise<boolean> {
+-    await this.scope.set(field, value)
+-    return this.userRecord()?.[field] === value
++    const accepted = await this.scope.set(field, value)
++    if (!accepted) return false
++    return this.specOf(field).secret === true || this.userRecord()?.[field] === value
+   }
+ 
+   private userRecord(): Record<string, unknown> | undefined {
+diff --git a/fixture/src/client/slash-dots.test.ts b/fixture/src/client/slash-dots.test.ts
+index f6431ea..baa9798 100644
+--- a/fixture/src/client/slash-dots.test.ts
++++ b/fixture/src/client/slash-dots.test.ts
+@@ -2,17 +2,16 @@
+  * Slash-menu skill dots: source lookup + candidates wrapping. The wrapper's
+  * contract is pure and injectable — fake api (catalog) and fake settings scope
+  * (getSnapshot) — so it tests cleanly in the node vitest environment. The dot
+- * itself is injected into the rendered DOM, which does not exist here, so these
+- * tests assert that candidate rows pass through untouched. The module caches
+- * the catalog map; resetModelCache keeps tests independent.
++ * itself is a candidate `icon` component; these tests assert which rows get
++ * one, that no other field changes, and that a dispose restores the source.
++ * The module caches the catalog map; resetModelCache keeps tests independent.
+  */
+ 
+ import { beforeEach, describe, expect, it } from 'vitest'
+-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+ import type { InputTriggerCandidate, InputTriggerServiceContract, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+ import type { HubSettingsValue } from '../protocol.ts'
+ import type { SkillHubApi } from './api.ts'
+-import { findSkillSource, resetModelCache, wrapSkillSource } from './slash-dots.tsx'
++import { findSkillSource, resetModelCache, wrapSkillSource, type DotColorSource } from './slash-dots.tsx'
+ 
+ beforeEach(() => {
+   resetModelCache()
+@@ -35,14 +34,10 @@ function registry(...sources: InputTriggerSource[]): InputTriggerServiceContract
+ }
+ 
+ /** Fake settings scope snapshotting a fixed HubSettingsValue. */
+-function scopeWith(value: HubSettingsValue): SettingsScope<HubSettingsValue> {
++function scopeWith(value: HubSettingsValue): DotColorSource {
+   return {
+-    getSnapshot: () => ({ status: 'ready', value, base: undefined, user: undefined, revision: 1, writable: true, mode: 'host' }),
+-    subscribe: () => () => {},
+-    set: async () => {},
+-    unset: async () => {},
+-    mutate: async () => {},
+-  } as unknown as SettingsScope<HubSettingsValue>
++    getSnapshot: () => ({ value }),
++  }
+ }
+ 
+ /** Fake hub api whose catalog lists the given skills. */
+@@ -87,7 +82,7 @@ describe('findSkillSource', () => {
+ })
+ 
+ describe('wrapSkillSource', () => {
+-  it('leaves candidate rows untouched — the dot goes to the DOM, not the icon slot', async () => {
++  it('hangs the dot on the candidate icon slot for catalog-known skills', async () => {
+     const source = skillSource(async () => [
+       { name: 'code-review', description: 'review code' },
+       { name: 'personal-note', description: 'only me' },
+@@ -103,10 +98,12 @@ describe('wrapSkillSource', () => {
+       const rows = await source.candidates({ sessionId: 's1' as never }, { query: '', position: 'leading', drilled: false, signal: new AbortController().signal })
+ 
+       expect(rows).toHaveLength(2)
+-      // MenuView renders `icon` through ReferenceIcon (enum-narrowed), so a
+-      // custom element would never show — rows must carry no icon at all.
+-      expect(rows[0].icon).toBeUndefined()
+-      expect(rows[1].icon).toBeUndefined()
++      // The dot rides the official candidate `icon` field (MenuView renders a
++      // component beside the reference glyph tokens), so every catalog-known
++      // skill row carries one and the color differs by invocation policy.
++      expect(rows[0].icon).toBeTypeOf('function')
++      expect(rows[1].icon).toBeTypeOf('function')
++      expect(rows[0].icon).not.toBe(rows[1].icon)
+       // Original fields pass through untouched.
+       expect(rows[0].name).toBe('code-review')
+       expect(rows[0].description).toBe('review code')
+@@ -115,6 +112,26 @@ describe('wrapSkillSource', () => {
+     }
+   })
+ 
++  it('leaves rows the catalog does not know, and rows already carrying an icon, untouched', async () => {
++    const preset = (): InputTriggerCandidate => ({ name: 'personal-note', description: 'only me', icon: 'folder' })
++    const source = skillSource(async () => [
++      { name: 'unrelated-command', description: '' },
++      preset(),
++    ])
++    const api = apiWith([{ name: 'personal-note', modelInvocable: false }])
++    const scope = scopeWith({ enabled: true, announceToAgent: true, showUseCount: true, showUseTime: true, showGroupSummary: true })
++
++    const restore = wrapSkillSource(source, api, scope)
++    try {
++      const rows = await source.candidates({ sessionId: 's1' as never }, { query: '', position: 'leading', drilled: false, signal: new AbortController().signal })
++
++      expect(rows[0].icon).toBeUndefined()
++      expect(rows[1].icon).toBe('folder')
++    } finally {
++      restore()
++    }
++  })
++
+   it('still returns the rows when the catalog route is down', async () => {
+     const source = skillSource(async () => [{ name: 'lonely', description: '' }])
+     const api = { catalog: async () => { throw new Error('route down') } } as unknown as SkillHubApi
+diff --git a/fixture/src/client/slash-dots.tsx b/fixture/src/client/slash-dots.tsx
+index ad04642..bc86efd 100644
+--- a/fixture/src/client/slash-dots.tsx
++++ b/fixture/src/client/slash-dots.tsx
+@@ -4,13 +4,15 @@
+  *
+  * Mechanism: hooks the `/skill` source's `candidates` so the hub learns which
+  * rows are skill candidates and how each one classifies for model invocation,
+- * then injects the dot straight into the rendered option rows. The menu's
+- * `icon` slot is unusable for this — `MenuView` narrowed `icon` to an enum
+- * ('file' | 'folder' | 'session') and renders it through `ReferenceIcon`, so a
+- * custom element never reaches the DOM. Colors come from the same settings
+- * (dotModelColor / dotUserColor) and the same `modelInvocable` classification
+- * the panel legend uses — so the chat menu and the Settings → 技能 panel stay
+- * in sync, and editing the color updates both.
++ * then hands back the same rows carrying a dot `icon` component. The candidate
++ * `icon` field accepts a component beside the reference glyph tokens
++ * (`InputTriggerCandidate.icon`, rendered by `MenuView` at the row's leading
++ * glyph size), so the dot rides the official row-anatomy extension point — no
++ * DOM injection into rendered option rows, no dependence on hashed CSS module
++ * class names. Colors come from the same settings (dotModelColor /
++ * dotUserColor) and the same `modelInvocable` classification the panel legend
++ * uses — so the chat menu and the Settings → 技能 panel stay in sync, and
++ * editing the color updates both.
+  *
+  * The skill source is registered by the core plugin under the `name` "skill"
+  * on the `/` trigger; re-registering the same name would throw, so this wraps
+@@ -19,13 +21,13 @@
+  * / `sessionOf` — the lookup below is defensive: it never throws).
+  */
+ 
++import type { ReactNode } from 'react'
+ import type { Context as ClientContext } from '@deepseek-ai/cordis'
+-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+ // Type-only: pulls the Context merge for ctx.inputTriggers.
+ import type {} from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+ // Type-only: pulls the connection/reset event.
+ import type {} from '@deepseek-ai/dsh-client-connection/client'
+-import type { InputTriggerServiceContract, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
++import type { InputTriggerCandidate, InputTriggerServiceContract, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+ import type { HubSettingsValue } from '../protocol.ts'
+ import type { SkillHubApi } from './api.ts'
+ import { DEFAULT_DOT_MODEL_COLOR, DEFAULT_DOT_USER_COLOR } from './panel/format.ts'
+@@ -91,68 +93,46 @@ async function modelInvocableMap(api: SkillHubApi): Promise<Map<string, boolean>
+   }
+ }
+ 
++/** The dot colors the menu reads from the hub's settings section. */
++export interface DotColorSource {
++  getSnapshot(): { value?: HubSettingsValue }
++}
++
++/** Candidate icon size the menu falls back to when the row supplies none. */
++const DEFAULT_DOT_GLYPH_SIZE = 16
++
+ /**
+- * 通过直接操作已渲染的 `[role="option"]` 列表注入彩色点，
+- * 绕过 MenuView 对 `icon` 的枚举限制。
+- * @param modelByName - 技能名 → 模型可调用性；不在表内的候选不注点。
+- * @param modelColor - 模型可调用技能的点色。
+- * @param userColor - 仅用户可调用技能的点色。
++ * Build the candidate `icon` component for one dot color: a `size`×`size`
++ * leading-glyph cell holding the 6px dot. `MenuView` renders the component at
++ * the row's glyph size and forwards only `size`/`className`, so the color is
++ * closed over here.
++ * @param color - CSS color of the dot.
++ * @returns a component assignable to `InputTriggerCandidate.icon`.
+  */
+-function injectDotsViaDOM(modelByName: Map<string, boolean>, modelColor: string, userColor: string): void {
+-  if (typeof document === 'undefined' || typeof requestAnimationFrame === 'undefined') return
+-  const run = (): void => {
+-    // 仅处理斜杠菜单：优先用哈希类 `_3e4SsG_menu` 严格隔离面板内其它 listbox，
+-    // 哈希为 dsh 构建产物（review #4 已知脆弱点），已提供 `[role="listbox"]` 回退；
+-    // 后续 dsh 若暴露 `data-*` 锚点应迁移至此
+-    const menu = document.querySelector('[class*="_3e4SsG_menu"]') as HTMLElement | null
+-    const listbox = menu?.querySelector('[role="listbox"]') ?? document.querySelector('[role="listbox"]')
+-    // 若菜单未打开则不注入
+-    if (listbox === null) return
+-    const scope: ParentNode = listbox
+-    const options = scope.querySelectorAll('[role="option"]')
+-    for (const opt of options) {
+-      if (opt.querySelector('[data-skill-dot]') !== null) continue
+-      const nameEl = opt.querySelector('[class*="itemName"]') as HTMLElement | null
+-      if (nameEl === null) continue
+-      const name = (nameEl.textContent ?? '').trim()
+-      if (name.length === 0) continue
+-      // 仅对技能生效：非技能候选（/command、@file 等）不在 catalog，不注点
+-      if (!modelByName.has(name)) continue
+-      const color = (modelByName.get(name) ?? true) ? modelColor : userColor
+-      // 布局对齐菜单行原有的 icon 槽：16×16 容器居中 6px 点
+-      const wrapper = document.createElement('span')
+-      wrapper.setAttribute('data-skill-dot', '')
+-      wrapper.setAttribute('aria-hidden', 'true')
+-      wrapper.style.width = '16px'
+-      wrapper.style.height = '16px'
+-      wrapper.style.display = 'inline-flex'
+-      wrapper.style.justifyContent = 'center'
+-      wrapper.style.alignItems = 'center'
+-      wrapper.style.flex = 'none'
+-      const dot = document.createElement('span')
+-      dot.style.display = 'inline-block'
+-      dot.style.width = '6px'
+-      dot.style.height = '6px'
+-      dot.style.borderRadius = '3px'
+-      dot.style.background = color
+-      dot.style.flex = 'none'
+-      wrapper.appendChild(dot)
+-      // 直接插在名称前，与菜单行原有 icon 槽的位置一致
+-      nameEl.parentElement?.insertBefore(wrapper, nameEl)
+-    }
+-  }
+-  requestAnimationFrame(() => setTimeout(run, 0))
++function dotIcon(color: string): (props: { size?: number | undefined; className?: string | undefined }) => ReactNode {
++  return ({ size = DEFAULT_DOT_GLYPH_SIZE }) => (
++    <span
++      aria-hidden="true"
++      style={{
++        width: size, height: size, display: 'inline-flex', justifyContent: 'center', alignItems: 'center', flex: 'none',
++      }}
++    >
++      <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 3, background: color, flex: 'none' }} />
++    </span>
++  )
+ }
+ 
+ /**
+- * Wrap the core skill source so every menu row carries the invocation dot.
++ * Wrap the core skill source so every skill row carries the invocation dot on
++ * its leading-glyph `icon`. A row the catalog does not know (a `/command`, an
++ * `@file`) and a row that already carries an icon pass through untouched.
+  * Exported for unit tests; production wiring goes through setupSkillSlashDots.
+  * @param source - the registered `/skill` source.
+  * @param api - hub browser API for the modelInvocable lookup.
+  * @param scope - hub settings scope for the dot colors.
+  * @returns a disposer restoring the original candidates.
+  */
+-export function wrapSkillSource(source: InputTriggerSource, api: SkillHubApi, scope: SettingsScope<HubSettingsValue>): () => void {
++export function wrapSkillSource(source: InputTriggerSource, api: SkillHubApi, scope: DotColorSource): () => void {
+   const original = source.candidates
+   source.candidates = async (session, req) => {
+     const items = await original(session, req)
+@@ -162,8 +142,11 @@ export function wrapSkillSource(source: InputTriggerSource, api: SkillHubApi, sc
+     const snapshot = scope.getSnapshot()
+     const modelColor = snapshot.value?.dotModelColor ?? DEFAULT_DOT_MODEL_COLOR
+     const userColor = snapshot.value?.dotUserColor ?? DEFAULT_DOT_USER_COLOR
+-    injectDotsViaDOM(modelByName, modelColor, userColor)
+-    return items
++    return items.map((item): InputTriggerCandidate => {
++      const modelInvocable = modelByName.get(item.name)
++      if (modelInvocable === undefined || item.icon !== undefined) return item
++      return { ...item, icon: dotIcon(modelInvocable ? modelColor : userColor) }
++    })
+   }
+   return () => {
+     source.candidates = original
+@@ -184,7 +167,7 @@ export function wrapSkillSource(source: InputTriggerSource, api: SkillHubApi, sc
+ export function setupSkillSlashDots(
+   ctx: ClientContext,
+   api: SkillHubApi,
+-  scope: SettingsScope<HubSettingsValue>,
++  scope: DotColorSource,
+ ): () => void {
+   const inputTriggers = ctx.get('inputTriggers')
+   if (inputTriggers === undefined) return () => {}
+diff --git a/fixture/src/index.ts b/fixture/src/index.ts
+index b991eb9..61bb5b2 100644
+--- a/fixture/src/index.ts
++++ b/fixture/src/index.ts
+@@ -7,16 +7,19 @@
+  * source changes.
+  */
+ 
+-import type { Context } from '@deepseek-ai/cordis'
++import type { Context, Volatile } from '@deepseek-ai/cordis'
++import type { SettingsDescriptor } from '@deepseek-ai/dsh-settings'
+ import type { SkillProviderControl } from '@deepseek-ai/dsh-skill'
+-import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
+-import z from 'schemastery'
++import z from '@deepseek-ai/schemastery'
++// Type-only: the Loader's `loader/volatile-update` commit event.
++import type {} from '@deepseek-ai/cordis-plugin-loader'
+ import type {} from '@deepseek-ai/dsh-host-webserver'
+ import type {} from '@deepseek-ai/dsh-skill'
+ import type {} from '@deepseek-ai/dsh-system-prompt'
+ import type {} from '@deepseek-ai/dsh-session-query'
+ import type {} from '@deepseek-ai/dsh-settings'
+-import { HUB_CONFIG_DEFAULTS, HEX_COLOR_RE, type HubConfig, type HubSettingsValue } from './protocol.ts'
++import { HUB_CONFIG_DEFAULTS, HEX_COLOR_RE, SETTINGS_ENTRY_ID, type HubConfig } from './protocol.ts'
++import { readLegacySettingsSection } from './legacy-config.ts'
+ import { SkillHubProvider } from './provider.ts'
+ import { makeRoutes } from './routes.ts'
+ import { createSkillStatsReader, asPersistenceSeam, type SessionPersistenceLike, type SessionQueryLike, type SkillStatsReader } from './stats.ts'
+@@ -33,54 +36,51 @@ export const name = 'skill-hub'
+ /** Services required before the skill-hub surfaces can mount. */
+ export const inject = ['webServer', 'skills', 'systemPrompt', 'settings']
+ 
+-/** Plugin config, validated by the same-named schemastery schema. */
++/**
++ * Plugin config, validated by the same-named schemastery schema.
++ *
++ * Every editable field is volatile: the settings service writes it into the
++ * active profile's plugin configuration, and the Loader commits the next value
++ * into this reference without remounting the plugin — so the host reads each
++ * field live through `Volatile.get()` and re-syncs its registrations on
++ * `loader/volatile-update`. The composition entry's `config` block stays the
++ * base layer beneath the user's profile overrides.
++ */
+ export interface Config {
+   /** When true (default), a system-prompt section announces the hub to every agent. */
+-  announceToAgent?: boolean
++  announceToAgent: Volatile<boolean>
+   /** Master switch for the plugin (routes, prompt section). */
+-  enabled?: boolean
++  enabled: Volatile<boolean>
+   /** Show per-skill invocation count chip. Default true. */
+-  showUseCount?: boolean
++  showUseCount: Volatile<boolean>
+   /** Show per-skill last-used relative time. Default true. */
+-  showUseTime?: boolean
++  showUseTime: Volatile<boolean>
+   /** Show group-header usage summaries (count + last used). Default true. */
+-  showGroupSummary?: boolean
++  showGroupSummary: Volatile<boolean>
+   /** 统计滚动窗口天数：只统计最近 N 天的使用；0 = 全部历史。默认 0。 */
+-  statsWindowDays?: number
++  statsWindowDays: Volatile<number>
+   /** 自动统计扫描间隔（分钟，最小 1）。默认 5。 */
+-  statsScanMinutes?: number
++  statsScanMinutes: Volatile<number>
++  /** Model-invocable dot color (#rrggbb); absent means the panel default. */
++  dotModelColor: Volatile<string | undefined>
++  /** User-invocable dot color (#rrggbb); absent means the panel default. */
++  dotUserColor: Volatile<string | undefined>
++  /** GitHub personal access token; the secret role keeps it out of every settings response. */
++  githubToken: Volatile<string | undefined>
+ }
+ 
+-export const Config: z<Config> = z.object({
+-  announceToAgent: z.boolean().default(HUB_CONFIG_DEFAULTS.announceToAgent),
+-  enabled: z.boolean().default(HUB_CONFIG_DEFAULTS.enabled),
+-  showUseCount: z.boolean().default(HUB_CONFIG_DEFAULTS.showUseCount),
+-  showUseTime: z.boolean().default(HUB_CONFIG_DEFAULTS.showUseTime),
+-  showGroupSummary: z.boolean().default(HUB_CONFIG_DEFAULTS.showGroupSummary),
+-  statsWindowDays: z.number().min(0).max(3650).default(HUB_CONFIG_DEFAULTS.statsWindowDays),
+-  statsScanMinutes: z.number().min(1).max(1440).default(HUB_CONFIG_DEFAULTS.statsScanMinutes),
+-})
+-
+-/**
+- * Settings namespace hosting the hub's runtime config. The host serves every
+- * registered settings namespace to the web client, so the browser card and the
+- * settings page edit this namespace through the official settings transport,
+- * and the plugin consumes the same resolved value — one source of truth.
+- */
+-export const CONFIG_NAMESPACE = 'dsh-skill-hub' as SettingsNamespace
+-
+-/** Schema of the hub's settings namespace: the card's fields (booleans + optional dot colors). */
+-export const HubSettingsSchema: z<HubSettingsValue> = z.object({
+-  enabled: z.boolean().default(HUB_CONFIG_DEFAULTS.enabled),
+-  announceToAgent: z.boolean().default(HUB_CONFIG_DEFAULTS.announceToAgent),
+-  showUseCount: z.boolean().default(HUB_CONFIG_DEFAULTS.showUseCount),
+-  showUseTime: z.boolean().default(HUB_CONFIG_DEFAULTS.showUseTime),
+-  showGroupSummary: z.boolean().default(HUB_CONFIG_DEFAULTS.showGroupSummary),
+-  dotModelColor: z.string().pattern(HEX_COLOR_RE),
+-  dotUserColor: z.string().pattern(HEX_COLOR_RE),
+-  githubToken: z.string(),
+-  statsWindowDays: z.number().min(0).max(3650).default(HUB_CONFIG_DEFAULTS.statsWindowDays),
+-  statsScanMinutes: z.number().min(1).max(1440).default(HUB_CONFIG_DEFAULTS.statsScanMinutes),
++/** Live preferences projected to the browser settings card. */
++export const Config = z.object({
++  announceToAgent: z.boolean().default(HUB_CONFIG_DEFAULTS.announceToAgent).volatile(),
++  enabled: z.boolean().default(HUB_CONFIG_DEFAULTS.enabled).volatile(),
++  showUseCount: z.boolean().default(HUB_CONFIG_DEFAULTS.showUseCount).volatile(),
++  showUseTime: z.boolean().default(HUB_CONFIG_DEFAULTS.showUseTime).volatile(),
++  showGroupSummary: z.boolean().default(HUB_CONFIG_DEFAULTS.showGroupSummary).volatile(),
++  statsWindowDays: z.number().min(0).max(3650).default(HUB_CONFIG_DEFAULTS.statsWindowDays).volatile(),
++  statsScanMinutes: z.number().min(1).max(1440).default(HUB_CONFIG_DEFAULTS.statsScanMinutes).volatile(),
++  dotModelColor: z.string().pattern(HEX_COLOR_RE).volatile(),
++  dotUserColor: z.string().pattern(HEX_COLOR_RE).volatile(),
++  githubToken: z.string().role('secret').volatile(),
+ })
+ 
+ /** Order of the announcement section within the tool-guidance band. */
+@@ -92,23 +92,43 @@ export const SKILL_HUB_GUIDANCE = [
+   'The dsh-skill-hub plugin is installed (the DSH Web GUI skill hub): Settings → "Skills" is the management page; the plugin\'s configuration card (enable / announcement toggles) lives on its own page in the Plugins manager (sidebar → 插件 → the plugin). Capabilities: full local skill catalog (project / custom / user / bundled roots via the official ctx.skills registry, including third-party providers); browsing by source and custom groups, each group header carrying a sliding switch to enable/disable the whole group in one click (cross-group conflicts prompt the user); market: a built-in catalog of curated repos (one-click add) plus custom repo sources, scan-and-install import, per-source installed / updatable / deleted-upstream badges with "check all" and "update all" actions; upstream source tracking: skills imported from GitHub repos (market sources or direct URLs) record the repo/commit snapshot, support update checks, selective sync, and follow-up deletion when the upstream removes a skill (moves it into a restorable trash; restoring keeps the source and scene membership); personal skills (no source record) are never tracked; invocation counts and last-used times; skill body inspection; discovery diagnostics; new-skill wizard (writes to ~/.dsh/skills or ~/.agents/skills). Limits: only user-level skills (user-dsh/user-agents roots) are writable; project/bundled/runtime skills are read-only; routes are loopback-only. When the user mentions "skill management / skill list / skill toggle / skill sync / skill market / update skills / new skill", this plugin is what they mean — collaborate accordingly.'
+ ].join('\n\n')
+ 
++/**
++ * Read the effective hub config out of the live Config references: schema
++ * defaults, then the composition entry's values, then the profile's user layer
++ * (the Loader resolves all three into each reference).
++ * @param config - the plugin's parsed Config.
++ * @returns the resolved hub config.
++ */
++export function effectiveHubConfig(config: Config): HubConfig {
++  const dotModelColor = config.dotModelColor.get()
++  const dotUserColor = config.dotUserColor.get()
++  const githubToken = config.githubToken.get()
++  return {
++    enabled: config.enabled.get(),
++    announceToAgent: config.announceToAgent.get(),
++    showUseCount: config.showUseCount.get(),
++    showUseTime: config.showUseTime.get(),
++    showGroupSummary: config.showGroupSummary.get(),
++    statsWindowDays: config.statsWindowDays.get(),
++    statsScanMinutes: config.statsScanMinutes.get(),
++    ...(dotModelColor !== undefined ? { dotModelColor } : {}),
++    ...(dotUserColor !== undefined ? { dotUserColor } : {}),
++    ...(githubToken !== undefined ? { githubToken } : {}),
++  }
++}
++
+ /**
+  * Mount the skill hub routes and announcement.
+  * @param ctx - host plugin context carrying webServer/skills/systemPrompt/settings.
+- * @param config - resolved plugin config (schema defaults applied by the loader).
++ * @param config - validated plugin config; each editable field is a live reference.
+  */
+-export function apply(ctx: Context, config?: Config): void {
+-  // The hub's runtime configuration lives in dsh's own settings service: the
+-  // host serves every registered settings namespace to the web client, so the
+-  // browser card and the config route edit this namespace through the official
+-  // settings transport, and the host consumes the very same resolved value —
+-  // one source of truth. The cordis composition entry seeds the base layer; the
+-  // sidecar config survives only as a one-time migration source below.
+-  const base = config ?? {}
+-  const settingsScope = ctx.settings.register(CONFIG_NAMESPACE, HubSettingsSchema, { base })
+-  // The effective resolved config, read live from the settings namespace
+-  // (schema defaults, then the composition base, then the user layer).
+-  const current = (): HubConfig => settingsScope.get()
++export function apply(ctx: Context, config: Config): void {
++  // The hub ships its own configuration card (the Plugins manager page), so it
++  // opts out of the settings service's generated page for this entry.
++  ctx.effect(
++    () => ctx.settings.configure({ auto: false }, ctx.fiber),
++    'dsh-skill-hub: settings presentation',
++  )
+ 
+   const store = new SkillHubStore()
+   let disposeRoutes: (() => void) | undefined
+@@ -123,27 +143,42 @@ export function apply(ctx: Context, config?: Config): void {
+   // stats route's data rather than failing to load.
+   let stats: SkillStatsReader | undefined
+ 
++  // The entry this plugin's settings form belongs to. The browser card looks
++  // the same id up through `ctx.configForms`, so a bundle patch that renames
++  // the row would strand the card — surface that instead of failing silently.
++  if (ctx.fiber.entry !== undefined && ctx.fiber.entry.options.id !== SETTINGS_ENTRY_ID) {
++    ctx.logger.warn(`[dsh-skill-hub] profile entry id "${ctx.fiber.entry.options.id}" does not match the settings entry "${SETTINGS_ENTRY_ID}"; the settings card and its form will not meet`)
++  }
++
++  // The effective resolved config, read live from the volatile references.
++  const current = (): HubConfig => effectiveHubConfig(config)
++
++  /** This entry's form descriptor (undefined while the Host does not serve it). */
++  const descriptor = (): SettingsDescriptor | undefined =>
++    ctx.settings.describe().find((entry) => entry.ns === SETTINGS_ENTRY_ID)
++
+   // The raw saved config layer (fields the user explicitly overrode); the
+   // config route reports it so callers can mark overridden fields.
+   const saved = (): Partial<HubConfig> => {
+-    const descriptor = ctx.settings.describe().find((entry) => entry.ns === CONFIG_NAMESPACE)
+-    return (descriptor?.user as Partial<HubConfig> | undefined) ?? {}
++    const user = descriptor()?.user
++    return typeof user === 'object' && user !== null ? user as Partial<HubConfig> : {}
+   }
+ 
+   // Persist a config patch, re-point the live config, and re-sync every
+   // surface through the settings transport. A patch value of undefined clears
+-  // the saved override (the key leaves the user section, so the field
+-  // re-inherits the base/default) — the old sidecar's reset semantics.
+-  // Runs inside the config route handler; the watcher below re-syncs the
+-  // surfaces once the namespace commits.
++  // the profile override (the path is unset, so the field re-inherits the
++  // composition base/default) — the old sidecar's reset semantics.
++  // Runs inside the config route handler; the volatile-update listener below
++  // re-syncs the surfaces once the Loader commits the new values.
+   const updateConfig = async (patch: Partial<HubConfig>): Promise<HubConfig> => {
+-    const user: Record<string, unknown> = { ...saved() }
+-    for (const [key, value] of Object.entries(patch) as Array<[keyof HubConfig, boolean | string | number | undefined]>) {
+-      if (value === undefined) delete user[key]
+-      else user[key] = value
++    const ops = Object.entries(patch)
++      .map(([key, value]) => (value === undefined
++        ? { op: 'unset' as const, path: [key] }
++        : { op: 'set' as const, path: [key], value }))
++    if (ops.length > 0) {
++      await ctx.settings.mutate(SETTINGS_ENTRY_ID, ops, descriptor()?.revision)
+     }
+-    await settingsScope.replace(user)
+-    return settingsScope.get()
++    return current()
+   }
+ 
+   // Register (or drop) every surface to match the current config. Each
+@@ -164,7 +199,7 @@ export function apply(ctx: Context, config?: Config): void {
+     const value = current()
+     // GitHub auth for market/source API calls: env GITHUB_TOKEN/GH_TOKEN is the
+     // fallback (read at module load); an explicit settings value wins live and
+-    // applies without a restart via the settings watcher below.
++    // applies without a restart via the volatile-update listener below.
+     setGithubToken(value.githubToken)
+     if (value.announceToAgent) {
+       disposeSection = ctx.systemPrompt.section({
+@@ -208,19 +243,16 @@ export function apply(ctx: Context, config?: Config): void {
+     )
+   }
+ 
+-  // Initial registration from the composition entry, then re-sync whenever
+-  // the settings namespace commits (any writer — the card, the config route,
+-  // or the Host document editor).
++  // Initial registration from the composition entry, then re-sync whenever the
++  // Loader commits a volatile config change (the settings card or the Host
++  // configuration editor). The references are already updated when the event
++  // fires, so `current()` reads the new values.
+   sync()
+   ctx.effect(
+-    () => settingsScope.watch(() => { sync() }),
+-    'dsh-skill-hub: settings config watch',
++    () => ctx.on('loader/volatile-update', () => { sync() }),
++    'dsh-skill-hub: config re-sync',
+   )
+ 
+-  // One-time migration: an install upgraded from the sidecar-configured
+-  // build seeds the settings namespace from the saved sidecar config when the
+-  // namespace has no user section yet. Later edits live only in the settings
+-  // document; the sidecar keeps its (now-stale) copy untouched.
+   // Startup: 清理 Issue #3 遗留的 .*.import-* 临时目录（尽早回收，不阻塞）
+   void (async () => {
+     const home = dshHome()
+@@ -245,16 +277,31 @@ export function apply(ctx: Context, config?: Config): void {
+     }
+   })()
+ 
+-  void (async () => {
++  // One-time migration into the profile entry's config: an install upgraded
++  // from an older build kept its values in the plugin sidecar (`config`) or in
++  // the removed global `settings.yaml` section `dsh-skill-hub` — a namespace id
++  // the Host's own import cannot map onto this entry, so the plugin reads the
++  // preserved document itself. Waits for the Loader to settle first, exactly as
++  // the Host's import does, and runs only while the entry carries no user
++  // override at all: once the profile owns a value, the legacy copies stay
++  // stale and are never replayed over a later reset (the one exception — the
++  // user unsets every field, emptying the user layer — is the same edge the
++  // pre-0.1.7 namespace import had).
++  const loader = ctx.get('loader')
++  const settled = loader === undefined ? Promise.resolve() : loader.await()
++  void settled.then(async () => {
+     try {
+-      const legacy = await store.getConfig()
+-      if (Object.keys(legacy).length > 0 && Object.keys(saved()).length === 0) {
+-        await settingsScope.update(legacy as Record<string, unknown>)
+-      }
++      if (Object.keys(saved()).length > 0) return
++      const legacy: Partial<HubConfig> = { ...await store.getConfig(), ...await readLegacySettingsSection(dshHome()) }
++      if (Object.keys(legacy).length === 0) return
++      await ctx.settings.update(SETTINGS_ENTRY_ID, legacy, descriptor()?.revision)
++      ctx.logger.info(`[dsh-skill-hub] migrated ${Object.keys(legacy).join(', ')} from the pre-profile configuration into entry ${SETTINGS_ENTRY_ID}`)
+     } catch (error) {
+-      ctx.logger.warn('[dsh-skill-hub] sidecar config migration into the settings namespace failed', error)
++      ctx.logger.warn('[dsh-skill-hub] legacy config migration into the profile entry failed', error)
+     }
+-  })()
++  }).catch((error: unknown) => {
++    ctx.logger.warn('[dsh-skill-hub] waiting for the Loader before the legacy config migration failed', error)
++  })
+ 
+   // Optional trigger statistics: while a session-query service exists, wire a
+   // cached invocation-count reader into the stats route. Re-running sync()
+@@ -285,8 +332,8 @@ export function apply(ctx: Context, config?: Config): void {
+     void (async () => {
+       // 恢复 sidecar 里的增量扫描检查点后再建 reader（异步、不阻塞）：
+       // 重启后无需重新解压全部历史日志；每次扫描完都落盘（含上次总数），所以
+-      // 重启后面板秒出旧数、后台重扫。扫描间隔与滚动窗口都从设置命名空间
+-      // 实时读取——卡片里改完即生效，无需重启。
++      // 重启后面板秒出旧数、后台重扫。扫描间隔与滚动窗口都从插件配置实时读取
++      // ——卡片里改完即生效，无需重启。
+       const checkpoint = await store.getSkillStatsState().catch(() => undefined)
+       if (generation !== statsGeneration) return
+       const scanMinutes = (): number => {
+diff --git a/fixture/src/legacy-config.test.ts b/fixture/src/legacy-config.test.ts
+new file mode 100644
+index 0000000..a51d342
+--- /dev/null
++++ b/fixture/src/legacy-config.test.ts
+@@ -0,0 +1,109 @@
++import { mkdtemp, rm, writeFile } from 'node:fs/promises'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++import { afterEach, beforeEach, describe, expect, it } from 'vitest'
++import { pickHubConfig, readLegacySettingsSection } from './legacy-config.ts'
++
++describe('pickHubConfig', () => {
++  it('keeps every known field of the legacy namespace', () => {
++    expect(pickHubConfig({
++      enabled: false,
++      announceToAgent: false,
++      showUseCount: false,
++      showUseTime: false,
++      showGroupSummary: false,
++      dotModelColor: '#112233',
++      dotUserColor: '#AABBCC',
++      statsWindowDays: 0,
++      statsScanMinutes: 30,
++      githubToken: '  ghp_exampletoken  ',
++    })).toEqual({
++      enabled: false,
++      announceToAgent: false,
++      showUseCount: false,
++      showUseTime: false,
++      showGroupSummary: false,
++      dotModelColor: '#112233',
++      dotUserColor: '#AABBCC',
++      statsWindowDays: 0,
++      statsScanMinutes: 30,
++      githubToken: 'ghp_exampletoken',
++    })
++  })
++
++  it('drops unknown keys and values the Config schema would reject', () => {
++    expect(pickHubConfig({
++      enabled: 'yes',
++      dotModelColor: 'red',
++      statsWindowDays: -1,
++      statsScanMinutes: 1.5,
++      githubToken: '   ',
++      somethingElse: 1,
++    })).toEqual({})
++  })
++
++  it('drops out-of-range numbers instead of failing the migration write', () => {
++    expect(pickHubConfig({ statsWindowDays: 3651, statsScanMinutes: 0 })).toEqual({})
++    expect(pickHubConfig({ statsWindowDays: 3650, statsScanMinutes: 1440 })).toEqual({ statsWindowDays: 3650, statsScanMinutes: 1440 })
++  })
++
++  it('returns nothing for a non-object section', () => {
++    expect(pickHubConfig(undefined)).toEqual({})
++    expect(pickHubConfig(['enabled'])).toEqual({})
++    expect(pickHubConfig('enabled: true')).toEqual({})
++  })
++})
++
++describe('readLegacySettingsSection', () => {
++  let home: string
++  const HUB = 'dsh-skill-hub'
++
++  beforeEach(async () => {
++    home = await mkdtemp(join(tmpdir(), 'dsh-skill-hub-legacy-'))
++  })
++
++  afterEach(async () => {
++    await rm(home, { recursive: true, force: true })
++  })
++
++  it('reads the plugin section out of a pre-import settings.yaml', async () => {
++    await writeFile(join(home, 'settings.yaml'), [
++      'ui-chat:',
++      '  transcriptView: detailed',
++      `${HUB}:`,
++      '  enabled: false',
++      '  dotModelColor: "#102030"',
++      '  statsScanMinutes: 15',
++      '',
++    ].join('\n'), 'utf8')
++    expect(await readLegacySettingsSection(home)).toEqual({
++      enabled: false,
++      dotModelColor: '#102030',
++      statsScanMinutes: 15,
++    })
++  })
++
++  it('falls back to the renamed settings.yaml.imported document', async () => {
++    await writeFile(join(home, 'settings.yaml.imported'), `${HUB}:\n  announceToAgent: false\n`, 'utf8')
++    expect(await readLegacySettingsSection(home)).toEqual({ announceToAgent: false })
++  })
++
++  it('prefers the live settings.yaml over an older imported copy', async () => {
++    await writeFile(join(home, 'settings.yaml.imported'), `${HUB}:\n  showUseCount: false\n  showUseTime: false\n`, 'utf8')
++    await writeFile(join(home, 'settings.yaml'), `${HUB}:\n  showUseCount: true\n`, 'utf8')
++    expect(await readLegacySettingsSection(home)).toEqual({ showUseCount: true, showUseTime: false })
++  })
++
++  it('returns nothing when no document or section exists', async () => {
++    expect(await readLegacySettingsSection(home)).toEqual({})
++    await writeFile(join(home, 'settings.yaml'), 'ui-chat:\n  transcriptView: compact\n', 'utf8')
++    expect(await readLegacySettingsSection(home)).toEqual({})
++  })
++
++  it('survives a malformed document', async () => {
++    await writeFile(join(home, 'settings.yaml'), ':\n  - [unclosed\n', 'utf8')
++    expect(await readLegacySettingsSection(home)).toEqual({})
++    await writeFile(join(home, 'settings.yaml'), '- just\n- a list\n', 'utf8')
++    expect(await readLegacySettingsSection(home)).toEqual({})
++  })
++})
+diff --git a/fixture/src/legacy-config.ts b/fixture/src/legacy-config.ts
+new file mode 100644
+index 0000000..f7a01fc
+--- /dev/null
++++ b/fixture/src/legacy-config.ts
+@@ -0,0 +1,107 @@
++/**
++ * One-time recovery of the hub config an install kept outside its profile
++ * entry: the `dsh-skill-hub` section of the removed global `settings.yaml`.
++ *
++ * dsh 0.1.7 moved settings into the active profile's plugin configuration and
++ * imports a leftover `settings.yaml` exactly once — but it maps each section to
++ * the entry of the same id, and this plugin's old namespace (`dsh-skill-hub`)
++ * differs from its entry id (`skill-hub`). The Host therefore rejects the
++ * section, logs it, and leaves it only in `settings.yaml.imported`; the plugin
++ * owns reading it back, exactly as the migration guidance requires.
++ *
++ * The document is renamed to `settings.yaml.imported` before the first write of
++ * the Host's import, so both names are tried; unreadable or malformed documents
++ * and unknown/invalid fields are dropped individually, never fatally.
++ */
++
++import { readFile } from 'node:fs/promises'
++import { join } from 'node:path'
++import { load } from 'js-yaml'
++import { HEX_COLOR_RE, LEGACY_SETTINGS_NAMESPACE, type HubConfig } from './protocol.ts'
++
++/** Candidate names of the removed global settings document, newest first. */
++const LEGACY_DOCUMENTS = ['settings.yaml.imported', 'settings.yaml'] as const
++
++/** Whole-number bounds of the fields carried over, mirroring the Config schema. */
++const STATS_WINDOW_DAYS_MAX = 3650
++const STATS_SCAN_MINUTES_MIN = 1
++const STATS_SCAN_MINUTES_MAX = 1440
++
++function booleanOf(value: unknown): boolean | undefined {
++  return typeof value === 'boolean' ? value : undefined
++}
++
++function colorOf(value: unknown): string | undefined {
++  return typeof value === 'string' && HEX_COLOR_RE.test(value) ? value : undefined
++}
++
++function integerOf(value: unknown, min: number, max: number): number | undefined {
++  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max ? value : undefined
++}
++
++function tokenOf(value: unknown): string | undefined {
++  return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined
++}
++
++/**
++ * Keep only the hub fields a settings section may carry, with values the Config
++ * schema accepts. A field of the wrong type is dropped rather than allowed to
++ * fail the whole migration write.
++ * @param value - one parsed settings section.
++ * @returns the accepted fields (empty for a non-object).
++ */
++export function pickHubConfig(value: unknown): Partial<HubConfig> {
++  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
++  const record = value as Record<string, unknown>
++  const picked: Partial<HubConfig> = {}
++  const enabled = booleanOf(record.enabled)
++  if (enabled !== undefined) picked.enabled = enabled
++  const announceToAgent = booleanOf(record.announceToAgent)
++  if (announceToAgent !== undefined) picked.announceToAgent = announceToAgent
++  const showUseCount = booleanOf(record.showUseCount)
++  if (showUseCount !== undefined) picked.showUseCount = showUseCount
++  const showUseTime = booleanOf(record.showUseTime)
++  if (showUseTime !== undefined) picked.showUseTime = showUseTime
++  const showGroupSummary = booleanOf(record.showGroupSummary)
++  if (showGroupSummary !== undefined) picked.showGroupSummary = showGroupSummary
++  const dotModelColor = colorOf(record.dotModelColor)
++  if (dotModelColor !== undefined) picked.dotModelColor = dotModelColor
++  const dotUserColor = colorOf(record.dotUserColor)
++  if (dotUserColor !== undefined) picked.dotUserColor = dotUserColor
++  const statsWindowDays = integerOf(record.statsWindowDays, 0, STATS_WINDOW_DAYS_MAX)
++  if (statsWindowDays !== undefined) picked.statsWindowDays = statsWindowDays
++  const statsScanMinutes = integerOf(record.statsScanMinutes, STATS_SCAN_MINUTES_MIN, STATS_SCAN_MINUTES_MAX)
++  if (statsScanMinutes !== undefined) picked.statsScanMinutes = statsScanMinutes
++  const githubToken = tokenOf(record.githubToken)
++  if (githubToken !== undefined) picked.githubToken = githubToken
++  return picked
++}
++
++/**
++ * Read the hub's section out of the removed global settings document.
++ * @param home - harness home holding the document (`$DSH_HOME`).
++ * @returns the section's accepted fields; empty when no document or section exists.
++ */
++export async function readLegacySettingsSection(home: string): Promise<Partial<HubConfig>> {
++  // The Host renames the document before its first import write, so the
++  // imported copy is the older of the two when both exist; a re-created plain
++  // document is newer and wins field by field.
++  let picked: Partial<HubConfig> = {}
++  for (const name of LEGACY_DOCUMENTS) {
++    let raw: string
++    try {
++      raw = await readFile(join(home, name), 'utf8')
++    } catch {
++      continue // absent (never written, or already renamed) or unreadable contributes nothing
++    }
++    let parsed: unknown
++    try {
++      parsed = load(raw)
++    } catch {
++      continue // a malformed document keeps nothing; the other name may still parse
++    }
++    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) continue
++    picked = { ...picked, ...pickHubConfig((parsed as Record<string, unknown>)[LEGACY_SETTINGS_NAMESPACE]) }
++  }
++  return picked
++}
+diff --git a/fixture/src/protocol.ts b/fixture/src/protocol.ts
+index aa8b9e3..3b438a5 100644
+--- a/fixture/src/protocol.ts
++++ b/fixture/src/protocol.ts
+@@ -31,7 +31,7 @@ export type {
+ } from './protocol/catalog.ts'
+ export type { SkillStat, StatsResponse, SkillStatsCheckpoint } from './protocol/stats.ts'
+ export type { ErrorResponse, HubConfig, HubSettingsValue, RedactedHubConfig, ConfigResponse, ConfigRequest } from './protocol/config.ts'
+-export { HUB_CONFIG_DEFAULTS, HEX_COLOR_RE, GITHUB_TOKEN_RE, resolveHubConfig, redactGithubToken } from './protocol/config.ts'
++export { HUB_CONFIG_DEFAULTS, HEX_COLOR_RE, GITHUB_TOKEN_RE, LEGACY_SETTINGS_NAMESPACE, SETTINGS_ENTRY_ID, resolveHubConfig, redactGithubToken } from './protocol/config.ts'
+ export type {
+   MarketSourceRecord,
+   MarketSourcesResponse,
+diff --git a/fixture/src/protocol/config.ts b/fixture/src/protocol/config.ts
+index 94b1fca..4b1c1c2 100644
+--- a/fixture/src/protocol/config.ts
++++ b/fixture/src/protocol/config.ts
+@@ -3,6 +3,22 @@ export interface ErrorResponse {
+   error: string
+ }
+ 
++/**
++ * The plugin's profile entry id (the row id its bundle patch declares). It is
++ * both the settings form namespace the Host serves and the key the browser
++ * card looks up through `ctx.configForms`; `cordis.patch.yml` and this constant
++ * must stay in step.
++ */
++export const SETTINGS_ENTRY_ID = 'skill-hub'
++
++/**
++ * The settings namespace the plugin used before settings moved into the profile
++ * entry's Config. The Host's one-time `settings.yaml` import maps sections by
++ * entry id, so this section is not imported automatically; the plugin reads the
++ * preserved document itself (see `legacy-config.ts`).
++ */
++export const LEGACY_SETTINGS_NAMESPACE = 'dsh-skill-hub'
++
+ /** The skill hub's own runtime configuration, edited from the settings card. */
+ export interface HubConfig {
+   /** Master switch: routes, provider, and announcement all go live with this. */
+diff --git a/fixture/tsdown.config.ts b/fixture/tsdown.config.ts
+index add5097..49cadb8 100644
+--- a/fixture/tsdown.config.ts
++++ b/fixture/tsdown.config.ts
+@@ -64,15 +64,19 @@ function libConfig(): UserConfig {
+     // clean must stay off: a default clean would wipe the lib/types
+     // declarations tsc emitted before tsdown runs (see package.json prebuild).
+     clean: false,
+-    // The cordis framework and the host SDK resolve at runtime from the dsh
+-    // profile tree, never from this package; their built declarations carry
+-    // .ts-suffixed relative imports rolldown cannot follow.
++    // The cordis framework, the host SDK, and the schema builder resolve at
++    // runtime from the dsh profile tree, never from this package; their built
++    // declarations carry .ts-suffixed relative imports rolldown cannot follow.
++    // `@deepseek-ai/schemastery` must stay external: the Loader parses this
++    // plugin's Config through the schema instance built here, and a bundled
++    // second copy would give that schema an identity the host never shares.
+     external: [
+       '@deepseek-ai/cordis',
+       '@deepseek-ai/dsh-skill',
+       '@deepseek-ai/dsh-host-webserver',
+       '@deepseek-ai/dsh-settings',
+       '@deepseek-ai/dsh-system-prompt',
++      '@deepseek-ai/schemastery',
+     ],
+   }
+ }

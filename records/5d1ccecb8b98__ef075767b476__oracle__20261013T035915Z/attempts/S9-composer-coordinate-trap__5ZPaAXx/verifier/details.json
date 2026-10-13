@@ -1,0 +1,71 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "projection-contract",
+      "verdict": "pass",
+      "reason": "The report explicitly distinguishes the clipboard projection (InputState.draft and Occurrence.offset/length, chip expanded to full clipboardText, 28 chars) from the detect projection (detectText, chip = one U+FFFC), grounded in host-input-contract.ts, and notes that insertReference and consumeToken take detect-coordinate spans. It implicitly covers ordinary text contributing normal width via the conversion rule. Fully correct.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "repeat-paste-failure",
+      "verdict": "pass",
+      "reason": "Locates snapshot.draft.length in plugin-client.js add as the clipboard-projection insertion point, explains that with an empty composer both coordinate systems coincide (first paste OK), and that after a chip draft.length (29) overshoots the 1-char detect text so the splice fails, insertReference returns false, and the plugin itself manufactures the changed-composer toast — explicitly noting no real concurrent edit occurred. Grounded in the capture and fixture files.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "removal-and-bookkeeping",
+      "verdict": "pass",
+      "reason": "Traces remove: occurrence.offset..offset+length (clipboard coords 0..28) passed unconverted to consumeToken's detect-coordinate span guard, the false return is never inspected, records.delete runs unconditionally, and the record === undefined branch renders 'unavailable' in the dock while the live occurrence keeps both chips visible. Ties it to the same coordinate mismatch, not a separate upload failure.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "conversion-and-success-gate",
+      "verdict": "pass",
+      "reason": "Derives the exact rule (subtract sum of preceding occurrences' length−1; chip spans 1 detect char) and applies it at both call sites: insert start=end=converted draft end, removal start=converted offset, end=start+1. Keeps the draftRev guard implicitly by retaining span structure, keeps the setDraft slice only as a clipboard-coordinate fallback, and requires retiring the record only after the verb reports success. Matches the required mapping.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "regression-sequences",
+      "verdict": "pass",
+      "reason": "Proposes two successive pastes asserting both occurrences and both dock chips, then removal of a chip with another chip present asserting composer occurrence count drops, dock chip gone (not unavailable), record removed, and the other chip surviving; adds first/last-chip and empty-again paste variants. Covers the required repeat-interaction and removal sequences.",
+      "points": 20,
+      "awarded": 20
+    }
+  ],
+  "caps": [],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-JgRBuz7YyD2Rt6OiEFPwlg6f",
+    "usage": {
+      "prompt_tokens": 5306,
+      "completion_tokens": 1084,
+      "total_tokens": 6390,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 578
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "9087ba7c136d2c57807202237337dcedf41d848940b7e9517aefa88e2123263a",
+    "response_sha256": "40e386e7ac4d39f2a1902d8107e6e548e2a5a4178816d79fd0da8a307a62f393"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "56cfe2269fc93d0e8e0173007e168b25b136df244f403dbb00cdda420f654dad"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "eca3984f1c94f3ff5770c686ae84e515e2364834e15b4ebcd21467077efb85a3",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

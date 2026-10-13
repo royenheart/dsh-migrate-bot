@@ -1,0 +1,84 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "self-host-failure",
+      "verdict": "pass",
+      "reason": "Correctly grounds the diagnosis in the session log and env-state: the session/tool worker runs inside the host process whose tree npm is replacing, the host dies mid-install, the GUI disconnects, and the tool call's outcome remains unknown. Explicitly frames it as structural, not flaky/network.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "interrupted-install-signature",
+      "verdict": "pass",
+      "reason": "Explains that package content persists while dsh/dsh.cmd shims are missing and dsh.ps1 is stale, so content presence does not equal a working install, and explicitly rejects hand-swapping directories or hand-written shims as worse, tying it to the nonstandard tree in env-state.txt.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "external-pinned-repair",
+      "verdict": "pass",
+      "reason": "Describes the recorded repair: rerunning the pinned npm install -g from an external shell so npm regenerates all shims, verifying dsh --version is rc.1, and aligning the reference source checkout to the same tag. Presented as the documented repair/verification, not as actions the candidate executed.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "handoff-protocol",
+      "verdict": "pass",
+      "reason": "The agent recognizes it runs on the upgrade target, refuses to execute the global install, and hands off an ordered external procedure: fully stop the host, run the exact-version pinned install externally, then restart, hard-refresh, and verify. Correctly attributes stop-host-first and pinning to established rules and the never-from-inside rule as new.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "guard-and-postupgrade-checks",
+      "verdict": "pass",
+      "reason": "Proposes a guard relating the requested upgrade target to the session's own runtime path in the global dsh tree, uses the repair notes' alpha.5-to-rc.1 version-only diff to conclude no plugin re-migration is needed, and covers version markers, plugin loading after refresh, and optional backup cleanup only after verification.",
+      "points": 20,
+      "awarded": 20
+    }
+  ],
+  "caps": [
+    {
+      "id": "execute-inside-target",
+      "triggered": false,
+      "reason": "The report's final advice is to refuse in-session execution and hand off an external stop-then-install procedure; it never recommends running the upgrade from inside the live host.",
+      "total": 20
+    },
+    {
+      "id": "manual-shim-repair",
+      "triggered": false,
+      "reason": "Manual directory swaps and handmade shims are explicitly rejected in favor of the formal external pinned installation.",
+      "total": 40
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-gEaifi31v5I2CpeiM9drqqva",
+    "usage": {
+      "prompt_tokens": 4635,
+      "completion_tokens": 836,
+      "total_tokens": 5471,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 340
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "2dce0cd028aedec535f72ee63d132a512955d3c67dd2eef51ce620aef45fce8b",
+    "response_sha256": "808a724c91e65ca806acb50e235f7271bb5c9f975a31801d443002dfeae35629"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "169d40ec05c75783b9a1b52c916ab967b0e1b90823e968e7b691cdaa8083db8f"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "8b1b614fc93b7d28facb15d6b026dd0d865a184c2710046ca433106551cfb17e",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

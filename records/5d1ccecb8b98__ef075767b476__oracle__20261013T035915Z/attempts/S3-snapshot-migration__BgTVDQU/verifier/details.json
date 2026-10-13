@@ -1,0 +1,128 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "chat-projection",
+      "verdict": "pass",
+      "reason": "Locates partial/runningCalls/turnEnds in Pet.tsx (lines 14, 21-23) and correctly explains the staged path: read them through views.get('chat')?.legacy as a temporary projection, then migrate to target-owned Chat/views/timeline surfaces, noting ordering caveats. Goes beyond merely saying legacy.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "session-lifecycle",
+      "verdict": "pass",
+      "reason": "Locates running at Pet.tsx:19, correctly states it stays on the Session/useSession lifecycle seat outside the chat legacy projection, and explicitly says the existing hook need not be renamed.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "type-and-inject",
+      "verdict": "pass",
+      "reason": "Locates the dsh-client-runtime imports (index.ts:6, Pet.tsx:8) and package.json:8 inject entry; repoints Context as ClientContext to @deepseek-ai/cordis, correctly states ConversationSnapshot must not come from cordis and defers the exact snapshot symbol to target exports (with documented ChatSnapshot owner), and requires removing dsh-client-runtime from client.inject.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "slot-registration",
+      "verdict": "pass",
+      "reason": "Locates the scoped slots.register call in index.ts:38-43, explains slots.inject around registration with the ui-renderer Context augmentation, and preserves slot name, id, order, lifetime and scoping. The proposed slots.inject form is a plausible equivalent supported registration shape.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "mapping-and-plan",
+      "verdict": "pass",
+      "reason": "Ties snapshot/lifecycle/slot changes to DSH-0.1.2-A1-03 and type/inject removal to DSH-0.1.2-A1-25 with explanatory context (not bare IDs), and clearly separates the temporary legacy projection (partial/runningCalls/turnEnds) from immediate changes (type imports, inject removal, slot registration, running staying on useSession).",
+      "points": 20,
+      "awarded": 20
+    }
+  ],
+  "caps": [],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-ipUKWe9SF8LTh7SLa8lmRR6k",
+    "usage": {
+      "prompt_tokens": 7097,
+      "completion_tokens": 658,
+      "total_tokens": 7755,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 250
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "1b05cd44b4836a9ef38088d19f888ec9800fd9aaa0512d813a12b54f9b78e7b5",
+    "response_sha256": "b8cfe12a9be531a3b97cfcba650707628dc3424619e3e8ad447dd2b3f5512643"
+  },
+  "citation_audit": [
+    {
+      "report": "report.md",
+      "citation": "src/client/index.ts:6",
+      "path": "src/client/index.ts",
+      "start": 6,
+      "end": 6,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "src/client/Pet.tsx:8",
+      "path": "src/client/Pet.tsx",
+      "start": 8,
+      "end": 8,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "package.json:8",
+      "path": "package.json",
+      "start": 8,
+      "end": 8,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "package.json:8",
+      "path": "package.json",
+      "start": 8,
+      "end": 8,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "src/client/Pet.tsx:14",
+      "path": "src/client/Pet.tsx",
+      "start": 14,
+      "end": 14,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "src/client/Pet.tsx:19",
+      "path": "src/client/Pet.tsx",
+      "start": 19,
+      "end": 19,
+      "valid": true
+    },
+    {
+      "report": "report.md",
+      "citation": "src/client/index.ts:38-43",
+      "path": "src/client/index.ts",
+      "start": 38,
+      "end": 43,
+      "valid": true
+    }
+  ],
+  "reports": {
+    "report.md": "641a32a51d6f0e61943cedae4554cb962877f12bd3c37d97b7ad84562beeeb06"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "1f642e97cf47268f9c81828a40e7bc9d7eb06ff90a98942de358600f04e1b30d",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

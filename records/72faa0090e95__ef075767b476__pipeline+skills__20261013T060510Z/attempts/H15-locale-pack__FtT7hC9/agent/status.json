@@ -1,0 +1,150 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "failed",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.8",
+              "version": "0.1.0-rc.8"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "cards": true,
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [
+          "e2e"
+        ],
+        "reviewed": true,
+        "attempts": 2,
+        "lastFingerprint": "e2e: plugin-registration.spec.ts \u203a the deployment mounts the bench-locale-pack plugin",
+        "failure": {
+          "check": "e2e",
+          "outcome": "fail",
+          "fingerprint": "e2e: plugin-registration.spec.ts \u203a the deployment mounts the bench-locale-pack plugin",
+          "detail": "These tests passed on the source release and do not pass now:\n- plugin-registration.spec.ts \u203a the deployment mounts the bench-locale-pack plugin (failed in a check step): Error: the bench-locale-pack card in the plugin list never held steady for two consecutive reads (last read: 0)\n\n",
+          "blame": "plugin"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [
+          "plugin-registration.spec.ts \u203a the deployment mounts the bench-locale-pack plugin"
+        ],
+        "stoppedBy": "repeated-failure",
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "comments": []
+      },
+      "run": "local-2026-10-13T06-06-48-877Z",
+      "startedAt": "2026-10-13T06:06:50.238Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "failed",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.8",
+            "version": "0.1.0-rc.8"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "cards": true,
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [
+        "e2e"
+      ],
+      "reviewed": true,
+      "attempts": 2,
+      "lastFingerprint": "e2e: plugin-registration.spec.ts \u203a the deployment mounts the bench-locale-pack plugin",
+      "failure": {
+        "check": "e2e",
+        "outcome": "fail",
+        "fingerprint": "e2e: plugin-registration.spec.ts \u203a the deployment mounts the bench-locale-pack plugin",
+        "detail": "These tests passed on the source release and do not pass now:\n- plugin-registration.spec.ts \u203a the deployment mounts the bench-locale-pack plugin (failed in a check step): Error: the bench-locale-pack card in the plugin list never held steady for two consecutive reads (last read: 0)\n\n",
+        "blame": "plugin"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [
+        "plugin-registration.spec.ts \u203a the deployment mounts the bench-locale-pack plugin"
+      ],
+      "stoppedBy": "repeated-failure",
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "comments": []
+    },
+    "run": "local-2026-10-13T06-06-48-877Z",
+    "startedAt": "2026-10-13T06:06:50.238Z"
+  }
+}

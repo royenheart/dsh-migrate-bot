@@ -1,0 +1,147 @@
+{
+  "schema": 3,
+  "id": "e701925b3e56__ef075767b476__pipeline+skills__20261013T035534Z",
+  "createdAt": "2026-10-13T03:55:34Z",
+  "producer": {
+    "commit": "e701925b3e56c614049d78ec282817c94c33d97c",
+    "version": "0.3.4",
+    "dirty": false,
+    "message": "feat(bench): write the report a task asks for in a session of its own",
+    "snapshot": "f4301636c33793c0"
+  },
+  "subject": {
+    "id": "pipeline+skills",
+    "agentRuntime": "0.2.0-rc.2",
+    "skills": {
+      "commit": "ef075767b476e8000c716a18f848028eebcd5aef",
+      "names": [
+        "plugin-upgrade"
+      ]
+    },
+    "attempts": 1,
+    "agentTimeoutMultiplier": 5
+  },
+  "suite": {
+    "repository": "oh-my-dsh/dsh-plugin-upgrade-skill",
+    "commit": "ef075767b476e8000c716a18f848028eebcd5aef",
+    "tasks": [
+      {
+        "id": "H15-locale-pack",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      }
+    ]
+  },
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-v4-flash",
+    "before": {
+      "at": "2026-10-13T03:55:35.389Z",
+      "servedModel": "deepseek-flash",
+      "fingerprint": "aeb56401ca74e127821c4f9126dcb669"
+    },
+    "after": {
+      "at": "2026-10-13T04:49:19.614Z",
+      "servedModel": "deepseek-flash",
+      "fingerprint": "aeb56401ca74e127821c4f9126dcb669"
+    }
+  },
+  "environment": {
+    "harbor": "0.24.0",
+    "docker": "29.6.1",
+    "os": "Linux 6.12.101+deb13-cloud-amd64",
+    "concurrency": 1
+  },
+  "attempts": [
+    {
+      "task": "H15-locale-pack",
+      "attempt": 1,
+      "trial": "H15-locale-pack__vQDfrHu",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 3136.5,
+        "verifierSec": 3.2,
+        "totalSec": 3220.6
+      },
+      "usage": {
+        "inputTokens": 311328,
+        "cacheHitTokens": 28357888,
+        "outputTokens": 250245,
+        "usd": 0.2819198639999999
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H15-locale-pack__vQDfrHu/agent/proposed.diff",
+          "sha256": "03fd5e8a97ee56d39bae81003d7e74ed0d9c1767df27335aef0ce2571c0c1481",
+          "bytes": 23865
+        },
+        "agent/agent.log": {
+          "path": "attempts/H15-locale-pack__vQDfrHu/agent/agent.log",
+          "sha256": "77d8bbaaf8f7daead81bd34583d4c354d05b2764ce7be9e536e9b561ddf7d1a6",
+          "bytes": 25187
+        },
+        "agent/report.log": {
+          "path": "attempts/H15-locale-pack__vQDfrHu/agent/report.log",
+          "sha256": "244ac3da8875380ed879fba7fafd7f247a3d9e077f32b3497d4e26c6b79cf584",
+          "bytes": 10838
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H15-locale-pack__vQDfrHu/agent/events.jsonl",
+          "sha256": "f4863644bc923a362f151785836ae0238691983a8e52e6c729afb150e784dceb",
+          "bytes": 4194
+        },
+        "agent/status.json": {
+          "path": "attempts/H15-locale-pack__vQDfrHu/agent/status.json",
+          "sha256": "f3bdecc1d4d1a4cc53940fa12a55d8d71d3afd28b212828f711d811d2940959c",
+          "bytes": 6513
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H15-locale-pack__vQDfrHu/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H15-locale-pack__vQDfrHu/verifier/test-stdout.txt",
+          "sha256": "9ea85457e55b6a3e1efa46952a24e19ee659110fd590b4ce76e672c5ca5a0f3d",
+          "bytes": 1469
+        }
+      }
+    }
+  ],
+  "metrics": {
+    "formula": "v1",
+    "values": {
+      "meanReward": 0.4,
+      "passRate@1.0": 0,
+      "passRate@0.7": 0,
+      "passAtK": 0,
+      "meanReward.S": null,
+      "meanReward.M": null,
+      "meanReward.H": 0.4,
+      "passHatK": 0,
+      "fragility": 0,
+      "dispersion": null,
+      "unstableTaskShare": 0,
+      "inputTokens": 311328,
+      "outputTokens": 250245,
+      "cacheHitRatio": 0.989141,
+      "costPerAttempt": 0.28192,
+      "costPerSuccess": null,
+      "agentSecP50": 3136.5,
+      "agentSecP90": 3136.5,
+      "timeoutRate": 0,
+      "infrastructureRate": 0,
+      "eligibleTasks": 1,
+      "infeasibleTasks": 0
+    },
+    "intervals": {}
+  }
+}

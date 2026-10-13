@@ -1,0 +1,142 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.7-rc.2",
+      "target": {
+        "tag": "dsh-v0.1.7-rc.2",
+        "version": "0.1.7-rc.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.7-rc.2",
+            "version": "0.1.7-rc.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.7-rc.1",
+              "version": "0.1.7-rc.1"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "cards": true,
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 0,
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [
+          "reader-turn.spec.ts \u203a a running turn shows its prompt, its wait clock and the model retry detail",
+          "reader-turn.spec.ts \u203a the turn navigation rail lists every turn and marks the current one",
+          "reader-view.spec.ts \u203a reading view is the default conversation view and renders the reading column",
+          "reader-view.spec.ts \u203a the reading toolbar auto-fold toggle flips the preference it persists",
+          "settings.spec.ts \u203a the Better Display section offers its settings switches with their defaults",
+          "settings.spec.ts \u203a the Better Display switches record the user choice and keep it after a reload",
+          "settings.spec.ts \u203a the generative-mcpapps skill row reports detection and can re-check the host"
+        ],
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-13T08-50-21-188Z",
+      "startedAt": "2026-10-13T08:50:21.956Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.7-rc.2",
+    "target": {
+      "tag": "dsh-v0.1.7-rc.2",
+      "version": "0.1.7-rc.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.7-rc.2",
+          "version": "0.1.7-rc.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.7-rc.1",
+            "version": "0.1.7-rc.1"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "cards": true,
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 0,
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [
+        "reader-turn.spec.ts \u203a a running turn shows its prompt, its wait clock and the model retry detail",
+        "reader-turn.spec.ts \u203a the turn navigation rail lists every turn and marks the current one",
+        "reader-view.spec.ts \u203a reading view is the default conversation view and renders the reading column",
+        "reader-view.spec.ts \u203a the reading toolbar auto-fold toggle flips the preference it persists",
+        "settings.spec.ts \u203a the Better Display section offers its settings switches with their defaults",
+        "settings.spec.ts \u203a the Better Display switches record the user choice and keep it after a reload",
+        "settings.spec.ts \u203a the generative-mcpapps skill row reports detection and can re-check the host"
+      ],
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-13T08-50-21-188Z",
+    "startedAt": "2026-10-13T08:50:21.956Z"
+  }
+}

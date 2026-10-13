@@ -1,0 +1,156 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.8",
+              "version": "0.1.0-rc.8"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "cards": true,
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [
+          "e2e"
+        ],
+        "reviewed": true,
+        "attempts": 1,
+        "lastFingerprint": "cards: the card ledger does not match its schema: cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string",
+        "failure": {
+          "check": "e2e",
+          "outcome": "fail",
+          "fingerprint": "e2e: plugin-mounted.spec.ts \u203a the host mounts the interpreters plugin",
+          "detail": "These tests passed on the source release and do not pass now:\n- plugin-mounted.spec.ts \u203a the host mounts the interpreters plugin (failed in a reach step, on the way through the host's UI): Error: expect(locator).toBeVisible() failed Locator: getByRole('dialog', { name: 'Settings' }).getByRole('tabpanel', { name: 'Plugin list' }).getByRole('button', { name: /^bench-interpreters-card\\b/ }).first() Expected: visible Timeout: 15000ms Error: element(s) not found Call log: - Expect \"toBeVisible\" with timeout 15000ms - waiting for getByRole('dialog', { name: 'Settings' }).getByRole('tabpan\n\n",
+          "blame": "host"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [
+          "interpreter-gateway.spec.ts \u203a the interpreters config gateway answers its get and set routes",
+          "plugin-mounted.spec.ts \u203a the host mounts the interpreters plugin"
+        ],
+        "warnings": [
+          "end-to-end tests that passed before the migration fail now (advisory, see the checks): e2e: plugin-mounted.spec.ts \u203a the host mounts the interpreters plugin"
+        ],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-13T11-54-31-339Z",
+      "startedAt": "2026-10-13T11:54:32.806Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.8",
+            "version": "0.1.0-rc.8"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "cards": true,
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [
+        "e2e"
+      ],
+      "reviewed": true,
+      "attempts": 1,
+      "lastFingerprint": "cards: the card ledger does not match its schema: cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string",
+      "failure": {
+        "check": "e2e",
+        "outcome": "fail",
+        "fingerprint": "e2e: plugin-mounted.spec.ts \u203a the host mounts the interpreters plugin",
+        "detail": "These tests passed on the source release and do not pass now:\n- plugin-mounted.spec.ts \u203a the host mounts the interpreters plugin (failed in a reach step, on the way through the host's UI): Error: expect(locator).toBeVisible() failed Locator: getByRole('dialog', { name: 'Settings' }).getByRole('tabpanel', { name: 'Plugin list' }).getByRole('button', { name: /^bench-interpreters-card\\b/ }).first() Expected: visible Timeout: 15000ms Error: element(s) not found Call log: - Expect \"toBeVisible\" with timeout 15000ms - waiting for getByRole('dialog', { name: 'Settings' }).getByRole('tabpan\n\n",
+        "blame": "host"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [
+        "interpreter-gateway.spec.ts \u203a the interpreters config gateway answers its get and set routes",
+        "plugin-mounted.spec.ts \u203a the host mounts the interpreters plugin"
+      ],
+      "warnings": [
+        "end-to-end tests that passed before the migration fail now (advisory, see the checks): e2e: plugin-mounted.spec.ts \u203a the host mounts the interpreters plugin"
+      ],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-13T11-54-31-339Z",
+    "startedAt": "2026-10-13T11:54:32.806Z"
+  }
+}

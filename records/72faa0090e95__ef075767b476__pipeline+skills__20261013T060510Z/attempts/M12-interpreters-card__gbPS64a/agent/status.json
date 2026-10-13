@@ -1,0 +1,160 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.8",
+              "version": "0.1.0-rc.8"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "cards": true,
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [
+          "e2e"
+        ],
+        "reviewed": true,
+        "attempts": 1,
+        "lastFingerprint": "cards: the card ledger does not match its schema: cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string",
+        "failure": {
+          "check": "e2e",
+          "outcome": "fail",
+          "fingerprint": "e2e: plugin-inventory.spec.ts \u203a the harness plugin list shows the interpreters card plugin mounted and enabled",
+          "detail": "These tests passed on the source release and do not pass now:\n- plugin-inventory.spec.ts \u203a the harness plugin list shows the interpreters card plugin mounted and enabled (failed in no step)\n\n",
+          "blame": "host"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [
+          "interpreters-gateway.spec.ts \u203a interpreters config gateway \u203a the gateway route serves the interpreters config the card reads",
+          "interpreters-gateway.spec.ts \u203a interpreters config gateway \u203a the gateway offers the card's read endpoint",
+          "interpreters-gateway.spec.ts \u203a interpreters config gateway \u203a the gateway offers the card's write endpoint",
+          "plugin-inventory.spec.ts \u203a the harness plugin list shows the interpreters card plugin mounted and enabled"
+        ],
+        "warnings": [
+          "end-to-end tests that passed before the migration fail now (advisory, see the checks): e2e: plugin-inventory.spec.ts \u203a the harness plugin list shows the interpreters card plugin mounted and enabled"
+        ],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-13T06-06-47-482Z",
+      "startedAt": "2026-10-13T06:06:49.099Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.8",
+            "version": "0.1.0-rc.8"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "cards": true,
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [
+        "e2e"
+      ],
+      "reviewed": true,
+      "attempts": 1,
+      "lastFingerprint": "cards: the card ledger does not match its schema: cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string",
+      "failure": {
+        "check": "e2e",
+        "outcome": "fail",
+        "fingerprint": "e2e: plugin-inventory.spec.ts \u203a the harness plugin list shows the interpreters card plugin mounted and enabled",
+        "detail": "These tests passed on the source release and do not pass now:\n- plugin-inventory.spec.ts \u203a the harness plugin list shows the interpreters card plugin mounted and enabled (failed in no step)\n\n",
+        "blame": "host"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [
+        "interpreters-gateway.spec.ts \u203a interpreters config gateway \u203a the gateway route serves the interpreters config the card reads",
+        "interpreters-gateway.spec.ts \u203a interpreters config gateway \u203a the gateway offers the card's read endpoint",
+        "interpreters-gateway.spec.ts \u203a interpreters config gateway \u203a the gateway offers the card's write endpoint",
+        "plugin-inventory.spec.ts \u203a the harness plugin list shows the interpreters card plugin mounted and enabled"
+      ],
+      "warnings": [
+        "end-to-end tests that passed before the migration fail now (advisory, see the checks): e2e: plugin-inventory.spec.ts \u203a the harness plugin list shows the interpreters card plugin mounted and enabled"
+      ],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-13T06-06-47-482Z",
+    "startedAt": "2026-10-13T06:06:49.099Z"
+  }
+}

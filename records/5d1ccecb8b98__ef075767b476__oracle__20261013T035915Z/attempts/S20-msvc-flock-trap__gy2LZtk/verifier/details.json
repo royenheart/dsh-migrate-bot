@@ -1,0 +1,103 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "native-install-failure",
+      "verdict": "pass",
+      "reason": "Correctly identifies fs-ext@2.1.1 pulled by @deepseek-ai/dsh-session-persistence-jsonl, its node-gyp configure build install step, and missing Visual Studio/MSVC as the failure cause, grounded in install-error.log and manifest-excerpt.json.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "static-import-trap",
+      "verdict": "pass",
+      "reason": "Explains that lease.ts statically imports flock from fs-ext, so the module must load at boot regardless of build; --ignore-scripts leaves no binary and the import throws. Grounded in lease-excerpt.md.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "platform-lock-contract",
+      "verdict": "pass",
+      "reason": "Distinguishes the Windows named kernel semaphore path (CreateSemaphoreW/WaitForSingleObject/ReleaseSemaphore via acquireLockHandleWin32) from POSIX flock, concludes the native module is dead code on Windows while Linux/macOS keep the native build in the plan. Grounded in lease-excerpt.md and win32-excerpt.ts.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "reproducible-local-patch",
+      "verdict": "pass",
+      "reason": "Follows the node-pty pnpm patch precedent: rewrite install script to run node-gyp only on non-Windows, provide a pure-JS import-safe flock fallback on win32, register in pnpm-workspace.yaml with patchedDependencies and allowBuilds, then re-run pnpm install. Verification checks are light (only re-running install is stated) but the core patch plan is complete and sufficient.",
+      "points": 25,
+      "awarded": 25
+    },
+    {
+      "id": "machine-and-upstream-boundaries",
+      "verdict": "pass",
+      "reason": "Explicitly frames the plan as no Visual Studio and no upstream changes, using the repository-managed pnpm patch mechanism.",
+      "points": 10,
+      "awarded": 10
+    },
+    {
+      "id": "corridor-mapping",
+      "verdict": "pass",
+      "reason": "Cites the full card ID DSH-0.1.3-A1-03 and connects it to the install-channel fs-ext native build failure and the pnpm-patch recipe.",
+      "points": 5,
+      "awarded": 5
+    }
+  ],
+  "caps": [
+    {
+      "id": "requires-visual-studio",
+      "triggered": false,
+      "reason": "The plan explicitly avoids installing Visual Studio; it uses a local pnpm patch instead.",
+      "total": 50
+    },
+    {
+      "id": "ignore-scripts-only",
+      "triggered": false,
+      "reason": "The plan does not rely on --ignore-scripts; it explains why that alone fails and proposes a patch making the entry loadable.",
+      "total": 40
+    },
+    {
+      "id": "upstream-edit-required",
+      "triggered": false,
+      "reason": "The plan uses the repository-managed patch mechanism and explicitly avoids upstream changes.",
+      "total": 40
+    },
+    {
+      "id": "lock-bypass",
+      "triggered": false,
+      "reason": "The Windows semaphore locking path is preserved; only the unused POSIX flock import gets a fallback on Windows.",
+      "total": 20
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-LvRpgK8sSc1hKq2zSwqYtB9q",
+    "usage": {
+      "prompt_tokens": 4355,
+      "completion_tokens": 984,
+      "total_tokens": 5339,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 434
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "584b90e94a52fbcaa9dd3223854590a920c1a5fb5bee8b8da808ad6908dfb3be",
+    "response_sha256": "76efecc0a1221149b686f4c7ac7f1ad16609f31753381220252517e053cddaaf"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "604de7c8447cef5ea1d9280d9d8902899cba98925f711b8974fb30510aa775a6"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "16602aec8cf4819e728e92243f7c5a3f9293cf9f3ae20f59eaaaa89a61650334",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

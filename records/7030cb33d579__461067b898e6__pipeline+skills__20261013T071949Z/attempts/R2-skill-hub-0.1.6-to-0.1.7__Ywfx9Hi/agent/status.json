@@ -1,0 +1,144 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.7-alpha.1",
+      "target": {
+        "tag": "dsh-v0.1.7-alpha.1",
+        "version": "0.1.7-alpha.1"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.7-alpha.1",
+            "version": "0.1.7-alpha.1"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.6-alpha.2",
+              "version": "0.1.6-alpha.2"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "checks": {
+              "cards": true,
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 1,
+        "lastFingerprint": "cards: the card ledger does not match its schema: cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string",
+        "failure": {
+          "check": "cards",
+          "outcome": "fail",
+          "fingerprint": "cards: the card ledger does not match its schema: cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string",
+          "detail": "\u2026lds in the same\n- DSH-0.1.7-A1-08 \u00b7 Tolerant Profile loading: unreadable optional bundles no longer abort the Profile [behavior; informational] Applies to: profile composition; every installed plugin's failure visibility Recipe: none for the plugin. Two awareness items for fleet maintainers: (1) after a host upgrade, a plugin can be MISSING rather than crashing the boot - check the Plugin Manager page / boot roster instead of assuming no crash means all loaded; (2) this is load-level tolerance only - a plugin that loads but\n- DSH-0.1.7-A1-09 \u00b7 Plugins can declare locale-aware title/description and a package.json icon [capability; optional] Applies to: plugin packaging (Plugin Manager display) Recipe: add the locale title/description structure and the package.json icon field per the contract at tag dsh-v0.1.7-alpha.1 (re-check exact field names in the target tag); the Plugin Manager renders them.\n- DSH-0.1.7-A1-10 \u00b7 Attachments stored only in custom events are no longer auto-read or exported [breaking; required-if-hit] Applies to: plugins that store attachment payloads in custom session events Recipe: per the release notes this is a declared adaptation duty: give the plugin its own durable storage for such attachments (or reference host-delivered attachments instead of duplicating payloads into custom events); re-check the event/export boundary at tag dsh-v0.1.7-alpha.1 before shipping. Audit exi\n- DSH-0.1.7-A1-11 \u00b7 Two new settings-page seats: settings.launcher and settings.models.sign-in [capability; optional] Applies to: client plugins extending the settings panel's opening surface (sidebar account launcher) or the Models settings credential flow (sign-in step) Recipe: settings.launcher is a root-scoped single seat typed in the ui-settings slot contract; the rendering site passes { wide, openSettings(), openOnboarding(id) } and the contribution is the sidebar account launcher that opens the shell-owned settings panel (the settings shell declares the seat in its ch"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [],
+        "warnings": [
+          "end-to-end suite not updated: dsh session (e2e-authoring) exceeded its 3600s watchdog and was killed\n--- last stderr ---\n134932,\"outputTokens\":138864,\"cacheHitTokens\":22467456,\"cacheMissTokens\":134932,\"costUsd\":0.3419211360000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":157,\"elapsedSeconds\":3510,\"inputTokens\":134932,\"outputTokens\":138864,\"cacheHitTokens\":22467456,\"cacheMissTokens\":134932,\"costUsd\":0.3419211360000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":157,\"elapsedSeconds\":3520,\"inputTokens\":135397,\"outputTokens\":140283,\"cacheHitTokens\":22727936,\"cacheMissTokens\":135397,\"costUsd\":0.3453263160000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":157,\"elapsedSeconds\":3530,\"inputTokens\":135397,\"outputTokens\":140283,\"cacheHitTokens\":22727936,\"cacheMissTokens\":135397,\"costUsd\":0.3453263160000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":158,\"elapsedSeconds\":3540,\"inputTokens\":135397,\"outputTokens\":140283,\"cacheHitTokens\":22727936,\"cacheMissTokens\":135397,\"costUsd\":0.3453263160000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":158,\"elapsedSeconds\":3550,\"inputTokens\":135563,\"outputTokens\":141837,\"cacheHitTokens\":22990208,\"cacheMissTokens\":135563,\"costUsd\":0.3488145480000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":158,\"elapsedSeconds\":3560,\"inputTokens\":135563,\"outputTokens\":141837,\"cacheHitTokens\":22990208,\"cacheMissTokens\":135563,\"costUsd\":0.3488145480000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":158,\"elapsedSeconds\":3570,\"inputTokens\":135563,\"outputTokens\":141837,\"cacheHitTokens\":22990208,\"cacheMissTokens\":135563,\"costUsd\":0.3488145480000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":158,\"elapsedSeconds\":3580,\"inputTokens\":135563,\"outputTokens\":141837,\"cacheHitTokens\":22990208,\"cacheMissTokens\":135563,\"costUsd\":0.3488145480000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":158,\"elapsedSeconds\":3590,\"inputTokens\":135563,\"outputTokens\":141837,\"cacheHitTokens\":22990208,\"cacheMissTokens\":135563,\"costUsd\":0.3488145480000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":159,\"elapsedSeconds\":3599,\"inputTokens\":135849,\"outputTokens\":142386,\"cacheHitTokens\":23254144,\"cacheMissTokens\":135849,\"costUsd\":0.35114276400000044}"
+        ],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-13T07-23-12-968Z",
+      "startedAt": "2026-10-13T07:23:15.395Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.7-alpha.1",
+    "target": {
+      "tag": "dsh-v0.1.7-alpha.1",
+      "version": "0.1.7-alpha.1"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.7-alpha.1",
+          "version": "0.1.7-alpha.1"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.6-alpha.2",
+            "version": "0.1.6-alpha.2"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "checks": {
+            "cards": true,
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 1,
+      "lastFingerprint": "cards: the card ledger does not match its schema: cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string",
+      "failure": {
+        "check": "cards",
+        "outcome": "fail",
+        "fingerprint": "cards: the card ledger does not match its schema: cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string; cards.<n>.evidence: Invalid input: expected array, received string",
+        "detail": "\u2026lds in the same\n- DSH-0.1.7-A1-08 \u00b7 Tolerant Profile loading: unreadable optional bundles no longer abort the Profile [behavior; informational] Applies to: profile composition; every installed plugin's failure visibility Recipe: none for the plugin. Two awareness items for fleet maintainers: (1) after a host upgrade, a plugin can be MISSING rather than crashing the boot - check the Plugin Manager page / boot roster instead of assuming no crash means all loaded; (2) this is load-level tolerance only - a plugin that loads but\n- DSH-0.1.7-A1-09 \u00b7 Plugins can declare locale-aware title/description and a package.json icon [capability; optional] Applies to: plugin packaging (Plugin Manager display) Recipe: add the locale title/description structure and the package.json icon field per the contract at tag dsh-v0.1.7-alpha.1 (re-check exact field names in the target tag); the Plugin Manager renders them.\n- DSH-0.1.7-A1-10 \u00b7 Attachments stored only in custom events are no longer auto-read or exported [breaking; required-if-hit] Applies to: plugins that store attachment payloads in custom session events Recipe: per the release notes this is a declared adaptation duty: give the plugin its own durable storage for such attachments (or reference host-delivered attachments instead of duplicating payloads into custom events); re-check the event/export boundary at tag dsh-v0.1.7-alpha.1 before shipping. Audit exi\n- DSH-0.1.7-A1-11 \u00b7 Two new settings-page seats: settings.launcher and settings.models.sign-in [capability; optional] Applies to: client plugins extending the settings panel's opening surface (sidebar account launcher) or the Models settings credential flow (sign-in step) Recipe: settings.launcher is a root-scoped single seat typed in the ui-settings slot contract; the rendering site passes { wide, openSettings(), openOnboarding(id) } and the contribution is the sidebar account launcher that opens the shell-owned settings panel (the settings shell declares the seat in its ch"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [],
+      "warnings": [
+        "end-to-end suite not updated: dsh session (e2e-authoring) exceeded its 3600s watchdog and was killed\n--- last stderr ---\n134932,\"outputTokens\":138864,\"cacheHitTokens\":22467456,\"cacheMissTokens\":134932,\"costUsd\":0.3419211360000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":157,\"elapsedSeconds\":3510,\"inputTokens\":134932,\"outputTokens\":138864,\"cacheHitTokens\":22467456,\"cacheMissTokens\":134932,\"costUsd\":0.3419211360000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":157,\"elapsedSeconds\":3520,\"inputTokens\":135397,\"outputTokens\":140283,\"cacheHitTokens\":22727936,\"cacheMissTokens\":135397,\"costUsd\":0.3453263160000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":157,\"elapsedSeconds\":3530,\"inputTokens\":135397,\"outputTokens\":140283,\"cacheHitTokens\":22727936,\"cacheMissTokens\":135397,\"costUsd\":0.3453263160000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":158,\"elapsedSeconds\":3540,\"inputTokens\":135397,\"outputTokens\":140283,\"cacheHitTokens\":22727936,\"cacheMissTokens\":135397,\"costUsd\":0.3453263160000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":158,\"elapsedSeconds\":3550,\"inputTokens\":135563,\"outputTokens\":141837,\"cacheHitTokens\":22990208,\"cacheMissTokens\":135563,\"costUsd\":0.3488145480000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":158,\"elapsedSeconds\":3560,\"inputTokens\":135563,\"outputTokens\":141837,\"cacheHitTokens\":22990208,\"cacheMissTokens\":135563,\"costUsd\":0.3488145480000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":158,\"elapsedSeconds\":3570,\"inputTokens\":135563,\"outputTokens\":141837,\"cacheHitTokens\":22990208,\"cacheMissTokens\":135563,\"costUsd\":0.3488145480000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":158,\"elapsedSeconds\":3580,\"inputTokens\":135563,\"outputTokens\":141837,\"cacheHitTokens\":22990208,\"cacheMissTokens\":135563,\"costUsd\":0.3488145480000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":158,\"elapsedSeconds\":3590,\"inputTokens\":135563,\"outputTokens\":141837,\"cacheHitTokens\":22990208,\"cacheMissTokens\":135563,\"costUsd\":0.3488145480000004}\ndsh-migrate-status: {\"turns\":1,\"steps\":159,\"elapsedSeconds\":3599,\"inputTokens\":135849,\"outputTokens\":142386,\"cacheHitTokens\":23254144,\"cacheMissTokens\":135849,\"costUsd\":0.35114276400000044}"
+      ],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-13T07-23-12-968Z",
+    "startedAt": "2026-10-13T07:23:15.395Z"
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "cards": [
+    {
+      "id": "DSH-0.1.2-A2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No plugin in this workspace produces or persists a SessionEvent (no SessionEventMap augmentation, no Session.append, no persistence/transport seam), so the restored ignorable marker cannot touch it."
+    },
+    {
+      "id": "DSH-0.1.2-A2-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No ctx.remote use anywhere: drill-host is a host-plane entry and reads the owning llm domain service directly (the plugin's own apiProxy->remote note is the trap API-01 warns about), so no RemoteResult/RemoteError code is on any path."
+    },
+    {
+      "id": "DSH-0.1.2-A2-03",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "drill-host/package.json",
+        "drill-web/package.json",
+        "drill-tools/package.json"
+      ],
+      "note": "Dependency graph maintained for alpha.2: the unpublished dsh-host-apiproxy dependency is gone, each plugin peers the service-owner package at ^0.1.2-alpha.2, the unpublished 0.1.2-alpha.1 floor is gone, and files[] now pins the self-contained dsh.bundle payload; the dependency contract check passes at the target for all three."
+    },
+    {
+      "id": "DSH-0.1.2-A2-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "The workspace ships no startup wrapper and no CI matrix: there is no Node-22 pin, no dsh-web skip and no major-version loader probe to retire, and the probe host runs Node 24.21.0, outside the 24.0-24.11.1 window."
+    },
+    {
+      "id": "DSH-0.1.2-A2-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No plugin consumes pluginInventory/list or validates PluginInventorySnapshot; agentPresets is never parsed, so the optional field and its conditional rows reach no local schema."
+    },
+    {
+      "id": "DSH-0.1.2-A2-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No ctx.remote.$host use and no legacy host.describe call: the host-plane catalog read is synchronous through ctx.llm, and nothing in the workspace reads Host home or loopback state."
+    },
+    {
+      "id": "DSH-0.1.2-A2-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "The plugins mount none of dsh-tool-todo/dsh-tool-subagent/dsh-agent/dsh-agent-loop/dsh-terminal-bash and peer none of them (peers are dsh-llm, dsh-host-webserver, dsh-tools), so the new required sessionProjections inject/peer is not on any row this workspace owns."
+    },
+    {
+      "id": "DSH-0.1.2-A2-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "No host-side settings use: no ctx.settings.register/update/get call, no @deepseek-ai/dsh-settings import and no test double mirroring that seam, so the dropped settingsNamespace export cannot break anything here."
+    }
+  ]
+}

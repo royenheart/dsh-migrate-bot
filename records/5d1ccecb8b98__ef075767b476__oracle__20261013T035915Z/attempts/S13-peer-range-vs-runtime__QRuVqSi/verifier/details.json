@@ -1,0 +1,78 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "removed-api-and-crash",
+      "verdict": "pass",
+      "reason": "Identifies the plugin's session.events reads across the source excerpt, ties them to the iteration failure in the crash trace, and cites the changelog removal at 0.1.2-alpha.4 with replacement APIs seq, eventAt, and snapshotEvents; explains undefined access and non-iterable crash.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "peer-check-boundary",
+      "verdict": "pass",
+      "reason": "Uses the npm install output to explain why alpha.5 satisfies ^0.1.2-alpha.2 through same-base prerelease ordering, and correctly frames npm peer checks as static package-metadata checks rather than runtime API or behavior verification.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "distinct-breakage-categories",
+      "verdict": "pass",
+      "reason": "Provides two genuinely distinct categories: removed/renamed API and changed behavior or contract such as sync-to-async, argument order, or return shape changes, each clearly tied to runtime failure despite peer validation.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "author-prevention",
+      "verdict": "pass",
+      "reason": "Covers both testing against the actual supported target versions and a concrete compatibility policy, including narrowing the peer range and implementing runtime feature detection; explains metadata versus runtime guards sufficiently.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "user-preinstall-check",
+      "verdict": "pass",
+      "reason": "Gives concrete pre-install checks by comparing the changelog between the peer floor and target version and inspecting plugin API usage against the installed version's declarations, directly tied to the Session.events incident.",
+      "points": 20,
+      "awarded": 20
+    }
+  ],
+  "caps": [
+    {
+      "id": "peers-prove-runtime",
+      "triggered": false,
+      "reason": "No affirmative conclusion claims peer satisfaction or a warning-free install proves runtime compatibility, and the Session.events removal is explicitly acknowledged rather than denied.",
+      "total": 20
+    }
+  ],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-DJI4XE9wXXFSs0odxGisBeAB",
+    "usage": {
+      "prompt_tokens": 3708,
+      "completion_tokens": 639,
+      "total_tokens": 4347,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 284
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "1d8abc3d1e3440eed571792fed78354a36fd159fbce585450a9e35d070e88d69",
+    "response_sha256": "5f38a5f708a9c0a2b740cc59578fcf564afda1f6bb10e1b943135de254b49866"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "504cef7c20980c22653a8d4e55155bb9f42315db940af1fe4260c0542d029da5"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "c88da29da8f9034a57645a0a81b2adb050ba1eeb870279ca8c6a80b57a8b1275",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

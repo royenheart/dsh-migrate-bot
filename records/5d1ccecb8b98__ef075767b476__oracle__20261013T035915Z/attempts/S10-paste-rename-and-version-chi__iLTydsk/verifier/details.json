@@ -1,0 +1,71 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "paste-names-and-scope",
+      "verdict": "pass",
+      "reason": "Defines paste_image/paste_file names with (2),(3) numbering before the extension until free, scopes renaming to the clipboard acquisition path before record creation in add(), and explicitly keeps drop/picker names unchanged; batch/live reservations are covered under the conflict-source design.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "live-conflict-state",
+      "verdict": "pass",
+      "reason": "Identifies live composer snapshot occurrences as the authoritative occupied-name source, explains the records subscription deletes entries on any momentary empty snapshot while the chip remains live, and unions records only as an accelerator for in-flight entries, not as the source of truth.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "stale-tag-display",
+      "verdict": "pass",
+      "reason": "Grounds the root cause in the captured response (x-cache HIT, age 178, page only up to v0.2.9) and renderCurrentChip showing the fetched tag; prescribes semantic comparison against running PLUGIN_VERSION, showing update only when remote is strictly newer and otherwise the newer/running version, never an older fetched tag.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "regressions",
+      "verdict": "pass",
+      "reason": "Proposes repeated same-name pastes asserting distinct coexistence of paste_image.png/(2)/(3), drop and picker paths keeping real names, name reuse after chip deletion (live conflict state), and chip tests with stale-older and strictly-newer stubbed tags against the running version.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "release-hygiene",
+      "verdict": "pass",
+      "reason": "Requires bumping package.json and hand-inlined PLUGIN_VERSION together with a node --check syntax check, and explains users receive the update by hard refresh of the served artifact since there is no host-side update endpoint; a tag or chip alone does not install anything.",
+      "points": 20,
+      "awarded": 20
+    }
+  ],
+  "caps": [],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-phO51BgeQasGft4pjljq05YW",
+    "usage": {
+      "prompt_tokens": 4898,
+      "completion_tokens": 1593,
+      "total_tokens": 6491,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1219
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "0428357c699718e92e5d17031f0fa2fdeeeb3b64f650e4c20da76d4a79c5c303",
+    "response_sha256": "d660635af7ccc2d9b9252354eb3e1c6b8536fcd95744f34dfbf9a10616abf309"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "2077ac7703845bebdaadcaa0c505eb227d50fec1e3e876e34fc851c4541d06f0"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "f43dfdea77d65c44f88cfef971933d96efcd9ae2e32d424d86f782e5e9fc4e66",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

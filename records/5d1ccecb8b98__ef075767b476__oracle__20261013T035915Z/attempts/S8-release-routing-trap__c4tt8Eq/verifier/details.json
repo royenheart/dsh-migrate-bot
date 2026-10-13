@@ -1,0 +1,71 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "missing-mirror-tag",
+      "verdict": "pass",
+      "reason": "Correctly identifies via ls-remote-tags.txt that v0.9.5 is absent from the mirror and grounds this in sync-script.sh pushing only HEAD:main (branches), never tags; explicitly rules out consumer network/command faults.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "runtime-compatibility-direction",
+      "verdict": "pass",
+      "reason": "Uses dsh-version.txt (0.1.1-rc.2) and compat-table.md (v0.9.7 targets 0.1.2-alpha.1 client API) to explain the newer-API artifact on the older runtime lacks the useConversation seat; correctly frames it as forward-incompatible version routing rather than an install/restart issue.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "frozen-runtime-remedy",
+      "verdict": "pass",
+      "reason": "Selects v0.9.3 based on its rc.1 verification and the additive rc.2 note, honors the freeze (no DSH upgrade), notices v0.9.3 is also absent from the mirror listing, sequences the maintainer tag push before the consumer install command pinning #v0.9.3, and offers a commit-SHA pin only as a conditional alternative without inventing a SHA.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "tag-distribution-repair",
+      "verdict": "pass",
+      "reason": "Proposes explicit non-forced 'git push <remote> --tags' after each branch push, grounded in the branch-only sync script, covering every mirror so documented tags resolve.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "version-routing-docs",
+      "verdict": "pass",
+      "reason": "Replaces the single newest-tag default with a README compatibility matrix routing rc.2 users to v0.9.3 and 0.1.2-alpha users to v0.9.7, plus a self-check symptom; does not generalize to untested future releases.",
+      "points": 20,
+      "awarded": 20
+    }
+  ],
+  "caps": [],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-Yc9sMJVXObpkU6CR4wipRAqv",
+    "usage": {
+      "prompt_tokens": 3179,
+      "completion_tokens": 915,
+      "total_tokens": 4094,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 523
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "675eff4c602f2a7bd27d6479f3449e2aeb55e92468d057b9a69abbc1edd65c4c",
+    "response_sha256": "985f0bc30d0d9a25f981cd7f749aec3c938566298b6d65cb2ed34dcd984ef3b5"
+  },
+  "citation_audit": [],
+  "reports": {
+    "report.md": "00fd259b7efb90a92779bc98412c5333a9f7a1718f3589232cf5a2111bb579ca"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "82381be5ad782a72355998ea254c768e56fe75a9a16d6a253233d8e80d50ab7a",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}

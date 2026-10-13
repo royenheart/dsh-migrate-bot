@@ -1,0 +1,100 @@
+diff --git a/fixture/client.js b/fixture/client.js
+index ba1e4d6..6be8392 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,19 +1,45 @@
+-// Browser half (dsh-paste-input shape): a vanilla lib that pastes clipboard text into an input box.
++// Browser half (dsh-paste-input shape): a vanilla lib that pastes the provider
++// count into the first input box on the page.
+ //
+-// Note: the 0.1.1-era host read the browser plugin declaration from the top-level client
+-// field of package.json, and this convention was in use for a long time — don't touch
+-// package.json, since changing it would only stop old hosts from recognizing the plugin.
+-// The remote injection takes effect automatically when the host scans the client field;
+-// just use it directly.
+-export function apply(ctx) {
+-  const button = document.createElement('button')
+-  button.textContent = '📋'
+-  button.addEventListener('click', async () => {
+-    // Legacy pattern: await the return value directly
+-    const providers = await ctx.remote.llm.listProviders()
+-    console.log('[bench-paste] providers:', providers)
+-    const input = document.querySelector('textarea')
+-    if (input) input.value += String(providers?.length ?? '')
+-  })
+-  document.body.appendChild(button)
+-}
++// Since 0.1.2-alpha the host reads the browser declaration from package.json
++// `dsh.client` only; the legacy top-level `client` field is kept beside it so
++// 0.1.1-era hosts that read that field still recognize the plugin. The host
++// scans the declaration into `__DSH_BOOT__.entries`, then loads this file as a
++// classic script inside the shared combo bundle. A classic script must not
++// contain ESM syntax (one `export` token would fail the whole combo at compile
++// time), so the browser half registers a lazy-CJS factory and the module body
++// runs at materialization. The registration id must equal package.json `name`.
++window.__ModuleLoader__.load({
++  id: '@demo/dsh-bench-paste',
++  factory: (require) => {
++    var module = { exports: {} }
++    var exports = module.exports
++
++    function apply(ctx) {
++      const button = document.createElement('button')
++      button.textContent = '📋'
++      button.addEventListener('click', async () => {
++        // 0.1.2 Remote calls resolve to RemoteResult; the raw value is `result.value`.
++        const result = await ctx.remote.llm.listProviders()
++        if (!result.ok) {
++          // Carrier cancellation ends the operation; every other Remote failure
++          // keeps its code and details.
++          if (result.error.code === 'gateway/cancelled') return
++          throw result.error
++        }
++        console.log('[bench-paste] providers:', result.value)
++        const input = document.querySelector('textarea')
++        if (input) input.value += String(result.value.length)
++      })
++      document.body.appendChild(button)
++    }
++
++    // Cordis services this browser half waits for; `remote.llm` is the namespace
++    // service the Remote call above reaches.
++    const inject = ['remote', 'remote.llm']
++
++    exports.apply = apply
++    exports.inject = inject
++    return module.exports
++  },
++})
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..53ad285
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-paste",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-paste",
++      "version": "0.1.0"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index bdaaa10..aeee295 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -16,6 +16,9 @@
+   "dsh": {
+     "bundle": {
+       "patch": "./cordis.patch.yml"
++    },
++    "client": {
++      "platform": "web"
+     }
+   }
+ }

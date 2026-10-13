@@ -1,0 +1,223 @@
+{
+  "schema": 3,
+  "id": "88649dd9d34d__ef075767b476__pipeline+skills__20261013T050243Z",
+  "createdAt": "2026-10-13T05:02:43Z",
+  "producer": {
+    "commit": "88649dd9d34d4ebe9f13587be36d1e5540703c83",
+    "version": "0.3.4",
+    "dirty": false,
+    "message": "feat(e2e): repair a failure in the plugin's part, report one on the way there",
+    "snapshot": "f4b0742e842ed68a"
+  },
+  "subject": {
+    "id": "pipeline+skills",
+    "agentRuntime": "0.2.0-rc.2",
+    "skills": {
+      "commit": "ef075767b476e8000c716a18f848028eebcd5aef",
+      "names": [
+        "plugin-upgrade"
+      ]
+    },
+    "attempts": 1,
+    "agentTimeoutMultiplier": 5
+  },
+  "suite": {
+    "repository": "oh-my-dsh/dsh-plugin-upgrade-skill",
+    "commit": "ef075767b476e8000c716a18f848028eebcd5aef",
+    "tasks": [
+      {
+        "id": "H15-locale-pack",
+        "family": "H",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "M12-interpreters-card",
+        "family": "M",
+        "networkMode": "public",
+        "agentTimeoutSec": 900,
+        "applicable": true,
+        "feasible": true
+      }
+    ]
+  },
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-v4-flash",
+    "before": {
+      "at": "2026-10-13T05:02:44.953Z",
+      "servedModel": "deepseek-flash",
+      "fingerprint": "aeb56401ca74e127821c4f9126dcb669"
+    },
+    "after": {
+      "at": "2026-10-13T06:02:30.153Z",
+      "servedModel": "deepseek-flash",
+      "fingerprint": "aeb56401ca74e127821c4f9126dcb669"
+    }
+  },
+  "environment": {
+    "harbor": "0.24.0",
+    "docker": "29.6.1",
+    "os": "Linux 6.12.101+deb13-cloud-amd64",
+    "concurrency": 2
+  },
+  "attempts": [
+    {
+      "task": "H15-locale-pack",
+      "attempt": 1,
+      "trial": "H15-locale-pack__UPF3WU3",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 2842.2,
+        "verifierSec": 3.4,
+        "totalSec": 2959.5
+      },
+      "usage": {
+        "inputTokens": 395877,
+        "cacheHitTokens": 33313536,
+        "outputTokens": 232001,
+        "usd": 0.2985227580000001
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/H15-locale-pack__UPF3WU3/agent/proposed.diff",
+          "sha256": "7dcf242cf9422cf9b42d686016aff46bf6a69a9f5eea27f2f1a9fbfe38c9f975",
+          "bytes": 25896
+        },
+        "agent/agent.log": {
+          "path": "attempts/H15-locale-pack__UPF3WU3/agent/agent.log",
+          "sha256": "1f0501fce5306c143330cf79191d71bf4c4bcdda63c9a824012a3b0ea3b10d43",
+          "bytes": 23433
+        },
+        "agent/report.log": {
+          "path": "attempts/H15-locale-pack__UPF3WU3/agent/report.log",
+          "sha256": "adcaf732095c51b3a9649fd07bd41bd98cf63ab8f2350e61c7aa144e531bea15",
+          "bytes": 8920
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/H15-locale-pack__UPF3WU3/agent/events.jsonl",
+          "sha256": "480d6ff4e15e972aaaac032f1e0c0b77b600118741c40baeb5d7dad67eb9b0f3",
+          "bytes": 3263
+        },
+        "agent/status.json": {
+          "path": "attempts/H15-locale-pack__UPF3WU3/agent/status.json",
+          "sha256": "32936c56479bea32986725b3cee06669e39fc6f4eb7c50c8fbdd740158f7257d",
+          "bytes": 3797
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/H15-locale-pack__UPF3WU3/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/H15-locale-pack__UPF3WU3/verifier/test-stdout.txt",
+          "sha256": "efcbe8187e34bfcc1346e1ef07fd47fc0fc9958b4a8ff1efd69251f36ef858e3",
+          "bytes": 1185
+        }
+      }
+    },
+    {
+      "task": "M12-interpreters-card",
+      "attempt": 1,
+      "trial": "M12-interpreters-card__7bqDHiw",
+      "outcome": "scored",
+      "reward": 0.4,
+      "rewards": {
+        "reward": 0.4
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 3468.4,
+        "verifierSec": 3.3,
+        "totalSec": 3581.7
+      },
+      "usage": {
+        "inputTokens": 477628,
+        "cacheHitTokens": 34974848,
+        "outputTokens": 332272,
+        "usd": 0.40054097999999994
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/M12-interpreters-card__7bqDHiw/agent/proposed.diff",
+          "sha256": "d75dac46f600e622abec79cb2609761d37bd0a2031d42eaf30ec965e212fe9aa",
+          "bytes": 24318
+        },
+        "agent/agent.log": {
+          "path": "attempts/M12-interpreters-card__7bqDHiw/agent/agent.log",
+          "sha256": "fa1f6ef935685282d3d51eb36612d3585817d4c6a615d5f15fd87c57ddfe67b8",
+          "bytes": 28800
+        },
+        "agent/report.log": {
+          "path": "attempts/M12-interpreters-card__7bqDHiw/agent/report.log",
+          "sha256": "61c37320dec65f38ea82c4fa072db3bc363d3e8ed2635762f8b17810644a1b7a",
+          "bytes": 11085
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/M12-interpreters-card__7bqDHiw/agent/events.jsonl",
+          "sha256": "8cb2b9958027d6031c855da7d95a7aca3882fbc46650bab037bb6b8c917f814d",
+          "bytes": 5896
+        },
+        "agent/status.json": {
+          "path": "attempts/M12-interpreters-card__7bqDHiw/agent/status.json",
+          "sha256": "28109742bb5318e1b44cebbb6e6ca14b847da8d49cccea2862593fe36811d360",
+          "bytes": 8383
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/M12-interpreters-card__7bqDHiw/verifier/reward.txt",
+          "sha256": "c36fdbcf57ed3348e59da37beebc5c3696b3e451b7ffe16f2ebb6c9b5ee5916b",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/M12-interpreters-card__7bqDHiw/verifier/test-stdout.txt",
+          "sha256": "a9e7f920c9c7018b4b0ca95383540ad7e14efdaf7db0d20c35f77260791c831b",
+          "bytes": 1131
+        }
+      }
+    }
+  ],
+  "metrics": {
+    "formula": "v1",
+    "values": {
+      "meanReward": 0.4,
+      "passRate@1.0": 0,
+      "passRate@0.7": 0,
+      "passAtK": 0,
+      "meanReward.S": null,
+      "meanReward.M": 0.4,
+      "meanReward.H": 0.4,
+      "passHatK": 0,
+      "fragility": 0,
+      "dispersion": null,
+      "unstableTaskShare": 0,
+      "inputTokens": 436752.5,
+      "outputTokens": 282136.5,
+      "cacheHitRatio": 0.98737,
+      "costPerAttempt": 0.349532,
+      "costPerSuccess": null,
+      "agentSecP50": 3155.3,
+      "agentSecP90": 3405.78,
+      "timeoutRate": 0,
+      "infrastructureRate": 0,
+      "eligibleTasks": 2,
+      "infeasibleTasks": 0
+    },
+    "intervals": {
+      "meanReward": [
+        0.4,
+        0.4
+      ],
+      "passRate@1.0": [
+        0,
+        0
+      ]
+    }
+  }
+}

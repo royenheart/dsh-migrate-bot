@@ -1,0 +1,73 @@
+{
+  "status": "scored",
+  "score": 100,
+  "max": 100,
+  "passed": true,
+  "decisions": [
+    {
+      "id": "host-break",
+      "verdict": "pass",
+      "reason": "Locates index.js inject [\"apiProxy\"] and ctx.apiProxy.llm.providers() with line citation, maps to DSH-0.1.2-A1-01, explains the llm.providers → llm/listProviders migration (correctly identifying host-plane ctx.llm injection per the field note), and flags the dead @deepseek-ai/dsh-host-apiproxy dependency in package.json as deleted in alpha.1. All essential elements present with correct reasoning.",
+      "points": 40,
+      "awarded": 40
+    },
+    {
+      "id": "negative-coverage",
+      "verdict": "pass",
+      "reason": "All six remaining categories are accounted for with hit/no-hit conclusions and scan evidence (no patch declaration, no events, no filesystem access, no commands/contributes, no server/WebSocket, no spawn). session-notes.js is correctly characterized as a pure string/array utility with the filename being only historical naming, and cordis.patch.yml is handled correctly — the 'no patch file/declaration' wording under the source-patch category is acceptable per the rubric since the composition file is in scan scope and not misclassified as host-source modification.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "inference-boundary",
+      "verdict": "pass",
+      "reason": "Explicitly states zero hits in the six categories only means 'not found in current patterns', not proof of compatibility; notes scan coverage limits (dependency-graph resolution, the still-present dead apiproxy dependency) and that static scanning cannot replace real execution. The decisive #3 apiProxy break is clearly distinguished from the six negative categories.",
+      "points": 20,
+      "awarded": 20
+    },
+    {
+      "id": "verification-plan",
+      "verdict": "pass",
+      "reason": "Specifies post-migration build/typecheck, an isolated 0.1.2-alpha.2 profile cold boot confirming no pending, and a real llm.listProviders() provider call, framed as mandatory steps after migration rather than as executed checks.",
+      "points": 20,
+      "awarded": 20
+    }
+  ],
+  "caps": [],
+  "model": {
+    "requested": "k3",
+    "returned": "k3",
+    "endpoint": "https://api.kimi.com/coding/v1/chat/completions",
+    "request_id": "chatcmpl-sdnh74zkwM5iG55V5Rq25S1i",
+    "usage": {
+      "prompt_tokens": 4959,
+      "completion_tokens": 786,
+      "total_tokens": 5745,
+      "cached_tokens": 512,
+      "completion_tokens_details": {
+        "reasoning_tokens": 396
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 512
+      }
+    },
+    "request_sha256": "e20ef9c96ac6d5517026dce101ac75929f9e88a66b0c2be68ade2b3e47dbd3fd",
+    "response_sha256": "a8aad767ebefe7320d8048eb81bc9f0c4717d57dabe009f08dccde8691a0b081"
+  },
+  "citation_audit": [
+    {
+      "report": "report.md",
+      "citation": "index.js:3",
+      "path": "index.js",
+      "start": 3,
+      "end": 3,
+      "valid": true
+    }
+  ],
+  "reports": {
+    "report.md": "c9273179cc42f08fb42f61dfb8f65976341026bcc4efcb6d3af47af5c076d6bc"
+  },
+  "protocol": "report-judge-v2",
+  "packet_sha256": "1bc0c4380ef019d66b966ad6e38cf9cc70f004b965baa5ced858adf5682312ec",
+  "judge_sha256": "be5a6b2464f2fc875b42db2cc579da9d62367cbdddd6b6373e673993e43a9cfa"
+}
