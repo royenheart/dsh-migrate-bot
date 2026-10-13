@@ -23,7 +23,7 @@ import type {
 export type Scope = 'initial' | 'attempt'
 
 export type ActivityRequest =
-  | { activity: 'check'; check: CheckName; release: 'source' | 'target'; e2eBaseline: string[] }
+  | { activity: 'check'; check: CheckName; release: 'source' | 'target'; e2eBaseline: string[]; source?: string | undefined }
   | { activity: 'characterize' }
   | { activity: 'session'; kind: 'overlap' | 'extension-points' | 'repair'; attempt: number }
   | { activity: 'publishE2E' }
@@ -71,7 +71,8 @@ export function checksFor(scope: Scope, settings: Settings, bootPassed: boolean)
   const enabled = (check: CheckName): boolean => check === 'mechanical' || settings.checks[check]
   const order: Record<Scope, CheckName[]> = {
     initial: ['mechanical', ...(bootPassed ? [] : ['boot'] as CheckName[]), 'web', 'e2e'],
-    attempt: ['mechanical', 'boot', 'web', 'e2e'],
+    // The cards check holds the tree to the ledger the reviews write, so the unmodified tree has none.
+    attempt: ['cards', 'mechanical', 'boot', 'web', 'e2e'],
   }
   return order[scope].filter(enabled)
 }
@@ -273,6 +274,7 @@ export const migrationMachine = setup({
               check: context.queue[0] as CheckName,
               release: 'target',
               e2eBaseline: context.e2eBaseline,
+              source: context.input.source?.release.version,
             }),
           },
           on: {
@@ -293,7 +295,6 @@ export const migrationMachine = setup({
     },
     evaluating: {
       always: [
-        // An advisory end-to-end failure is reported, never worked on: it is often the host's own UI that moved, which no change to the plugin can fix.
         {
           guard: 'advisoryE2EFailure',
           target: 'concluding',

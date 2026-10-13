@@ -17,7 +17,10 @@ Every document uses these terms as written here and does not redefine them. *Rep
 | **consumer** | A plugin repository that runs the Action. | `GITHUB_REPOSITORY` | consumer plugin repo, plugin repo |
 | **plugin** | A directory whose `package.json` declares `dsh.bundle`; a consumer holds one at its root or several below it. | `Plugin`, `findPlugins` | — |
 | **migration** | One consumer and one target release: the unit of work, identified by the target version. | `migrations/<version>/` | migrate run |
-| **check** | One of the four keyless checks of a tree against a release: mechanical, boot, web, end-to-end. A check produces a **check result** with an outcome `pass`, `fail` or `skipped`. | `CheckName`, `CheckResult` | gate stack, verification layer, fast gate |
+| **check** | One of the five keyless checks of a tree against a release: cards, mechanical, boot, web, end-to-end. A check produces a **check result** with an outcome `pass`, `fail` or `skipped`. | `CheckName`, `CheckResult` | gate stack, verification layer, fast gate |
+| **change card** | One change a release made a plugin face, as the upgrade skill lists it in its release file, with a type, an action level and a migration recipe. | `Card`, `cardsInSpan` | version card |
+| **card ledger** | The record the sessions keep of every change card a migration crosses: whether it applies, whether it is required, its status and its evidence. | `cards.json`, `CardLedger` | — |
+| **cards check** | Holding the tree to the card ledger: every card accounted for, every required card done, its evidence in the tree. | `cards` | — |
 | **mechanical check** | The plugin's build, typecheck and tests with `@deepseek-ai/dsh-*` pinned to the release, and the plugin shape scan. | `mechanical` | — |
 | **boot check** | Installing the tree into a temporary profile and starting dsh; it passes when dsh reaches the credential check. | `boot` | boot probe |
 | **web check** | Serving a temporary web profile with the plugins mounted and waiting for its ready line. | `web` | web smoke |

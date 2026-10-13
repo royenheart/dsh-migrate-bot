@@ -14,7 +14,7 @@ export const releaseSchema = z.strictObject({
 })
 export type Release = z.infer<typeof releaseSchema>
 
-export const CHECKS = ['mechanical', 'boot', 'web', 'e2e'] as const
+export const CHECKS = ['cards', 'mechanical', 'boot', 'web', 'e2e'] as const
 export type CheckName = (typeof CHECKS)[number]
 
 export const checkResultSchema = z.strictObject({
@@ -45,7 +45,8 @@ export const settingsSchema = z.strictObject({
   reviewPolicy: z.enum(REVIEW_POLICIES),
   maxAttempts: z.number().int().min(1),
   e2eFailurePolicy: z.enum(E2E_FAILURE_POLICIES),
-  checks: z.strictObject({ boot: z.boolean(), web: z.boolean(), e2e: z.boolean() }),
+  // A log started before the cards check existed ran without it.
+  checks: z.strictObject({ cards: z.boolean().default(false), boot: z.boolean(), web: z.boolean(), e2e: z.boolean() }),
   /** Whether a changed tree becomes a proposal on GitHub. */
   publish: z.boolean(),
   /** Report channels that are enabled, in delivery order. */

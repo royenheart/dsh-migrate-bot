@@ -25,6 +25,7 @@ const inputArbitrary: fc.Arbitrary<MigrationInput> = fc.record({
   boot: fc.boolean(),
   web: fc.boolean(),
   e2e: fc.boolean(),
+  cards: fc.boolean(),
   publish: fc.boolean(),
   channels: fc.subarray(CHANNELS),
 }).map(drawn => ({
@@ -34,7 +35,7 @@ const inputArbitrary: fc.Arbitrary<MigrationInput> = fc.record({
     reviewPolicy: drawn.reviewPolicy,
     maxAttempts: drawn.maxAttempts,
     e2eFailurePolicy: drawn.e2eFailurePolicy,
-    checks: { boot: drawn.boot, web: drawn.web, e2e: drawn.e2e },
+    checks: { cards: drawn.cards, boot: drawn.boot, web: drawn.web, e2e: drawn.e2e },
     publish: drawn.publish,
     reportChannels: drawn.channels,
   },

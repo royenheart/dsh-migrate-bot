@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { runMechanical } from '../mechanical/run.ts'
+import { cardsInSpan, checkLedger, ledgerPathOf, ledgerSchema, renderCardList, type CardLedger } from '../skills/cards.ts'
 import { declaresClient, findPlugins } from '../plugins.ts'
 import { bootProbe, normalizeSignature } from '../verify/boot.ts'
 import { errorSummary } from '../mechanical/errors.ts'
@@ -13,7 +14,7 @@ import type { ActivityRequest } from '../workflow/machine.ts'
 import type { CheckName, CheckResult, Release } from '../workflow/model.ts'
 
 /**
- * The check activity: one of the four checks on the working tree, against one
+ * The check activity: one of the checks on the working tree, against one
  * release. Every check is keyless.
  *
  * The result in the event log carries a bounded excerpt; the full output is
@@ -37,6 +38,8 @@ export interface CheckDeps {
   cacheDir: string
   /** Where full outputs are kept for this run. */
   runDir: string
+  /** The upgrade skill's release files (`references/`), for the cards check. */
+  cardsDir?: string | undefined
 }
 
 export class CheckRunner {
@@ -77,6 +80,26 @@ export class CheckRunner {
   private async execute(request: Extract<ActivityRequest, { activity: 'check' }>, release: Release): Promise<CheckOutput> {
     const { workdir, config } = this.deps
     switch (request.check) {
+      case 'cards': {
+        const source = request.source
+        if (source === undefined) return { outcome: 'skipped', fingerprint: '', output: 'no source release is known, so no span of change cards' }
+        const cards = this.deps.cardsDir === undefined ? [] : cardsInSpan(this.deps.cardsDir, source, release.version)
+        if (cards.length === 0) return { outcome: 'skipped', fingerprint: '', output: `the upgrade skill has no change card after ${source} up to ${release.version}` }
+        const path = ledgerPathOf(this.deps.runDir)
+        const parsed = existsSync(path) ? safeLedger(readFileSync(path, 'utf8')) : { error: `no card ledger at ${path}` }
+        if ('error' in parsed) return { outcome: 'fail', fingerprint: `cards: ${normalizeSignature(parsed.error)}`, output: `${parsed.error}\n\n${renderCardList(cards)}` }
+        const problems = checkLedger(cards, parsed.ledger, file => existsSync(join(workdir, file)))
+        if (problems.length > 0) {
+          const byId = new Map(cards.map(card => [card.id, card]))
+          return {
+            outcome: 'fail',
+            fingerprint: `cards: ${problems.map(problem => problem.id).sort().join(' ').slice(0, 300)}`,
+            output: `The card ledger (${path}) falls short:\n${problems.map(problem => `- ${problem.id} (${byId.get(problem.id)?.title ?? ''}): ${problem.problem}. Recipe: ${byId.get(problem.id)?.recipe ?? ''}`).join('\n')}`,
+          }
+        }
+        const done = parsed.ledger.cards.filter(entry => entry.status === 'done').length
+        return { outcome: 'pass', fingerprint: '', output: `${String(cards.length)} card(s) after ${source} up to ${release.version}: ${String(done)} done, the rest not needed` }
+      }
       case 'mechanical': {
         // Every plugin is checked, so a repair is given every failure at once.
         const found = findPlugins(workdir)
@@ -149,5 +172,14 @@ export class CheckRunner {
         return { outcome: 'fail', fingerprint: `e2e: ${[...broken].sort().join(' | ').slice(0, 300)}`, output: `${heading}\n${broken.map(id => `- ${id}${run.errors[id] === undefined ? '' : `: ${run.errors[id]}`}`).join('\n')}\n\n${run.output}` }
       }
     }
+  }
+}
+
+function safeLedger(text: string): { ledger: CardLedger } | { error: string } {
+  try {
+    const parsed = ledgerSchema.safeParse(JSON.parse(text))
+    return parsed.success ? { ledger: parsed.data } : { error: `the card ledger does not match its schema: ${parsed.error.issues.slice(0, 3).map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; ')}` }
+  } catch (error) {
+    return { error: `the card ledger is not JSON: ${(error as Error).message}` }
   }
 }

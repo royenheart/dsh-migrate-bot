@@ -35,7 +35,7 @@ test('latest is the newest dsh-v tag; a named release is used as given', async (
 test('the pre-migration boot checks classify the failure', () => {
   const source = { release: { tag: 'dsh-v0.1.7', version: '0.1.7' }, origin: 'verified' as const }
   const boot = (outcome: 'pass' | 'fail') => ({ type: 'check.done' as const, result: { check: 'boot' as const, outcome, fingerprint: outcome === 'fail' ? 'x' : '', detail: '' } })
-  const withBoot = input('0.2.0', { source, settings: { ...input().settings, checks: { boot: true, web: false, e2e: false } } })
+  const withBoot = input('0.2.0', { source, settings: { ...input().settings, checks: { cards: false, boot: true, web: false, e2e: false } } })
   assert.equal(classifyBaseline(contextOf(withBoot, [boot('pass'), boot('fail')])), 'regression')
   assert.equal(classifyBaseline(contextOf(withBoot, [boot('fail'), boot('fail')])), 'pre-existing')
   assert.equal(classifyBaseline(contextOf(withBoot, [boot('pass'), boot('pass')])), 'unaffected')

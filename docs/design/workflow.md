@@ -60,6 +60,7 @@ The state branch is the Action's database. It is written with git plumbing and n
 |---|---|---|
 | `migrations/<version>/events.jsonl` | The event log of the migration to `<version>`: one `started` entry per run, then one entry per event | Every later decision is derived from it, and it is the audit record of what the Action did |
 | `migrations/<version>/reports/<name>.md` | The overlap, extension-point and repair reports | A merge report quotes them after the job that wrote them is gone |
+| `migrations/<version>/cards.json` | The card ledger as the last session left it | It says which change cards the migration judged to apply and where it acted on them, which the proposal's reviewer and a merge report check |
 | `migrations/<version>/patch-reports/<slug>.md` | The patch reports the reviews wrote | The duplicate check of `harness-discussion` posts these drafts |
 | `badge.json` | The shields.io endpoint for the README badge | shields.io reads a file; it is rewritten from the projection in the same commit as every log write |
 
@@ -103,7 +104,7 @@ When a proposal is merged, each enabled report channel receives one report. A ch
 
 | Channel | Destination | Session |
 |---|---|---|
-| `upgrade-skill` | An issue in `oh-my-dsh/dsh-plugin-upgrade-skill`, shaped as that project's bug report | Reports a version card that the migration contradicts, or a release edge without one |
+| `upgrade-skill` | An issue in `oh-my-dsh/dsh-plugin-upgrade-skill`, shaped as that project's bug report | Reports a change card that the migration contradicts, or a release edge without one |
 | `migrate-bot` | An issue in `royenheart/dsh-migrate-bot` | Attributes what the maintainer fixed by hand to the stage that should have caught it |
 | `harness-discussion` | A discussion in `deepseek-ai/deepseek-harness` | Decides whether each discussion draft the reviews wrote is still unasked; it posts the draft itself and writes nothing new |
 

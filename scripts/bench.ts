@@ -43,7 +43,7 @@ const KEYLESS: ReadonlySet<SubjectId> = new Set(['oracle', 'nop'])
 const RECORDS_DIR = join(REPO_ROOT, '.bench', 'records')
 const AGENT = 'tools.harbor.dsh_agent:DshAgent'
 /** The files of a trial a record keeps, relative to the trial directory. */
-const AGENT_FILES = ['agent/proposed.diff', 'agent/agent.log', 'agent/report.log', 'agent/events.jsonl', 'agent/status.json']
+const AGENT_FILES = ['agent/proposed.diff', 'agent/agent.log', 'agent/report.log', 'agent/events.jsonl', 'agent/status.json', 'agent/cards.json']
 
 const git = (args: string[], cwd = REPO_ROOT): string => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 const recordPath = (records: string, id: string): string => join(records, 'records', id, 'record.json')

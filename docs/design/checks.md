@@ -1,6 +1,6 @@
 ---
 kind: design
-description: The four checks a migration runs, the agent runtime the sessions run in, and the end-to-end suite and its baseline.
+description: The five checks a migration runs, the change-card ledger, the agent runtime the sessions run in, and the end-to-end suite and its baseline.
 ---
 
 # Checks and the agent runtime
@@ -14,10 +14,11 @@ A check looks at the plugin working tree under one release and produces a check 
 3. **Cheap checks first.** A pass stops at its first failure, and the repair session receives the output of that check only.
 4. **The repair session cannot edit the tests.** The end-to-end suite lives outside the plugin tree, on its own branch, so a repair cannot make the suite pass by weakening it.
 
-## The four checks
+## The five checks
 
 | Check | What it runs | Needs an API key | What it catches |
 |---|---|---|---|
+| `cards` | After the reviews: the card ledger the sessions keep against the upgrade skill's change cards between the source and the target release; skipped without a source release, without the skill, or when no card lies in the span | no | A breaking change the plugin still carries, which a plugin without tests of its own shows nowhere else |
 | `mechanical` | In each plugin's directory: the dependency contract, the plugin-shape scan, then `npm install`, the `@deepseek-ai/dsh-*` dependencies pinned to the release, and the plugin's `build`, `typecheck` and `test` scripts; `tests.commands` replaces the scripts | no | A dependency the release no longer publishes or a range that does not admit it; type, build and unit-test failures |
 | `boot` | Installs every plugin of the tree into one temporary profile and starts dsh | no | A plugin that fails to load or that dsh skips, throws in `apply`, waits forever for a service, or hangs the host |
 | `web` | Serves a temporary web profile with every plugin mounted and waits for the ready line; skipped when no plugin declares `dsh.client` | no | A web client that never attaches, or a plugin dsh left out of the served profile |
@@ -28,6 +29,12 @@ A plugin is a directory whose `package.json` declares `dsh.bundle` (`src/plugins
 The dependency contract (`src/mechanical/dependencies.ts`) runs first, because pinning the dependencies to the release hides what a user installing the plugin would meet. Every `@deepseek-ai/dsh-*` package is published with the release's version and a removed one stops at its last release, so each package the plugin names must be published at the release, under a range that admits it by npm's rules, which compare a prerelease only within the same `major.minor.patch`. An optional peer the release no longer publishes is the exception: npm installs it only for whoever needs it, so it harms nothing and is not pinned; its range must still admit the release, because dsh refuses a plugin whose peer ranges do not. The published versions are read from the npm registry; when it cannot be read, the contract decides nothing and the install that follows fails instead.
 
 A plugin that declares no build, typecheck or test command produces a skipped mechanical check, not a passing one. Each release a check needs is installed once into its own cached prefix (`src/verify/dsh-install.ts`), with `npm install --before` an hour after the release was published, so it gets the dependencies it was published with: a fresh install of an older release otherwise resolves today's Cordis and fails to boot whatever the plugin does. The mechanical check pins the plugin's dsh packages with the same `--before`: a prerelease's packages declare `^` ranges on each other until 0.1.7-alpha.2, so without it they resolve their peers to a later prerelease of the line and the install fails on a peer conflict. An installation that fails is an error of the Action, not a failed check. A plugin with a browser half (`dsh.client`) may need services only the web composition provides, so the boot check loads the plugins without one and the web check loads every plugin in the web composition; when every plugin has a browser half, the boot check is skipped and says so. The web check serves its profile by name (`dsh --profile <name>`): `dsh web` is `dsh --profile web`, a profile of its own, which would serve a fresh default composition without the plugins. It passes `--no-open` only to a release whose `dsh web --help` lists it. dsh from 0.2 skips a bundle it refuses (a peer range that does not admit the release, a malformed patch) with `skipping profile bundle`, and still boots or serves; both checks fail on that line, before reading anything else.
+
+### The change-card ledger
+
+The upgrade skill keeps one file per release (`references/v<version>.md`) listing, card by card, the changes that release made a plugin face, each with a type, an action level (`required`, `required-if-hit`, `conditional`, `optional`, `informational`) and a migration recipe (`src/skills/cards.ts`). A migration crosses every card of the releases after its source up to its target. The extension-point review and every repair attempt are given those cards and keep a ledger of them in the run directory, outside the plugin tree: for each card, whether it applies to the plugin, whether the migration must act on it, its status, and the files that show it was done. A card that applies is required by its level, and an `optional` capability card is required too when the plugin carries a patch, shim or private call that the capability replaces, because a migration retires a workaround once the release offers the public way.
+
+The cards check fails while a card is missing from the ledger, a required card is not done, or the evidence of a done card names a file that is not in the tree; its output gives each such card's recipe to the repair. The check verifies the ledger against the cards and the tree, not the change itself: the sessions judge whether a card applies, and the other checks judge whether the plugin works. It does not run on the unmodified tree, which has no ledger, so a plugin whose initial checks pass still concludes without a session.
 
 ### Why the boot check needs no key
 

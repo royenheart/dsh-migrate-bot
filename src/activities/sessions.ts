@@ -1,6 +1,7 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { assembleRepairPrompt, EXTENSION_POINTS_PROMPT, OVERLAP_PROMPT, REPAIR_PROMPT, withHarnessContext } from '../prompts/migration.ts'
+import { assembleRepairPrompt, cardLedgerNote, EXTENSION_POINTS_PROMPT, OVERLAP_PROMPT, REPAIR_PROMPT, withHarnessContext } from '../prompts/migration.ts'
+import { cardsInSpan, ledgerPathOf, renderCardList } from '../skills/cards.ts'
 import { checkoutHarness } from '../harness/checkout.ts'
 import { decideQuota } from '../quota/check.ts'
 import { isQuotaError } from '../quota/errors.ts'
@@ -45,6 +46,8 @@ export interface SessionDeps {
   log: (message: string) => void
   /** The full output of the last failing check. */
   lastFailure: () => string
+  /** The upgrade skill's release files (`references/`), for the change cards. */
+  cardsDir?: string | undefined
 }
 
 export class SessionRunner {
@@ -78,6 +81,15 @@ export class SessionRunner {
     return this.harness ?? undefined
   }
 
+  /** The change cards this migration crosses and how to keep their ledger, or nothing when the cards check is off. */
+  private cards(context: MigrationContext): string {
+    const source = context.input.source?.release.version
+    if (!context.input.settings.checks.cards || source === undefined || this.deps.cardsDir === undefined) return ''
+    const cards = cardsInSpan(this.deps.cardsDir, source, context.input.target.version)
+    if (cards.length === 0) return ''
+    return `\n\n${cardLedgerNote({ cards: renderCardList(cards), source, target: context.input.target.version, path: ledgerPathOf(this.deps.runDir) })}`
+  }
+
   private prompt(request: Extract<ActivityRequest, { activity: 'session' }>, context: MigrationContext): string {
     const harness = this.harnessFor(context)
     const prompts = this.deps.config.prompts
@@ -85,7 +97,7 @@ export class SessionRunner {
       case 'overlap':
         return withHarnessContext(prompts.overlap ?? OVERLAP_PROMPT, harness)
       case 'extension-points':
-        return withHarnessContext(prompts.extensionPoints ?? EXTENSION_POINTS_PROMPT, harness)
+        return withHarnessContext(prompts.extensionPoints ?? EXTENSION_POINTS_PROMPT, harness) + this.cards(context)
       case 'repair':
         return assembleRepairPrompt({
           template: prompts.repair ?? REPAIR_PROMPT,
@@ -95,7 +107,7 @@ export class SessionRunner {
           priorRepairs: [...this.reports.entries()].filter(([name]) => name.startsWith('repair-')).map(([, text]) => text),
           harness,
           baselineNote: describeBaseline(context),
-        })
+        }) + this.cards(context)
     }
   }
 
@@ -112,6 +124,8 @@ export class SessionRunner {
     if (cap !== undefined) return done('spend-cap', cap)
 
     this.deps.syncSkills(this.deps.config.agent.upgradeSkills)
+    // The run directory holds the card ledger the session writes.
+    mkdirSync(this.deps.runDir, { recursive: true })
     let result
     try {
       result = await this.deps.agent.run({
@@ -135,6 +149,9 @@ export class SessionRunner {
     mkdirSync(join(this.deps.runDir, 'reports'), { recursive: true })
     writeFileSync(join(this.deps.runDir, 'reports', `${name}.md`), result.report)
     files.set(`reports/${name}.md`, result.report)
+    // The ledger as this session left it: what a maintainer and a merge report check the cards against.
+    const ledger = ledgerPathOf(this.deps.runDir)
+    if (existsSync(ledger)) files.set('cards.json', readFileSync(ledger, 'utf8'))
 
     const blocker = request.kind === 'repair' ? parseBlocker(result.report) : undefined
     return done('completed', blocker?.declared === true ? `upstream blocker declared${blocker.valid ? '' : ` without ${blocker.missing.join(', ')}`}` : '', {

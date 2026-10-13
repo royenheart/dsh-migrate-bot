@@ -23,6 +23,7 @@ A consumer configures the Action in `.github/dsh-migrate.yml`. Every key is opti
 | `repair.maxAttempts` | integer | `5` | Attempt limit: the most repair attempts one migration runs. |
 | `secrets.apiKeyEnv` | string | `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` | Environment variable holding the DeepSeek API key. |
 | `quota.limit` | number | — | Spend cap: the most USD one migration may spend, priced from its own usage. |
+| `checks.cards.enabled` | boolean | `true` | After the reviews, hold the tree to the ledger the sessions keep of the upgrade skill's change cards between the source and the target release. Needs `agent.upgradeSkills`. |
 | `checks.boot.enabled` | boolean | `true` | Run the boot check. |
 | `checks.boot.timeoutMs` | integer | `180000` | Watchdog for one boot check, in milliseconds. |
 | `checks.web.enabled` | boolean | `true` | Run the web check. |

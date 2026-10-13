@@ -115,7 +115,7 @@ The checks are not reimplemented for the preview; they cannot be avoided, becaus
 | A new commit on the branch | The same pipeline | Same checks; a preview rebuild follows only from a commit that exists |
 | A pre-check in the preview | The preview's agent | **Advice only.** It runs the cheap checks locally so a person learns early that a change will likely be refused. It is never the authority, and it is labelled as advice wherever it is shown |
 
-What "passes" means is owned by the pipeline ([the checks design](checks.md#the-four-checks)): mechanical and boot must pass, the web check must pass when the plugin declares a client surface, and the end-to-end suite refuses only under the `blocking` policy. A publish runs that same stack (`checkTree` in `src/activities/check-tree.ts`), and a tree on which every check was skipped is refused, because nothing verified it.
+What "passes" means is owned by the pipeline ([the checks design](checks.md#the-five-checks)): mechanical and boot must pass, the web check must pass when the plugin declares a client surface, and the end-to-end suite refuses only under the `blocking` policy; the cards check holds a migration to its ledger and is not run on a handed-back tree, which has none. A publish runs that same stack (`checkTree` in `src/activities/check-tree.ts`), and a tree on which every check was skipped is refused, because nothing verified it.
 
 ## 8. The HTTP contract
 

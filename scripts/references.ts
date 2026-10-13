@@ -153,7 +153,7 @@ function workflow(): string {
     if (description === undefined) throw new Error(`guard ${guard} has no description in GUARD_DESCRIPTIONS`)
     return `| \`${guard}\` | ${description} |`
   })
-  const everyCheck: Settings = { reviewPolicy: 'always', maxAttempts: 1, e2eFailurePolicy: 'advisory', checks: { boot: true, web: true, e2e: true }, publish: true, reportChannels: [] }
+  const everyCheck: Settings = { reviewPolicy: 'always', maxAttempts: 1, e2eFailurePolicy: 'advisory', checks: { cards: true, boot: true, web: true, e2e: true }, publish: true, reportChannels: [] }
   const scopes: Record<Scope, string> = {
     initial: 'The unmodified tree, under the `when-checks-fail` review policy.',
     attempt: 'After the reviews and after each repair attempt.',

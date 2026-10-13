@@ -71,7 +71,7 @@ What the metrics do not cover: whether a change is confined to what the migratio
 
 ## 6. Records
 
-A record is `records/<id>/record.json` on the `bench/records` branch, beside the files its attempts kept: `proposed.diff` (the fixture against its baseline commit), `agent.log`, for a pipeline `events.jsonl` and `status.json`, and the verifier's output. Each kept file carries its SHA-256. A record is written once, by the run that produced it, and never edited; a run that went wrong is rerun as a new record.
+A record is `records/<id>/record.json` on the `bench/records` branch, beside the files its attempts kept: `proposed.diff` (the fixture against its baseline commit), `agent.log`, for a pipeline `events.jsonl`, `status.json`, its card ledger `cards.json` and the report session's `report.log`, and the verifier's output. Each kept file carries its SHA-256. A record is written once, by the run that produced it, and never edited; a run that went wrong is rerun as a new record.
 
 The working tree must be clean, or the run passes `--allow-dirty` and the record says `producer.dirty`.
 

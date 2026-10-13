@@ -74,6 +74,9 @@ export const configSchema = z.strictObject({
     limit: z.number().positive().optional().describe('Spend cap: the most USD one migration may spend, priced from its own usage.'),
   }).prefault({}),
   checks: z.strictObject({
+    cards: z.strictObject({
+      enabled: z.boolean().default(true).describe('After the reviews, hold the tree to the ledger the sessions keep of the upgrade skill\'s change cards between the source and the target release. Needs `agent.upgradeSkills`.'),
+    }).prefault({}),
     boot: checkSchema(180_000, 'boot check').prefault({}),
     web: checkSchema(120_000, 'web check').prefault({}),
     e2e: z.strictObject({

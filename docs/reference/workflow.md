@@ -184,7 +184,7 @@ The checks of a pass run in this order and stop at the first failure. A disabled
 | Scope | Checks | When |
 | --- | --- | --- |
 | `initial` | mechanical, boot, web, e2e | The unmodified tree, under the `when-checks-fail` review policy. |
-| `attempt` | mechanical, boot, web, e2e | After the reviews and after each repair attempt. |
+| `attempt` | cards, mechanical, boot, web, e2e | After the reviews and after each repair attempt. |
 
 ## Events
 

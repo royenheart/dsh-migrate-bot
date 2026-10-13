@@ -8,7 +8,8 @@ import { SessionRunner } from '../../src/activities/sessions.ts'
 import { syncUpgradeSkills } from '../../src/skills/upgrade.ts'
 import { parseConfig } from '../../src/config/load.ts'
 import { QuotaError } from '../../src/quota/errors.ts'
-import { contextOf, input } from '../support/migration.ts'
+import { appRootFrom } from '../../src/paths.ts'
+import { contextOf, input, settings } from '../support/migration.ts'
 import type { AgentRequest, AgentRunner } from '../../src/agents/types.ts'
 import type { MigrateConfig } from '../../src/config/schema.ts'
 import type { QuotaQuery } from '../../src/quota/types.ts'
@@ -78,7 +79,7 @@ test('a source release that does not install leaves the baseline unknown; a targ
   }
 })
 
-function sessions(config: MigrateConfig, agent: AgentRunner, quota?: QuotaQuery) {
+function sessions(config: MigrateConfig, agent: AgentRunner, quota?: QuotaQuery, cardsDir?: string) {
   const { dir, cleanup } = scratch()
   const runner = new SessionRunner({
     workdir: dir,
@@ -91,6 +92,7 @@ function sessions(config: MigrateConfig, agent: AgentRunner, quota?: QuotaQuery)
     syncSkills: () => {},
     log: () => {},
     lastFailure: () => 'error TS2304: cannot find name',
+    cardsDir,
   })
   // No harness checkout in a unit test: the sessions run without one.
   ;(runner as unknown as { harness: null }).harness = null
@@ -116,6 +118,25 @@ test('a repair session gets the reviews and the failing output, and its report i
     assert.equal(readFileSync(join(dir, 'run', 'reports', 'repair-1.md'), 'utf8'), '# repair')
     assert.equal(repair.event.type === 'session.done' && repair.event.usage?.usd, 0.25)
     assert.equal(runner.spent, 0.75)
+  } finally {
+    cleanup()
+  }
+})
+
+test('the extension-point review is given the change cards of the span, and the ledger it keeps goes to the state branch', async () => {
+  const references = join(appRootFrom(import.meta.url), 'vendor', 'dsh-plugin-upgrade-skill', 'skills', 'plugin-upgrade', 'references')
+  let ledgerPath = ''
+  const agent: AgentRunner = { run: async (request) => {
+    ledgerPath = /at `([^`]+cards\.json)`/.exec(request.prompt)?.[1] ?? ''
+    writeFileSync(ledgerPath, '{"cards":[]}')
+    return { report: '# extension points', raw: '' }
+  } }
+  const { runner, cleanup } = sessions(parseConfig({}), agent, undefined, references)
+  try {
+    const context = contextOf(input('0.1.2-alpha.2', { source: { release: { tag: 'dsh-v0.1.1-rc.2', version: '0.1.1-rc.2' }, origin: 'declared-peers' }, settings: settings({ checks: { cards: true, boot: false, web: false, e2e: false } }) }), [])
+    const review = await runner.run({ activity: 'session', kind: 'extension-points', attempt: 0 }, context)
+    assert.notEqual(ledgerPath, '', 'the prompt names the ledger')
+    assert.equal(review.files.get('cards.json'), '{"cards":[]}')
   } finally {
     cleanup()
   }

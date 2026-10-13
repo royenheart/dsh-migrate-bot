@@ -4,6 +4,7 @@ import { isTreeChanged, changedPaths, treeDiff } from '../git/worktree.ts'
 import { renderProposal } from '../github/templates.ts'
 import { runReportChannel, type ReportDeps } from '../merge-reports/run.ts'
 import { CheckRunner } from './checks.ts'
+import { skillsSource, UPGRADE_SKILLS } from '../skills/upgrade.ts'
 import { SessionRunner } from './sessions.ts'
 import { characterize, publishE2E, type E2EDeps } from './e2e-suite.ts'
 import { publishProposal } from './proposal.ts'
@@ -41,7 +42,8 @@ export interface ActivityDeps {
 
 export function createActivities(deps: ActivityDeps): ActivityRunner {
   const runDir = join(deps.home, 'runs', deps.runId)
-  const checks = new CheckRunner({ workdir: deps.workdir, config: deps.config, cacheDir: join(deps.home, 'dsh'), runDir })
+  const cardsDir = join(skillsSource(deps.env), UPGRADE_SKILLS[0], 'references')
+  const checks = new CheckRunner({ workdir: deps.workdir, config: deps.config, cacheDir: join(deps.home, 'dsh'), runDir, cardsDir })
   const latest = new Map<CheckName, CheckResult>()
   let sessions: SessionRunner | undefined
   const sessionRunner = (): SessionRunner => {
@@ -57,6 +59,7 @@ export function createActivities(deps: ActivityDeps): ActivityRunner {
       syncSkills: deps.syncSkills,
       log: deps.log,
       lastFailure: () => checks.lastFailure?.output ?? '',
+      cardsDir,
     })
     return sessions
   }

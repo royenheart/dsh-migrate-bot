@@ -73,7 +73,7 @@ test('the badge shows the verified release and what happened to a newer one', ()
 })
 
 test('the end-to-end suite is published after the proposal, which stays open meanwhile', () => {
-  const withSuite = input('0.2.0', { settings: settings({ checks: { boot: false, web: false, e2e: true } }) })
+  const withSuite = input('0.2.0', { settings: settings({ checks: { cards: false, boot: false, web: false, e2e: true } }) })
   const proposed = proposedEvents(proposal(9)).map(event => event.type === 'check.done' && event.result.outcome === 'pass'
     ? [event, { type: 'check.done' as const, result: { check: 'e2e' as const, outcome: 'pass' as const, fingerprint: '', detail: '' } }]
     : [event]).flat()

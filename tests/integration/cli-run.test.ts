@@ -125,8 +125,11 @@ test('a migration runs to a proposal, and its merge is reported to the enabled c
     const state = new StateStore(repo.clone()).read()
     const log = state.logs.get('0.2.0') ?? []
     assert.deepEqual(log.filter(entry => entry.kind === 'event').map(entry => entry.kind === 'event' ? entry.event.type : ''), [
-      'session.done', 'session.done', 'check.done', 'tree.inspected', 'proposal.published', 'pull-request.closed', 'report.done',
+      'session.done', 'session.done', 'check.done', 'check.done', 'tree.inspected', 'proposal.published', 'pull-request.closed', 'report.done',
     ])
+    // The fixture declares no dsh release, so the cards check has no span to hold the tree to.
+    const cards = log.find(entry => entry.kind === 'event' && entry.event.type === 'check.done' && entry.event.result.check === 'cards')
+    assert.equal(cards?.kind === 'event' && cards.event.type === 'check.done' && cards.event.result.outcome, 'skipped')
     assert.match(repo.git(['show', 'dsh-migrate/state:badge.json'], repo.remote), /"message": "dsh-v0\.2\.0"/)
   } finally {
     await server.close()

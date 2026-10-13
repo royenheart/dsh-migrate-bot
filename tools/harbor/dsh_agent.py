@@ -26,8 +26,9 @@ vendored upgrade-skill commit is loaded.
 
 The agent leaves in its log directory: `proposed.diff` (the fixture against
 its baseline commit), `agent.log`, and for a pipeline `events.jsonl` and
-`status.json`. A pipeline writes `agent.log` as it runs, so a run that times
-out still leaves it.
+`status.json`, and `cards.json`, its card ledger, when it kept one. A
+pipeline writes `agent.log` as it runs, so a run that times out still leaves
+it.
 """
 
 from __future__ import annotations
@@ -203,6 +204,9 @@ class DshAgent(BaseAgent):
         if migration is not None:
             events = await self._exec(environment, f"git -C {plugin} show dsh-migrate/state:migrations/{target}/events.jsonl")
             (self.logs_dir / "events.jsonl").write_text(events, encoding="utf-8")
+            ledger = await environment.exec(command=f"git -C {plugin} show dsh-migrate/state:migrations/{target}/cards.json")
+            if ledger.return_code == 0:
+                (self.logs_dir / "cards.json").write_text(ledger.stdout or "", encoding="utf-8")
             _add_session_usage(events, context)
         # The fixture receives what a consumer would be proposed: the tree of a
         # migration that ended `unpublished`, and nothing otherwise.

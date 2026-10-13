@@ -16,6 +16,7 @@ export interface ProposalDocuments {
 }
 
 const CHECK_LABEL: Record<CheckResult['check'], string> = {
+  cards: 'Change cards',
   mechanical: 'Mechanical checks',
   boot: 'Boot check',
   web: 'Web check',

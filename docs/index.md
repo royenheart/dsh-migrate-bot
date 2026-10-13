@@ -16,7 +16,7 @@ The entry point to the documentation: `AGENTS.md` holds the rules and links here
 | Merge reports: the channels, their evidence, and their tokens | `docs/design/workflow.md` | [Merge reports](design/workflow.md#8-merge-reports) |
 | Every state, transition and guard of the migration statechart | `docs/reference/workflow.md` | [States](reference/workflow.md#states) |
 | The comment commands | `docs/reference/commands.md` | [Comment commands reference](reference/commands.md#comment-commands-reference) |
-| The four checks, the end-to-end suite and its baseline, and watchdogs | `docs/design/checks.md` | [The four checks](design/checks.md#the-four-checks) |
+| The five checks, the change-card ledger, the end-to-end suite and its baseline, and watchdogs | `docs/design/checks.md` | [The five checks](design/checks.md#the-five-checks) |
 | The agent runtime and its self-test | `docs/design/checks.md` | [The agent runtime](design/checks.md#the-agent-runtime) |
 | The 2026-09-29 outage of every agent session | `docs/postmortems/2026-09-29-agent-runtime-drift.md` | [What broke](postmortems/2026-09-29-agent-runtime-drift.md#what-broke) |
 | Every configuration key, its type and its default | `docs/reference/configuration.md` | [Configuration reference](reference/configuration.md#configuration-reference) |
