@@ -155,7 +155,12 @@ The upgrade skill lists, card by card, the changes each release made a plugin fa
 
 ${input.cards}
 
-Keep a ledger of them at \`${input.path}\`, outside the plugin tree: a JSON object \`{ "cards": [ { "id", "applies", "required", "status", "evidence", "note" } ] }\` with one entry for every card above.
+Keep a ledger of them at \`${input.path}\`, outside the plugin tree, with one entry for every card above, shaped exactly like this:
+
+\`\`\`json
+{ "cards": [ { "id": "DSH-0.1.2-A1-25", "applies": true, "required": true, "status": "done", "evidence": ["client.js:12", "package.json"], "note": "imports moved to dsh-client-store" } ] }
+\`\`\`
+
 - \`applies\`: whether the change touches this plugin: it uses the API, package, slot, setting or behaviour the card names.
 - \`required\`: whether this migration must act on it. A card that applies is required when its level is \`required\`, \`required-if-hit\`, or \`conditional\` with its condition met. An \`optional\` capability card that applies is required too when the plugin carries a patch, monkey-patch, shim, private API call or local workaround that the card's capability or recipe replaces: once the release offers the public way, a migration retires the workaround. Otherwise it is not required.
 - \`status\`: \`done\` when acted on, with \`evidence\` naming the files that show it (\`path\` or \`path:line\`, relative to the plugin repository); \`not-needed\` when it does not apply or is not required; \`open\` when it is required and not done.

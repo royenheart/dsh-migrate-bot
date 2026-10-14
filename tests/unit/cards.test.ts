@@ -90,9 +90,10 @@ test('the cards check holds the tree to the ledger the sessions keep, and needs 
     const open = await check('0.1.1-rc.2')
     assert.equal(open.fingerprint, 'cards: DSH-0.1.2-A1-10')
     assert.match(open.detail, /Recipe: Replace custom i18n patches/)
-    writeFileSync(ledgerPathOf(runDir), JSON.stringify({ cards: [
-      { id: 'DSH-0.1.2-A1-10', applies: true, required: true, status: 'done', evidence: ['src/locale.ts:3'], note: '' },
-      { id: 'DSH-0.1.2-A1-25', applies: false, required: false, status: 'not-needed', evidence: [], note: '' },
+    // Shapes sessions write: one evidence path as a string, no note, keys the check does not read.
+    writeFileSync(ledgerPathOf(runDir), JSON.stringify({ plugin: '@acme/web', cards: [
+      { id: 'DSH-0.1.2-A1-10', applies: true, required: true, status: 'done', evidence: 'src/locale.ts:3', corridor: 'A1' },
+      { id: 'DSH-0.1.2-A1-25', applies: false, required: false, status: 'not-needed' },
     ] }))
     assert.equal((await check('0.1.1-rc.2')).outcome, 'pass')
   } finally {

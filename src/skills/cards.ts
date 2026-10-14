@@ -92,14 +92,20 @@ export function renderCardList(cards: readonly Card[]): string {
 
 export const CARD_STATUSES = ['done', 'not-needed', 'open'] as const
 
-export const ledgerSchema = z.strictObject({
-  cards: z.array(z.strictObject({
+/**
+ * The ledger a session writes. What the check decides on is held strictly;
+ * what a session adds around it (other keys, one evidence path written as a
+ * string, no note) is accepted, because a ledger refused for its shape sends a
+ * repair attempt to fix a file rather than the plugin.
+ */
+export const ledgerSchema = z.object({
+  cards: z.array(z.object({
     id: z.string(),
     applies: z.boolean().describe('Whether the change touches this plugin.'),
     required: z.boolean().describe('Whether this migration must act on it.'),
     status: z.enum(CARD_STATUSES),
-    evidence: z.array(z.string()).describe('Where it was done: tree-relative paths, optionally `path:line`.'),
-    note: z.string(),
+    evidence: z.union([z.array(z.string()), z.string().transform(path => [path])]).default([]).describe('Where it was done: tree-relative paths, optionally `path:line`.'),
+    note: z.string().default(''),
   })),
 })
 export type CardLedger = z.infer<typeof ledgerSchema>
