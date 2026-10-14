@@ -3,7 +3,7 @@ name = "cz_customize"
 version_provider = "commitizen"
 version = "0.3.4"
 tag_format = "v$version"
-version_scheme = "semver"
+version_scheme = "semver2"
 # Repo-owned so a full `cz changelog` regeneration reproduces the header too.
 template = "CHANGELOG.j2"
 update_changelog_on_bump = true
@@ -13,6 +13,7 @@ version_files = [
     "package.json:version",
     "package-lock.json:version",
     "action.yml:ghcr.io/royenheart/dsh-migrate-bot",
+    ".github/workflows/migrate.yml:royenheart/dsh-migrate-bot@",
 ]
 
 # `cz_conventional_commits` hardcodes which commit types can reach the

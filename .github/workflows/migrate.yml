@@ -1,6 +1,11 @@
 # The reusable workflow consumers call. It owns the triggers' jobs, the secret
 # mapping, and the concurrency group, so a consumer's workflow is only the
 # triggers and one `uses:` line (examples/workflow.yml).
+#
+# Its jobs run the Action of this workflow's own release, named by version
+# (commitizen bumps it): the major tag a consumer pins moves to a release whose
+# workflow and Action agree, and a prerelease, which moves no major tag, runs
+# its own Action too.
 
 name: dsh-migrate
 
@@ -44,7 +49,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
-      - uses: royenheart/dsh-migrate-bot@v1
+      - uses: royenheart/dsh-migrate-bot@v0.3.4
         with:
           command: run
           config: ${{ inputs.config }}
@@ -63,7 +68,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
-      - uses: royenheart/dsh-migrate-bot@v1
+      - uses: royenheart/dsh-migrate-bot@v0.3.4
         with:
           command: pull-request-closed
           config: ${{ inputs.config }}
@@ -85,7 +90,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
-      - uses: royenheart/dsh-migrate-bot@v1
+      - uses: royenheart/dsh-migrate-bot@v0.3.4
         with:
           command: comment
           config: ${{ inputs.config }}

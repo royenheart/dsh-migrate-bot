@@ -58,6 +58,8 @@ test('verify-release rejects a file that states another version', () => {
   const version = files.version.trim()
   const drifted = verifyRelease({ ...files, actionYml: files.actionYml.replace(`:v${version}`, ':v0.0.1') })
   assert.deepEqual(drifted, [`action.yml image says 0.0.1, VERSION says ${version}`])
+  const workflow = verifyRelease({ ...files, migrateYml: files.migrateYml.replace(`dsh-migrate-bot@v${version}`, 'dsh-migrate-bot@v1') })
+  assert.deepEqual(workflow, [`migrate.yml uses #1 says 1, VERSION says ${version}`])
 })
 
 test('verify-pure-core reads run-time imports and rejects one with side effects', () => {

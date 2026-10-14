@@ -1,6 +1,8 @@
 # A pushed vX.Y.Z tag publishes the Action's image, then moves the major tag
 # (v1, v2, …) consumers pin. The image is pushed before the major tag moves, so
-# a consumer never resolves a tag whose image does not exist.
+# a consumer never resolves a tag whose image does not exist. A prerelease tag,
+# vX.Y.Z-rc.N, publishes its image and a GitHub prerelease and moves no major
+# tag: only a consumer who pins it runs it.
 
 name: release
 
@@ -8,6 +10,7 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+'
   workflow_dispatch:
     inputs:
       tag:
@@ -54,6 +57,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ env.TAG }}
       - name: Move the major tag
+        if: ${{ !contains(env.TAG, '-') }}
         run: |
           set -euo pipefail
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -69,4 +73,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
+          prerelease: ${{ contains(env.TAG, '-') }}
           generate_release_notes: true
