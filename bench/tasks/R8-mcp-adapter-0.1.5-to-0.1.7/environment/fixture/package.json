@@ -1,0 +1,72 @@
+{
+  "name": "@auggieteo/dsh-mcp-adapter",
+  "version": "0.3.0",
+  "description": "DSH plugin connecting the agent to MCP servers through one mcp proxy tool and a Settings > MCP page.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/auggie246/dsh-mcp-adapter.git"
+  },
+  "main": "src/host/index.js",
+  "files": [
+    "src/host/",
+    "skills/",
+    "lib/client.js",
+    "lib/client.js.map",
+    "cordis.patch.yml",
+    "CHANGELOG.md",
+    "CONTEXT.md",
+    "docs/adr/",
+    "docs/verification/",
+    "LICENSE",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "default": "./src/host/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch",
+    "prepack": "npm run build",
+    "test": "node --test test/*.test.js"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-settings": "^0.1.1-rc.2 || ^0.1.2-rc.1 || ^0.1.5-rc.1",
+    "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-settings": "0.1.1-rc.2",
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "esbuild": "^0.25.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0"
+  }
+}

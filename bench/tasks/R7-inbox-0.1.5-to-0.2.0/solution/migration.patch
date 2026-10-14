@@ -1,0 +1,2301 @@
+diff --git a/AGENTS.md b/AGENTS.md
+index d44f362..f5a1bd6 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -6,7 +6,7 @@
+ 
+ - **一句话**：dsh-inbox 是 DeepSeek Harness（dsh）的插件，把日常复制粘贴的链接、图片、文本、账密收进一个本地仓库，自动分类、可在侧栏浏览、可在 dsh 对话里检索取回。
+ - **面向谁**：公开 npm 包 `@chance722/dsh-inbox`，任何人都能像装社区插件一样安装。
+-- **当前阶段**：**M0–M8 已验收**（阶段、验收标准与记录见 `docs/feature/dev-bus.md`）；此后按模块继续（面板中英双语等）。当前版本 `0.2.8`（`package.json` 是版本的单一源，这里只是回显）。
++- **当前阶段**：**M0–M8 已验收**（阶段、验收标准与记录见 `docs/feature/dev-bus.md`）；此后按模块继续（面板中英双语等）。当前版本 `0.2.10`（`package.json` 是版本的单一源，这里只是回显）。
+ - **平台**：代码跨平台；**v1 只在 Windows 实测验收**，macOS/Linux 未验证（README 需如实写明）。
+ - **包名**：`@chance722/dsh-inbox`。
+ 
+@@ -40,15 +40,16 @@ docs/
+ ## 关键约束与约定
+ 
+ 1. **单包双半边**：`package.json` 同时声明宿主侧 `dsh.bundle.patch` 与浏览器侧 `dsh.client`（`platform: "web"` + 导出 `./client`）。客户端 bundle 由 tsdown 生成，**禁止手写 `window.__ModuleLoader__.load(...)`**。
+-2. **工具必须挂进 agent preset**：`defineTool` 注册的工具只有在会话的 `agent.cordis.yml` 里挂上才对模型可见。安装体验必须自动化这一步（`init` 命令），不指望用户手工改 preset。**代价是同一个进程里会有两个插件实例**（profile 一份 + 每个会话的 preset 一份），而存储域按名字只允许 open 一次——所以**宿主半边必须是进程内单例**（现在走 `src/host/vault/lease.ts`，进程级引用计数），凡是 open 域/开端口/挂定时器这类进程级资源，都按"`apply` 会跑两遍"写；细节见 `docs/help/dsh-plugin-platform.md`。
++   - **peer 区间就是安装门禁**：`dsh plugin add` 用 `semver.satisfies(runtime, range, { includePrerelease: true })` 逐个核对名字以 `@deepseek-ai/dsh` 开头的 `peerDependencies`，不合格就拒绝安装并回滚 profile。`^0.1.x` 按 semver 天然不含 `0.2.x`，所以**每支持一条 dsh 线都要显式写进区间**（现在是 `^0.1.5-rc.2 || ^0.2.0-rc.2`）——只升 devDependencies 不改 peer，等于什么都没做。机制与逃生门见 `docs/help/dsh-plugin-platform.md`。
++2. **工具靠 profile 那一行就到模型面前，不靠 preset**（2026-09-30 真模型实测订正；老说法"必须挂进 agent preset"不成立）：`defineTool` + `ctx.tools.register` 在 profile 组合里注册的工具，会话直接看得见——0.2.0-rc.2 上验过两次（会话挂着 `standard` preset 与不挂，模型都调到了 `inbox_status`）。0.2.0 起 preset 也不再是 `$DSH_HOME/.agent-presets/` 目录，而是 bundle 里的声明行，`init` 在 0.2.x 上跳过那两步（`presetMechanism()`）。**但同一进程里仍可能有两个实例**（profile 一份 + 某个 preset 里再挂一份），而存储域按名字只允许 open 一次——所以**宿主半边必须是进程内单例**（现在走 `src/host/vault/lease.ts`，进程级引用计数），凡是 open 域/开端口/挂定时器这类进程级资源，都按"`apply` 会跑两遍"写；证据见 `docs/help/dsh-plugin-platform.md`。
+ 3. **密钥红线**：账密类资源**加密落盘（2026-09-20 已实现，域 v6）**——正文进 `secret`（AES-256-GCM，密钥由主密码 scrypt 派生），主密码与派生密钥**都不落盘**（只在进程内存里，重启即锁，界面显式解锁）；新捕获的账密在**没有密钥时直接拒绝入库**（绝不退回明文），老明文记录在首次设置/解锁时自动转密文。列表脱敏、明文**永不进模型上下文**、对话里**永不输出明文**，长期保留。任何发往模型的分类请求先过脱敏。列表里密钥/账密记录**只显示你起的名字**，没起名字时才用你的备注，**绝不显示正文**；取名规则只写在一处（`src/client/heading.ts`，列表与 dock 共用），「这是什么」由类目图标（钥匙）表达。**由此有一条不变式：`title` 只能由用户在面板里填**——规则、模型、抓来的页面标题等任何自动路径都不许往 `title` 写（那正是"列表把密文当标题"这条老漏洞的成因；抓来的标题进 `linkTitle`，`model.ts` 只 patch `category`/`categorySource`）。
+ 4. **图片与证件**：分类时**允许把图片发给模型判断**（2026-09-19 用户授权——手机拍的证件照比例就是普通照片，靠宽高判不出来）；对话里默认只回 `[attachment:<id>]` 标记，字节不进对话。**唯一的例外**（2026-09-20 用户授权）：`inbox_get` 显式带 `withImage: true` 时，把该记录的那张图作为 content part 发给模型——用于"帮我看这张图是什么"，**每次调用都要显式要**、默认永不发。类目结论里，只有**用户亲口说的**才算确定证件；模型判的标 `categorySource: model`，可以随时被用户改掉。模型调用受预算闸门约束（见 `docs/help/…` 与 `src/host/classify/model.ts`）。
+ 5. **上下文红线**：不自动把 inbox 摘要注入模型上下文；模型只有主动调工具时才看到仓库内容。
+ 6. **用户描述 = 权威分类**：用户给的描述/类目优先于任何模型判断，模型不得覆盖。
+ 7. **同步红线（2026-09-20 用户拍板改）**：**上云的密文只有账密正文**——账密的 `secret` 本来就是密文，别的字段（文本、链接、标题、备注、类目、标签、时间）和附件**字节**都按明文上云。因此 **远端必须有访问控制**（README 写明"别用公开桶"），并且：主密码与派生密钥永不上传、永不同步；冲突**直接按 `updatedAt` 覆盖**（不留冲突副本）；删除以墓碑同步，清空回收站连远端一起删；附件随同步走。**清空回收站还要在本机 `graves` 表留一条 `{id, purgedAt}`**（2026-09-21）：定向删除只覆盖本机那棵同步树，别的树里的副本靠这条墓碑挡住——merge 对本机没有的 id 只收"比 `purgedAt` 更新"的副本；机制与实测见 `docs/help/sync.md`。
+-8. **数据事实只认实测**：dsh 处于 rc 阶段（本机 0.1.5-rc.2），API 会变。写 dsh 相关代码前先查 `docs/help/dsh-plugin-platform.md`；该文档与代码冲突时以 `.research/` 里的官方源码为准，并回改文档。
++8. **数据事实只认实测**：dsh 处于 rc 阶段，API 会变。**这台机器上有两个运行时**（PATH 上的 `dsh` 是 0.1.5-rc.2，桌面端 `D:\deepseek` 是 0.2.0-rc.2，各自一条 CLI），问事实先问对哪一个。写 dsh 相关代码前先查 `docs/help/dsh-plugin-platform.md`；该文档与代码冲突时以官方分发的源码为准（CLI 版在 `.research/`，桌面端在 `app.asar` 里），并回改文档。
+ 9. **文档语言**：代码与标识符英文，代码注释中文；文档中英双份（`README.md` + `README.zh.md`），`AGENTS.md`/`docs/` 用中文。
+-10. **持久化只走 `ctx.storageDomain`**：不自己开文件、SQLite 或别的存储；域 spec 的 schema 演进见 `docs/help/vault-data-model.md`。
++10. **持久化只走 `ctx.storageDomain`**：不自己开文件、SQLite 或别的存储；域 spec 的 schema 演进见 `docs/help/vault-data-model.md`。**设置值不走这条线**（面板偏好、同步端点在 dsh 的设置服务里），而那服务的两代形状不兼容、写错会带走整个宿主——写这类代码前先读 `docs/help/dsh-plugin-platform.md` 的「设置服务换了形状」一节。
+ 11. **客户端半边不许引入宿主依赖**：`src/client/**` 只能 import React、平台静态模块表里的包，以及 `src/shared/` 下的纯常量（不许 zod、不许 `node:*`、不许 `@deepseek-ai/dsh-*`），否则浏览器产物会在加载期炸。
+ 12. **面板跟随宿主主题，别写死**：配色方案从宿主读（`<html>` 的 `color-scheme`，读不到再按继承来的文字色亮度判），实现在 `src/client/scheme.ts`，判定与三个坑见 `docs/help/panel-theme.md`。**禁止**再出现硬编码的 `color-scheme`，也别读面板自己的（那是自我回声）。
+ 13. **客户端文案必须走词典，别写死在组件里**：面板 / dock / 对话卡片的文案一律进 `src/client/messages.ts`（`zh` 与 `en` 同键集），经 `t()` 渲染；面板要跟随 dsh 的语言（接官方 `ctx.locale`，服务缺席时退到 `<html lang>`），**别自造语言开关**。宿主发给模型的文字是另一层（`src/shared/vocabulary.ts` 等保持中文），两者别混。`test/i18n.test.ts` 会拦下客户端里的中文字面量；机制、边界与"为什么句内碎片要整句成 key"见 `docs/help/panel-i18n.md`。
+@@ -64,8 +65,9 @@ docs/
+ | 起隔离开发 profile | `dsh --profile inbox --no-open --port 3102` |
+ | 挂载本仓库到 profile | `dsh plugin --profile inbox add <仓库路径>` |
+ | 验证模型能调到工具 | `dsh --profile inbox-m0 "<让模型调用工具的提示>"`（headless 派生 profile） |
++| 用桌面端的运行时验证 | `D:\deepseek\resources\runtime\cli\bin\dsh.cmd`（0.2.0-rc.2；先把 `DSH_HOME` 指到仓库里的 scratch 目录） |
+ 
+-本机 dsh 不在 PATH 上，完整命令（含 Node 22 路径）见 `docs/help/dev-setup.md`。构建需要提权（esbuild 要 spawn 子进程）。
++完整命令（含两个运行时的路径与 Node 版本）见 `docs/help/dev-setup.md`。构建需要提权（esbuild 要 spawn 子进程）。
+ 
+ ## 知识文档索引
+ 
+@@ -83,7 +85,7 @@ docs/
+ 
+ | 文档 | 读者 | 内容 | 变化触发 |
+ |---|---|---|---|
+-| `README.md` | 人（开发者/使用者） | 是什么、功能特性、快速开始、常用命令 | 用户可见命令/用法/项目定位变化 |
++| `README.md` | 人（开发者/使用者） | 是什么、功能特性、安装/卸载/更新命令、常用命令。**只写命令和事实，不写原理、不解释设计取舍**——那些进 `docs/help/`（用户已两次要求删掉这类段落） | 用户可见命令/用法/项目定位变化 |
+ | `AGENTS.md` | agent | 代码组织、规范、约束（单一源，CLAUDE.md 引用式跟随） | agent 写码规则变化 |
+ | `docs/help/{topic}.md` | agent | 关键逻辑知识（下次还会用到、不看代码猜不出） | 可复用知识增量（新模块/契约/排查方法/流程/关键决策） |
+ | `docs/help/index.md` | agent | 主题索引 + 末尾「维护记录」表（维护锚点，**最多保留 5 条**） | 任何 help 文档增删改 |
+diff --git a/README.md b/README.md
+index 093173d..3dc38cb 100644
+--- a/README.md
++++ b/README.md
+@@ -56,7 +56,9 @@ Two questions in the same conversation, on a real machine:
+ 
+ ## Install
+ 
+-Needs Node ≥ 22 and a working `dsh`; the installer brings pnpm along when your machine does not have it. **Windows only so far** — macOS and Linux are unverified.
++Needs Node ≥ 22 and a working `dsh` (the installer brings pnpm along when your machine does not have it). **Windows only so far** — macOS and Linux are unverified.
++
++**Web (command line)**
+ 
+ ```powershell
+ # install (`dsh web` is `dsh --profile web`, so this is the profile you already start)
+@@ -65,14 +67,21 @@ npx @chance722/dsh-inbox init --profile web --install-pnpm
+ # never run dsh on this machine? create the profile in the same command
+ npx @chance722/dsh-inbox init --profile web --create-profile --install-pnpm
+ 
+-# update (init only installs and wires things up — re-running it never upgrades;
+-# minutes after a release, write the exact version instead: @0.2.8)
++# update (within 24h of a release, swap @latest for the exact version, e.g. @0.2.10)
+ dsh plugin --profile web add @chance722/dsh-inbox@latest
+ ```
+ 
+-**Restart dsh** afterwards, then start it as usual. **Inbox** is in the left rail, and a new session's assistant can look things up ("what links in my inbox haven't I read yet?").
++**Desktop app (DeepSeek Harness)**
++
++Open **Plugins** in the sidebar → install → enter `@chance722/dsh-inbox@latest` (within 24h of a release, `@0.2.10`) → restart when it asks.
++
++The same from the desktop's own CLI:
++
++```powershell
++"<desktop install dir>\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add @chance722/dsh-inbox@latest
++```
+ 
+-`init` also copies dsh's shipped `standard` preset to `~/.dsh/.agent-presets/inbox/` with this plugin added, and points your default preset at it — that is what lets the assistant see the inbox tools. It becomes a snapshot that will not follow later dsh upgrades; both it and the profile are reversible (see Uninstall).
++**Restart** afterwards. **Inbox** is in the left rail, and a new session's assistant can look things up ("what links in my inbox haven't I read yet?").
+ 
+ To keep your daily dsh untouched, give the plugin its own profile and port: `npx @chance722/dsh-inbox init --create-profile`, then `dsh --profile inbox --no-open --port 3102`.
+ 
+@@ -91,9 +100,10 @@ node lib/cli.js init --package <absolute path to this repo>
+ ```powershell
+ # 1. remove the package from the profile you installed it into
+ #    (also drops it from dsh.profile.bundles)
++#    desktop app: uninstall it in the Plugins panel — same thing
+ dsh plugin --profile <that profile> remove @chance722/dsh-inbox
+ 
+-# 2. delete what init created
++# 2. delete what init created (**dsh 0.1.x only**; from 0.2 init skips this)
+ rm -r ~/.dsh/.agent-presets/inbox      # the preset copy
+ # default preset: delete agent-presets.default in ~/.dsh/settings.yaml (falls back to the
+ # deployment default) or set it to standard; every init left a settings.yaml.bak-* backup
+diff --git a/README.zh.md b/README.zh.md
+index 8298a01..56fbc69 100644
+--- a/README.zh.md
++++ b/README.zh.md
+@@ -56,22 +56,32 @@
+ 
+ ## 安装
+ 
+-前置：Node ≥ 22 和一个能用的 `dsh`；没装 pnpm 时安装命令会顺手装好。**目前只在 Windows 上验收过**，macOS / Linux 未验证。
++前置：Node ≥ 22 和一个能用的 `dsh`（没装 pnpm 时安装命令会顺手装好）。**只在 Windows 上验收过**，macOS / Linux 未验证。
++
++**Web（命令行）**
+ 
+ ```powershell
+-# 安装（`dsh web` 就是 `dsh --profile web`，所以装进你日常启动的那个 profile）
++# 安装（`dsh web` 就是 `dsh --profile web`，装进你日常启动的那个 profile）
+ npx @chance722/dsh-inbox init --profile web --install-pnpm
+ 
+ # 全新机器（还没跑过 dsh、没有这个 profile）多带一个 --create-profile
+ npx @chance722/dsh-inbox init --profile web --create-profile --install-pnpm
+ 
+-# 更新（init 只管装和接线，重复跑不会升级；刚发布的几分钟内请写确切版本：@0.2.8）
++# 更新（刚发布 24 小时内把 @latest 换成确切版本，如 @0.2.10）
+ dsh plugin --profile web add @chance722/dsh-inbox@latest
+ ```
+ 
+-装完**重启 dsh**，然后照旧启动。左栏出现 **Inbox**；新会话里问「我的收件箱里有哪些还没看的链接」，助手就会去查。
++**桌面端（DeepSeek Harness 桌面版）**
++
++侧栏打开**插件** → 安装 → 填 `@chance722/dsh-inbox@latest`（刚发布 24 小时内填 `@0.2.10`）→ 按提示重启。
++
++命令行等价（用桌面版自带的那条 `dsh`）：
++
++```powershell
++"<桌面版安装目录>\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add @chance722/dsh-inbox@latest
++```
+ 
+-`init` 还会把 dsh 自带的 `standard` preset 复制到 `~/.dsh/.agent-presets/inbox/` 并加上本插件、把默认 preset 指向它——助手能看见收件箱工具就是靠这一步。那份快照不会跟着 dsh 以后升级 `standard` 一起变；它和 profile 都能退掉（见「卸载」）。
++装完**重启**。左栏出现 **Inbox**；新会话里问「我的收件箱里有哪些还没看的链接」，助手就会去查。
+ 
+ 想让日常 dsh 保持干净：`npx @chance722/dsh-inbox init --create-profile`，然后 `dsh --profile inbox --no-open --port 3102`。
+ 
+@@ -89,9 +99,10 @@ node lib/cli.js init --package <本仓库的绝对路径>
+ 
+ ```powershell
+ # 1. 从你装进去的那个 profile 里摘掉（同时会从 dsh.profile.bundles 移除）
++#    桌面端：在插件面板里卸载，等价于这一条
+ dsh plugin --profile <你装的 profile> remove @chance722/dsh-inbox
+ 
+-# 2. 删掉 init 建的东西
++# 2. 删掉 init 建的东西（**只有 dsh 0.1.x 会建**；0.2 起 init 会跳过这步）
+ rm -r ~/.dsh/.agent-presets/inbox      # 那个 preset 副本
+ # 默认 preset：把 ~/.dsh/settings.yaml 里 agent-presets.default 删掉（继承部署默认），
+ # 或改成 standard；init 每次都留了 settings.yaml.bak-* 备份，也可以直接还原
+diff --git a/docs/help/dev-setup.md b/docs/help/dev-setup.md
+index f29abc3..80ce010 100644
+--- a/docs/help/dev-setup.md
++++ b/docs/help/dev-setup.md
+@@ -12,6 +12,12 @@
+ | dsh CLI | `0.1.5-rc.2`，npm 全局装好之后 `dsh` 就在 PATH 上，直接敲 |
+ | PATH 没配好时 | `node <全局 node_modules>\@deepseek-ai\dsh\lib\bin.js <参数>`（全局 root 问 `npm root -g`） |
+ 
++**2026-09-30 起这台机器上有第二个运行时**：桌面端 DeepSeek Harness `0.2.0-rc.2`（装在 `D:\deepseek`），
++自带一条 CLI `D:\deepseek\resources\runtime\cli\bin\dsh.cmd`，跑的是 `app.asar` 里的运行时。
++两条 CLI 的 profile 目录是同一个 `%DSH_HOME%\profiles`，但**运行时版本不同**（`--version` 各问一次最稳）。
++拿桌面端那条验证时，先把 `DSH_HOME` 指到一个仓库里的 scratch 目录，别碰日常那套；机制与实测见
++`docs/help/dsh-plugin-platform.md` 的「0.2.0-rc.2（DeepSeek Harness 桌面端）实测」。
++
+ ## 命令
+ 
+ ```powershell
+@@ -62,25 +68,30 @@ dsh --profile inbox --no-open --port 3102
+ 
+ ## 验证模型能调到工具（headless 路线）
+ 
+-**2026-09-20 起用这个配方**（它复现的正是用户真实的组合：插件既是 profile bundle、又由会话 preset 带进来，也就是那个
+-"域被打开两次"的场景。少了 preset 那一半，`dsh_inbox` 只 open 一次，测试会假通过）：
+-
+ ```powershell
+ dsh --profile inbox-check --from-default-profile headless --dump-config   # 派生一个 headless profile
+-dsh plugin --profile inbox-check add <仓库路径>              # ① profile 那半边
+-# ② 会话那半边：用户级默认 preset 已经是收件箱 preset（init 写过 agent-presets.default），无需额外操作
++dsh plugin --profile inbox-check add <仓库路径>
+ dsh --profile inbox-check "调用 inbox_status 工具，把它的原始结果原样贴给我。"
+-# 期望：dsh-inbox v0.1.0: vault open, 7 record(s).
++# 期望：dsh-inbox v0.2.9: vault open, N record(s).
+ # 顺带验命中：dsh --profile inbox-check "我的个人仓库里有哪些还没看的链接？"（应调用 inbox_search）
+ ```
+ 
+ 跑完把临时 profile 删掉（`%DSH_HOME%\profiles\inbox-check`）。**注意** `pnpm build` 之后才会带上最新代码：headless 启动时装载 `lib/`。
+ 
+-早期（还没有 preset 的 M0 阶段）用过 `inbox-m0` 那种"只挂 profile、工具行直接可见"的写法，现在**不足以验证**上面那条双加载场景。
++**2026-09-30 订正**：以前这里写着"少了 preset 那一半，`dsh_inbox` 只 open 一次，测试会假通过"。现在实测相反——
++profile 那一行注册的工具**会话直接看得见**，preset 挂不挂都一样（0.2.0-rc.2 上真模型验过两次，见
++`docs/help/dsh-plugin-platform.md`）。这条 headless 配方因此是完整的，不需要再补 preset。
++
++用桌面端那条 CLI（0.2.0-rc.2）跑同一套时，先把 `D:\deepseek\resources\runtime\cli\bin` 放到 PATH 前面，
++并把 `DSH_HOME` 指到仓库里的 scratch 目录；它跑的是 `app.asar` 里的运行时。
++
++## preset：只在 0.1.x 上还要自己搭
+ 
+-## 在 web 里验证需要 agent preset
++**先确认你面对的是哪个载体**——0.2.0 起 preset 是 bundle patch 里的**声明行**（`@deepseek-ai/dsh-agent-preset-registry`
++解析），`$DSH_HOME\.agent-presets\<id>\` 那个目录**没有任何代码再读**，`@deepseek-ai/dsh-agent-presets`
++这个包也不存在了。判断方法：`dsh --version`，或看 `init` 第①步回显的版本。
+ 
+-用户级 preset 根：`%DSH_HOME%\.agent-presets\<preset-id>\`（**当前这台机器上这个目录还不存在**，要自己建），两个文件：
++0.1.x 上仍然是目录，两个文件：
+ 
+ - `preset.yml` —— `name` / `description` / `order`
+ - `agent.cordis.yml` —— 组合；把 `profiles\node_modules\@deepseek-ai\dsh-agent-presets\presets\standard\` 整个复制过来，再追加自己的行：
+diff --git a/docs/help/dsh-plugin-platform.md b/docs/help/dsh-plugin-platform.md
+index 5b79861..e89d168 100644
+--- a/docs/help/dsh-plugin-platform.md
++++ b/docs/help/dsh-plugin-platform.md
+@@ -308,3 +308,172 @@ const rev  = info.tab.navigation.revision // 每次导航 +1，参数没变也
+ **接之前先做小 spike**（rc 期 API 会变）：我们的客户端 bundle 能否 require 到它（`package.json` 的
+ `dsh.client.inject` 要加这一条，和现有的 connection/ui-layout/ui-sidebar 并列）、`t` 席位在我们自己的
+ slot 注册里是否可用、以及 `ctx.effect` 的释放是否按官方样例走。
++
++## 0.2.0-rc.2（DeepSeek Harness 桌面端）实测（2026-09-30）
++
++本机多了一个运行时：桌面端 `DeepSeek Harness 0.2.0-rc.2`（注册表项 `InstallLocation: D:\deepseek`），
++而 PATH/nvm 上的 `@deepseek-ai/dsh` 仍是 `0.1.5-rc.2`。**两个运行时并存**，`docs/help/dev-setup.md`
++里的老命令只对后者成立。
++
++### 桌面端的 dsh 在哪、怎么当命令行用
++
++- 桌面端自带 CLI：`D:\deepseek\resources\runtime\cli\bin\dsh.cmd`。它把 Electron 当 node 用
++  （`ELECTRON_RUN_AS_NODE=1`），跑 `app.asar\dsh\node_modules\@deepseek-ai\dsh-desktop-host\lib\cli.js`。
++  `--version` 回 `0.2.0-rc.2`，`dsh --help` / `dsh plugin --profile <p> …` 与 CLI 版同形。
++- **运行时包在 `app.asar` 里**（121 MB 的归档，shell 工具打不开，官方文档也这么写）。要在里面找事实
++  （README、`lib/types`、patch 行 id）只能把 asar 当字节流搜：`[IO.File]::ReadAllBytes` + 全文 `IndexOf`，
++  或用 `--expose-internals` 跑一段脚本。**profile 仍在 `%DSH_HOME%\profiles`**，桌面端自己那个叫 `desktop`。
++- 于是可以完全不碰真实环境地验证：`$env:DSH_HOME=<仓库里的 scratch 目录>` 之后
++  `dsh --profile X --from-default-profile web --dump-config` 建 profile、
++  `dsh plugin --profile X add <路径>` 装插件、`dsh --profile X --no-open --port <n>` 起 web。
++  实测 0.2.0-rc.2 会照常把我们的 client bundle 挂上
++  （页面里出现 `plugins/??@chance722/dsh-inbox/client.js&rev=…`，那个 URL 直接 GET 回
++  `200 text/javascript`、21 万字节、内容是 `window.__ModuleLoader__.load({ id: "@chance722/dsh-inbox", … })`）。
++
++### 桌面端的插件面板（用户装插件走的那条路）
++
++侧栏的**插件**面板（`@deepseek-ai/dsh-client-ui-plugin-manager`，root 页面，不属于任何会话）是桌面端装插件的正道。
++它和 `dsh plugin add` 跑的是**同一套 pnpm、同一道门禁**，所以上面那些坑在这里一模一样。官方自陈的边界
++（`app.asar` 里该包的 README「已知限制」）：
++
++- **没有版本选择器，也没有升级按钮**——spec 按 pnpm 接受的写法手输，升级＝卸载后重装。⇒ 刚发布 24 小时内
++  必须手输**确切版本**，否则就是"静默降级到上一版 + 门禁报旧版不兼容"那一幕（0.2.9 发布当天就是这么中招的）。
++- **一次只能装一个**；**只管理组合包**（没有 `dsh.bundle.patch` 的依赖在安装前就被拒）。
++- 失败的**行只显示阶段、不显示原因**（原因在 Host 日志里）；"要等重启的变更"是一条会自己消失的 toast。
++- 那个输入框收的是 pnpm 认的 spec：包名 / GitHub 地址 / 本地目录。**GitHub 地址对本包没用**——仓库里
++  没有 `lib/`（`.gitignore` 里就有它），而 `prepare` 也没写，所以从 git 装出来是个没有构建产物的空壳。
++
++### 插件兼容门禁就是 peer 区间（这是"版本不一致"报错的全部真相）
++
++报错原文 `Plugin <pkg>@<v> is incompatible with dsh <runtime>: peerDependencies {…}` 来自
++`@deepseek-ai/dsh-app-boot` 的 `evaluatePluginCompatibility`（证据：`app.asar` 里该包的 lib 源码）：
++
++- 只看 peerDependencies 里名字是 `@deepseek-ai/dsh` 或 `@deepseek-ai/dsh-*` 的项，
++  **`@deepseek-ai/cordis` 之类不在检查范围**（名字不匹配）。
++- 判定是 `semver.satisfies(runtimeVersion, range, { includePrerelease: true })`——**预发布版参与区间比较**，
++  没有"rc 一律放行"的宽容。
++- `workspace:^` / `workspace:~` / `workspace:*` 三个写法被当作"等于当前运行时版本"。
++- **坑在 semver 对 0.x 的规矩**：`^0.1.5-rc.2` = `>=0.1.5-rc.2 <0.2.0`，所以 0.2.0-rc.2 **天然落在区间外**。
++  不是 dsh 0.2 "改了接口"，是 `^0.1.x` 从不允许 `0.2.x`。修法是把区间写成
++  `^0.1.5-rc.2 || ^0.2.0-rc.2`（本包 0.2.9 起这么写）。
++- 时机：`dsh plugin add` **先把包装完**（pnpm 正常跑），再校验**已安装的** package.json，不合格就
++  `dsh: installation rejected: …` 并把 `package.json` / `pnpm-lock.yaml` / `node_modules` **一起回滚**
++  （证据：`~/.dsh/profiles/<p>/\.plugin-manager\logs\operation-*/pnpm.log`）。
++- 逃生门（应急，不是解法）：`dsh plugin --profile <p> allow-version <pkg>@<ver> --dsh-version <exact> --accept-risk`。
++  **豁免是"精确包版本 × 精确运行时版本"的一对**，落在 profile 的 `compatibility.json` 里；它只关掉门禁，
++  不解决任何真实不兼容。
++
++**验证这套结论的办法**（别只看一次成功）：拿同一份代码、只把 peer 区间改回 `^0.1.5-rc.2` 装进另一个
++scratch profile，报错应当逐字复现；改回 `|| ^0.2.0-rc.2` 则装上。0.2.9 的这次就是这么验的。
++
++### 预设不再是目录（0.2.0 起，`init` 的第②③步因此是死路）
++
++0.1.5-rc.2 的用户级 preset 是目录 `$DSH_HOME/.agent-presets/<id>/`（`preset.yml` + `agent.cordis.yml`）。
++0.2.0-rc.2 改成**声明行**，官方原话（`app.asar` 里的 authoring 文档）：
++
++> Before declaration rows, a user preset was a directory `$DSH_HOME/.agent-presets/<id>/` … **Nothing reads
++> that directory any more.**
++
++- 现在一份 preset 是 bundle patch 里的一行：
++  `- id: preset-<id>` / `name: '@deepseek-ai/dsh-agent-preset'` / `config: { id, name?, description?, order?, plugins: [...] }`。
++  默认 preset 归 `@deepseek-ai/dsh-agent-preset-registry`：`config.default` 是部署默认，用户的选择存在它的
++  易变字段 `selectedDefault` 里；**registry 不扫目录、也不接受 preset 路径**。
++- 对本包的含义：`src/cli.ts` 里"复制 standard 目录 + 追加 `agent.cordis.yml` 一行"这条路在 0.2.0-rc.2 上
++  **是死的**（不报错，只是没人读；而 `@deepseek-ai/dsh-agent-presets` 这个包在 0.2.0 上根本不存在——
++  npm 上最高 `0.1.6-alpha.2`，桌面端 `app.asar` 里连字符串都搜不到，所以老 `init` 会卡在第②步
++  "找不到随 dsh 附带的 standard preset" 并以 1 退出）。
++
++### 但工具**不需要** preset 就能到模型面前（2026-09-30 用真模型实测，这条推翻了 AGENTS 的老说法）
++
++在 `hl` profile（`dsh-base` + `dsh-headless` + 本插件，**没有** preset 声明）上问
++「我的收件箱里有哪些还没看的链接？没有相关工具就说没有」，模型直接调了 `inbox_status`
++（回显 `dsh-inbox v0.2.9`、仓库已打开）。再把**官方那份 `standard` 的 plugins 列表原样**塞进
++`--patch` 覆盖层（`agent-preset-registry` + `preset-standard`，两次运行都确认没有
++"1 entry did not activate" 警告，即 preset 真的挂上了）重跑，模型照样调到 `inbox_status` / `inbox_search`。
++
++**结论**：`ctx.tools.register` 在 **profile 组合**里注册的工具，会话直接看得见，preset 挂不挂都一样。
++"工具必须挂进 agent preset 才可见"是错的（`docs/help/dsh-plugin-platform.md` 的 M4 一节早就这么测过，
++只是 AGENTS 那条一直没改）。**声明式 preset 因此不是必需品**，`init` 在 0.2.x 上直接跳过第②③步
++（`presetMechanism()`，0.1.x 仍走目录那条路）。
++
++**硬做也做不动**：声明一行要**复述整份** standard 的 `plugins` 列表（覆盖是整体替换），而桌面端那份
++`presets/standard.patch.yml` 在 `app.asar` 里——一个 `npx` 跑的 CLI 打不开它。真要走声明式，
++只能先 `dsh --profile <p> --dump-config` 把组合打出来再从文本里抠出那段，收益（实测为零）不抵这个脆弱度。
++
++### `init` 用的是 PATH 上那个 dsh，不是目标 profile 的运行时
++
++`dsh plugin add` 转发给 PATH 上的 `dsh`，所以这台机器上（PATH 是 0.1.5-rc.2、桌面端是 0.2.0-rc.2）
++`npx @chance722/dsh-inbox init` 会**用 0.1.5 去装**、并走**目录式 preset** 那条分支。要装进桌面端那个
++profile，先把桌面端的 CLI 放到 PATH 前面：`D:\deepseek\resources\runtime\cli\bin`。
++0.2.9 起 `init` 在第①步回显它问到的版本（`（用 dsh 0.2.0-rc.2）`），这类错配不再静默。
++
++### pnpm 的 `minimumReleaseAge`：**范围**被静默降级，**确切版本**才会自己豁免
++
++pnpm 11 默认 `minimumReleaseAge: 1440`（24 小时）：发布不满 24 小时的版本不许装。后果分两种，
++而它们长得完全不一样（2026-09-30 用桌面端自带的 pnpm 11.7.0 实测；起因是用户发完 0.2.9 之后
++用 `@latest` 装不上）：
++
++- **写范围（`@latest`、`^0.2.8`）→ 静默降级。** pnpm 在范围里挑"够老"的最新版，于是刚发布的
++  0.2.9 被跳过，装下去的是 **0.2.8**。**没有任何警告**，而且 `dsh plugin add` 后面那句门禁报错会指向
++  **0.2.8**（`@chance722/dsh-inbox@0.2.8 与 DSH 0.2.0-rc.2 不兼容（要求 … ^0.1.5-rc.2）`）——
++  看起来像兼容性没修好，其实是新版本压根没装上。桌面端插件管理器的信息卡读的是 registry 的
++  `latest` 标签（0.2.9），所以**界面显示 0.2.9、报错说 0.2.8**，更迷惑。
++  证据：`~/.dsh/profiles/desktop/.plugin-manager/logs/operation-*/pnpm.log` 里那行
++  `+ @chance722/dsh-inbox ^0.2.8`。
++- **写确切版本（`@0.2.9`）→ 自动豁免。** pnpm 照装，并自己往 `pnpm-workspace.yaml` 追加一条
++  `minimumReleaseAgeExclude: <pkg>@<ver>`（会打 "Added 1 entry to minimumReleaseAgeExclude"）。
++
++**结论**：刚发布之后一律写**确切版本**，别写 `@latest`；等满 24 小时再回到 `@latest`。
++本仓库自己（开发侧）用一行 `minimumReleaseAgeExclude: ['@deepseek-ai/*']` 把这条产品线整个开口子，
++其它依赖照样要过 24 小时。
++
++### 设置服务换了形状：0.2.0 上没有"命名空间"这回事（2026-09-30 实测，写错形状会带走整个宿主）
++
++两个运行时的 `ctx.get('settings')` 是**同一个服务的两代**，形状不兼容：
++
++| | 0.1.5-rc.2 | 0.2.0-rc.2 |
++|---|---|---|
++| 声明 | `settings.register(namespace, schema, { base })` | 插件自己 `export const Config`，字段标 `volatile()` |
++| 读 | `settings.get(namespace)` | `settings.describe()` → `[{ ns, value, ... }]`，`ns` 是**profile 行 id** |
++| 写 | `settings.update(namespace, patch)`（同步） | `settings.update(rowId, patch)`（**async**，只收 volatile 字段） |
++
++证据：`app.asar` 里 `dsh/node_modules/@deepseek-ai/dsh-settings/lib/index.js`（对外只有
++`describe/update/replace/mutate/write/configure`，**没有 `register`、也没有 `get`**；`write()` 找不到行时原话是
++`No configurable plugin entry "<ns>"`，不是行里的字段时是 `Config field "x" is not volatile`）。
++行 id 用 `loader` 自己的记录拿：`ctx.fiber.entry.options.id`（`Entry.key = Symbol.for("cordis.entry")`，
++fiber 的 `entry` 由 `cordis-plugin-loader` 的 `internal/plugin` 钩子设置，就是 profile 那行的 `id`），
++所以用户改行 id 也还成立。写下去的落点是 profile 的 `cordis.patch.yml`，形状与官方主题插件那行一模一样
++（本包实测：`- id: dsh-inbox` / `name: @chance722/dsh-inbox` / `config: { listMode: compact }`，
++基座默认值不会被抄进文件）。
++
++**为什么必须认真挑门（用户 2026-09-30 报的那条"点一下列表模式，整个桌面端退出"）**：0.2.0 的 `update()` 是
++async，用 0.1.x 的命名空间调它 = 一个**没人 await 的 rejected promise**，而 dsh 把 unhandled rejection 当
++致命错误（那句 `dsh: fatal load failure: Error: No configurable plugin entry "dsh-inbox-ui"` 下面跟着
++`at process.processTicksAndRejections`，宿主随即 `exited with 1`）。修法在 `src/host/settings.ts`：
++能力探测（有 `register` 走命名空间门，否则 `describe`+`update` 走行门）、写一律 await 并把拒绝转成
++`{ ok:false, reason }`，读也**永不抛**（`describe()` 会读 profile 目录，读不动就当没有）。
++
++**怎么在不碰真实环境的前提下验完这条链**（这次用的配方，可复用）：
++
++```powershell
++$env:DSH_HOME="$env:TEMP\dsh-inbox-lab"                       # 仓库外的 scratch 家目录
++dsh --profile lab --from-default-profile web --dump-config    # 建 profile
++dsh plugin --profile lab add D:\Workspace\dsh-inbox           # link 装本包（不需要网络）
++dsh --profile lab --no-open --port 3199                       # 起宿主，别用真实 profile
++```
++
++面板的 Fetch 路由要浏览器 cookie，**没有浏览器也能点**：`dsh-client-connection` 签 cookie 用的密钥就存在
++`$DSH_HOME/.credentials.yaml` 的 `client-connection/browser-session` 记录里，照它的规则自己签一个
++（`dsh-auth-<base64url(sha256('127.0.0.1:3199'))>` = `v1.<payload>.<sig>`，payload 里
++`issuedAt/expiresAt` 是**毫秒**、`issuedAt <= now < expiresAt`、间隔 ≤ `cookieMaxAgeDays`，HMAC 的键是
++**base64url 解码后的** secret），然后 `POST /api/inbox/ui`：
++
++```jsonc
++{"action":"read"} → {"ok":true,"value":{"listMode":"grid","settingsAvailable":true}}
++{"action":"save","listMode":"compact"} → 重启宿主后再 read，仍是 compact（写到了 profile patch 里）
++```
++
++**反面控制**（同一套配方跑的）：在 `$DSH_HOME/cordis.patch.yml` 里覆盖我们那行的 `config`，同一句 save
++就回 `{"ok":false,"error":{"code":"inbox/ui-unsaved","message":"Configuration for \"dsh-inbox\" is
++overridden by a home patch or command-line overlay"}}`，接着再 read 照常 200 —— **宿主活着**，
++而这条路正是修前会死的那条。
+diff --git a/docs/help/index.md b/docs/help/index.md
+index 9ad763f..86802aa 100644
+--- a/docs/help/index.md
++++ b/docs/help/index.md
+@@ -4,7 +4,7 @@
+ 
+ | 主题 | 路径 | 一句话 |
+ |---|---|---|
+-| dsh 插件平台实测事实 | `dsh-plugin-platform.md` | dsh 的扩展点、限制、安装机制，逐条带证据路径 |
++| dsh 插件平台实测事实 | `dsh-plugin-platform.md` | dsh 的扩展点、限制、安装机制，逐条带证据路径；末尾一节是 0.2.0-rc.2 桌面端（peer 区间即安装门禁、预设改声明行、**设置服务换形状 / 写错会带走宿主**、不用浏览器怎么点面板 API、asar 里怎么查事实） |
+ | 已锁定的产品与架构决策 | `product-decisions.md` | 需求边界、隐私红线、分类与生命周期规则 |
+ | 本地开发与验收流程 | `dev-setup.md` | 建 profile、挂插件、起服务、headless 验证工具的命令 |
+ | 抓链接标题（外发请求） | `link-title-fetch.md` | 一次 GET 的自述身份、站点拒绝的两种长相（空壳页 / 假标题）、实测矩阵与复查命令 |
+@@ -22,11 +22,11 @@
+ 
+ | 时间 | 维护时 HEAD | 变更摘要 |
+ |---|---|---|
++| 2026-09-30 | `11b8c13` | **dsh 0.2.0-rc.2 装不上**——用户报 `@chance722/dsh-inbox@0.2.8 与 DSH 0.2.0-rc.2 不兼容（要求 @deepseek-ai/dsh-* ^0.1.5-rc.2）`。定位：门禁是 `@deepseek-ai/dsh-app-boot` 的 `evaluatePluginCompatibility`，只看名字以 `@deepseek-ai/dsh` 开头的 peer，判定 `semver.satisfies(runtime, range, {includePrerelease:true})`——`^0.1.5-rc.2` 按 semver 是 `>=0.1.5-rc.2 <0.2.0`，0.2.0-rc.2 天然出界，**不是接口坏了**。修法：六项 peer 改成 `^0.1.5-rc.2 \|\| ^0.2.0-rc.2`、devDeps 钉 0.2.0-rc.2、`pnpm-workspace.yaml` 只给 `@deepseek-ai/*` 开 `minimumReleaseAgeExclude`、版本 0.2.8 → 0.2.9；反面控制（同代码改回旧区间）逐字复现用户那条报错。**顺带改掉 `init`**：0.2.0 起 preset 是 bundle 里的声明行、`.agent-presets/` 目录没人再读（`@deepseek-ai/dsh-agent-presets` 在 0.2.0 上不存在），老代码会卡在第②步以 1 退出；新增 `presetMechanism()` 按 `dsh --version` 分流（0.2.x 跳过②③），第①步回显问到的版本（这台机器 PATH 是 0.1.5、桌面端是 0.2.0）。**真模型实测订正了一条老规则**：profile 那一行注册的工具会话直接可见，preset 挂不挂都一样（0.2.0-rc.2 上验两次），AGENTS 第 2 条据此改写。`dsh-plugin-platform.md` 加「0.2.0-rc.2 桌面端」整节（门禁机制、桌面端 CLI 与 asar、preset 载体、age 豁免），`dev-setup.md` 订正 headless 配方与 preset 一节，README 中英各补兼容区间与 PATH 提醒。313 测试全绿 + tsc + build。**发布后补记（同一轮维护）**：发完 0.2.9 用 `@latest` 装仍报 `@0.2.8 不兼容`——pnpm 的 24h `minimumReleaseAge` 对**范围**是**静默降级**（装下去的是 0.2.8，门禁报错因此指向旧版本；桌面端插件管理器的卡片读的是 registry 的 `latest` 标签，于是界面说 0.2.9、报错说 0.2.8）。用桌面端自带 pnpm 11.7.0 复现，写确切版本 `@0.2.9` 则自动豁免，端到端装进 scratch profile 且门禁放行。两份 README 与平台文档按实测改写 |
+ | 2026-09-21 | `f2912ff` | **M9.17 投放目录被当成投放文件**——用户报"点击刷新有 500 报错"，接口原话 `failed: 1`、`reason: inbox：取对象失败：HTTP 500 — {"msg":"未知运行时异常","code":500}`，`listed 39 / skippedSync 38`。定位：39 项里 **38 项是本机自己写的 `inbox/sync/…`**，第 39 项不在任何 `sync/` 树下、名字正是投放目录名 ⇒ 那就是**目录本身**（云盘的 key 以 `/` 结尾的占位对象）；GET 它本来就不是"读一个文件"，网关对不提供的东西一律回那句 500。因为**失败会钉住游标**，每次刷新重复同一句。修法：`remote/pull.ts` 新增 `isFolder()`，在"要不要读"之前按**形状**跳过（末尾 `/`，或路径等于被列举的投放目录），并计入新增的 `PullResult.skippedFolders`（面板不显示）；`…/sync/` 树的判定不动。两条新测试（WebDAV `inbox/sub/`、S3 `inbox/` + `inbox`）都断言"**根本没发出那次 GET**"，改前必红——复现出的那句与用户贴的逐字一致。`sync.md` 加「投放目录不是一个文件」一节 + 排查表一行，`remote-gateway-compat.md` 记下那句 500 的第二种来源。309 测试全绿 + tsc + build（本机 `lib/` 已重建，重启 dsh 即生效）|
+ | 2026-09-21 | `790b03d` | **M9.16 清空回收站又被拉回来**——用户报"清空后重启 dsh，13 条又躺在回收站里"。定位到 merge：定向删除只覆盖本机那棵同步树，开着「同时合并别的同步目录」时老树 `sync/` 里的墓碑副本每次启动都被重新导入（本机没有行可压）。域 **v7 → v8** 加 `graves`（`{id, purgedAt}`，`Vault.purge` 写、merge 读，只收"比清空时刻更新"的副本），`PullResult.purged` + tooltip 一句话；新增 3 条测试（含 v7 库能被 v8 打开）。`sync.md` 加「清空之后为什么不会再回来」一节与排查表一行，`vault-data-model.md` 加 v8 与表说明，AGENTS 同步红线补一句，README 中英各一句 |
+ | 2026-09-21 | `d7e88ec` | **M9.15 README 全书压缩**——用户："可以，都压缩一下，精简一点"。中英两份逐节收：开头两节并成「它是什么」；功能表 11 行每格收短；截图说明与重复句删掉；"东西存在哪 / 云端长什么样 / 同步怎么走" 表格保留、句子收短；隐私 7 条收到 ≤2 行但**事实一条不减**（加密边界、图片例外、云端明文、抓取身份外溢）；开发段收短。英文 **2104 → 1763 词（-16%）**，两份对称，无代码改动 |
+ | 2026-09-21 | `96eed94` | **M9.14 README 安装/更新压成命令块**——用户："README 太啰嗦，面向用户就直接写清楚安装命令和更新命令"。上一轮加的「更新」整节折进安装块（一条命令配一条注释：安装 / 全新机器 / 更新；"init 重复跑不会升级""刚发布时写确切版本"落成注释），平台说明与"init 做三件事"等段落合并，隐私里那条抓取身份收短。中英各 **-45/+21**、**-44/+21** 行，安装区 45 → 22 行，两份对称。只改 Markdown |
+-| 2026-09-21 | `75de827` | **M9.13 「更新」原来没有路径**——用户问"本地更新线上版本是不是跑 init 就行"，他只看到 `Already up to date`。答案：`init` 转发 `dsh plugin add <包名>`，profile 里的**版本范围**已被满足 ⇒ pnpm 什么都不做（同一个 pnpm 行为，这次撞在用户侧）。README 中英加「更新 / Update」一节（`@latest` 装、刚发布时要写确切版本、装完重启、**用 `inbox_status` 回显的 `dsh-inbox vX.Y.Z` 确认**），`init` 收尾提示加一行，dev-setup 第 5 条记下。顺带拉 registry 上 0.2.6 的 tarball 核对：平台表 / `refused-page` / 新 UA 都在 ⇒ **不需要 0.2.7**；用户 profile 依赖已是 `0.2.6` |
+ 
+ > 表内哈希在 **2026-09-20** 因替换作者邮箱重写过一次历史（内容未变、tree 一致）后按新提交更新了最后一行；更早几行的短 id 是重写前的旧 id，只作历史记录，不再能直接 git show。dev-bus 正文里的旧短 id 同理。
+ 
+diff --git a/package.json b/package.json
+index e6648b5..90c86e7 100644
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "@chance722/dsh-inbox",
+-  "version": "0.2.8",
++  "version": "0.2.10",
+   "private": false,
+   "description": "Personal paste inbox for DeepSeek Harness (dsh): capture, classify, browse and retrieve.",
+   "keywords": [
+@@ -75,24 +75,24 @@
+   },
+   "peerDependencies": {
+     "@deepseek-ai/cordis": "^4.0.2",
+-    "@deepseek-ai/dsh-attachment": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-client-connection": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-commands": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-storage-domain": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-tools": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-web": "^0.1.5-rc.2"
++    "@deepseek-ai/dsh-attachment": "^0.1.5-rc.2 || ^0.2.0-rc.2",
++    "@deepseek-ai/dsh-client-connection": "^0.1.5-rc.2 || ^0.2.0-rc.2",
++    "@deepseek-ai/dsh-commands": "^0.1.5-rc.2 || ^0.2.0-rc.2",
++    "@deepseek-ai/dsh-storage-domain": "^0.1.5-rc.2 || ^0.2.0-rc.2",
++    "@deepseek-ai/dsh-tools": "^0.1.5-rc.2 || ^0.2.0-rc.2",
++    "@deepseek-ai/dsh-web": "^0.1.5-rc.2 || ^0.2.0-rc.2"
+   },
+   "devDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.2",
+-    "@deepseek-ai/dsh-attachment": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-client-connection": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-commands": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-storage": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-storage-domain": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-storage-json": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-tools": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-web": "0.1.5-rc.2",
+-    "@deepseek-ai/schemastery": "3.18.2",
++    "@deepseek-ai/cordis": "~4.0.4",
++    "@deepseek-ai/dsh-attachment": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-client-connection": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-commands": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-storage": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-storage-domain": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-storage-json": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-web": "0.2.0-rc.2",
++    "@deepseek-ai/schemastery": "~3.18.4",
+     "@types/node": "^22.10.0",
+     "@types/react": "~18.3.1",
+     "esbuild": "^0.25.0",
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 12018aa..c1d8c8f 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -16,35 +16,35 @@ importers:
+         version: 4.6.5
+     devDependencies:
+       '@deepseek-ai/cordis':
+-        specifier: ^4.0.2
+-        version: 4.0.2
++        specifier: ~4.0.4
++        version: 4.0.4
+       '@deepseek-ai/dsh-attachment':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
++        specifier: 0.2.0-rc.2
++        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
+       '@deepseek-ai/dsh-client-connection':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
++        specifier: 0.2.0-rc.2
++        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
+       '@deepseek-ai/dsh-commands':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-agent@0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a))(@deepseek-ai/dsh-attachment@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/dsh-typert-protocol@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
++        specifier: 0.2.0-rc.2
++        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-agent@0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977))(@deepseek-ai/dsh-attachment@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))(@deepseek-ai/dsh-typert-protocol@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
+       '@deepseek-ai/dsh-storage':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++        specifier: 0.2.0-rc.2
++        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+       '@deepseek-ai/dsh-storage-domain':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-storage@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
++        specifier: 0.2.0-rc.2
++        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-storage@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
+       '@deepseek-ai/dsh-storage-json':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-storage@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
++        specifier: 0.2.0-rc.2
++        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-storage@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
+       '@deepseek-ai/dsh-tools':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(7f9e302786cf21e030eafe960666842c)
++        specifier: 0.2.0-rc.2
++        version: 0.2.0-rc.2(c6e351a6a6cfd1c2a664558bffcd410d)
+       '@deepseek-ai/dsh-web':
+-        specifier: 0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
++        specifier: 0.2.0-rc.2
++        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
+       '@deepseek-ai/schemastery':
+-        specifier: 3.18.2
+-        version: 3.18.2
++        specifier: ~3.18.4
++        version: 3.18.4
+       '@types/node':
+         specifier: ^22.10.0
+         version: 22.20.3
+@@ -66,181 +66,207 @@ importers:
+ 
+ packages:
+ 
+-  '@deepseek-ai/cordis@4.0.2':
+-    resolution: {integrity: sha512-asOnXP1TzFSFQlHb1iegDZp0z/8WD1c7YNrwJR/Tx2bzNuMXfcekE/I67Iv6SQXeLB4csxqCngzQKANP7gdw0g==}
++  '@deepseek-ai/cordis@4.0.4':
++    resolution: {integrity: sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==}
+     hasBin: true
+     peerDependencies:
+-      '@deepseek-ai/cordis-plugin-include': ^1.0.7
+-      '@deepseek-ai/cordis-plugin-loader': ^1.0.3
++      '@deepseek-ai/cordis-plugin-include': ~1.0.9
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
+     peerDependenciesMeta:
+       '@deepseek-ai/cordis-plugin-include':
+         optional: true
+       '@deepseek-ai/cordis-plugin-loader':
+         optional: true
+ 
+-  '@deepseek-ai/cosmokit@1.8.3':
+-    resolution: {integrity: sha512-qBo+ronVM6Eu2WNVJXi8JcMiqZ19T9BRIpV+5qJUFPXjGH/Z0QKcQMC/IZJ7L394YTOtJgcovbk9qP0w2GsBXQ==}
++  '@deepseek-ai/cosmokit@1.8.5':
++    resolution: {integrity: sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==}
+ 
+-  '@deepseek-ai/dsh-agent@0.1.5-rc.2':
+-    resolution: {integrity: sha512-SlUL1riZmVLwMUR3jo9CP/R1cxov9dHkCJDh6JQW3fSZJVCIdPygBRlAweCUDvHxAEmPpFHxE/U3NmSUbX+vQQ==}
++  '@deepseek-ai/dsh-agent@0.2.0-rc.2':
++    resolution: {integrity: sha512-CUkbU+c1G0ETXkpoLkpAFo5midz66FQGtlgQOP9pzvU9H3zJQVl4H5LrhhGVbEXKLFgdbtQiOynEW8hpWn3y0Q==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-llm': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-scope': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-session': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-session-projection': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-system-prompt': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-typert-protocol': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-util-values': ^0.1.5-rc.2
+-
+-  '@deepseek-ai/dsh-attachment@0.1.5-rc.2':
+-    resolution: {integrity: sha512-S6b8/WjqzGw+dMDLRXnq+tbijDGkQh38yE+zpQytX2/w/mPR3VzGj5r6McS01WwD76vXR8WFoheSCLyCAro8WQ==}
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session-projection': 0.2.0-rc.2
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2
++      '@deepseek-ai/dsh-typert-protocol': 0.2.0-rc.2
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.2
++      '@deepseek-ai/dsh-workspace': 0.2.0-rc.2
++    peerDependenciesMeta:
++      '@deepseek-ai/dsh-workspace':
++        optional: true
++
++  '@deepseek-ai/dsh-attachment@0.2.0-rc.2':
++    resolution: {integrity: sha512-asUDLv+mfb30vjjlQtMI9aBnC+kmPoUxS1ooadhwAd8wssIlLetq97nzC5W1qd0GQGwZtPG/gpljVAMcSwPr1g==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-brand': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-brand@0.1.5-rc.2':
+-    resolution: {integrity: sha512-/+3TzQRYT4M8NINZ9OrsL5VWNyQSXof8mFLx3txiosWA7Bt0H6UcxUdKGXVwj6gCXhsQ74mzEHm2ucsflG0mYA==}
++  '@deepseek-ai/dsh-brand@0.2.0-rc.2':
++    resolution: {integrity: sha512-A5XlN4tIgP0qObkYFhcZ7Oz/tM2oESEZqLwS0Qq+sM1ivGx6o4AMPgJdfKQlwLzqk0cMLNtAaVBHfiYoElt4lw==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-client-connection@0.1.5-rc.2':
+-    resolution: {integrity: sha512-W0GAZX01hAfrfjoZbtwEJ5ik3dG20Hy/0TFYJ6dnvwxtcacGYNIwi3f2oHpZgLcEw+PWwq1Y9IV1iKG+yDOytg==}
++  '@deepseek-ai/dsh-client-connection@0.2.0-rc.2':
++    resolution: {integrity: sha512-eL66YSZ0+HlWRzAPGU8jtCLd322WXBoMGN1g1OsM5T7Skqbbo9hSwV1FO3Lm0IcMZR3Y07sGPQBwZwf/l66T3w==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-code-runtime@0.1.5-rc.2':
+-    resolution: {integrity: sha512-qex3bvQNBkv1eapi8iTyNq+c52q1kxfdv5+8Nkswv4/kwrkvcDa4n4iiCbEgKS+K5U4DiVIprnyIv8Nx7il7Nw==}
++  '@deepseek-ai/dsh-commands@0.2.0-rc.2':
++    resolution: {integrity: sha512-pU5oUyOMPDN0yxEjE1wJRInNeC5hs5vJnbOG8MSSfkFov/7Q8hrfwETxZtcRnbrpzzeG19wsvtRz1twkEMKZBA==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2
++      '@deepseek-ai/dsh-attachment': 0.2.0-rc.2
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2
++      '@deepseek-ai/dsh-typert-protocol': 0.2.0-rc.2
++
++  '@deepseek-ai/dsh-credentials@0.2.0-rc.2':
++    resolution: {integrity: sha512-TQlvP0jxXYGy1ZNzh4nVsiCzb8FR9iGarD6BfIZ3LwJC8lDtjSxQHWE8//NYjpn10TIMxmaR4s6niHuJ3JkTOw==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-commands@0.1.5-rc.2':
+-    resolution: {integrity: sha512-ODc9h2Jig+Lo4XLdxqHpHjSXsBFeUCth6Y/rToor4KVRWQMedUARlq5otPyB1lYHyQh2DonNs2uf7g3mvag57A==}
++  '@deepseek-ai/dsh-invariants@0.2.0-rc.2':
++    resolution: {integrity: sha512-QOVc0HpRsS8ekvprb45FlxieDvgR/cAMaxW289HASjMoV/U/B54FpbkHuPBw4EnTw07/sPkjx2B/23+YqE0cbg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-agent': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-attachment': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-brand': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-llm': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-scope': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-session': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-typert-protocol': ^0.1.5-rc.2
+-
+-  '@deepseek-ai/dsh-credentials@0.1.5-rc.2':
+-    resolution: {integrity: sha512-TfX5MYLlyw0BFERj3dGxVfP9QGcKZUE5eXDSaY7ZfJbfQgK51VfxV5tP899OxIDRD3Bw94K5Rzx+dbUTSWJBtA==}
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-llm@0.2.0-rc.2':
++    resolution: {integrity: sha512-6QFrQn/h0iNqCfPpgQidnHtLSpA99A7ZND/uYKaGSd/4BGP8KBhuRd0w63e9s4u+hfW8jc3j29WKcNLIOeUfcA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-invariants@0.1.5-rc.2':
+-    resolution: {integrity: sha512-oUxttB2yjAgkk47AiXOCxk9GwnfGvIEGsQfnMD7fukwIdD3KLJObU7+nz63tbFN80rjwMI8rg+p9QBQ10KU5+g==}
++  '@deepseek-ai/dsh-ptc-runtime@0.2.0-rc.2':
++    resolution: {integrity: sha512-HR/3h1VFRcNlAAjCtCAxZ4V3F5pViYicXcLBuYLGjzXWpOhr4zKzeFKh9+UMLjsc9XWIarJMoSvxl662nDV/xQ==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-sandbox': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-llm@0.1.5-rc.2':
+-    resolution: {integrity: sha512-Z7BVsBkK24SE4EItQeow8PHms/9GP0DSTi337vTAa/RY7tNg2Snz3INcXUj6CPZfvntQr1in9op9wLI+rfNsqA==}
++  '@deepseek-ai/dsh-sandbox-policy@0.2.0-rc.2':
++    resolution: {integrity: sha512-0xXVqWw908/V6scohMyyU9SZSiQJYji+S1hMPulcUNLb3iew89d+WPWMIkWQBJRvcJzdQ2ghHwCESRkONXTJnQ==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
++      '@deepseek-ai/dsh-sandbox': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session-projection': 0.2.0-rc.2
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2
++
++  '@deepseek-ai/dsh-sandbox@0.2.0-rc.2':
++    resolution: {integrity: sha512-luKF7ey6HRZkGhImqLCB5Npt4f4omDRk1r+x5qQNqqdNOuN9LXciKDMNPfnSbHfKCcqSZbH3sK+APOmKzRAhVA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-scope@0.1.5-rc.2':
+-    resolution: {integrity: sha512-JwItISje52iVIjlGMNayRVMZrvZU/0i3Gr0s+coND5nBp5lS+pOj9Zf1RQzA5cWjHYCWKmDuQc+m6zGlwmtAeQ==}
++  '@deepseek-ai/dsh-scope@0.2.0-rc.2':
++    resolution: {integrity: sha512-066p7Wv74GNWt4xA5Cyvl+7c/i9KrNEDALYh2/hu0VsJPLb4T9He+TY7y1bld9OgungmqyTy1n/cB2ZrVskvxA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-session-projection@0.1.5-rc.2':
+-    resolution: {integrity: sha512-WMXGBdbxD1FO1Eu7Qs2FKDXq/kl+z+5b7zGLHdra66eEnShSnQmdF9bXSFQu1sJwba2yF7ueMcBJpWy76gtgQQ==}
++  '@deepseek-ai/dsh-session-projection@0.2.0-rc.2':
++    resolution: {integrity: sha512-caJ+XGjmR8ouws0LrvuXrabrzi21akB2l8CniUHdx4IpT6GkLapFYlWLbjZlDYqEWB3ktR+q32nxW2s+f27GSA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-session': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-session@0.1.5-rc.2':
+-    resolution: {integrity: sha512-y+klWiGAWR4m4cc4ylurA0cW63673B4N8cr2ANMimweDZAfxL4XVBC7WiD/5DT2DtIhYmVZhz/niyS/WbniUTA==}
++  '@deepseek-ai/dsh-session@0.2.0-rc.2':
++    resolution: {integrity: sha512-wj+6MeqCYbDcbEvKH3puHyEGdjyu51JwBoN6Ua2tz6griLufDgLM5HpSU40L5xgpbOfrYVhXZs4vRgOrMlFY2g==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-scope': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-storage-domain@0.1.5-rc.2':
+-    resolution: {integrity: sha512-NZ9U14kqcCnF4F+ynrTlBLb+S9FEOwSLkfdjDgdfrFdHh4c2WsRKWxyeYbL8AME1rB+XxLp4YQBx8LQ0Kiy62A==}
++  '@deepseek-ai/dsh-storage-domain@0.2.0-rc.2':
++    resolution: {integrity: sha512-GHHphcdLUNnFBPY1QOfE3dg6yKenIxB5wpgSNghZ7iG+Ifunwj4tyRUZ6YLKvni3HO9Kog1eIdXlUa9yEux39A==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-storage': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
++      '@deepseek-ai/dsh-storage': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-storage-json@0.1.5-rc.2':
+-    resolution: {integrity: sha512-vIdKeI6BUQpqneD/+oTZ2YNotNSGXZX0VbFbhdvgMSgamOrExIjl4cRsEJttcNr8zSvB8PjmuX2wPFvkMoeAlQ==}
++  '@deepseek-ai/dsh-storage-json@0.2.0-rc.2':
++    resolution: {integrity: sha512-h7pD397LA8JUD3QMz1IUV5kAg4WD6iVSZnMFrrCnN0wBF5B0PS0BDHT+x7zojLtq3MFfyx3JwpmX7uF12S0glg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-storage': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-storage': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-storage@0.1.5-rc.2':
+-    resolution: {integrity: sha512-mYt6+JSRxA5fSUcYnI3JFvYw9/TKUyykz5JWoZZ3MxWudItfhw+CV6T3kn3/bpTbWIQnGesSeY+0pJJVz0xBAA==}
++  '@deepseek-ai/dsh-storage@0.2.0-rc.2':
++    resolution: {integrity: sha512-tItvFJ1IAurwmZfBdrr8w+GuyLADZXZ01bos06Ma0QmD3+0NNyvo0E9qmYb54TfJ2h5yvRcFosHO1048gzuPPw==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-system-prompt@0.1.5-rc.2':
+-    resolution: {integrity: sha512-VtmZVKqBMJ7kzskHu0jY+Jth7jSuKMG8QB3MBPzJe9M0LL4YPMWsGKt9gGky9RXolk/ugAy4YZEv1gUqouVofA==}
++  '@deepseek-ai/dsh-system-prompt@0.2.0-rc.2':
++    resolution: {integrity: sha512-ZZNk2gkXFV8CIT0IOZXS+pFaxNVJaRknYyH2vc4ZgZAiHKT+RqUYNr8e1F5Kp0AaN0DNlcTkjOGP5MCxeXfDjg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-llm': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-scope': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-timeout@0.1.5-rc.2':
+-    resolution: {integrity: sha512-FgfaAw8Zt5X4Y6Ljh833B8Hy7h96FeR+yjNKI3iSyZSqREqOBgvDGXFfQlSu6V3Buvw/cbI/CJUQJvfRBKXOiA==}
++  '@deepseek-ai/dsh-timeout@0.2.0-rc.2':
++    resolution: {integrity: sha512-NDob8b8DJDB/sDPz3P7xhrkxOh1O9FbN1EZRKsxP4fuTfp4hrQU7aekYS5qZENFKoR8dBJMTh/zcEBw4m31glQ==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-tools@0.1.5-rc.2':
+-    resolution: {integrity: sha512-k2yZuJJtszaU9lzr2aBtdeFMINrkdlk4ellbtrMokA2oySVqJmAM8dv+u9RtzduD3aRRqyr2i2hWrTACz0qOrA==}
++  '@deepseek-ai/dsh-tools@0.2.0-rc.2':
++    resolution: {integrity: sha512-vquUz8PjHWE4zaS3wH70IpYjL441p2UlUcG8TN2yJZN1RhDkuiHum4bWCsjEPyWLS/aB1QJvzdXC2EK/PRkbsQ==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-agent': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-code-runtime': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-llm': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-scope': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-session': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-system-prompt': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-user-approval': ^0.1.5-rc.2
+-
+-  '@deepseek-ai/dsh-typert-protocol@0.1.5-rc.2':
+-    resolution: {integrity: sha512-zP8J20rBXa1AFjKL2i83JBeQcePZx8yal3pNojj4t7CCokMcoFMUbr50woa6fY1tRJ7qHxgypO3rH8Q6YWgmiA==}
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2
++      '@deepseek-ai/dsh-ptc-runtime': 0.2.0-rc.2
++      '@deepseek-ai/dsh-sandbox': 0.2.0-rc.2
++      '@deepseek-ai/dsh-sandbox-policy': 0.2.0-rc.2
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2
++      '@deepseek-ai/dsh-user-approval': 0.2.0-rc.2
++
++  '@deepseek-ai/dsh-typert-protocol@0.2.0-rc.2':
++    resolution: {integrity: sha512-95RvIDcVac2BWdv1IxN6yKlRV+8eEvkofqSxV+d0r8x1kx2EIWEsbdxz6C+coYIm+8e03MiN+rwOt8J7sLfe7Q==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-user-approval@0.1.5-rc.2':
+-    resolution: {integrity: sha512-8UpMEnEyMo6mYEVELBo0DC2iG7aJJfFMTNkU+DKD3c5Ut7ySRDzt1iRr1qni/CzqlTIpQBAkGaG77qk4q/v1bg==}
++  '@deepseek-ai/dsh-user-approval@0.2.0-rc.2':
++    resolution: {integrity: sha512-fZMfDp4IeWZMwAKEQkuAYCiGRrwoVWNObvAbpdmQNUavjfYCtwwduWqYQz+5lMQq8vENdczBj7cxnO/pOQ1oZQ==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-agent': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-brand': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-llm': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-scope': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-session': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-system-prompt': ^0.1.5-rc.2
+-
+-  '@deepseek-ai/dsh-util-crypto@0.1.5-rc.2':
+-    resolution: {integrity: sha512-JR0aJEUL35RE8FVT89wMZMbPwMrbkjNcy+gE9pq70d/m2Zxw3a0iNer+BAxPAKYPbmy0xDDXReTwXiecKVy4sQ==}
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2
++
++  '@deepseek-ai/dsh-util-crypto@0.2.0-rc.2':
++    resolution: {integrity: sha512-5OvvmepY69uXTagUMlnoHqg7euI4ZMifLgfdV8xZO20OslWGGiRCkJbZRyDtcJG9GsXWz9UimfWmUu52zKXJ5w==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-util-values@0.1.5-rc.2':
+-    resolution: {integrity: sha512-Cr0TkM6dFAD+Iy4sNXH/afJVMHwJXoOztivj+RflkYoACsOq+Ix0vdHn36hwW7mayU8OK3ZKIZUQ6BPo1fHvUg==}
++  '@deepseek-ai/dsh-util-values@0.2.0-rc.2':
++    resolution: {integrity: sha512-qgpsbgiZABuE9UvgNaVo9b2HiWwLeU93CTl9PFXqE0jN8ap1ALxzQsLGvr/q2MJuWDYqnFBg60XnqnY8ZxPWEg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-web@0.1.5-rc.2':
+-    resolution: {integrity: sha512-3qt/Fh+uCghOy2wZPjwQ6xIMU3t1NW4D5yRvTXOyvadwaDwosqXOzCteYUhnuWzWN66adrFLeRrymhSDS4PMeg==}
++  '@deepseek-ai/dsh-web@0.2.0-rc.2':
++    resolution: {integrity: sha512-d44eM9mMqGnQUGsjqUc6k1G9QrC0w+TWx6Cw6I1iXJkVw5LZ/hpVVzsuCqck8GGS8+GK20kqjGUJSyomfEgd1A==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-llm': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/schemastery@3.18.2':
+-    resolution: {integrity: sha512-njDtZsznjYxok7KLLlHOPyuv2efdWVbSflAHgztSfbMsg+CVraEoRe2DjOCgClYv3ZCSm7WXoaUkbB/+RY7tWQ==}
++  '@deepseek-ai/schemastery@3.18.4':
++    resolution: {integrity: sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==}
+ 
+   '@esbuild/aix-ppc64@0.25.12':
+     resolution: {integrity: sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA==}
+@@ -1003,180 +1029,204 @@ packages:
+ 
+ snapshots:
+ 
+-  '@deepseek-ai/cordis@4.0.2':
++  '@deepseek-ai/cordis@4.0.4':
+     dependencies:
+-      '@deepseek-ai/cosmokit': 1.8.3
++      '@deepseek-ai/cosmokit': 1.8.5
+       '@standard-schema/spec': 1.1.0
+ 
+-  '@deepseek-ai/cosmokit@1.8.3': {}
++  '@deepseek-ai/cosmokit@1.8.5': {}
+ 
+-  '@deepseek-ai/dsh-agent@0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a)':
++  '@deepseek-ai/dsh-agent@0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-scope': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/dsh-session': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/dsh-session-projection': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))
+-      '@deepseek-ai/dsh-system-prompt': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/dsh-typert-protocol': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-
+-  '@deepseek-ai/dsh-attachment@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-session-projection': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-typert-protocol': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++
++  '@deepseek-ai/dsh-attachment@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4
+ 
+-  '@deepseek-ai/dsh-client-connection@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-client-connection@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-credentials': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/schemastery': 3.18.2
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-credentials': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/schemastery': 3.18.4
+       zod: 4.6.5
+     transitivePeerDependencies:
+       - '@deepseek-ai/dsh-invariants'
+ 
+-  '@deepseek-ai/dsh-code-runtime@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-commands@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-agent@0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977))(@deepseek-ai/dsh-attachment@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))(@deepseek-ai/dsh-typert-protocol@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977)
++      '@deepseek-ai/dsh-attachment': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-typert-protocol': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-util-crypto': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      zod: 4.6.5
+ 
+-  '@deepseek-ai/dsh-commands@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-agent@0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a))(@deepseek-ai/dsh-attachment@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/dsh-typert-protocol@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-credentials@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-agent': 0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a)
+-      '@deepseek-ai/dsh-attachment': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-scope': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/dsh-session': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/dsh-typert-protocol': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-crypto': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      zod: 4.6.5
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++
++  '@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/dsh-credentials@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-timeout': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-typert-protocol': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-util-crypto': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/schemastery': 3.18.4
++      zod: 4.6.5
+ 
+-  '@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-ptc-runtime@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-sandbox@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/schemastery': 3.18.2
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-sandbox': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))
+ 
+-  '@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-sandbox-policy@0.2.0-rc.2(86f6fd7d6eb5d5ef0468bcbf88da8d4d)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-timeout': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-typert-protocol': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-crypto': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/schemastery': 3.18.2
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-sandbox': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-session-projection': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/schemastery': 3.18.4
+       zod: 4.6.5
+ 
+-  '@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-sandbox@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++
++  '@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/dsh-session-projection@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))':
++  '@deepseek-ai/dsh-session-projection@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-session': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
+       zod: 4.6.5
+ 
+-  '@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))':
++  '@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-scope': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/dsh-storage-domain@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-storage@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-storage-domain@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-storage@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-storage': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/schemastery': 3.18.2
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-storage': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/schemastery': 3.18.4
+       zod: 4.6.5
+ 
+-  '@deepseek-ai/dsh-storage-json@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-storage@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-storage-json@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-storage@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-storage': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/schemastery': 3.18.2
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-storage': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/dsh-storage@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-storage@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4
+ 
+-  '@deepseek-ai/dsh-system-prompt@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))':
++  '@deepseek-ai/dsh-system-prompt@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-scope': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/schemastery': 3.18.2
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/dsh-timeout@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-timeout@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4
+ 
+-  '@deepseek-ai/dsh-tools@0.1.5-rc.2(7f9e302786cf21e030eafe960666842c)':
++  '@deepseek-ai/dsh-tools@0.2.0-rc.2(c6e351a6a6cfd1c2a664558bffcd410d)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-agent': 0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a)
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-code-runtime': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-scope': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/dsh-session': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/dsh-system-prompt': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/dsh-user-approval': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-agent@0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a))(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/dsh-system-prompt@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/schemastery': 3.18.2
+-
+-  '@deepseek-ai/dsh-typert-protocol@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977)
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-ptc-runtime': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-sandbox@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))))
++      '@deepseek-ai/dsh-sandbox': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))
++      '@deepseek-ai/dsh-sandbox-policy': 0.2.0-rc.2(86f6fd7d6eb5d5ef0468bcbf88da8d4d)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-user-approval': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-agent@0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977))(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))(@deepseek-ai/dsh-system-prompt@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/schemastery': 3.18.4
++
++  '@deepseek-ai/dsh-typert-protocol@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/dsh-user-approval@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-agent@0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a))(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/dsh-system-prompt@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))':
++  '@deepseek-ai/dsh-user-approval@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-agent@0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977))(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))(@deepseek-ai/dsh-system-prompt@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-agent': 0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a)
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-scope': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/dsh-session': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/dsh-system-prompt': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/schemastery': 3.18.2
+-
+-  '@deepseek-ai/dsh-util-crypto@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977)
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/schemastery': 3.18.4
++
++  '@deepseek-ai/dsh-util-crypto@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4
+ 
+-  '@deepseek-ai/dsh-util-values@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-util-values@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4
+ 
+-  '@deepseek-ai/dsh-web@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-web@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/schemastery': 3.18.2
++      '@deepseek-ai/cordis': 4.0.4
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/schemastery@3.18.2':
++  '@deepseek-ai/schemastery@3.18.4':
+     dependencies:
+-      '@deepseek-ai/cosmokit': 1.8.3
++      '@deepseek-ai/cosmokit': 1.8.5
+       '@standard-schema/spec': 1.1.0
+ 
+   '@esbuild/aix-ppc64@0.25.12':
+diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
+index 393dcb9..3462fc2 100644
+--- a/pnpm-workspace.yaml
++++ b/pnpm-workspace.yaml
+@@ -7,6 +7,12 @@ packages:
+ allowBuilds:
+   esbuild: true
+ 
++# pnpm's default `minimumReleaseAge` (24h) refuses a package published minutes
++# ago. This repo tracks dsh's rc line on purpose, so the age gate is lifted for
++# that scope only — every other dependency still has to age.
++minimumReleaseAgeExclude:
++  - '@deepseek-ai/*'
++
+ onlyBuiltDependencies:
+   - esbuild
+ 
+diff --git a/src/cli.ts b/src/cli.ts
+index d491abb..ad632c6 100644
+--- a/src/cli.ts
++++ b/src/cli.ts
+@@ -20,6 +20,12 @@
+  *   3. point the user-level default preset at it (backing the settings file up
+  *      first, because that file is the user's, not ours)
+  *
++ * Steps ② and ③ belong to the preset carrier dsh 0.1.x reads. From 0.2.0 the
++ * carrier is a declaration row inside a bundle patch and nothing reads the
++ * directory any more, so `init` skips both there and says why — the tools reach
++ * the model from the profile row alone (measured on 0.2.0-rc.2, see
++ * `presetMechanism` below and `docs/help/dsh-plugin-platform.md`).
++ *
+  * The copy is the user's to edit afterwards: re-running adds the row when it is
+  * missing, and otherwise leaves the file alone — the one exception being that
+  * row's package name, which is ours to keep pointing at the real package (see
+@@ -107,6 +113,7 @@ function usage(): string {
+ 
+ 做三件事：① 把插件装进 profile；② 复制 standard preset 到
+ <DSH_HOME>/.agent-presets/<id> 并追加本插件；③ 把用户级默认 preset 指向它。
++dsh 0.2 起 preset 换了载体（目录不再被读），②③ 自动跳过——那一版不需要它们。
+ 重复运行是安全的：已经做过的不会重复做。`
+ }
+ 
+@@ -333,6 +340,56 @@ function dshPrefixes(): string[] {
+   return prefixes
+ }
+ 
++/**
++ * Which carrier the running dsh reads user presets from.
++ *
++ * - `directory` — 0.1.x：`$DSH_HOME/.agent-presets/<id>/`，里面是 `preset.yml`
++ *   （显示名/描述/顺序）和 `agent.cordis.yml`（组合）。
++ * - `declaration` — 0.2.0 起：preset 是 bundle patch 里的一行声明，交给
++ *   `@deepseek-ai/dsh-agent-preset-registry`；那个目录**没有任何代码再读它**，
++ *   而且 `@deepseek-ai/dsh-agent-presets` 这个包在 0.2.0 上已经不存在了
++ *   （2026-09-30 实测：npm 上最高 0.1.6-alpha.2，桌面端 `app.asar` 里连字符串都搜不到）。
++ * - `unknown` — 问不出来（PATH 上没有 dsh、版本号看不懂）：按老行为走。不猜——
++ *   猜错的代价要么是"该做的没做且不出声"，要么是"在一个根本不读那个目录的版本上
++ *   白跑一趟然后以 1 退出"，后者至少是看得见的。
++ */
++export type PresetMechanism = 'directory' | 'declaration' | 'unknown'
++
++/**
++ * Read a dsh version as "which preset carrier is this".
++ *
++ * 只有 major.minor 参与判断：rc 号、alpha 号和构建元数据都不改变载体。
++ *
++ * @param version - `dsh --version` 的输出，或 undefined（没问出来）。
++ * @returns the carrier to assume.
++ */
++export function presetMechanism(version: string | undefined): PresetMechanism {
++  const match = /(\d+)\.(\d+)\./.exec(version ?? '')
++  if (match === null) return 'unknown'
++  const major = Number(match[1])
++  const minor = Number(match[2])
++  if (major > 0) return 'declaration'
++  return minor >= 2 ? 'declaration' : 'directory'
++}
++
++/**
++ * Ask dsh what it is.
++ *
++ * `--version` needs no profile and prints one line, so it is the cheapest way to
++ * tell the two preset carriers apart. A failure is not fatal: the caller treats
++ * "no answer" as the old behaviour.
++ *
++ * @returns stdout+stderr of `dsh --version`, or undefined when it cannot be run.
++ */
++function dshVersion(): string | undefined {
++  const probe = spawnSync('dsh', ['--version'], {
++    encoding: 'utf8',
++    shell: process.platform === 'win32',
++  })
++  if (probe.error !== undefined || probe.status !== 0) return undefined
++  return `${probe.stdout ?? ''}${probe.stderr ?? ''}`
++}
++
+ /**
+  * Point the user-level default preset at this one.
+  *
+@@ -451,7 +508,17 @@ function main(argv: readonly string[]): number {
+     process.stdout.write(`   建好了 ${profileDir}\n`)
+   }
+ 
+-  process.stdout.write(`① 把 ${options.source} 装进 profile「${profile}」${chosen}…\n`)
++  /*
++    Which dsh answers matters, and on a machine with both a CLI install and the
++    desktop app it is easy to talk to the wrong one: `init` installs with the
++    `dsh` on PATH, so a 0.1.x CLI would wire up a profile the 0.2 desktop boots.
++    Printing the version it found turns that from silent into visible.
++  */
++  const version = dshVersion()
++  process.stdout.write(
++    `① 把 ${options.source} 装进 profile「${profile}」${chosen}` +
++      `（用 dsh ${version === undefined ? '（版本问不出来）' : version.trim()}）…\n`,
++  )
+   const added = spawnSync('dsh', ['plugin', '--profile', profile, 'add', options.source], {
+     stdio: 'inherit',
+     shell: process.platform === 'win32',
+@@ -464,54 +531,73 @@ function main(argv: readonly string[]): number {
+     return 1
+   }
+ 
+-  const standard = shippedStandard(home, profileDir)
+-  if (standard === undefined) {
+-    process.stderr.write('找不到随 dsh 附带的 standard preset，无法创建 agent preset。\n')
+-    return 1
+-  }
+-  const presetDir = join(home, '.agent-presets', options.preset)
+-  if (existsSync(join(presetDir, 'agent.cordis.yml'))) {
+-    process.stdout.write(`② preset 「${options.preset}」已存在，只补上缺失的插件行\n`)
++  /*
++    0.2.0 换掉了 preset 的载体：目录不再被读，改成 bundle patch 里的声明行。
++
++    这里**不做**那一步，而不是"做一半"——原因是实测：装进 profile 的那一行，
++    它注册的工具会话直接看得见（2026-09-30 在 0.2.0-rc.2 上用真模型验过两次：
++    一次会话里挂着 standard preset、一次没有，两次模型都调到了 inbox_status）。
++    声明行只在该版本的会话组合**不**继承进程级工具时才需要，而那没有发生。
++
++    顺带一提，硬做也做不动：声明要复述整份 standard 的 plugins 列表，而桌面端
++    那份 `presets/standard.patch.yml` 在 `app.asar` 里——一个 npx 跑的 CLI 打不开它。
++  */
++  const mechanism = presetMechanism(version)
++  if (mechanism === 'declaration') {
++    process.stdout.write(
++      '② 跳过 preset：这一版 dsh 不再读 ~/.dsh/.agent-presets/（preset 改成了随 bundle 声明的行）。\n' +
++        '   也**不需要**它——装进 profile 的那一行，工具对会话直接可见（0.2.0-rc.2 实测）。\n',
++    )
+   } else {
+-    process.stdout.write(`② 从 standard 复制一份 preset 到 ${presetDir}\n`)
+-    mkdirSync(dirname(presetDir), { recursive: true })
+-    cpSync(standard, presetDir, { recursive: true })
+-    const manifest = join(presetDir, 'preset.yml')
+-    if (existsSync(manifest)) {
+-      const text = readFileSync(manifest, 'utf8')
+-      writeFileSync(
+-        manifest,
+-        text
+-          .replace(/^name:.*$/m, 'name: 收件箱（带 dsh-inbox）')
+-          .replace(
+-            /^description:.*$/m,
+-            'description: 标准模式 + dsh-inbox：助手可以直接查你的收件箱（叫它仓库 / inbox 也行）并把内容取回来。',
+-          ),
+-        'utf8',
+-      )
++    const standard = shippedStandard(home, profileDir)
++    if (standard === undefined) {
++      process.stderr.write('找不到随 dsh 附带的 standard preset，无法创建 agent preset。\n')
++      return 1
++    }
++    const presetDir = join(home, '.agent-presets', options.preset)
++    if (existsSync(join(presetDir, 'agent.cordis.yml'))) {
++      process.stdout.write(`② preset 「${options.preset}」已存在，只补上缺失的插件行\n`)
++    } else {
++      process.stdout.write(`② 从 standard 复制一份 preset 到 ${presetDir}\n`)
++      mkdirSync(dirname(presetDir), { recursive: true })
++      cpSync(standard, presetDir, { recursive: true })
++      const manifest = join(presetDir, 'preset.yml')
++      if (existsSync(manifest)) {
++        const text = readFileSync(manifest, 'utf8')
++        writeFileSync(
++          manifest,
++          text
++            .replace(/^name:.*$/m, 'name: 收件箱（带 dsh-inbox）')
++            .replace(
++              /^description:.*$/m,
++              'description: 标准模式 + dsh-inbox：助手可以直接查你的收件箱（叫它仓库 / inbox 也行）并把内容取回来。',
++            ),
++          'utf8',
++        )
++      }
++    }
++    const composition = join(presetDir, 'agent.cordis.yml')
++    const body = readFileSync(composition, 'utf8')
++    const outcome = ensurePresetRow(body)
++    if (outcome.change === 'added') {
++      writeFileSync(composition, outcome.body, 'utf8')
++      process.stdout.write(`   已把 ${PACKAGE_NAME} 追加进 preset 的组合\n`)
++    } else if (outcome.change === 'renamed') {
++      writeFileSync(composition, outcome.body, 'utf8')
++      process.stdout.write(`   preset 里那一行的来源从 ${String(outcome.from)} 改成 ${PACKAGE_NAME}\n`)
++    } else {
++      process.stdout.write('   preset 里已经有这个插件，跳过\n')
+     }
+-  }
+-  const composition = join(presetDir, 'agent.cordis.yml')
+-  const body = readFileSync(composition, 'utf8')
+-  const outcome = ensurePresetRow(body)
+-  if (outcome.change === 'added') {
+-    writeFileSync(composition, outcome.body, 'utf8')
+-    process.stdout.write(`   已把 ${PACKAGE_NAME} 追加进 preset 的组合\n`)
+-  } else if (outcome.change === 'renamed') {
+-    writeFileSync(composition, outcome.body, 'utf8')
+-    process.stdout.write(`   preset 里那一行的来源从 ${String(outcome.from)} 改成 ${PACKAGE_NAME}\n`)
+-  } else {
+-    process.stdout.write('   preset 里已经有这个插件，跳过\n')
+-  }
+ 
+-  if (options.defaultPreset) {
+-    const changed = setDefaultPreset(join(home, 'settings.yaml'), options.preset)
+-    process.stdout.write(`③ 默认 preset：${changed}\n`)
++    if (options.defaultPreset) {
++      const changed = setDefaultPreset(join(home, 'settings.yaml'), options.preset)
++      process.stdout.write(`③ 默认 preset：${changed}\n`)
++    }
+   }
+ 
+   process.stdout.write(
+     `\n完成。接下来：\n` +
+-      `  · 重启 dsh（preset 在启动时扫描）\n` +
++      `  · 重启 dsh（profile 的插件行在启动时加载）\n` +
+       `  · 用你平时那条命令启动它：${profile === 'web' ? 'dsh web' : `dsh --profile ${profile}`}\n` +
+       `  · 新建一个会话，它就会带上收件箱工具；想让助手查仓库，直接问「我的收件箱里有哪些还没看的链接」\n` +
+       `  · 面板（侧栏 Inbox）不需要 preset，装完就在\n` +
+diff --git a/src/client/index.tsx b/src/client/index.tsx
+index 5bd5995..098b117 100644
+--- a/src/client/index.tsx
++++ b/src/client/index.tsx
+@@ -644,9 +644,9 @@ function InboxPanel(): React.ReactElement {
+   /**
+    * The layout the panel remembers for next time.
+    *
+-   * Read once on mount and written on every change: this is a preference, not
+-   * state the host needs to be told about immediately, so a failed write only
+-   * means the choice does not survive a reload.
++   * Read once on mount and written on every change. The panel keeps the choice
++   * either way, so a refused write has to be *said*: staying quiet would read
++   * as "it remembered" right up to the next reload.
+    */
+   React.useEffect(() => {
+     void (async () => {
+@@ -660,7 +660,13 @@ function InboxPanel(): React.ReactElement {
+   const chooseListMode = React.useCallback(
+     (mode: ListMode): void => {
+       setListMode(mode)
+-      void call(INBOX_ENDPOINT_UI, { action: 'save', listMode: mode } satisfies UiRequest)
++      void (async () => {
++        const answer = await call(INBOX_ENDPOINT_UI, {
++          action: 'save',
++          listMode: mode,
++        } satisfies UiRequest)
++        if (!answer.ok) setNotice(t('notice.listModeUnsaved', { reason: answer.error.message }))
++      })()
+     },
+     [call],
+   )
+diff --git a/src/client/messages.ts b/src/client/messages.ts
+index ffb0c0e..d17444a 100644
+--- a/src/client/messages.ts
++++ b/src/client/messages.ts
+@@ -170,6 +170,7 @@ export const zh = {
+   'notice.listUnreadable': '读取列表失败：宿主返回的内容看不懂',
+   'notice.detailFailed': '读取详情失败：{reason}',
+   'notice.responseUnreadable': '宿主返回了看不懂的响应（HTTP {status}）',
++  'notice.listModeUnsaved': '列表模式没记住：{reason}',
+   'notice.captureEmpty': '还没东西可存：粘一段文字、一个链接，或者把图片拖进来',
+   'notice.captureFailed': '没存进去：{reason}',
+   'notice.saved': '已存入 {count} 条',
+@@ -464,6 +465,7 @@ export const en: Dictionary = {
+   'notice.listUnreadable': 'Could not read the list: the host answered with something we cannot read',
+   'notice.detailFailed': 'Could not read the record: {reason}',
+   'notice.responseUnreadable': 'The host answered with something we cannot read (HTTP {status})',
++  'notice.listModeUnsaved': 'The list layout was not remembered: {reason}',
+   'notice.captureEmpty': 'Nothing to save yet: paste some text or a link, or drop an image in',
+   'notice.captureFailed': 'Not saved: {reason}',
+   'notice.saved': 'Saved {count}',
+diff --git a/src/host/index.ts b/src/host/index.ts
+index 941e800..bf72cb6 100644
+--- a/src/host/index.ts
++++ b/src/host/index.ts
+@@ -1,15 +1,17 @@
+ import type { Context } from '@deepseek-ai/cordis'
++import z from '@deepseek-ai/schemastery'
+ import { defineTool } from '@deepseek-ai/dsh-tools'
+ 
+ import { PACKAGE_NAME, VERSION } from '../shared/constants.js'
+ import { registerInboxCommand } from './command.js'
+ import { registerInboxRpc } from './rpc.js'
++import { markLive } from './settings.js'
+ import { registerInboxTools } from './tools.js'
+-import { installUiSettings } from './ui/config.js'
++import { installUiSettings, UI_FIELDS } from './ui/config.js'
+ import { leaseVault } from './vault/lease.js'
+ import { Vault } from './vault/vault.js'
+ import { runPull } from './webdav/run.js'
+-import { installWebdavSettings } from './webdav/config.js'
++import { installWebdavSettings, WEBDAV_FIELDS } from './webdav/config.js'
+ 
+ /** Stable Cordis plugin name for the host half. */
+ export const name = 'dsh-inbox'
+@@ -17,6 +19,29 @@ export const name = 'dsh-inbox'
+ /** Tool registry, command surface, and the storage domain form we persist through. */
+ export const inject = ['tools', 'commands', 'storageDomain']
+ 
++/**
++ * What a profile may configure on our row.
++ *
++ * Both halves of this are settings the user changes *in the panel* — the list
++ * density it opens with, and where the sync endpoint lives — so this schema is
++ * not decoration: on dsh 0.2.x it is the only thing that makes those fields
++ * writable at all. That service keeps no namespaces, so a setting's address is
++ * the profile row of the plugin (`dsh-inbox`, see `cordis.patch.yml`), and it
++ * refuses to write a field the plugin's own `Config` has not marked live
++ * (`volatile()`), which `markLive` does and 0.1.x's schemastery simply ignores.
++ */
++export const Config = z.object({
++  ...liveFields(UI_FIELDS),
++  ...liveFields(WEBDAV_FIELDS),
++})
++
++/** The same fields, marked live where the runtime knows that question. */
++function liveFields<T extends Record<string, unknown>>(fields: T): T {
++  return Object.fromEntries(
++    Object.entries(fields).map(([name, field]) => [name, markLive(field)]),
++  ) as T
++}
++
+ /**
+  * Claim the vault and publish the tools.
+  *
+diff --git a/src/host/rpc.ts b/src/host/rpc.ts
+index 9f7ce0d..11b9885 100644
+--- a/src/host/rpc.ts
++++ b/src/host/rpc.ts
+@@ -742,7 +742,7 @@ async function handleUi(ctx: Context, payload: unknown): Promise<InboxRpcResult<
+   if (!parsed.success) return failure('inbox/bad-ui-request', parsed.error.message)
+ 
+   if (parsed.data.action === 'save' && parsed.data.listMode !== undefined) {
+-    const saved = saveUiPrefs(ctx, { listMode: parsed.data.listMode })
++    const saved = await saveUiPrefs(ctx, { listMode: parsed.data.listMode })
+     if (!saved.ok) return failure('inbox/ui-unsaved', saved.reason ?? '存不进去')
+   }
+   return { ok: true, value: readUiPrefs(ctx) }
+diff --git a/src/host/settings.ts b/src/host/settings.ts
+new file mode 100644
+index 0000000..e3b36fe
+--- /dev/null
++++ b/src/host/settings.ts
+@@ -0,0 +1,191 @@
++/**
++ * The two shapes of dsh's settings service, behind one small door.
++ *
++ * This plugin keeps a handful of *values* in dsh's settings: which list density
++ * the panel opens with, and where the sync endpoint lives. dsh moved that
++ * service between the two lines we ship to, and the two shapes are not
++ * compatible:
++ *
++ * - **0.1.x**: you declare a namespace of your own — `register(namespace,
++ *   schema, { base })` — and then address it by name with `get(namespace)` /
++ *   `update(namespace, patch)`.
++ * - **0.2.x**: the service keeps no namespaces at all. The address is the
++ *   *profile row id of the plugin itself* (`describe()` reports `ns`, i.e. the
++ *   row's `id`), and only fields the plugin's own `Config` marks with
++ *   `volatile()` may be written through `update(id, patch)`.
++ *
++ * Asking the wrong one is not a tidy error. On 0.2.x the old call throws
++ * `No configurable plugin entry "dsh-inbox-ui"`, and because `update()` there is
++ * `async`, an unawaited rejection escapes as an unhandled rejection — which dsh
++ * treats as fatal, so the desktop host exits (measured 2026-09-30: clicking the
++ * panel's list-mode toggle killed the whole app). Hence: the shape is chosen
++ * once, here, and every write is awaited and answered with a reason instead of
++ * a throw.
++ */
++
++import type { Context } from '@deepseek-ai/cordis'
++
++/**
++ * One group of fields this plugin keeps in dsh's settings.
++ *
++ * The two names are the same group under the two service shapes: the namespace
++ * is how 0.1.x addresses it, the field list is how 0.2.x finds the same values
++ * inside the plugin's own config row.
++ */
++export interface SettingsSection {
++  /** The namespace this group owns in the 0.1.x settings service. */
++  namespace: string
++  /** The fields this group owns in the 0.2.x plugin config row. */
++  fields: readonly string[]
++}
++
++/** How a write ended. A refusal is an answer, not an exception. */
++export type SettingsWrite = { ok: true } | { ok: false; reason: string }
++
++/** Read one group; merge fields into it. */
++export interface SettingsStore {
++  /** The group's stored fields, or undefined when nothing is stored for it. */
++  read(section: SettingsSection): Record<string, unknown> | undefined
++  write(section: SettingsSection, patch: Record<string, unknown>): Promise<SettingsWrite>
++}
++
++/** The 0.1.x settings service: namespaces you declare and then address by name. */
++export interface LegacySettings {
++  register(namespace: string, schema: unknown, options: { base: unknown }): unknown
++  get(namespace: string): Record<string, unknown> | undefined
++  update(namespace: string, patch: Record<string, unknown>): unknown
++}
++
++/** One row of the 0.2.x service's own report. */
++interface SettingsDescriptor {
++  ns: string
++  value?: Record<string, unknown>
++}
++
++/** The 0.2.x settings service: the plugin's config row, addressed by row id. */
++interface ModernSettings {
++  describe(): SettingsDescriptor[]
++  update(id: string, patch: Record<string, unknown>): Promise<unknown>
++}
++
++/** Whatever settings service this composition has, if any. */
++function settingsService(ctx: Context): Record<string, unknown> | undefined {
++  return ctx.get('settings') as Record<string, unknown> | undefined
++}
++
++/**
++ * Mark one config field as live, so the 0.2.x settings service will write it.
++ *
++ * `volatile()` is what makes a field writable through that service, and marking
++ * is a no-op on a runtime that never heard of it (0.1.x), so one field map
++ * serves both lines: the plain schema still declares the namespace there.
++ *
++ * @param field - a schemastery field.
++ * @returns the same field, marked where the runtime knows how.
++ */
++export function markLive<T>(field: T): T {
++  const mark = (field as { volatile?: () => unknown }).volatile
++  return typeof mark === 'function' ? (mark.call(field) as T) : field
++}
++
++/**
++ * The namespace-shaped service, or undefined when this composition has none.
++ *
++ * Only declarations go through here: 0.2.x has no `register` at all, and its
++ * config row is declared by the exported `Config` instead.
++ *
++ * @param ctx - host context.
++ */
++export function legacySettings(ctx: Context): LegacySettings | undefined {
++  const settings = settingsService(ctx)
++  return typeof settings?.register === 'function' ? (settings as unknown as LegacySettings) : undefined
++}
++
++/**
++ * The settings this plugin reads and writes, whichever shape the runtime has.
++ *
++ * @param ctx - host context.
++ * @returns the store, or undefined when there is nothing to store into.
++ */
++export function settingsStore(ctx: Context): SettingsStore | undefined {
++  const settings = settingsService(ctx)
++  if (settings === undefined) return undefined
++
++  if (typeof settings.register === 'function') {
++    const legacy = settings as unknown as LegacySettings
++    return {
++      read: (section) => legacy.get(section.namespace),
++      write: async (section, patch) => {
++        try {
++          await legacy.update(section.namespace, patch)
++          return { ok: true }
++        } catch (error) {
++          return { ok: false, reason: reasonOf(error) }
++        }
++      },
++    }
++  }
++
++  if (typeof settings.describe === 'function' && typeof settings.update === 'function') {
++    // The address is the profile row this plugin instance was loaded from, so a
++    // renamed row keeps working; without it there is nothing to write to.
++    const id = pluginRowId(ctx)
++    if (id === undefined) return undefined
++    const modern = settings as unknown as ModernSettings
++    return {
++      read: (section) => {
++        // `describe()`, not the config object: it answers in plain values, and
++        // it is the same call the host's own settings page renders from.
++        const row = readable(modern).find((each) => each.ns === id)
++        return row?.value === undefined ? undefined : pick(row.value, section.fields)
++      },
++      write: async (section, patch) => {
++        try {
++          await modern.update(id, pick(patch, section.fields))
++          return { ok: true }
++        } catch (error) {
++          return { ok: false, reason: reasonOf(error) }
++        }
++      },
++    }
++  }
++
++  return undefined
++}
++
++/**
++ * The id of the profile row this plugin instance was loaded from.
++ *
++ * The loader records every row's entry on the fiber it created for it
++ * (`fiber.entry`, set from the row's own context), and 0.2.x settings writes are
++ * addressed by exactly that row id.
++ *
++ * @param ctx - host context.
++ * @returns the row id, or undefined when this context is not a loaded row.
++ */
++function pluginRowId(ctx: Context): string | undefined {
++  const fiber = (ctx as { fiber?: { entry?: { options?: { id?: unknown } } } }).fiber
++  const entry = fiber?.entry
++  const id = entry?.options?.id
++  return typeof id === 'string' && id.length > 0 ? id : undefined
++}
++
++/** `describe()` reads the profile from disk, so a failure is a default, not a throw. */
++function readable(settings: ModernSettings): SettingsDescriptor[] {
++  try {
++    return settings.describe()
++  } catch {
++    return []
++  }
++}
++
++/** Only the fields this section owns — one row holds every section's. */
++function pick(source: Record<string, unknown>, fields: readonly string[]): Record<string, unknown> {
++  const picked: Record<string, unknown> = {}
++  for (const field of fields) if (Object.hasOwn(source, field)) picked[field] = source[field]
++  return picked
++}
++
++function reasonOf(error: unknown): string {
++  return error instanceof Error ? error.message : String(error)
++}
+diff --git a/src/host/ui/config.ts b/src/host/ui/config.ts
+index 070e196..63dec4d 100644
+--- a/src/host/ui/config.ts
++++ b/src/host/ui/config.ts
+@@ -15,38 +15,42 @@ import type { Context } from '@deepseek-ai/cordis'
+ import z from '@deepseek-ai/schemastery'
+ 
+ import { UI_LIST_MODES, type UiListMode, type UiPrefs } from '../../shared/panel-wire.js'
++import { legacySettings, settingsStore, type SettingsSection } from '../settings.js'
+ 
+-/** Namespace this plugin owns for panel preferences. */
++/** Namespace this plugin owns for panel preferences (0.1.x settings service). */
+ export const UI_SETTINGS_NAMESPACE = 'dsh-inbox-ui'
+ 
+ /** What a fresh install looks like: two columns of cards, the roomier of the two. */
+ export const DEFAULT_UI_PREFS: UiPrefs = { listMode: 'grid' }
+ 
+-/** The namespace's schema; every field optional so a partial layer is valid. */
+-export const UiPrefsSchema = z.object({
++/**
++ * The fields the panel remembers, in one place: the 0.1.x namespace schema and
++ * the 0.2.x config row are both built from this map, and the row needs only the
++ * names (see `../settings.js`).
++ */
++export const UI_FIELDS = {
+   listMode: z.union(['grid', 'compact']).default('grid'),
+-})
+-
+-/** The slice of the settings service this file uses. */
+-interface SettingsScope {
+-  get(): UiPrefs
+-  update(patch: Partial<UiPrefs>): void
+ }
+ 
+-interface SettingsLike {
+-  register(namespace: string, schema: unknown, options: { base: UiPrefs }): SettingsScope
+-  get(namespace: string): UiPrefs | undefined
+-  update(namespace: string, patch: Partial<UiPrefs>): void
++/** The namespace's schema; every field optional so a partial layer is valid. */
++export const UiPrefsSchema = z.object(UI_FIELDS)
++
++/** Where the panel's own preferences live, under either service shape. */
++export const UI_SECTION: SettingsSection = {
++  namespace: UI_SETTINGS_NAMESPACE,
++  fields: Object.keys(UI_FIELDS),
+ }
+ 
+ /**
+  * Declare the namespace. Registering more than once in a process throws, so a
+  * second activation of the plugin simply keeps the first declaration.
+  *
++ * Nothing to declare on 0.2.x — the exported `Config` is the declaration there.
++ *
+  * @param ctx - host context.
+  */
+ export function installUiSettings(ctx: Context): void {
+-  const settings = ctx.get('settings') as SettingsLike | undefined
++  const settings = legacySettings(ctx)
+   if (settings === undefined) return
+   try {
+     settings.register(UI_SETTINGS_NAMESPACE, UiPrefsSchema, { base: DEFAULT_UI_PREFS })
+@@ -62,9 +66,9 @@ export function installUiSettings(ctx: Context): void {
+  * @returns the preferences, plus whether a settings service was there at all.
+  */
+ export function readUiPrefs(ctx: Context): UiPrefs & { settingsAvailable: boolean } {
+-  const settings = ctx.get('settings') as SettingsLike | undefined
+-  if (settings === undefined) return { ...DEFAULT_UI_PREFS, settingsAvailable: false }
+-  const stored = settings.get(UI_SETTINGS_NAMESPACE)?.listMode
++  const store = settingsStore(ctx)
++  if (store === undefined) return { ...DEFAULT_UI_PREFS, settingsAvailable: false }
++  const stored = store.read(UI_SECTION)?.listMode
+   const listMode = UI_LIST_MODES.includes(stored as UiListMode)
+     ? (stored as UiListMode)
+     : DEFAULT_UI_PREFS.listMode
+@@ -78,10 +82,10 @@ export function readUiPrefs(ctx: Context): UiPrefs & { settingsAvailable: boolea
+  * @param patch - what to change; an absent field changes nothing.
+  * @returns whether the write went through, and why not when it did not.
+  */
+-export function saveUiPrefs(
++export async function saveUiPrefs(
+   ctx: Context,
+   patch: { listMode?: string },
+-): { ok: boolean; reason?: string } {
++): Promise<{ ok: boolean; reason?: string }> {
+   if (patch.listMode === undefined) return { ok: true }
+   if (!UI_LIST_MODES.includes(patch.listMode as UiListMode)) {
+     return {
+@@ -89,9 +93,12 @@ export function saveUiPrefs(
+       reason: `列表模式只支持 ${UI_LIST_MODES.join(' / ')}，收到的是 ${patch.listMode}`,
+     }
+   }
+-  const settings = ctx.get('settings') as SettingsLike | undefined
+-  if (settings === undefined) return { ok: false, reason: '这个组合里没有设置服务，记不住列表模式' }
++  const store = settingsStore(ctx)
++  if (store === undefined) return { ok: false, reason: '这个组合里没有设置服务，记不住列表模式' }
+   installUiSettings(ctx)
+-  settings.update(UI_SETTINGS_NAMESPACE, { listMode: patch.listMode as UiListMode })
++  const written = await store.write(UI_SECTION, { listMode: patch.listMode })
++  // The raw reason: the panel wraps it in its own sentence, and a second one
++  // here would read "列表模式没记住：列表模式没记住：…".
++  if (!written.ok) return { ok: false, reason: written.reason }
+   return { ok: true }
+ }
+diff --git a/src/host/webdav/config.ts b/src/host/webdav/config.ts
+index f5e0594..cd2de0d 100644
+--- a/src/host/webdav/config.ts
++++ b/src/host/webdav/config.ts
+@@ -16,11 +16,12 @@ import z from '@deepseek-ai/schemastery'
+ 
+ import type { WebdavSettings, WebdavStatus } from '../../shared/panel-wire.js'
+ import { DEFAULT_USER_AGENT } from '../../shared/constants.js'
++import { legacySettings, settingsStore, type SettingsSection } from '../settings.js'
+ import type { Vault } from '../vault/vault.js'
+ 
+ export type { WebdavSettings, WebdavStatus } from '../../shared/panel-wire.js'
+ 
+-/** Namespace this plugin owns in the settings service. */
++/** Namespace this plugin owns in the 0.1.x settings service. */
+ export const SETTINGS_NAMESPACE = 'dsh-inbox-webdav'
+ 
+ /** The credential key holding the password. */
+@@ -45,8 +46,12 @@ export const DEFAULT_SETTINGS: WebdavSettings = {
+   webdavUserAgent: '',
+ }
+ 
+-/** The namespace's schema: every field optional, so a partial user layer is valid. */
+-export const WebdavSettingsSchema = z.object({
++/**
++ * The fields the sync endpoint is made of, in one place: the 0.1.x namespace
++ * schema and the 0.2.x config row are both built from this map, and the row
++ * needs only the names (see `../settings.js`).
++ */
++export const WEBDAV_FIELDS = {
+   protocol: z.union(['webdav', 's3']).default('webdav'),
+   baseUrl: z.string().default(''),
+   directory: z.string().default('/inbox'),
+@@ -59,23 +64,15 @@ export const WebdavSettingsSchema = z.object({
+   accessKeyId: z.string().default(''),
+   userAgent: z.string().default(''),
+   webdavUserAgent: z.string().default(''),
+-})
+-
+-/** The slice of the settings service this file uses. */
+-interface SettingsScope {
+-  get(): WebdavSettings
+-  update(patch: Partial<WebdavSettings>): void
+ }
+ 
+-interface SettingsLike {
+-  register(
+-    namespace: string,
+-    schema: unknown,
+-    options: { base: WebdavSettings },
+-  ): SettingsScope
+-  get(namespace: string): WebdavSettings | undefined
+-  /** Namespace-addressed write: no scope object required. */
+-  update(namespace: string, patch: Partial<WebdavSettings>): void
++/** The namespace's schema: every field optional, so a partial user layer is valid. */
++export const WebdavSettingsSchema = z.object(WEBDAV_FIELDS)
++
++/** Where the sync endpoint lives, under either settings service shape. */
++export const WEBDAV_SECTION: SettingsSection = {
++  namespace: SETTINGS_NAMESPACE,
++  fields: Object.keys(WEBDAV_FIELDS),
+ }
+ 
+ /** The slice of the credentials service this file uses. */
+@@ -87,9 +84,9 @@ interface CredentialsLike {
+ 
+ /** Resolve the current settings, falling back to the composed defaults. */
+ export function readSettings(ctx: Context): WebdavSettings {
+-  const settings = ctx.get('settings') as SettingsLike | undefined
+-  if (settings === undefined) return DEFAULT_SETTINGS
+-  return settings.get(SETTINGS_NAMESPACE) ?? DEFAULT_SETTINGS
++  const store = settingsStore(ctx)
++  if (store === undefined) return DEFAULT_SETTINGS
++  return { ...DEFAULT_SETTINGS, ...store.read(WEBDAV_SECTION) } as WebdavSettings
+ }
+ 
+ /**
+@@ -105,7 +102,7 @@ export function readSettings(ctx: Context): WebdavSettings {
+  * @param base - composed defaults for this deployment.
+  */
+ export function installWebdavSettings(ctx: Context, base: WebdavSettings = DEFAULT_SETTINGS): void {
+-  const settings = ctx.get('settings') as SettingsLike | undefined
++  const settings = legacySettings(ctx)
+   if (settings === undefined) return
+   try {
+     settings.register(SETTINGS_NAMESPACE, WebdavSettingsSchema, { base })
+@@ -221,7 +218,6 @@ export async function saveWebdav(
+   base: WebdavSettings,
+   patch: WebdavPatch,
+ ): Promise<{ ok: boolean; reason?: string }> {
+-  const settings = ctx.get('settings') as SettingsLike | undefined
+   const credentials = ctx.get('credentials') as CredentialsLike | undefined
+ 
+   const config: Partial<WebdavSettings> = {}
+@@ -257,14 +253,16 @@ export async function saveWebdav(
+   }
+ 
+   if (Object.keys(config).length > 0) {
+-    if (settings === undefined) {
+-      return { ok: false, reason: '这个组合里没有设置服务，改不了地址' }
+-    }
+-    // The namespace is declared at load time; here we only write. `update()`
+-    // merges into the *user* layer and persists, leaving the composed base the
++    // Declaration happened at load time; here we only write. Either door merges
++    // into the *user* layer and persists, leaving the composed base the
+     // deployment's — which is what makes a shipped default work.
+     installWebdavSettings(ctx, base)
+-    settings.update(SETTINGS_NAMESPACE, config)
++    const store = settingsStore(ctx)
++    if (store === undefined) {
++      return { ok: false, reason: '这个组合里没有设置服务，改不了地址' }
++    }
++    const written = await store.write(WEBDAV_SECTION, config)
++    if (!written.ok) return { ok: false, reason: `地址没存进去：${written.reason}` }
+   }
+ 
+   if (patch.password !== undefined) {
+diff --git a/test/cli.test.ts b/test/cli.test.ts
+index 1e63e52..57621fa 100644
+--- a/test/cli.test.ts
++++ b/test/cli.test.ts
+@@ -24,6 +24,7 @@ import {
+   missingPnpmMessage,
+   parse,
+   pnpmInstallAttempts,
++  presetMechanism,
+   profileCreationAttempts,
+ } from '../src/cli.js'
+ 
+@@ -232,6 +233,38 @@ describe('running as a program', () => {
+   })
+ })
+ 
++describe('which preset carrier the running dsh has', () => {
++  it('reads 0.1.x as the directory carrier', () => {
++    // The line this repo was built on, and the one the README's older advice
++    // (copy `standard` into ~/.dsh/.agent-presets) was written against.
++    expect(presetMechanism('0.1.5-rc.2\n')).toBe('directory')
++    expect(presetMechanism('0.1.0-rc.2')).toBe('directory')
++  })
++
++  it('reads 0.2.x as the declaration carrier', () => {
++    // Measured 2026-09-30 against the desktop runtime: `dsh --version` answers
++    // `0.2.0-rc.2`, `@deepseek-ai/dsh-agent-presets` does not exist at that
++    // version, and the string appears nowhere in its app.asar — nothing reads
++    // the directory any more, so step ② must not run.
++    expect(presetMechanism('0.2.0-rc.2\n')).toBe('declaration')
++    expect(presetMechanism('0.2.1')).toBe('declaration')
++    expect(presetMechanism('1.0.0')).toBe('declaration')
++  })
++
++  it('only major.minor decide, so an rc or alpha number cannot flip it', () => {
++    expect(presetMechanism('0.2.0-alpha.1')).toBe('declaration')
++    expect(presetMechanism('0.1.7-rc.9+build.3')).toBe('directory')
++  })
++
++  it('assumes the old carrier when dsh cannot be asked', () => {
++    // Doing a step that is unnecessary is recoverable; skipping one that was
++    // needed leaves the assistant without tools and says nothing.
++    expect(presetMechanism(undefined)).toBe('unknown')
++    expect(presetMechanism('')).toBe('unknown')
++    expect(presetMechanism('not a version')).toBe('unknown')
++  })
++})
++
+ describe('the preset row', () => {
+   it('adds the row when the preset has never heard of us', () => {
+     const outcome = ensurePresetRow('- id: tool-web\n')
+diff --git a/test/settings.test.ts b/test/settings.test.ts
+new file mode 100644
+index 0000000..28de587
+--- /dev/null
++++ b/test/settings.test.ts
+@@ -0,0 +1,185 @@
++/**
++ * The settings door: two service shapes behind one seam.
++ *
++ * The 0.2.x shape is here because getting it wrong is what killed the desktop
++ * host — its `update()` is async, so a call made in the 0.1.x way rejects on a
++ * promise nobody waits for, and dsh treats an unhandled rejection as fatal. The
++ * refusal has to come back as an answer instead.
++ */
++
++import type { Context } from '@deepseek-ai/cordis'
++import z from '@deepseek-ai/schemastery'
++import { describe, expect, it, vi } from 'vitest'
++
++import { Config } from '../src/host/index.js'
++import { legacySettings, markLive, settingsStore, type SettingsSection } from '../src/host/settings.js'
++import { UI_FIELDS, UI_SECTION, UiPrefsSchema } from '../src/host/ui/config.js'
++import { WEBDAV_FIELDS, WEBDAV_SECTION, WebdavSettingsSchema } from '../src/host/webdav/config.js'
++
++const SECTION: SettingsSection = { namespace: 'dsh-inbox-ui', fields: ['listMode'] }
++
++/** The 0.1.x service: namespaces a plugin declares and then addresses by name. */
++function legacySettingsService(initial: Record<string, unknown> = {}) {
++  let current = { listMode: 'grid', ...initial }
++  return {
++    current: () => current,
++    register: vi.fn((_namespace: string, _schema: unknown, options: { base: Record<string, unknown> }) => {
++      current = { ...options.base, ...current }
++      return { get: () => current, update: () => undefined }
++    }),
++    get: vi.fn(() => current),
++    update: vi.fn((_namespace: string, patch: Record<string, unknown>) => {
++      current = { ...current, ...patch }
++    }),
++  }
++}
++
++/** The 0.2.x service: one config row per plugin, addressed by row id. */
++function modernSettingsService(initial: Record<string, unknown> = {}) {
++  let current = { listMode: 'grid', protocol: 'webdav', baseUrl: '', ...initial }
++  return {
++    current: () => current,
++    describe: vi.fn(() => [{ ns: 'dsh-inbox', value: { ...current } }]),
++    update: vi.fn(async (id: string, patch: Record<string, unknown>) => {
++      if (id !== 'dsh-inbox') throw new Error(`No configurable plugin entry "${id}"`)
++      current = { ...current, ...patch }
++    }),
++  }
++}
++
++/** A context whose plugin was loaded from the profile row `dsh-inbox`. */
++const context = (settings?: unknown, rowId = 'dsh-inbox'): Context =>
++  ({
++    get: (name: string) => (name === 'settings' ? settings : undefined),
++    fiber: { entry: { options: { id: rowId } } },
++  }) as unknown as Context
++
++describe('choosing a door', () => {
++  it('is nothing at all without a settings service', () => {
++    expect(settingsStore(context())).toBeUndefined()
++    expect(legacySettings(context())).toBeUndefined()
++  })
++
++  it('is nothing at all when the service is neither shape', () => {
++    expect(settingsStore(context({ launch: () => undefined }))).toBeUndefined()
++  })
++
++  it('takes the namespace door when the service declares namespaces', () => {
++    const settings = legacySettingsService()
++    expect(legacySettings(context(settings))).toBe(settings)
++    expect(settingsStore(context(settings))?.read(SECTION)).toEqual({ listMode: 'grid' })
++  })
++
++  it('takes the config-row door when the service is the 0.2.x one', () => {
++    const settings = modernSettingsService({ listMode: 'compact' })
++    // No `register` at all: that is how the two shapes are told apart.
++    expect(legacySettings(context(settings))).toBeUndefined()
++    expect(settingsStore(context(settings))?.read(SECTION)).toEqual({ listMode: 'compact' })
++  })
++
++  it('has no address for a context that came from no profile row', () => {
++    // Without a row id there is nothing to write to, and saying so beats
++    // writing a namespace the 0.2.x service has never heard of.
++    const settings = modernSettingsService()
++    const ctx = { get: () => settings, fiber: {} } as unknown as Context
++    expect(settingsStore(ctx)).toBeUndefined()
++  })
++})
++
++describe('the two faces of one field', () => {
++  /** Whether a schema node carries the 0.2.x "you may write this" mark. */
++  const marked = (field: unknown): boolean =>
++    (field as { meta?: { volatile?: boolean } }).meta?.volatile === true
++
++  /** One field out of an object schema, by name. */
++  const field = (schema: unknown, name: string): unknown =>
++    (schema as { dict?: Record<string, unknown> }).dict?.[name]
++
++  it('marks the config row live', () => {
++    // Without this mark 0.2.x refuses the write outright, and the panel is back
++    // to "the toggle does nothing".
++    expect(marked(field(Config, 'listMode'))).toBe(true)
++    expect(marked(field(Config, 'baseUrl'))).toBe(true)
++  })
++
++  it('leaves the namespace schemas exactly as 0.1.x knew them', () => {
++    // 0.1.x is told these same fields are a *namespace* schema; marking them
++    // live on the way there would be a change to the line that never broke.
++    expect(marked(field(UiPrefsSchema, 'listMode'))).toBe(false)
++    expect(marked(field(WebdavSettingsSchema, 'baseUrl'))).toBe(false)
++    expect(marked(UI_FIELDS.listMode)).toBe(false)
++    expect(marked(WEBDAV_FIELDS.baseUrl)).toBe(false)
++  })
++
++  it('is a no-op on a runtime whose schemastery never heard of volatile()', () => {
++    const plain = { meta: {} }
++    expect(markLive(plain)).toBe(plain)
++    const field = z.string()
++    expect(markLive(field)).not.toBe(field)
++    expect(marked(field)).toBe(false)
++  })
++})
++
++describe('reading a section', () => {
++  it('hands back only the fields that section owns', () => {
++    const settings = modernSettingsService({ listMode: 'compact', baseUrl: 'https://dav.example' })
++    const store = settingsStore(context(settings))!
++
++    expect(store.read(UI_SECTION)).toEqual({ listMode: 'compact' })
++    expect(store.read(WEBDAV_SECTION)).toMatchObject({ baseUrl: 'https://dav.example' })
++    expect(store.read(WEBDAV_SECTION)).not.toHaveProperty('listMode')
++  })
++
++  it('falls back to nothing when the service cannot report at all', () => {
++    // `describe()` reads the profile from disk; a broken profile must not take
++    // the panel's own preferences down with it.
++    const settings = {
++      describe: () => {
++        throw new Error('profile is unreadable')
++      },
++      update: async () => undefined,
++    }
++    expect(settingsStore(context(settings))!.read(SECTION)).toBeUndefined()
++  })
++})
++
++describe('writing a section', () => {
++  it('addresses a namespace through the 0.1.x door', async () => {
++    const settings = legacySettingsService()
++    const store = settingsStore(context(settings))!
++
++    expect(await store.write(SECTION, { listMode: 'compact' })).toEqual({ ok: true })
++    expect(settings.update).toHaveBeenCalledWith('dsh-inbox-ui', { listMode: 'compact' })
++    expect(settings.current().listMode).toBe('compact')
++  })
++
++  it('addresses the plugin row through the 0.2.x door', async () => {
++    const settings = modernSettingsService()
++    const store = settingsStore(context(settings))!
++
++    expect(await store.write(SECTION, { listMode: 'compact' })).toEqual({ ok: true })
++    expect(settings.update).toHaveBeenCalledWith('dsh-inbox', { listMode: 'compact' })
++    expect(settings.current().listMode).toBe('compact')
++  })
++
++  it('answers a refusal instead of leaving a rejected promise behind', async () => {
++    // The desktop crash, in one test: this rejection had no awaiter, and node
++    // (with dsh's own handler) took the host down over it.
++    const settings = modernSettingsService()
++    settings.update.mockRejectedValueOnce(new Error('No configurable plugin entry "dsh-inbox-ui"'))
++
++    const written = await settingsStore(context(settings))!.write(SECTION, { listMode: 'compact' })
++    expect(written.ok).toBe(false)
++    expect(written.ok === false && written.reason).toContain('No configurable plugin entry')
++  })
++
++  it('answers a synchronous refusal too', async () => {
++    const settings = legacySettingsService()
++    settings.update.mockImplementationOnce(() => {
++      throw new Error('no user layer to write into')
++    })
++
++    const written = await settingsStore(context(settings))!.write(SECTION, { listMode: 'compact' })
++    expect(written.ok).toBe(false)
++  })
++})
+diff --git a/test/ui-config.test.ts b/test/ui-config.test.ts
+index 8373e1d..184d6e8 100644
+--- a/test/ui-config.test.ts
++++ b/test/ui-config.test.ts
+@@ -1,7 +1,8 @@
+ /**
+  * The panel's own preferences: a namespace of their own, a bad value refused,
+  * and a composition without a settings service degrading to defaults instead of
+- * throwing.
++ * throwing — on either of the settings services dsh ships (a namespace one on
++ * 0.1.x, the plugin's own config row on 0.2.x).
+  */
+ 
+ import type { Context } from '@deepseek-ai/cordis'
+@@ -44,26 +45,69 @@ function fakeSettings(initial?: { listMode?: string }) {
+ const context = (settings?: unknown): Context =>
+   ({ get: (name: string) => (name === 'settings' ? settings : undefined) }) as unknown as Context
+ 
++/**
++ * The 0.2.x service: no namespaces, one config row per plugin, and `update()`
++ * is async. `rowId` lets a test check the address it was called with.
++ */
++function modernSettings(initial?: { listMode?: string }) {
++  let current = { ...DEFAULT_UI_PREFS, ...initial }
++  return {
++    current: () => current,
++    describe: () => [{ ns: 'dsh-inbox', value: { ...current } }],
++    update: vi.fn(async (_id: string, patch: { listMode?: string }) => {
++      current = { ...current, ...patch }
++    }),
++  }
++}
++
++/** A context loaded from the profile row `dsh-inbox`, as the loader records it. */
++const loadedContext = (settings?: unknown): Context =>
++  ({
++    get: (name: string) => (name === 'settings' ? settings : undefined),
++    fiber: { entry: { options: { id: 'dsh-inbox' } } },
++  }) as unknown as Context
++
+ describe('panel preferences', () => {
+   it('falls back to the default layout with no settings service', () => {
+     expect(readUiPrefs(context())).toEqual({ ...DEFAULT_UI_PREFS, settingsAvailable: false })
+     expect(readUiPrefs(context(fakeSettings())).listMode).toBe('grid')
+   })
+ 
+-  it('remembers the chosen layout', () => {
++  it('remembers the chosen layout', async () => {
+     const settings = fakeSettings()
+     const ctx = context(settings)
+ 
+-    expect(saveUiPrefs(ctx, { listMode: 'grid' }).ok).toBe(true)
++    expect((await saveUiPrefs(ctx, { listMode: 'grid' })).ok).toBe(true)
+     expect(settings.current().listMode).toBe('grid')
+     expect(readUiPrefs(ctx).listMode).toBe('grid')
+ 
+-    expect(saveUiPrefs(ctx, { listMode: 'compact' }).ok).toBe(true)
++    expect((await saveUiPrefs(ctx, { listMode: 'compact' })).ok).toBe(true)
++    expect(readUiPrefs(ctx).listMode).toBe('compact')
++  })
++
++  it('remembers the chosen layout on the 0.2.x service too', async () => {
++    const settings = modernSettings()
++    const ctx = loadedContext(settings)
++
++    expect((await saveUiPrefs(ctx, { listMode: 'compact' })).ok).toBe(true)
++    expect(settings.update).toHaveBeenCalledWith('dsh-inbox', { listMode: 'compact' })
+     expect(readUiPrefs(ctx).listMode).toBe('compact')
+   })
+ 
+-  it('refuses a layout it does not have, and says which ones it does', () => {
+-    const result = saveUiPrefs(context(fakeSettings()), { listMode: 'masonry' })
++  it('answers a refused write instead of throwing it at the host', async () => {
++    // Regression, measured on the desktop 2026-09-30: 0.2.x's `update()` is
++    // async, so the 0.1.x namespace call left an unawaited rejection behind and
++    // dsh's fatal handler took the whole host down over a list-layout toggle.
++    const settings = modernSettings()
++    settings.update.mockRejectedValueOnce(new Error('No configurable plugin entry "dsh-inbox-ui"'))
++
++    const result = await saveUiPrefs(loadedContext(settings), { listMode: 'compact' })
++    expect(result.ok).toBe(false)
++    expect(result.reason).toContain('No configurable plugin entry')
++  })
++
++  it('refuses a layout it does not have, and says which ones it does', async () => {
++    const result = await saveUiPrefs(context(fakeSettings()), { listMode: 'masonry' })
+     expect(result.ok).toBe(false)
+     expect(result.reason).toContain('grid')
+     expect(result.reason).toContain('masonry')
+@@ -76,8 +120,8 @@ describe('panel preferences', () => {
+     expect(readUiPrefs(context(settings)).listMode).toBe(DEFAULT_UI_PREFS.listMode)
+   })
+ 
+-  it('refuses to remember anything when there is nowhere to remember it', () => {
+-    const result = saveUiPrefs(context(), { listMode: 'grid' })
++  it('refuses to remember anything when there is nowhere to remember it', async () => {
++    const result = await saveUiPrefs(context(), { listMode: 'grid' })
+     expect(result.ok).toBe(false)
+     expect(result.reason).toContain('设置服务')
+   })

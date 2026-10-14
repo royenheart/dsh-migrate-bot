@@ -1,0 +1,1857 @@
+diff --git a/.gitignore b/.gitignore
+index a46fb1b..03a405b 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -4,3 +4,4 @@ lib/
+ .DS_Store
+ .dsh/
+ docs/
++.workbuddy/
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+index 0d1b6f4..1cface9 100644
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@ -39,7 +39,7 @@ src/client/locales/     dictionaries by view (common/skills/market/sources/detai
+ ```bash
+ npm install
+ npm run typecheck   # tsc --noEmit
+-npm test            # vitest (233 tests across 14 suites)
++npm test            # vitest (232 tests across 14 suites)
+ npm run build       # tsc declarations + tsdown bundles (lib/index.js + lib/client.js)
+ ```
+ 
+@@ -53,8 +53,8 @@ npm run build       # tsc declarations + tsdown bundles (lib/index.js + lib/clie
+    live GUI.
+ 3. **Build** — `npm run build` must produce `lib/index.js` and `lib/client.js`.
+ 4. **Keep the diff focused** — one logical change per PR, with a clear title and description.
+-5. **Documentation** — update `README.md` (including the embedded Chinese collapsible section) when
+-   behavior or the API surface changes.
++5. **Documentation** — update `README.md` **and** `README.zh.md` (both ship with the package and are
++   kept in sync) when behavior or the API surface changes.
+ 
+ ## Code style
+ 
+@@ -68,7 +68,9 @@ npm run build       # tsc declarations + tsdown bundles (lib/index.js + lib/clie
+ ```bash
+ # after a change:
+ npm run build
+-# restart the dsh web process, then verify Settings → 技能 and Settings → 插件 → Skill Hub
++# restart the dsh web process, then verify both surfaces:
++#   Settings → 技能              — the skill hub panel
++#   sidebar 插件 → dsh-skill-hub  — the plugin's settings card
+ ```
+ 
+ When the web profile installs this repo as a link (`"dsh-skill-hub": "link:/path/to/repo"`, the
+diff --git a/README.md b/README.md
+index 0fcdfe7..74a3651 100644
+--- a/README.md
++++ b/README.md
+@@ -24,7 +24,9 @@ dsh plugin --profile web add dsh-skill-hub
+ # restart dsh web → Settings → 技能 → Market → scan → import
+ ```
+ 
+-Requires `Node ^22.19 || >=24` + dsh web (`0.1.6-alpha.1`, `0.1.x` forward compatible).
++Requires `Node ^22.19 || >=24` + dsh web `>=0.1.6-alpha.2 <0.2`.
++
++Two surfaces — the hub panel lives at **Settings → 技能**, and the plugin's settings card lives on the plugin's own page in the **Plugins manager** (sidebar → 插件 → dsh-skill-hub). The card moved there in dsh `0.1.6-alpha.2`, when the Plugins manager replaced the old Settings → 插件 list; this plugin registers into the new location only.
+ 
+ ## Features
+ 
+@@ -38,7 +40,7 @@ Requires `Node ^22.19 || >=24` + dsh web (`0.1.6-alpha.1`, `0.1.x` forward compa
+ - **Market** — built-in curated repos plus custom `owner/repo` sources. Any top-level directory containing `SKILL.md` scans as a root (no allowlist). Async import with byte-level progress and cancel. Each source pins a version — click the ref badge to switch between releases, branches, or a custom ref.
+ - **Track updates** — imported skills record a repo + commit snapshot. Check all / update-all, per-source badges (installed / updatable / deleted upstream / new release). Sync overwrites local edits (with confirm); upstream deletions move into a restorable trash that keeps source and scene membership.
+ - **Stats** — per-skill call counts + last-used times from session logs (incremental cache), group summaries; window and scan interval live-configurable from the settings card.
+-- **Settings card** — master switch, announce-to-agent, invocation dot colors, usage display toggles, stats window/interval; plus a self-update check against GitHub releases.
++- **Settings card** — on the plugin's own page in the **Plugins manager** (sidebar → 插件 → dsh-skill-hub): master switch, announce-to-agent, invocation dot colors, usage display toggles, stats window/interval; plus a self-update check against GitHub releases.
+ 
+ ## Why not just the read-only browser?
+ 
+@@ -105,7 +107,7 @@ Host uses only `ctx.skills.snapshot/get`, `ctx.webServer.register`, `ctx.systemP
+ 
+ ```bash
+ npm run typecheck  # tsc --noEmit
+-npm test           # 176 tests, 9 suites
++npm test           # 232 tests, 14 suites
+ npm run build      # tsc + tsdown → lib/index.js + lib/client.js
+ ```
+ 
+@@ -117,6 +119,7 @@ npm run build      # tsc + tsdown → lib/index.js + lib/client.js
+ - Skill missing — check the diagnostics section (frontmatter / name mismatch / short description).
+ - Empty source group — its skills were deleted, or their disabled records were lost (sidecar restored/hand-edited). Startup reconciles `.disabled` files on disk; source groups with no visible member are no longer rendered.
+ - Dots missing in `/` menu — dsh internals changed; catalog still works.
++- Settings card missing — it lives in the Plugins manager (sidebar → 插件 → dsh-skill-hub), not under Settings. On dsh older than `0.1.6-alpha.2` this plugin contributes no config surface at all.
+ 
+ ## Community
+ 
+diff --git a/README.zh.md b/README.zh.md
+index e96de21..dabc0ef 100644
+--- a/README.zh.md
++++ b/README.zh.md
+@@ -24,7 +24,9 @@ dsh plugin --profile web add dsh-skill-hub
+ # 重启 dsh web → 设置 → 技能 → 市场 → 扫描 → 导入
+ ```
+ 
+-要求 `Node ^22.19 || >=24` + dsh web（`0.1.6-alpha.1`，兼容后续 `0.1.x`）。
++要求 `Node ^22.19 || >=24` + dsh web `>=0.1.6-alpha.2 <0.2`。
++
++两个界面 —— 管理面板在 **设置 → 技能**；本插件的设置卡片在 **插件管理页** 的插件自有页面上（侧边栏「插件」→ dsh-skill-hub）。该卡片于 dsh `0.1.6-alpha.2` 迁到此处 —— 插件管理页取代了旧的「设置 → 插件」列表，本插件只注册到新位置。
+ 
+ ## 功能
+ 
+@@ -38,7 +40,7 @@ dsh plugin --profile web add dsh-skill-hub
+ - **市场** — 内置精选仓库 + 自定义 `owner/repo`。任何含 `SKILL.md` 的顶层目录都可扫描（无白名单）。异步导入，字节级进度+取消。每个源钉一个版本 —— 点 ref 徽标可在发布版/分支/手输之间切换。
+ - **跟踪更新** — 导入的技能记录 repo+commit 快照。检查全部/一键全更；每源徽章（已装/可更新/上游已删/新版本）。同步覆盖本地修改（先确认）；上游删除跟进移入回收站，恢复保留来源与场景归属。
+ - **统计** — 会话日志的调用次数+最近使用，分组头汇总；窗口与扫描间隔在设置卡片实时可调。
+-- **设置卡片** — 总开关、向 Agent 公告、调用圆点颜色、用量显示开关、统计窗口/间隔；附带插件自更新检查（对 GitHub releases）。
++- **设置卡片** — 位于 **插件管理页** 的插件自有页面（侧边栏「插件」→ dsh-skill-hub）：总开关、向 Agent 公告、调用圆点颜色、用量显示开关、统计窗口/间隔；附带插件自更新检查（对 GitHub releases）。
+ 
+ ## 为什么还需要一个管理器？
+ 
+@@ -105,7 +107,7 @@ GitHub 仓库 ──扫描/导入──▶ ~/.dsh/skills
+ 
+ ```bash
+ npm run typecheck  # tsc --noEmit
+-npm test           # 176 tests, 9 suites
++npm test           # 232 tests, 14 suites
+ npm run build      # tsc + tsdown → lib/index.js + lib/client.js
+ ```
+ 
+@@ -117,6 +119,7 @@ npm run build      # tsc + tsdown → lib/index.js + lib/client.js
+ - 技能不出现 — 看诊断区（缺 frontmatter / 名称不一致 / 描述过短）。
+ - 来源组空壳 — 组内技能已被删除、或禁用记录丢失（状态文件被恢复/手改）。启动时自动对账磁盘上的 `.disabled` 文件补记录；无可见成员的来源组不再渲染。
+ - `/` 菜单圆点消失 — dsh 内部触发源变更，目录功能不受影响。
++- 找不到设置卡片 — 它在插件管理页（侧边栏「插件」→ dsh-skill-hub），不在「设置」里；dsh 低于 `0.1.6-alpha.2` 时本插件不提供任何配置入口。
+ 
+ ## 社区
+ 
+diff --git a/package-lock.json b/package-lock.json
+index 42f0816..138a63f 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -14,19 +14,20 @@
+       },
+       "devDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-client-connection": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-client-locale": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-client-store": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-client-ui-input-trigger": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-client-ui-settings": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-client-ui-slots": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-host-webserver": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-query": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-settings": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-skill": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.1",
++        "@deepseek-ai/dsh-client-connection": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-client-store": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-client-ui-input-trigger": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-client-ui-plugin-manager": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-client-ui-settings": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-host-webserver": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-query": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-settings": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-skill": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2",
+         "@types/js-yaml": "^4.0.9",
+         "@types/node": "^22.20.0",
+         "@types/react": "~18.3.1",
+@@ -46,19 +47,19 @@
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.1 || ^4.0.2",
+-        "@deepseek-ai/dsh-client-connection": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-locale": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-runtime": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-store": ">=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-ui-settings": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-ui-slots": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-        "@deepseek-ai/dsh-host-webserver": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-        "@deepseek-ai/dsh-session": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-        "@deepseek-ai/dsh-session-query": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-        "@deepseek-ai/dsh-settings": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-        "@deepseek-ai/dsh-skill": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-        "@deepseek-ai/dsh-system-prompt": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-client-connection": ">=0.1.6-alpha.2 <0.2.0-0",
++        "@deepseek-ai/dsh-client-locale": ">=0.1.6-alpha.2 <0.2.0-0",
++        "@deepseek-ai/dsh-client-runtime": ">=0.1.6-alpha.2 <0.2.0-0",
++        "@deepseek-ai/dsh-client-store": ">=0.1.6-alpha.2 <0.2.0-0",
++        "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.1.6-alpha.2 <0.2.0-0",
++        "@deepseek-ai/dsh-client-ui-settings": ">=0.1.6-alpha.2 <0.2.0-0",
++        "@deepseek-ai/dsh-client-ui-slots": ">=0.1.6-alpha.2 <0.2.0-0",
++        "@deepseek-ai/dsh-host-webserver": ">=0.1.6-alpha.2 <0.2.0-0",
++        "@deepseek-ai/dsh-session": ">=0.1.6-alpha.2 <0.2.0-0",
++        "@deepseek-ai/dsh-session-query": ">=0.1.6-alpha.2 <0.2.0-0",
++        "@deepseek-ai/dsh-settings": ">=0.1.6-alpha.2 <0.2.0-0",
++        "@deepseek-ai/dsh-skill": ">=0.1.6-alpha.2 <0.2.0-0",
++        "@deepseek-ai/dsh-system-prompt": ">=0.1.6-alpha.2 <0.2.0-0",
+         "react": "^18.2.0",
+         "react-dom": "^18.2.0"
+       },
+@@ -183,40 +184,40 @@
+       "license": "MIT"
+     },
+     "node_modules/@deepseek-ai/dsh-agent": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-agent/-/dsh-agent-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-QIUJCzc0gVpwajKeKzZfvcIUToD5D2F2OzxZAqxiERblW5UfbT0V/4UEuNWSnz98ViAy1unfat/JJDx/r8FTxg==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-agent/-/dsh-agent-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-XEOytfXmJG6dyHld3Np0IYRrVPJnuoKKx2yQ+o74a7cN89k+J61c33D7zIcDG5rLkF7sMNM608ZkhfCWJuTcjg==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-typert-protocol": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-attachment": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-attachment/-/dsh-attachment-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-DUjH5jIe3K3Cnkcp1+BXtCVAt3hlrjDYt7CDkWq5NVpef8dGhKUOfejRwYIO9vsSdWkKavz43OZZMTLLPAQvQw==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-attachment/-/dsh-attachment-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-dv3s/FrFuZwmcBfWzWozj9khlb8LrFSCgz/spGsEg6l9zka1Wu3ZkHDcE+CRsM+fyCD/z/jTClMOkQ2DIMw5wQ==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-brand": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-brand/-/dsh-brand-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-bS2ud+5KsNukiZYPCbAoNz8FOP7NSaa8ibYf/dKPmG9lLPw/GaReD+APGJs1mmqT96AhlzbxDmrQx4hlNo8fZA==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-brand/-/dsh-brand-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-Fx+GKwkTjTVf6drn888j7vF5ak0/6mxHDF1bYH4FBsRI+h/8UmPAgIV5fAfT63GqBSXdgmVe/hdzdmXS2nq6Eg==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+@@ -224,13 +225,13 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-connection": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-connection/-/dsh-client-connection-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-z3mDQGTf2he/ZeG+ScTM5z9Cz7fJAyuXqyKSz+ch8pqeIVhGo9ZIe9x3SBIv9Sbpfo0OAx0h4A+5JU4O/k0LbA==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-connection/-/dsh-client-connection-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-M/5WNKgxrPm+Y5C2tDTQDGMmFRpk7jMdlKD2Hkg4HmzdTXr/O2VzCXdCiBHvB/AZEkvZa2FSNPa3fqcLkPdvyg==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-credentials": "^0.1.6-alpha.1",
++        "@deepseek-ai/dsh-credentials": "^0.1.6-alpha.2",
+         "@deepseek-ai/schemastery": "^3.18.2",
+         "zod": "^4.4.3"
+       },
+@@ -239,9 +240,9 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-locale": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-locale/-/dsh-client-locale-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-QQ/5ZORyY8T/U9eaC6oHLMmSzZRbqjmV20qmHQeJu/RUgHIZNutWGdYaUgMLt4n3vHk9FdHqLdAX6n6IVCfAGg==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-locale/-/dsh-client-locale-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-n22prMdNVl+d7Bx/E16zhtTEXZqk9fUBRY7DScNem0kXftIwxuQCXQkOmDraNrbLUtA3WHPe6/4+8UpQ+1xIuA==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+@@ -252,9 +253,9 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-store": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-store/-/dsh-client-store-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-ZGRi//ZKi1Pe0+aOnUz3AAKDwUHhTUrR2jQs0Fu733zyDTAR8SWvGOBzIGORnpesQY8WUuXCkpaIAmpYvQUeog==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-store/-/dsh-client-store-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-TUAfEQkptbd41uDXlmrjqA4e4lQ/AFRZYXHSNSwkOZApfPUk4drJOGFlHBseWGwrjcS6kWknia28ubUM9WZdEw==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+@@ -262,9 +263,19 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-ui-input-trigger": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-input-trigger/-/dsh-client-ui-input-trigger-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-7JEKf24DZZCI3r/gqJhO1g9p0c8fnIY16zzXRvHje1n/tTZT2iCcOegrsV/Mv+DJVMXVryGhXcDP2x5D/RNq4Q==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-input-trigger/-/dsh-client-ui-input-trigger-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-vC1/xY8/abiZG/F/6ikGamqSiF/fQ/fbKy0SPPiHhqG3SSLQmYUs+Hk00fgufwUZnRkLOclR9w09afO08+gKdA==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-plugin-manager": {
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-plugin-manager/-/dsh-client-ui-plugin-manager-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-DJuN13Jo5UN9LKjZLsOTAGMEQsRM7NSPW9/mBS8oCJUvbPSwqi1N1mNn1bHzNmiOCjPNBlNcH2XnZiT+BTRseg==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+@@ -272,9 +283,9 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-ui-settings": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings/-/dsh-client-ui-settings-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-2habcvrp3k5CL3wGZqKAt18DlSqY87awvfeyvMTWmAfolEDzr25ffRYG5Vg6Dkww4flZhdl4TT8R522KpdoQBw==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings/-/dsh-client-ui-settings-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-90hotMS5Cdk2pYuOC/E4K9Giffze/UTGekXyB9yzsV2DSEaFAD0s0/Ie/NnVe8xmdTrLgFd2fxKTi6xDQIwooQ==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+@@ -282,9 +293,9 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-ui-settings-plugins": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings-plugins/-/dsh-client-ui-settings-plugins-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-VwFPuwBkg0jsEz3Seh+joNMjvE0WsbLHapt0ekukZ3bXk3Qh1bxPkXNI0xGm8e+5fSoUk01FkPtF/wiujPmu+g==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings-plugins/-/dsh-client-ui-settings-plugins-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-fQKzLhjdfRsN6kulAOdFF1wliyAPT1J19dgT1tMFRlO5RMZCpXHgh+O1cVh3o5hl3K/xGTHlWsQL3XtNB1hjmQ==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+@@ -292,9 +303,9 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-ui-slots": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-slots/-/dsh-client-ui-slots-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-Sm91STGc2R4EDeKF9zqksclv0Xj/vqIJ4ruVieB8+asFRSsO6iLOH6dOP9DyDix6ehx4MUknurO4KBA0zmaurg==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-slots/-/dsh-client-ui-slots-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-yvmMjjwcVgy+PuOPljdYcMuqrhL0fNzwjT7Ar0pPZ5Jv8WcRFJGeo7s8vrW6/V1dcQyhgvPGvz+ozSu8MUmwUw==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+@@ -302,79 +313,79 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-commands": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-commands/-/dsh-commands-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-LpuYQlWgBkCltpliy3SMMj7SxAG46vGtno+PBnaUYp2IQlIAP2V2xiZwy1o1qI0daOtOwiR7LYDPW27xEpEHPg==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-commands/-/dsh-commands-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-u90h9UUy5maUzmNZJn3jRjqFXKzvWMIX6RtD4YDy0sJsEFBkZTupBO4cITNd8w4s3tYBKSUAltZqxgxSE4Ngaw==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-crypto": "^0.1.6-alpha.1",
++        "@deepseek-ai/dsh-util-crypto": "^0.1.6-alpha.2",
+         "zod": "^4.4.3"
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-attachment": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-typert-protocol": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-attachment": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-compaction": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-compaction/-/dsh-compaction-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-Pt2Q6UVRbxxh2Vhvkd7X3t8QOiObIeqlo7f8GK5YFIO6UVQzzTZWazm603QM1kiHcNqyo8AG/bIVUF96dna//g==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-compaction/-/dsh-compaction-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-jS580ZgaBOX9XjcEXetcSowuUeNK249HUuxJMpNL7JjPz2q+IwQYE4UDRNjAyBaArMp24rc2RhGJYdfse8k1ZA==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-commands": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-commands": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-compaction-image-offload": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-compaction-image-offload/-/dsh-compaction-image-offload-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-hAKM7BPojUdmj75zoU/2ZCWRy0fV4wdsOcG9TcgtEyAsXqENmQ4ASh8TNxCWEsi2n4hHJ/rb6tm8t3IXvvDzzA==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-compaction-image-offload/-/dsh-compaction-image-offload-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-mYJjxjbq48nHeExbvdsDuXlxG9FnA8wtS4zqH2TP/d6AiMYIZOVkEpVA6Fk94Vcr310XcALPwv4pl5PU0GHE3w==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-compaction": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-compaction": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-credentials": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-credentials/-/dsh-credentials-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-eZKtlebZ/hI4N2wM/EOO+K+vhA7Uxege5HuafspuAN9t7bWlkS4Gq+yJKQZyRUAUo5y/EmChf6sWMTnO8rTvvQ==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-credentials/-/dsh-credentials-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-xfUX30VlsXCLX+5/99AXIKQXEUXaW1pe1wJXKohj+OnMZWYBZGXpSlEpquiUaINgifs129lHCCFGbLWhr3wmWA==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2"
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-host-webserver": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-host-webserver/-/dsh-host-webserver-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-TFIbx911WREYp0C7yK8atbv0MWeAFPB17s7q4uFOh6g0HHuQmkcWaeSaOGTDNHbEoNgF3MUkojc3vEUCcrv6MQ==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-host-webserver/-/dsh-host-webserver-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-lq4BAR25yg3N6niq3kujWvxrYrcAqvZF/Xz3AuHbJPUiZkYQ5P3lWPl5LxmWpnPh8FJwW4yHNXg93gvV7l99iQ==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+@@ -387,9 +398,9 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-invariants": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-invariants/-/dsh-invariants-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-kCQIyhVBIk2mfSMnBkT+vxU//gdxTAiYZ3ffXcgpdXDn7CeAzUcyk49LeLsllQZJB7cZWMIF/CLhCsU6hzSykQ==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-invariants/-/dsh-invariants-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-YS4DysoPqwFx02istRp2FHN8XmJPRoPDc+pu56b/UtHovqIFzcX4QepQ4yRESDQ4SOO44KZBg72RxXma/9ziVw==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+@@ -401,17 +412,17 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-llm": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-llm/-/dsh-llm-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-J6CR7lfZEDrYnmWbuN8m3Vso7pQYhBGeecT+uvF4jEsCbVeEXLNbqjOBFudlPR2BXZQI7DqG6uJ6I1doJpLIew==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-llm/-/dsh-llm-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-kIQoqnD6jN3Z2qQ+gd0TrIwkEDfUZAPC3kkTUUv2yQm1GeDjB7JULwT1vGAKTbEqOhOpVfKhdp4wItpG5PclfA==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-timeout": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-typert-protocol": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-util-crypto": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.1",
++        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-timeout": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-util-crypto": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2",
+         "@deepseek-ai/schemastery": "^3.18.2",
+         "zod": "^4.4.3"
+       },
+@@ -420,37 +431,37 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-ptc-runtime": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-ptc-runtime/-/dsh-ptc-runtime-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-gUaXOhZ77jYIVu/1lyJe6UeKXOyEIAoYC76d0+M0oMiufCLetOOaPyppkUBFRH95ILvc4ldX6Em46kfexMQnpQ==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-ptc-runtime/-/dsh-ptc-runtime-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-A5WjgPaEGqjzbe3Qq6Q4Dxh7FMmiki6beFEDmR9M64n6+g97eHPWF7jA7HRTEJ3rYD0kOno6bRWd84tngA5NWQ==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-sandbox": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-sandbox": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-sandbox": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-sandbox/-/dsh-sandbox-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-GLIJ5tdC08OO+3KKiv8jpHudtLO1nXvOXGw8VwCDzwl7AqG/O90xkvY/R2AkyFQ31CiCjywRQzkPdmlCm8Uf3w==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-sandbox/-/dsh-sandbox-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-WQ718npnJI1htC++wGxBll7iFlaOfgS1PpN+SoVzL39BcYuqp6zGP5CuLlxIIjz4uMs8bMbeQkk3MSl/mBV72g==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-sandbox-policy": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-sandbox-policy/-/dsh-sandbox-policy-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-mjGj+UIY9oQWv6lnG+s9bQ6VWqq4AfzZn8I269caIVG3UOk5/R4+M4r5gdpxsuEVQFlPrgnNydcb16NriRdbnA==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-sandbox-policy/-/dsh-sandbox-policy-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-yeLbgxCuCl5xUA1/eAzduBl82/WQuBNmNqYddMMNgSp79Vpb6YcvDY8Q0DC00Uaviz8rpPgQ91K60biU4p4FAQ==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+@@ -460,122 +471,122 @@
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-sandbox": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-sandbox": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-scope": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-scope/-/dsh-scope-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-InFGdrRr/o5Shn+8oOJz5/5njJh1h7YmZufXmSn0z+sjc/y684WHhvHqmES8Y2xieJ96e9VL8wNeiIQpaKce5A==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-scope/-/dsh-scope-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-nbh9kxekeiZPYVG2Up3ufJsDZRHrXaBqOGutERMBw1IfFjE8EXZReDQV9F8qP1hQKIF1xkxFcGaPcFPbxJwDAw==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session/-/dsh-session-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-IUdpUwIZaQIXNrgaYr0JAwAhUuhmjzzIgrg8Q8bSQM6fO+nYHIERF/MQZHnnon7wkibtyak+Nj8RKF82boQWIA==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session/-/dsh-session-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-WQNriZEQb0ykg+SDvqvNbp/AmG/DnydY5YdkTm5u3ST+PNXSQDLkaFzlY2YFU6hEuzs1h0yGCw6qPVpVGDAm1g==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-format": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format/-/dsh-session-format-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-h1LJ5A2Iq5aMG+RkCkAiEM19mvjqh3trdtTqkmcPFMVRGy2NmTGrc0jwqZmEvEZ/RxgkBCenvv7HseFG0g8JlA==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format/-/dsh-session-format-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-KM1VvrasXgi3Hs5Y1d2NhIVetUnP9wzaecghsXTsGH1NfZ12bYvMB5nmtVgqp2vYrnqZVn8IuOJHSR8AlBa7yQ==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-format-catalog": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-catalog/-/dsh-session-format-catalog-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-P/uurUDDleHlXaHB3alyKFAvIijyQ97RKxPqMowIsu7sWgePjG5wMDA4czyq8Mrie4a6MW42i+C6MZvVJKjWaA==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-catalog/-/dsh-session-format-catalog-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-+++F17ZVq1FaH/vMlAUfs2P0eQHvBpntrCbfTcjkUd6wt6bmgXwtLS3rJhtyOeZ/+9yaBg5kJF7nn2Rm3PdNDA==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-compaction-image-offload": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-format-v0-to-v1": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-format-v1-to-v2": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-format-v2-to-v3": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-compaction-image-offload": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-format-v0-to-v1": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-format-v1-to-v2": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-format-v2-to-v3": "^0.1.6-alpha.2"
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-format-v0-to-v1": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v0-to-v1/-/dsh-session-format-v0-to-v1-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-eMPzUo55bEHZpxsO6ya44/IYpSawTKIAcRF5GhSVw+mnIO6MbVp7xMWVvd7Y2yu+Bt6Dknhd2alNjsM3ury+FQ==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v0-to-v1/-/dsh-session-format-v0-to-v1-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-ICKbie7Db+FgjYkdUTx8gD0M4UjDMXdrvxIyIEbxggfG9s92bMEG9m6l9vd+yCeKWiguJNsL21fZfAAU8aeRcw==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-format-v1-to-v2": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v1-to-v2/-/dsh-session-format-v1-to-v2-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-PyG7UwWEuuVpiDdnG7AP6w55hxD0oYUZtP1eSH2NZOl6d2t++KyVoPjrgIGj6OHVimqsNiwVUAKEqac6xoKd7Q==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v1-to-v2/-/dsh-session-format-v1-to-v2-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-Gx4ucbohIyFsdtXvKofN8hBe1Wp7nL2L7BeUH9JA4U6k417MhFTCu7fx3cTEbGl7keVLz2vjnshjNqhhotpLbg==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-format-v0-to-v1": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-format-v0-to-v1": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-format-v2-to-v3": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v2-to-v3/-/dsh-session-format-v2-to-v3-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-ydCJhn9zZnKcGAl8VBPoskdV3bSIWe6kXFdolBanIty9XyZTPUqMORXzuo1xkIm6lo3+FzTmFZcN++s7gYlqfQ==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v2-to-v3/-/dsh-session-format-v2-to-v3-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-eLpl5/mBOBsF6iIUQgegr5wLx50BdST31fDPlf1FwelqTVcIPybQftsjrz2Ezb0JSVRscVwvh2gqI6Pn3Qb2IA==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-format-v0-to-v1": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-format-v1-to-v2": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-format-v0-to-v1": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-format-v1-to-v2": "^0.1.6-alpha.2"
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-projection": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-projection/-/dsh-session-projection-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-rvN5s2TTE/sRqePUoqUkWxhEpggNlbEm3xSBt+Hpxdn683kcYlKmyrVb4oKfc+Zk+7RSC6HmbiNrAlJLJxdJ4w==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-projection/-/dsh-session-projection-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-ig+XpRxv5N+gSpfy3IajvG5AlFm2UKfTKqqtem4DXwxCHIPoRbZnYWgwd/qFIl1bNNJHL6z1zjnOGGNeO640GA==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+@@ -584,28 +595,28 @@
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-query": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-query/-/dsh-session-query-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-FcR0RbT1/MFiiCov73AL/B9csiZLHdy8KdL819y/GjdPAmw4hBjm4dIFdiPxhPEy+o1JA7iwhdonuEw/QlkGzw==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-query/-/dsh-session-query-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-rB/Kss4VtN4H+MZx1n/nToppl95+0lihrnJw3cJqN8mRz9ytqcpHPhoQh7P6LQlM6R9nI5ou6XUr79hsDPkqog==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-session-format-catalog": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-session-format-catalog": "^0.1.6-alpha.2"
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-persistence": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-projection-cache": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-title": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-tool-todo": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-persistence": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-projection-cache": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-title": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-tool-todo": "^0.1.6-alpha.2"
+       },
+       "peerDependenciesMeta": {
+         "@deepseek-ai/dsh-session-persistence": {
+@@ -620,64 +631,64 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-title": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-title/-/dsh-session-title-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-BpvYnYsgl8eUNO4nS+LhcNoQ9Stnkoriww/XiYASQz+fNRZ1tP/VUmQUS9AwarGbL0uM4bnMEla73kBWdK/RuQ==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-title/-/dsh-session-title-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-NZnEDIAUBEn8CFYFtZ+vB7SruoCAaLrZ9Xhqpbl8e/6/glx3jm7ZOlwdwVh9FhM/69yfOgfscuT4a+mV4dqG7g==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2",
+         "@deepseek-ai/schemastery": "^3.18.2",
+         "zod": "^4.4.3"
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-settings": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-settings/-/dsh-settings-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-7Q5UG809Hf/zy1elrAF/EqqbDGFYCq3D+Yp5iOSWx0f1XfAEgWb2YZmiM1sBHVYvrQf8UvNWeY9sDvM1DffjgQ==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-settings/-/dsh-settings-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-ty9zaulN2ceHJHahQ+D42fIpFCOxluY+AFVWJbkMJukdFcZEiWGucRxDwmgsoUt8ob/pkRnk0BBCTG0TI/FdIQ==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.1",
++        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+         "@deepseek-ai/schemastery": "^3.18.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-skill": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-skill/-/dsh-skill-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-Rkx2HKkj4/QfIHNgZU8rq2FsRiuPVrY94ouH7eNOYJ5jK7OrPlqotXupMocdLD91TVPhZykq8uVGS/uMZZxhVg==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-skill/-/dsh-skill-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-Ycq+5JrKDd1gU3KErnra6s6mL5qaXGdJX66+A9085M6JxSCBMqsb/Fhgh2nnk/D5vV6p7XSE8CEYPISMtXo/TA==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2",
+         "@deepseek-ai/schemastery": "^3.18.2"
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-system-prompt": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-system-prompt/-/dsh-system-prompt-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-Lc+udg/vuacydI9CnOC9syc762nkIm/SarqdcJf4YAXT257u4BMYD05JNS+B06VhXT3vfwOTaXyyt0TJ9Qi7zA==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-system-prompt/-/dsh-system-prompt-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-nP+gpLPy4S1c8Rv3uZpmYB6J7gnMBwmehYWd/3oqPTWtcezj0L5opFkdfzrCrwEQLPgnTRgmr99OnBaJy2vZSQ==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+@@ -685,15 +696,15 @@
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-timeout": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-timeout/-/dsh-timeout-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-RuDwOyXm68OsIqj/DVx1zXQLIArrubrkYRbpOxbBmNQQ5WCEVxGDvAXQPUd2ULw4RJo0tIBx0nqQ85kkKRrQew==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-timeout/-/dsh-timeout-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-Hdcv+GMyfJVENm7CFEjztwbpDfsND10HZ+Q/9Nnw5UqlCkyQd8alhW+I2xIDTZQVvlDnRcu6l8ix1k2OOmiFSA==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+@@ -701,9 +712,9 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-tool-todo": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tool-todo/-/dsh-tool-todo-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-RvZ5AQd38leOJBl7HNHuywklL6Ypal3TP2a3jMvGCiccbjYREjWJdhlHFRHLNnNyer5nKTyhlHLSqZSpilnxkg==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tool-todo/-/dsh-tool-todo-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-iPQW6ahvKzDKwTrPUNb0qqZ2Gxzp2hfT9yErIdTPVMyh/njBeT0Zv/PML0Iul5uieYhr8lFqksNlvphXMfyMzQ==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+@@ -713,43 +724,43 @@
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-tools": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-tools": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-tools": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tools/-/dsh-tools-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-kMVU8nZvM9jaam60FH9px2m/vcvXCcuSdZNf3fhZ1N/5mjbdhXLm5CGaNV8QaDlrYjpV8L/wop8TO3LaDuufqA==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tools/-/dsh-tools-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-twRy/AffES124neGEpDLHjOTgcmWi8HtisTdTIm1b144LdEUBfU604A5N65muE+GfECDzyDKK/jJeLGuosMx2w==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.1",
++        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2",
+         "@deepseek-ai/schemastery": "^3.18.2"
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-ptc-runtime": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-sandbox": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-sandbox-policy": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-user-approval": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-ptc-runtime": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-sandbox": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-sandbox-policy": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-user-approval": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-typert-protocol": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-typert-protocol/-/dsh-typert-protocol-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-szYjrNvmlLMcR+3dDTAP+2sTqVy0MvRWkJeA1Y5CzT//HiimNDB7+q6WZX1jZ3m2ZyIfHQqfsnUVZ+PXIYHCyw==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-typert-protocol/-/dsh-typert-protocol-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-rC0XtllnwXXr+956y5r9E1CQIe/BA7AoNVZVW3+4srF7i4BoH90j64g4c3U+KsNLFC4dCOufNJ15kXKrMLMauQ==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+@@ -757,9 +768,9 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-user-approval": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-user-approval/-/dsh-user-approval-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-0jpco20Iq8x4kDSCxXZEF2LwthCIxkzt9ewJfTF1qrGUDDOKb6smPHnR6EnLjL4oBzieT57MGIyADaCL3wjzOQ==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-user-approval/-/dsh-user-approval-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-PMV8LOBoO3xwXpxDHBhh7PHHSqxHCn8YmzTMeGA2VNCSsL4e4KHLuVMUKyhpsny6KdP8Y2GjBHaKg2ZxLuEbnA==",
+       "dev": true,
+       "license": "MIT",
+       "peer": true,
+@@ -768,19 +779,19 @@
+       },
+       "peerDependencies": {
+         "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.1",
+-        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.1"
++        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-util-crypto": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-crypto/-/dsh-util-crypto-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-sNr5pLIajPOT9cOn61QfEsWYCBme47DFRajL3OTiOxrd7L4Ch+HgPUunUolofFNjq37gXave6/2+dcsv3L3BnA==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-crypto/-/dsh-util-crypto-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-Jn+3w5pp+rBOSFekvtNWQAx2+M08ZxJmlVYn7OI6l5Gd9ISq4/T0v4yE07O9s7uU5zr7yZ9nq5CTUpcXCrBrxw==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+@@ -788,9 +799,9 @@
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-util-values": {
+-      "version": "0.1.6-alpha.1",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.6-alpha.1.tgz",
+-      "integrity": "sha512-YtF7+XmWKY7E48ozmPEXTJT+Wn8HN4MPytY+MRoySsPRAJJp09/68oo/dKcOND+ZEWUZiJN8KJUrBcTB3VSm2Q==",
++      "version": "0.1.6-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.6-alpha.2.tgz",
++      "integrity": "sha512-9p+4ffFjq7OIeYqvHlIhKs85MZrirdu9QYi+vknOwkgszZXAgoRbPnX0ZzhsTneFSqQgLEfBXtUHUtOI1iiB/Q==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+@@ -1331,9 +1342,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1376,9 +1384,9 @@
+       }
+     },
+     "node_modules/@quansync/fs": {
+-      "version": "1.0.0",
+-      "resolved": "https://registry.npmjs.org/@quansync/fs/-/fs-1.0.0.tgz",
+-      "integrity": "sha512-4TJ3DFtlf1L5LDMaM6CanJ/0lckGNtJcMjQ1NAV6zDmA0tEHKZtxNKin8EgPaVX1YzljbxckyT2tJrpQKAtngQ==",
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@quansync/fs/-/fs-1.1.0.tgz",
++      "integrity": "sha512-qAPG/t3HqML1TlN7sY/pTbEjzFVAKsMjNNMGheyDosro+kT4iw2KCUoHcVdmliwWjorm4elZbgNQyU2eD97eDg==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+@@ -1481,9 +1489,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1501,9 +1506,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1521,9 +1523,6 @@
+         "ppc64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1541,9 +1540,6 @@
+         "s390x"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1561,9 +1557,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1581,9 +1574,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1762,9 +1752,6 @@
+         "arm"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1779,9 +1766,6 @@
+         "arm"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1796,9 +1780,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1813,9 +1794,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1830,9 +1808,6 @@
+         "loong64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1847,9 +1822,6 @@
+         "loong64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1864,9 +1836,6 @@
+         "ppc64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1881,9 +1850,6 @@
+         "ppc64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1898,9 +1864,6 @@
+         "riscv64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1915,9 +1878,6 @@
+         "riscv64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1932,9 +1892,6 @@
+         "s390x"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1949,9 +1906,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1966,9 +1920,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -2117,9 +2068,9 @@
+       "license": "MIT"
+     },
+     "node_modules/@types/node": {
+-      "version": "22.20.2",
+-      "resolved": "https://registry.npmjs.org/@types/node/-/node-22.20.2.tgz",
+-      "integrity": "sha512-xlvWf4Vs9n1PEVYwP1n4vvG07M6y8WgvJ2t0vbrWTmijsIHp1cS+uJ2kMIRdY3nHZK0nCYKrPeD171+SzF4/zw==",
++      "version": "22.20.3",
++      "resolved": "https://registry.npmjs.org/@types/node/-/node-22.20.3.tgz",
++      "integrity": "sha512-DZmzkmwHzXrLPAXPyKNDzlIwMMUZCVacoD25ywdy5YTKGbOx/2ld+Q38Im2zJ0vBuZP5Prd3VZutKZyXwkOS8A==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+@@ -2659,9 +2610,9 @@
+       }
+     },
+     "node_modules/hookable": {
+-      "version": "6.1.1",
+-      "resolved": "https://registry.npmjs.org/hookable/-/hookable-6.1.1.tgz",
+-      "integrity": "sha512-U9LYDy1CwhMCnprUfeAZWZGByVbhd54hwepegYTK7Pi5NvqEj63ifz5z+xukznehT7i6NIZRu89Ay1AZmRsLEQ==",
++      "version": "6.1.2",
++      "resolved": "https://registry.npmjs.org/hookable/-/hookable-6.1.2.tgz",
++      "integrity": "sha512-+abwxtiEA52GCVIsQqut3S/uKTbUwYIp4Pe/vv+6py5XiXBCqMZHg6pA6Y5qhgLSEys0/cYuPbO0z1QFj5ZCmg==",
+       "dev": true,
+       "license": "MIT"
+     },
+@@ -2677,9 +2628,9 @@
+       }
+     },
+     "node_modules/import-without-cache": {
+-      "version": "0.4.0",
+-      "resolved": "https://registry.npmjs.org/import-without-cache/-/import-without-cache-0.4.0.tgz",
+-      "integrity": "sha512-NkJQA7oZ4YHQhd2+H3BoRFKF3d/XNsiKpHZCQEMH9pDX27hQQLsTyOocyRgaIVtf8gHX3Nt3LPkR4e5EdtPAGQ==",
++      "version": "0.4.1",
++      "resolved": "https://registry.npmjs.org/import-without-cache/-/import-without-cache-0.4.1.tgz",
++      "integrity": "sha512-vXoV9PjKHEednCUu01e98TkImxy67e3BJXbTIOmIq4Hyzw3IAwYRcuPkfeTzJzwyyts4kjuA73x+pWJLc4f86A==",
+       "dev": true,
+       "license": "MIT",
+       "engines": {
+@@ -2874,9 +2825,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -2898,9 +2846,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -2922,9 +2867,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -2946,9 +2888,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+diff --git a/package.json b/package.json
+index b8556f3..2b0256f 100644
+--- a/package.json
++++ b/package.json
+@@ -61,19 +61,7 @@
+     ],
+     "compatibility": {
+       "dshVersions": [
+-        "0.1.0-rc.7",
+-        "0.1.1-rc.2",
+-        "0.1.2-alpha.2",
+-        "0.1.2-alpha.3",
+-        "0.1.2-alpha.4",
+-        "0.1.2-alpha.5",
+-        "0.1.2-rc.1",
+-        "0.1.3-alpha.2",
+-        "0.1.5-alpha.1",
+-        "0.1.5-alpha.2",
+-        "0.1.5-rc.1",
+-        "0.1.5-rc.2",
+-        "0.1.6-alpha.1"
++        "0.1.6-alpha.2"
+       ]
+     },
+     "capability": {
+@@ -95,19 +83,19 @@
+   },
+   "peerDependencies": {
+     "@deepseek-ai/cordis": "^4.0.1 || ^4.0.2",
+-    "@deepseek-ai/dsh-client-connection": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-locale": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-runtime": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-store": ">=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-ui-settings": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-ui-slots": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-    "@deepseek-ai/dsh-host-webserver": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-    "@deepseek-ai/dsh-session": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-    "@deepseek-ai/dsh-session-query": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-    "@deepseek-ai/dsh-settings": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-    "@deepseek-ai/dsh-skill": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
+-    "@deepseek-ai/dsh-system-prompt": ">=0.1.0-rc.7 <0.2.0-0 || >=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-alpha.2 <0.2.0-0 || >=0.1.2-alpha.3 <0.2.0-0 || >=0.1.2-alpha.4 <0.2.0-0 || >=0.1.2-alpha.5 <0.2.0-0 || >=0.1.2-rc.1 <0.2.0-0 || >=0.1.3-alpha.2 <0.2.0-0 || >=0.1.5-alpha.1 <0.2.0-0 || >=0.1.5-alpha.2 <0.2.0-0 || >=0.1.5-rc.1 <0.2.0-0 || >=0.1.5-rc.2 <0.2.0-0 || >=0.1.6-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-client-connection": ">=0.1.6-alpha.2 <0.2.0-0",
++    "@deepseek-ai/dsh-client-locale": ">=0.1.6-alpha.2 <0.2.0-0",
++    "@deepseek-ai/dsh-client-runtime": ">=0.1.6-alpha.2 <0.2.0-0",
++    "@deepseek-ai/dsh-client-store": ">=0.1.6-alpha.2 <0.2.0-0",
++    "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.1.6-alpha.2 <0.2.0-0",
++    "@deepseek-ai/dsh-client-ui-settings": ">=0.1.6-alpha.2 <0.2.0-0",
++    "@deepseek-ai/dsh-client-ui-slots": ">=0.1.6-alpha.2 <0.2.0-0",
++    "@deepseek-ai/dsh-host-webserver": ">=0.1.6-alpha.2 <0.2.0-0",
++    "@deepseek-ai/dsh-session": ">=0.1.6-alpha.2 <0.2.0-0",
++    "@deepseek-ai/dsh-session-query": ">=0.1.6-alpha.2 <0.2.0-0",
++    "@deepseek-ai/dsh-settings": ">=0.1.6-alpha.2 <0.2.0-0",
++    "@deepseek-ai/dsh-skill": ">=0.1.6-alpha.2 <0.2.0-0",
++    "@deepseek-ai/dsh-system-prompt": ">=0.1.6-alpha.2 <0.2.0-0",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+   },
+@@ -121,19 +109,20 @@
+   },
+   "devDependencies": {
+     "@deepseek-ai/cordis": "^4.0.2",
+-    "@deepseek-ai/dsh-client-connection": "^0.1.6-alpha.1",
+-    "@deepseek-ai/dsh-client-locale": "^0.1.6-alpha.1",
+-    "@deepseek-ai/dsh-client-store": "^0.1.6-alpha.1",
+-    "@deepseek-ai/dsh-client-ui-input-trigger": "^0.1.6-alpha.1",
+-    "@deepseek-ai/dsh-client-ui-settings": "^0.1.6-alpha.1",
+-    "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.6-alpha.1",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.6-alpha.1",
+-    "@deepseek-ai/dsh-host-webserver": "^0.1.6-alpha.1",
+-    "@deepseek-ai/dsh-session": "^0.1.6-alpha.1",
+-    "@deepseek-ai/dsh-session-query": "^0.1.6-alpha.1",
+-    "@deepseek-ai/dsh-settings": "^0.1.6-alpha.1",
+-    "@deepseek-ai/dsh-skill": "^0.1.6-alpha.1",
+-    "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.1",
++    "@deepseek-ai/dsh-client-connection": "^0.1.6-alpha.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.6-alpha.2",
++    "@deepseek-ai/dsh-client-store": "^0.1.6-alpha.2",
++    "@deepseek-ai/dsh-client-ui-input-trigger": "^0.1.6-alpha.2",
++    "@deepseek-ai/dsh-client-ui-plugin-manager": "^0.1.6-alpha.2",
++    "@deepseek-ai/dsh-client-ui-settings": "^0.1.6-alpha.2",
++    "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.6-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.6-alpha.2",
++    "@deepseek-ai/dsh-host-webserver": "^0.1.6-alpha.2",
++    "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
++    "@deepseek-ai/dsh-session-query": "^0.1.6-alpha.2",
++    "@deepseek-ai/dsh-settings": "^0.1.6-alpha.2",
++    "@deepseek-ai/dsh-skill": "^0.1.6-alpha.2",
++    "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2",
+     "@types/js-yaml": "^4.0.9",
+     "@types/node": "^22.20.0",
+     "@types/react": "~18.3.1",
+diff --git a/src/client/SkillHubSettingsCard.tsx b/src/client/SkillHubSettingsCard.tsx
+index 14e3be2..e915c68 100644
+--- a/src/client/SkillHubSettingsCard.tsx
++++ b/src/client/SkillHubSettingsCard.tsx
+@@ -2,8 +2,10 @@
+  * The dsh-skill-hub plugin settings card: bridges the hub's settings
+  * namespace (bound through the official settings transport) onto the
+  * family-style staged card form (enabled master switch + agent announcement).
+- * Registered into the official `settings.plugin.item` slot keyed by that
+- * namespace, so the plugin shows up in Settings → 插件 on dsh rc.7+.
++ * Registered into `plugins.bundle.config` under the bundle's package name, so
++ * the Plugins manager renders it on dsh-skill-hub's own page. That slot is
++ * dispatched with `view: 'page'` only, so the card always renders its full
++ * form (no `summary` one-liner variant).
+  */
+ 
+ import { useEffect, useState, type ReactElement } from 'react'
+@@ -54,7 +56,7 @@ export interface SkillHubSettingsCardFace {
+ 
+ /** Props the slot renderer binds (locale copy + injected form actions). */
+ export type SkillHubSettingsCardProps =
+-  PropsRuntime<'settings.plugin.item'> & PropsLocale<'dsh-skill-hub'> & InjectFace<SkillHubSettingsCardFace>
++  PropsRuntime<'plugins.bundle.config'> & PropsLocale<'dsh-skill-hub'> & InjectFace<SkillHubSettingsCardFace>
+ 
+ /** Bridges the hub's config scope onto the card's staged form. */
+ export class SkillHubSettingsCardController {
+diff --git a/src/client/icons.tsx b/src/client/icons.tsx
+index 8ce8b81..0ee54b9 100644
+--- a/src/client/icons.tsx
++++ b/src/client/icons.tsx
+@@ -2,11 +2,10 @@
+  * Vendored UI icons for dsh-skill-hub.
+  *
+  * These were originally imported from `@deepseek-ai/dsh-client-ui-primitives`.
+- * That package is still published for the rc.7/rc.2 SDK families, but newer dsh
+- * web builds no longer expose it as a standalone plugin module — they keep a
+- * static compatibility module instead. Vendoring the few tiny outline icons the
+- * hub uses makes the browser half self-contained and equally compatible with
+- * older and newer dsh hosts.
++ * That package is not exposed as a standalone plugin module by the dsh web
++ * build this plugin targets — dsh keeps a static compatibility module instead.
++ * Vendoring the few tiny outline icons the hub uses keeps the browser half
++ * self-contained and independent of how that module is packaged.
+  *
+  * SVG paths are copied verbatim from dsh-client-ui-primitives (MIT licensed)
+  * so the visuals remain pixel-identical to the dsh icon family.
+diff --git a/src/client/index.tsx b/src/client/index.tsx
+index 4a84f99..45232e2 100644
+--- a/src/client/index.tsx
++++ b/src/client/index.tsx
+@@ -4,12 +4,13 @@
+  *
+  * Registers the dsh-skill-hub locale dictionaries and mounts two Settings
+  * surfaces, both through official slots (no DOM injection):
+- *  - a plugin-management card in the `settings.plugin.item` slot (Settings →
+- *    插件 → 可配置插件列表), keyed by the hub's settings namespace and bound
+- *    through the official settings transport (dsh rc.7 serves every
+- *    registered namespace to the web client, and the tab dispatches cards by
+- *    namespace) — the family-bucket card pattern (PluginSettingsCard +
+- *    CardForm vendored from dsh-task-board);
++ *  - a plugin-management card in the `plugins.bundle.config` slot, keyed by the
++ *    bundle package name, rendered on the plugin's own page in the Plugins
++ *    manager (sidebar → 插件 → dsh-skill-hub), bound through the official
++ *    settings transport (the Host serves every registered namespace to the web
++ *    client, and the manager dispatches that key with `view: 'page'`) — the
++ *    family-bucket card pattern (PluginSettingsCard + CardForm vendored from
++ *    dsh-task-board);
+  *  - a top-level Settings section (Settings → 技能) hosting the skill hub
+  *    panel: catalog, search, enable/disable, diagnostics, new-skill form.
+  *
+@@ -29,14 +30,15 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
+ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+ // Type-only: pulls the LocaleNamespaceMap merge table.
+ import type {} from '@deepseek-ai/dsh-client-ui-slots'
+-// Type-only: pulls the settings-plugins SlotMap merge (settings.plugin.item).
+-import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
+ // Type-only: pulls the Context merge for ctx.inputTriggers (slash-dots wiring).
+ import type {} from '@deepseek-ai/dsh-client-ui-input-trigger/client'
++// Type-only: pulls the plugin-manager SlotMap merge (plugins.bundle.config).
++import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
+ // Type-only: pulls the connection/reset event.
+ import type {} from '@deepseek-ai/dsh-client-connection/client'
+ 
+-// 0.1.2-alpha.2: slots service moved to ui-renderer; provide local augmentation for build.
++// The slots service is owned by ui-renderer, which this build does not depend
++// on; augment the Context locally so the browser half typechecks.
+ declare module '@deepseek-ai/cordis' {
+   interface Context {
+     slots: any
+@@ -83,10 +85,10 @@ export function apply(ctx: ClientContext): void {
+   const t = ctx.locale.bind(NS)
+   const api = new SkillHubApi()
+ 
+-  // The card edits the hub's settings namespace through the official
+-  // settings transport — the configurable-plugins tab only dispatches cards
+-  // whose key the Host serves, and the Host serves every registered namespace
+-  // since rc.7, so this is what makes the card appear (and stay in sync).
++  // The card edits the hub's settings namespace through the official settings
++  // transport: the Plugins manager dispatches the card by the bundle package
++  // name, and the Host serves every registered namespace — that pairing is
++  // what makes the card appear (and stay in sync).
+   // Single scope instance reused for both the card and slash-dots to avoid
+   // duplicate subscriptions (review #3).
+   const scope = ctx.settingsScope.bind<HubSettingsValue>({ namespace: NS })
+@@ -96,17 +98,18 @@ export function apply(ctx: ClientContext): void {
+   // inject 含 inputTriggers 保证 fiber 就绪后再 wrap，slash-dots 内的 undefined 防御仅用于单元测试 mock
+   ctx.effect(() => setupSkillSlashDots(ctx, api, scope), 'dsh-skill-hub: slash dots')
+ 
+-  // Plugin-management card: Settings → 插件 → 可配置插件列表.
+-  // rc.7's slot contract declares this keyed slot with options `key`
+-  // (the settings namespace the card edits), so registration is fully typed.
++  // Plugin configuration: the hub renders its own form on the bundle's page in
++  // the Plugins manager (sidebar → 插件 → dsh-skill-hub), keyed by the bundle's
++  // package name — the manager dispatches that key with `view: 'page'`.
++  // No extra settings tab is contributed.
+   ctx.effect(
+-    () => ctx.slots.inject('settings.plugin.item', () => ctx.slots.register({
+-      name: 'settings.plugin.item',
+-      key: NS,
++    () => ctx.slots.inject('plugins.bundle.config', () => ctx.slots.register({
++      name: 'plugins.bundle.config',
++      key: 'dsh-skill-hub',
+       locale: NS,
+       inject: () => settingsCard.inject(),
+     }, SkillHubSettingsCard)),
+-    'dsh-skill-hub: settings card',
++    'dsh-skill-hub: plugin config',
+   )
+ 
+   // Top-level Settings section: the skill management page.
+diff --git a/src/client/slash-dots.test.ts b/src/client/slash-dots.test.ts
+index 96eba41..f6431ea 100644
+--- a/src/client/slash-dots.test.ts
++++ b/src/client/slash-dots.test.ts
+@@ -1,8 +1,10 @@
+ /**
+  * Slash-menu skill dots: source lookup + candidates wrapping. The wrapper's
+  * contract is pure and injectable — fake api (catalog) and fake settings scope
+- * (getSnapshot), no DOM — so it tests cleanly in the node vitest environment.
+- * The module caches the catalog map; resetModelCache keeps tests independent.
++ * (getSnapshot) — so it tests cleanly in the node vitest environment. The dot
++ * itself is injected into the rendered DOM, which does not exist here, so these
++ * tests assert that candidate rows pass through untouched. The module caches
++ * the catalog map; resetModelCache keeps tests independent.
+  */
+ 
+ import { beforeEach, describe, expect, it } from 'vitest'
+@@ -85,11 +87,10 @@ describe('findSkillSource', () => {
+ })
+ 
+ describe('wrapSkillSource', () => {
+-  it('adds a model-colored dot to model-callable skills and a user-colored dot to user-only ones (old host, no drilled)', async () => {
++  it('leaves candidate rows untouched — the dot goes to the DOM, not the icon slot', async () => {
+     const source = skillSource(async () => [
+       { name: 'code-review', description: 'review code' },
+       { name: 'personal-note', description: 'only me' },
+-      { name: 'known-default', description: 'fallback unknown' },
+     ])
+     const api = apiWith([
+       { name: 'code-review', modelInvocable: true },
+@@ -99,16 +100,13 @@ describe('wrapSkillSource', () => {
+ 
+     const restore = wrapSkillSource(source, api, scope)
+     try {
+-      // Old host: CandidateRequest 无 drilled 字段，注入彩色点
+-      const rows = await source.candidates({ sessionId: 's1' as never }, { query: '', position: 'leading', signal: new AbortController().signal } as unknown as import('@deepseek-ai/dsh-client-ui-input-trigger/client').CandidateRequest)
+-
+-      expect(rows).toHaveLength(3)
+-      // Model-callable → model color.
+-      expect((rows[0].icon as unknown as { props: { style: { background: string } } }).props.style.background).toBe('#112233')
+-      // User-only → user color.
+-      expect((rows[1].icon as unknown as { props: { style: { background: string } } }).props.style.background).toBe('#445566')
+-      // Unknown name → model default (still a dot, safer than no dot).
+-      expect(rows[2].icon).toBeDefined()
++      const rows = await source.candidates({ sessionId: 's1' as never }, { query: '', position: 'leading', drilled: false, signal: new AbortController().signal })
++
++      expect(rows).toHaveLength(2)
++      // MenuView renders `icon` through ReferenceIcon (enum-narrowed), so a
++      // custom element would never show — rows must carry no icon at all.
++      expect(rows[0].icon).toBeUndefined()
++      expect(rows[1].icon).toBeUndefined()
+       // Original fields pass through untouched.
+       expect(rows[0].name).toBe('code-review')
+       expect(rows[0].description).toBe('review code')
+@@ -117,33 +115,18 @@ describe('wrapSkillSource', () => {
+     }
+   })
+ 
+-  it('falls back to the default colors when settings omit them and catalog fails (old host)', async () => {
++  it('still returns the rows when the catalog route is down', async () => {
+     const source = skillSource(async () => [{ name: 'lonely', description: '' }])
+     const api = { catalog: async () => { throw new Error('route down') } } as unknown as SkillHubApi
+     const scope = scopeWith({ enabled: true, announceToAgent: true, showUseCount: true, showUseTime: true, showGroupSummary: true })
+ 
+-    const restore = wrapSkillSource(source, api, scope)
+-    try {
+-      const rows = await source.candidates({ sessionId: 's1' as never }, { query: '', position: 'leading', signal: new AbortController().signal } as unknown as import('@deepseek-ai/dsh-client-ui-input-trigger/client').CandidateRequest)
+-      // Catalog failed → unknown name → model default dot still renders.
+-      expect(rows[0].icon).toBeDefined()
+-      expect((rows[0].icon as unknown as { props: { style: { background: string } } }).props.style.background).toBe('#2f81f7')
+-    } finally {
+-      restore()
+-    }
+-  })
+-
+-  it('skips dot injection on new host (alpha.2, drilled present) for ReferenceIcon compat', async () => {
+-    const source = skillSource(async () => [{ name: 'code-review', description: 'review code' }])
+-    const api = apiWith([{ name: 'code-review', modelInvocable: true }])
+-    const scope = scopeWith({ enabled: true, announceToAgent: true, showUseCount: true, showUseTime: true, showGroupSummary: true, dotModelColor: '#112233', dotUserColor: '#445566' })
+-
+     const restore = wrapSkillSource(source, api, scope)
+     try {
+       const rows = await source.candidates({ sessionId: 's1' as never }, { query: '', position: 'leading', drilled: false, signal: new AbortController().signal })
++      // A failed catalog only means no dots (unknown names are skipped); the
++      // menu itself must keep working.
+       expect(rows).toHaveLength(1)
+-      expect(rows[0].icon).toBeUndefined()
+-      expect(rows[0].name).toBe('code-review')
++      expect(rows[0].name).toBe('lonely')
+     } finally {
+       restore()
+     }
+diff --git a/src/client/slash-dots.tsx b/src/client/slash-dots.tsx
+index 866b4a0..ad04642 100644
+--- a/src/client/slash-dots.tsx
++++ b/src/client/slash-dots.tsx
+@@ -2,14 +2,15 @@
+  * Slash-menu skill dots: puts the invocation-status dot (model-callable blue /
+  * user-only green) in front of every skill candidate in the chat `/` menu.
+  *
+- * Mechanism (mirrors how dsh-at-file fills the menu icon slot): the candidate
+- * menu's rows already render an optional `icon` slot (`MenuView` renders
+- * `item.icon` in a 16×16 leading span when it's defined), but the core `/skill`
+- * source (`dsh-client-ui-skill`) returns candidates without `icon`. This module
+- * wraps that source's `candidates` and stamps each row with a colored dot,
+- * reusing the same settings (dotModelColor / dotUserColor) and the same
+- * `modelInvocable` classification the panel legend uses — so the chat menu and
+- * the Settings → 技能 panel stay in sync, and editing the color updates both.
++ * Mechanism: hooks the `/skill` source's `candidates` so the hub learns which
++ * rows are skill candidates and how each one classifies for model invocation,
++ * then injects the dot straight into the rendered option rows. The menu's
++ * `icon` slot is unusable for this — `MenuView` narrowed `icon` to an enum
++ * ('file' | 'folder' | 'session') and renders it through `ReferenceIcon`, so a
++ * custom element never reaches the DOM. Colors come from the same settings
++ * (dotModelColor / dotUserColor) and the same `modelInvocable` classification
++ * the panel legend uses — so the chat menu and the Settings → 技能 panel stay
++ * in sync, and editing the color updates both.
+  *
+  * The skill source is registered by the core plugin under the `name` "skill"
+  * on the `/` trigger; re-registering the same name would throw, so this wraps
+@@ -24,8 +25,7 @@ import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+ import type {} from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+ // Type-only: pulls the connection/reset event.
+ import type {} from '@deepseek-ai/dsh-client-connection/client'
+-import type { InputTriggerCandidate, InputTriggerServiceContract, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+-import { createElement } from 'react'
++import type { InputTriggerServiceContract, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+ import type { HubSettingsValue } from '../protocol.ts'
+ import type { SkillHubApi } from './api.ts'
+ import { DEFAULT_DOT_MODEL_COLOR, DEFAULT_DOT_USER_COLOR } from './panel/format.ts'
+@@ -92,37 +92,11 @@ async function modelInvocableMap(api: SkillHubApi): Promise<Map<string, boolean>
+ }
+ 
+ /**
+- * One menu-row dot element. Inline span so it needs no CSS module; the
+- * candidate menu centers it inside its 16×16 leading icon slot.
+- * @param color - the dot's background color.
+- * @returns a React node (memory-only, never crosses the Host boundary).
+- */
+-function dotIcon(color: string): InputTriggerCandidate['icon'] {
+-  return createElement('span', {
+-    'aria-hidden': true,
+-    style: {
+-      display: 'inline-block',
+-      width: 6,
+-      height: 6,
+-      borderRadius: 3,
+-      background: color,
+-      flex: 'none',
+-    },
+-  }) as unknown as InputTriggerCandidate['icon']
+-}
+-
+-/**
+- * Wrap the core skill source so every menu row carries the invocation dot.
+- * Exported for unit tests; production wiring goes through setupSkillSlashDots.
+- * @param source - the registered `/skill` source.
+- * @param api - hub browser API for the modelInvocable lookup.
+- * @param scope - hub settings scope for the dot colors.
+- * @returns a disposer restoring the original candidates.
+- */
+-/**
+- * DOM 兜底：在 alpha.2 新版 MenuView（icon 仅枚举）下通过直接操作
+- * 已渲染的 `[role="option"]` 列表注入彩色点，绕过 `icon` 限制。
+- * 旧版仍走 `icon` 注入，此处仅为新版。
++ * 通过直接操作已渲染的 `[role="option"]` 列表注入彩色点，
++ * 绕过 MenuView 对 `icon` 的枚举限制。
++ * @param modelByName - 技能名 → 模型可调用性；不在表内的候选不注点。
++ * @param modelColor - 模型可调用技能的点色。
++ * @param userColor - 仅用户可调用技能的点色。
+  */
+ function injectDotsViaDOM(modelByName: Map<string, boolean>, modelColor: string, userColor: string): void {
+   if (typeof document === 'undefined' || typeof requestAnimationFrame === 'undefined') return
+@@ -145,7 +119,7 @@ function injectDotsViaDOM(modelByName: Map<string, boolean>, modelColor: string,
+       // 仅对技能生效：非技能候选（/command、@file 等）不在 catalog，不注点
+       if (!modelByName.has(name)) continue
+       const color = (modelByName.get(name) ?? true) ? modelColor : userColor
+-      // 复刻旧版 icon 槽：16×16 容器居中 6px 点，与升级前 `dotIcon` 在 `itemIcon` 内的效果一致
++      // 布局对齐菜单行原有的 icon 槽：16×16 容器居中 6px 点
+       const wrapper = document.createElement('span')
+       wrapper.setAttribute('data-skill-dot', '')
+       wrapper.setAttribute('aria-hidden', 'true')
+@@ -163,37 +137,33 @@ function injectDotsViaDOM(modelByName: Map<string, boolean>, modelColor: string,
+       dot.style.background = color
+       dot.style.flex = 'none'
+       wrapper.appendChild(dot)
+-      // 新版无 icon 槽，直接插在名称前，与旧版 `itemIcon` 位置一致
++      // 直接插在名称前，与菜单行原有 icon 槽的位置一致
+       nameEl.parentElement?.insertBefore(wrapper, nameEl)
+     }
+   }
+   requestAnimationFrame(() => setTimeout(run, 0))
+ }
+ 
++/**
++ * Wrap the core skill source so every menu row carries the invocation dot.
++ * Exported for unit tests; production wiring goes through setupSkillSlashDots.
++ * @param source - the registered `/skill` source.
++ * @param api - hub browser API for the modelInvocable lookup.
++ * @param scope - hub settings scope for the dot colors.
++ * @returns a disposer restoring the original candidates.
++ */
+ export function wrapSkillSource(source: InputTriggerSource, api: SkillHubApi, scope: SettingsScope<HubSettingsValue>): () => void {
+   const original = source.candidates
+   source.candidates = async (session, req) => {
+     const items = await original(session, req)
+     if (req.signal.aborted) return items
+-    // Dual-compat: 0.1.2-alpha.2 的 MenuView 将 icon 收窄为 'file'|'folder'|'session'
+-    // 并通过 ReferenceIcon 渲染，旧版的自定义 ReactElement 点已无法展示。
+-    // 以 `drilled` 是否存在探测新版（alpha.2 必有，rc 无）。
+-    const isNewHost = req !== null && typeof req === 'object' && 'drilled' in (req as unknown as Record<string, unknown>)
+     const modelByName = await modelInvocableMap(api)
+     if (req.signal.aborted) return items
+     const snapshot = scope.getSnapshot()
+     const modelColor = snapshot.value?.dotModelColor ?? DEFAULT_DOT_MODEL_COLOR
+     const userColor = snapshot.value?.dotUserColor ?? DEFAULT_DOT_USER_COLOR
+-    if (isNewHost) {
+-      // 新版：不通过 icon（枚举限制），改为 DOM 注入
+-      injectDotsViaDOM(modelByName, modelColor, userColor)
+-      return items
+-    }
+-    // 旧版：保持原有 icon 注入
+-    return items.map((item) => ({
+-      ...item,
+-      icon: dotIcon((modelByName.get(item.name) ?? true) ? modelColor : userColor),
+-    }))
++    injectDotsViaDOM(modelByName, modelColor, userColor)
++    return items
+   }
+   return () => {
+     source.candidates = original
+diff --git a/src/index.ts b/src/index.ts
+index 1f6162f..b991eb9 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -62,11 +62,10 @@ export const Config: z<Config> = z.object({
+ })
+ 
+ /**
+- * Settings namespace hosting the hub's runtime config. Since dsh rc.7 the
+- * host serves every registered settings namespace to the web client (the
+- * dsh-host-apiproxy allowlist is gone), so the browser card and the settings
+- * page edit this namespace through the official settings transport, and the
+- * plugin consumes the same resolved value — one source of truth.
++ * Settings namespace hosting the hub's runtime config. The host serves every
++ * registered settings namespace to the web client, so the browser card and the
++ * settings page edit this namespace through the official settings transport,
++ * and the plugin consumes the same resolved value — one source of truth.
+  */
+ export const CONFIG_NAMESPACE = 'dsh-skill-hub' as SettingsNamespace
+ 
+@@ -89,8 +88,8 @@ const SECTION_ORDER = 152
+ 
+ /** Model-facing announcement: plugin presence, capabilities, and limits. */
+ export const SKILL_HUB_GUIDANCE = [
+-  '本机已安装 dsh-skill-hub 插件（DSH Web GUI 技能中枢）：设置 →「技能」分区为管理主页；设置 → 插件列表中有本插件的配置卡片（启用/公告开关）。能力：完整本地技能目录（项目/自定义/用户/内置全部来源，走官方 ctx.skills 注册表，含第三方 provider）；按来源与自定义分组浏览，分组/来源头部的滑动开关可一键启用/禁用整组（跨组冲突时询问）；市场：内置市场目录（精选仓库一键添加）加自定义仓库源，扫描后勾选安装，每个市场源行显示已装/可更新/上游已删数量，支持「检查全部」与「全部更新」；来源跟踪：从 GitHub 仓库（市场源或直接地址）导入的技能记录上游 repo/commit 快照，可检查更新、选择同步、上游删除时跟进删除（移入回收站可恢复，恢复后保留来源与场景归属）；个人技能（无来源记录）不跟踪；调用次数与最近使用时间统计；查看技能正文；发现诊断；新建技能向导（写入 ~/.dsh/skills 或 ~/.agents/skills）。限制：仅用户级技能（user-dsh/user-agents 根目录）可写，项目/内置/运行时技能只读展示；路由仅回环可访问。用户提到「技能管理 / 技能列表 / 技能开关 / 技能同步 / 技能市场 / 更新技能 / 新建技能」时即指本插件，请据此协作。',
+-  'The dsh-skill-hub plugin is installed (the DSH Web GUI skill hub): Settings → "Skills" is the management page; Settings → Plugins lists this plugin\'s configuration card (enable / announcement toggles). Capabilities: full local skill catalog (project / custom / user / bundled roots via the official ctx.skills registry, including third-party providers); browsing by source and custom groups, each group header carrying a sliding switch to enable/disable the whole group in one click (cross-group conflicts prompt the user); market: a built-in catalog of curated repos (one-click add) plus custom repo sources, scan-and-install import, per-source installed / updatable / deleted-upstream badges with "check all" and "update all" actions; upstream source tracking: skills imported from GitHub repos (market sources or direct URLs) record the repo/commit snapshot, support update checks, selective sync, and follow-up deletion when the upstream removes a skill (moves it into a restorable trash; restoring keeps the source and scene membership); personal skills (no source record) are never tracked; invocation counts and last-used times; skill body inspection; discovery diagnostics; new-skill wizard (writes to ~/.dsh/skills or ~/.agents/skills). Limits: only user-level skills (user-dsh/user-agents roots) are writable; project/bundled/runtime skills are read-only; routes are loopback-only. When the user mentions "skill management / skill list / skill toggle / skill sync / skill market / update skills / new skill", this plugin is what they mean — collaborate accordingly.'
++  '本机已安装 dsh-skill-hub 插件（DSH Web GUI 技能中枢）：设置 →「技能」分区为管理主页；本插件的配置卡片（启用/公告开关）在插件管理页——侧边栏「插件」→ 本插件。能力：完整本地技能目录（项目/自定义/用户/内置全部来源，走官方 ctx.skills 注册表，含第三方 provider）；按来源与自定义分组浏览，分组/来源头部的滑动开关可一键启用/禁用整组（跨组冲突时询问）；市场：内置市场目录（精选仓库一键添加）加自定义仓库源，扫描后勾选安装，每个市场源行显示已装/可更新/上游已删数量，支持「检查全部」与「全部更新」；来源跟踪：从 GitHub 仓库（市场源或直接地址）导入的技能记录上游 repo/commit 快照，可检查更新、选择同步、上游删除时跟进删除（移入回收站可恢复，恢复后保留来源与场景归属）；个人技能（无来源记录）不跟踪；调用次数与最近使用时间统计；查看技能正文；发现诊断；新建技能向导（写入 ~/.dsh/skills 或 ~/.agents/skills）。限制：仅用户级技能（user-dsh/user-agents 根目录）可写，项目/内置/运行时技能只读展示；路由仅回环可访问。用户提到「技能管理 / 技能列表 / 技能开关 / 技能同步 / 技能市场 / 更新技能 / 新建技能」时即指本插件，请据此协作。',
++  'The dsh-skill-hub plugin is installed (the DSH Web GUI skill hub): Settings → "Skills" is the management page; the plugin\'s configuration card (enable / announcement toggles) lives on its own page in the Plugins manager (sidebar → 插件 → the plugin). Capabilities: full local skill catalog (project / custom / user / bundled roots via the official ctx.skills registry, including third-party providers); browsing by source and custom groups, each group header carrying a sliding switch to enable/disable the whole group in one click (cross-group conflicts prompt the user); market: a built-in catalog of curated repos (one-click add) plus custom repo sources, scan-and-install import, per-source installed / updatable / deleted-upstream badges with "check all" and "update all" actions; upstream source tracking: skills imported from GitHub repos (market sources or direct URLs) record the repo/commit snapshot, support update checks, selective sync, and follow-up deletion when the upstream removes a skill (moves it into a restorable trash; restoring keeps the source and scene membership); personal skills (no source record) are never tracked; invocation counts and last-used times; skill body inspection; discovery diagnostics; new-skill wizard (writes to ~/.dsh/skills or ~/.agents/skills). Limits: only user-level skills (user-dsh/user-agents roots) are writable; project/bundled/runtime skills are read-only; routes are loopback-only. When the user mentions "skill management / skill list / skill toggle / skill sync / skill market / update skills / new skill", this plugin is what they mean — collaborate accordingly.'
+ ].join('\n\n')
+ 
+ /**
+@@ -99,12 +98,11 @@ export const SKILL_HUB_GUIDANCE = [
+  * @param config - resolved plugin config (schema defaults applied by the loader).
+  */
+ export function apply(ctx: Context, config?: Config): void {
+-  // The hub's runtime configuration lives in dsh's own settings service:
+-  // since rc.7 the host serves every registered settings namespace to the
+-  // web client (dsh-host-apiproxy's allowlist is gone), so the browser card
+-  // and the config route edit this namespace through the official settings
+-  // transport, and the host consumes the very same resolved value — one
+-  // source of truth. The cordis composition entry seeds the base layer; the
++  // The hub's runtime configuration lives in dsh's own settings service: the
++  // host serves every registered settings namespace to the web client, so the
++  // browser card and the config route edit this namespace through the official
++  // settings transport, and the host consumes the very same resolved value —
++  // one source of truth. The cordis composition entry seeds the base layer; the
+   // sidecar config survives only as a one-time migration source below.
+   const base = config ?? {}
+   const settingsScope = ctx.settings.register(CONFIG_NAMESPACE, HubSettingsSchema, { base })
+diff --git a/tsdown.config.ts b/tsdown.config.ts
+index b3b18ef..add5097 100644
+--- a/tsdown.config.ts
++++ b/tsdown.config.ts
+@@ -27,9 +27,9 @@ const ID = 'dsh-skill-hub'
+  * shared/web-platform.ts): the only specifiers the browser loader can
+  * answer. Everything else must inline.
+  *
+- * Dual-compat: `dsh-client-store` 是 0.1.2-alpha.2 新增（原先在
+- * dsh-client-runtime），为兼容旧版（0.1.0-rc.7 / 0.1.1-rc.2）将其打包进
+- * 本插件，而非走外部加载；新版主机上同样可用，旧版主机不会 404。
++ * `@deepseek-ai/dsh-client-store` is deliberately NOT in this table: the
++ * loader does not answer it, so the client bundle inlines it (see noExternal
++ * below) rather than requiring it at runtime.
+  */
+ const PLATFORM_MODULES = [
+   'react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@deepseek-ai/cordis',
+@@ -38,11 +38,8 @@ const PLATFORM_MODULES = [
+   '@deepseek-ai/dsh-client-schema-form',
+ ] as const
+ 
+-/** 已打包，无需外部豁免；保留空数组以兼容旧配置注释。 */
+-const RUNTIME_STORE_EXEMPTION: readonly string[] = []
+-
+ /** Externals resolved from the loader module table. */
+-const CLIENT_EXTERNALS: readonly string[] = [...PLATFORM_MODULES, ...RUNTIME_STORE_EXEMPTION]
++const CLIENT_EXTERNALS: readonly string[] = [...PLATFORM_MODULES]
+ 
+ /**
+  * Virtual-id wrapper keeping module CSS away from tsdown's own css pipeline

@@ -1,0 +1,391 @@
+/**
+ * Sending the vault to the remote.
+ *
+ * The rules this implements are the ones the user decided on 2026-09-20:
+ * **only credential bodies travel encrypted** (they are ciphertext on disk
+ * already), everything else goes up as it is; a conflict is settled by writing
+ * what is newer; and the layout is `sync/items/<id>.json` plus
+ * `sync/attachments/<id>` under the configured directory — one file per object,
+ * so "increment" is "whatever got touched since last time".
+ *
+ * Deliberately *not* here yet: deleting remote objects for records the user
+ * emptied out of the bin, and merging what other devices pushed. Those are the
+ * next two steps; this one only ever adds and overwrites.
+ */
+
+import type { AttachmentStore, FileAttachmentRef, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import type { Context } from '@deepseek-ai/cordis'
+
+import type { PushResult } from '../../shared/panel-wire.js'
+import { CATEGORY_LABELS, KIND_LABELS } from '../../shared/vocabulary.js'
+import type { Attachment, Item } from '../vault/spec.js'
+import type { Vault } from '../vault/vault.js'
+import { remoteWriter, syncRoot } from './writer.js'
+
+/** What one write to the remote looks like, whichever protocol is configured. */
+type Writer = (path: string, bytes: Uint8Array, contentType: string) => Promise<void>
+
+/** The `AttachmentStore` reference shapes the store's own read methods want. */
+function imageRef(record: Attachment): ImageAttachmentRef {
+  return {
+    attachmentId: record.storeId as ImageAttachmentRef['attachmentId'],
+    mediaType: record.mime as ImageAttachmentRef['mediaType'],
+    bytes: record.bytes,
+    width: record.width ?? 0,
+    height: record.height ?? 0,
+    ...(record.filename === undefined ? {} : { name: record.filename }),
+  }
+}
+
+function fileRef(record: Attachment): FileAttachmentRef {
+  return {
+    attachmentId: record.storeId as FileAttachmentRef['attachmentId'],
+    name: record.filename ?? 'file',
+    bytes: record.bytes,
+  }
+}
+
+/** The bytes of one attachment, whichever lane it was stored on. */
+async function bytesOf(
+  attachments: AttachmentStore,
+  record: Attachment,
+): Promise<Uint8Array | undefined> {
+  try {
+    if (record.mime.startsWith('image/')) {
+      return (await attachments.readImage(imageRef(record))).data
+    }
+    const chunks: Uint8Array[] = []
+    for await (const chunk of attachments.readFileStream(fileRef(record))) chunks.push(chunk)
+    const total = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0)
+    const joined = new Uint8Array(total)
+    let at = 0
+    for (const chunk of chunks) {
+      joined.set(chunk, at)
+      at += chunk.byteLength
+    }
+    return joined
+  } catch {
+    // A record can reference bytes this host does not hold (pulled elsewhere,
+    // or a store that cannot hand them out). The record still syncs; its bytes
+    // are reported as skipped rather than failing the whole push.
+    return undefined
+  }
+}
+
+/** The JSON one record becomes on the remote. */
+function packItem(item: Item): Uint8Array {
+  return new TextEncoder().encode(
+    JSON.stringify({ format: 'dsh-inbox-item/1', record: item }, undefined, 0),
+  )
+}
+
+/** Suffix per media type, so a stored object is recognisable outside this plugin. */
+const EXTENSIONS: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'video/mp4': 'mp4',
+  'video/quicktime': 'mov',
+  'audio/mpeg': 'mp3',
+  'audio/mp4': 'm4a',
+  'application/pdf': 'pdf',
+  'text/plain': 'txt',
+  'application/json': 'json',
+}
+
+/**
+ * The suffix one attachment should carry.
+ *
+ * The file's *own* name wins when it has one: a `报税表.xlsx` knows what it is
+ * far better than any table here does, and guessing from the media type would
+ * hand back `bin` for every format nobody thought to list. The table is the
+ * fallback, and `bin` the last resort — a name that says "unknown" rather than a
+ * name that lies.
+ *
+ * @param filename - the name the file arrived with, when there is one.
+ * @param mime - its media type.
+ * @returns the extension without the dot.
+ */
+export function extensionOf(filename: string | undefined, mime: string): string {
+  const fromName = /\.([A-Za-z0-9]{1,8})$/.exec(filename ?? '')?.[1]
+  if (fromName !== undefined) return fromName.toLowerCase()
+  return EXTENSIONS[mime.toLowerCase()] ?? 'bin'
+}
+
+/**
+ * The object name one attachment gets on the remote.
+ *
+ * `<our id>.<extension>`: the id keeps it unique and idempotent, the extension
+ * keeps it *readable* — a cloud drive with a folder full of extension-less files
+ * cannot preview a photo, cannot open it, and cannot tell you which one is which.
+ * The user asked exactly that question ("我的图片呢？都是 json 文件？"), and a bare
+ * id was the whole reason.
+ *
+ * @param attachmentId - our row id for the attachment.
+ * @param record - the attachment row, for its own name and media type.
+ * @returns the file name to PUT.
+ */
+export function attachmentObjectName(attachmentId: string, record: Pick<Attachment, 'mime' | 'filename'>): string {
+  return `${attachmentId}.${extensionOf(record.filename, record.mime)}`
+}
+
+/** The metadata a pulling device needs to re-create the record's attachment row. */
+function packAttachment(record: Attachment): Uint8Array {
+  return new TextEncoder().encode(
+    JSON.stringify(
+      {
+        format: 'dsh-inbox-attachment/1',
+        attachment: {
+          id: record.id,
+          mime: record.mime,
+          bytes: record.bytes,
+          // Part of the row, and a domain that reads without it refuses to open
+          // at all — the merge learned that the hard way.
+          createdAt: record.createdAt,
+          ...(record.filename === undefined ? {} : { filename: record.filename }),
+          ...(record.width === undefined ? {} : { width: record.width }),
+          ...(record.height === undefined ? {} : { height: record.height }),
+          ...(record.sha256 === undefined ? {} : { sha256: record.sha256 }),
+        },
+      },
+      undefined,
+      0,
+    ),
+  )
+}
+
+/** `2026-09-20 13:20` in local time, for a file a person reads. */
+function readableTime(iso: string): string {
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return iso
+  const pad = (value: number): string => String(value).padStart(2, '0')
+  return `${String(at.getFullYear())}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`
+}
+
+/**
+ * The record as a text file a person can open in the cloud drive.
+ *
+ * The JSON beside it is the source of truth — this is a **view**, regenerated on
+ * every push and never read back. It exists because a bucket full of
+ * `{"format":"dsh-inbox-item/1",…}` is a bucket you cannot *use*: you cannot read
+ * the article you saved, you cannot see which photo belongs to which record, and
+ * you cannot tell a note from a link without a JSON viewer.
+ *
+ * A credential's body is the one thing it never contains: it is ciphertext on
+ * this machine and it stays ciphertext on the remote, so the text file says so
+ * instead of pretending the record is empty.
+ *
+ * @param item - the record.
+ * @param attachmentNames - the remote names of its attachments, in order.
+ * @returns the file's text.
+ */
+export function renderItemText(item: Item, attachmentNames: readonly string[]): string {
+  const heading = item.title ?? item.linkTitle ?? item.url ?? (item.category === 'secret' ? '密钥 / 账密' : '（无标题）')
+  const lines: string[] = [heading, '='.repeat(Math.min(40, Math.max(6, heading.length))), '']
+
+  lines.push(`类目：${CATEGORY_LABELS[item.category]}　类型：${KIND_LABELS[item.kind]}　来源：${item.source}`)
+  lines.push(`存入：${readableTime(item.createdAt)}${item.updatedAt === item.createdAt ? '' : `　更新：${readableTime(item.updatedAt)}`}`)
+  if (item.platform !== undefined) lines.push(`平台：${item.platform}`)
+  if (item.tags.length > 0) lines.push(`标签：${item.tags.map((tag) => `#${tag}`).join(' ')}`)
+  if (item.watchLater === true) lines.push('待看：是')
+  if (item.deletedAt !== undefined) lines.push(`回收站：是（${readableTime(item.deletedAt)} 删除）`)
+  if (item.url !== undefined) lines.push(`链接：${item.url}`)
+  if (item.linkTitle !== undefined && item.linkTitle !== heading) lines.push(`页面标题：${item.linkTitle}`)
+  if (attachmentNames.length > 0) {
+    lines.push('附件：')
+    for (const name of attachmentNames) lines.push(`  - ${name}`)
+  }
+  lines.push('')
+
+  if (item.note !== undefined && item.note.length > 0) {
+    lines.push('备注', '----', item.note, '')
+  }
+
+  if (item.category === 'secret') {
+    lines.push('正文', '----', '（加密。需要主密码在本机解锁后才能读到正文；密钥与密码永不随同步上传。）')
+  } else if (item.text !== undefined && item.text.length > 0) {
+    lines.push('正文', '----', item.text)
+  }
+
+  return `${lines.join('\n').trimEnd()}\n`
+}
+
+/**
+ * Push everything that changed since the last push.
+ *
+ * @param ctx - host context carrying settings and credentials.
+ * @param vault - the open vault.
+ * @param attachments - where attachment bytes live.
+ * @returns what happened, including the reasons a caller can show.
+ */
+export async function pushRemote(
+  ctx: Context,
+  vault: Vault,
+  attachments: AttachmentStore | undefined,
+  /** `all` ignores the cursor and sends everything again — the repair button. */
+  options: { all?: boolean } = {},
+): Promise<PushResult> {
+  if (attachments === undefined) return failed('这个组合里没有附件仓库，附件没法上传')
+  const connection = await remoteWriter(ctx)
+  if (connection.status === 'unconfigured') return unconfigured(connection.reason)
+  if (connection.status === 'failed') return failed(connection.reason)
+  return pushOnce(
+    vault,
+    attachments,
+    connection.writer.write,
+    connection.root,
+    options,
+    connection.writer.remove,
+  )
+}
+
+/**
+ * The push itself, with the transport injected.
+ *
+ * Split out the same way the pull is (`pullOnce` behind `pullRemote`), and for
+ * the same reason: the interesting rules — what counts as "changed", what
+ * happens when one write of twenty fails, that an attachment is uploaded once
+ * however many records point at it — are worth testing without a server.
+ *
+ * @param vault - the open vault.
+ * @param attachments - where attachment bytes live.
+ * @param writer - one write to the remote.
+ * @param basePath - the sync root inside the configured directory.
+ * @param options - `all` re-sends records the cursor thinks are already up.
+ * @param remover - optional: clears the pre-extension attachment name (see the
+ *   call site), something only a real remote can answer.
+ * @returns what happened.
+ */
+export async function pushOnce(
+  vault: Vault,
+  attachments: AttachmentStore,
+  writer: Writer,
+  basePath: string,
+  options: { all?: boolean } = {},
+  remover?: (path: string) => Promise<void>,
+): Promise<PushResult> {
+  const lastPushAt = options.all === true ? undefined : vault.global.sync.lastPushAt
+  const items = vault.list({ includeDeleted: true })
+  let pushed = 0
+  let attachmentCount = 0
+  let skipped = 0
+  const failures: string[] = []
+
+  // Attachments are pushed once per push, however many records reference them:
+  // the store is content-addressed, so the same bytes are the same object.
+  const seenAttachments = new Set<string>()
+
+  for (const item of items) {
+    // A record the user has since emptied out of the bin is gone from the
+    // domain, but not from the remote — that deletion is the next step.
+    if (lastPushAt !== undefined && item.updatedAt <= lastPushAt) {
+      skipped += 1
+      continue
+    }
+    try {
+      await writer(`${basePath}/items/${item.id}.json`, packItem(item), 'application/json')
+      pushed += 1
+    } catch (error) {
+      failures.push(`记录 ${item.id}：${reasonOf(error)}`)
+      continue
+    }
+
+    /*
+      The attachment objects first, so the text file can name them: the point of
+      that file is that a person opening the bucket can see which photo belongs
+      to which record.
+    */
+    const attachmentNames: string[] = []
+    for (const attachmentId of item.attachmentIds) {
+      if (seenAttachments.has(attachmentId)) continue
+      seenAttachments.add(attachmentId)
+      const record = vault.getAttachment(attachmentId)
+      if (record === undefined) continue
+      const objectName = attachmentObjectName(attachmentId, record)
+      attachmentNames.push(`attachments/${objectName}（${record.mime}，${String(record.bytes)} 字节${record.filename === undefined ? '' : `，原名 ${record.filename}`}）`)
+      const bytes = await bytesOf(attachments, record)
+      if (bytes === undefined) {
+        failures.push(`附件 ${attachmentId}：本机拿不到字节`)
+        continue
+      }
+      try {
+        await writer(`${basePath}/attachments/${objectName}`, bytes, record.mime)
+        // The row travels beside the bytes: without the original name, the
+        // intrinsic size and the digest, another device could download the file
+        // but never rebuild the record that points at it.
+        await writer(
+          `${basePath}/attachments/${attachmentId}.meta.json`,
+          packAttachment(record),
+          'application/json',
+        )
+        /*
+          And one blind DELETE of the name this attachment used to have.
+
+          Before 2026-09-20 the object was `<id>` with no extension; those two
+          files are still sitting in the user's bucket, and nothing else will
+          ever remove them (a sweep would have to guess, and guessing deletes
+          another device's objects). We know this id is ours and we know we no
+          longer write that name, so asking for it to be gone is exact.
+        */
+        try {
+          await remover?.(`${basePath}/attachments/${attachmentId}`)
+        } catch {
+          // A remote that refuses the delete is not a reason to fail the push.
+        }
+        attachmentCount += 1
+      } catch (error) {
+        failures.push(`附件 ${attachmentId}：${reasonOf(error)}`)
+      }
+    }
+
+    /*
+      And the record itself, in a form a person can open.
+
+      Written after the bytes so it can name them, and written even when the
+      record has no text: a text file saying "类目：图片 / 附件：…" is how you find
+      out which of two photos belongs to which record without a JSON viewer.
+    */
+    try {
+      await writer(
+        `${basePath}/items/${item.id}.txt`,
+        new TextEncoder().encode(renderItemText(item, attachmentNames)),
+        'text/plain; charset=utf-8',
+      )
+    } catch (error) {
+      failures.push(`记录 ${item.id}（文本视图）：${reasonOf(error)}`)
+    }
+  }
+
+  const now = new Date().toISOString()
+  if (pushed > 0 || attachmentCount > 0) await vault.setSync({ ...vault.global.sync, lastPushAt: now })
+
+  return {
+    status: failures.length === 0 ? 'ok' : pushed + attachmentCount === 0 ? 'failed' : 'partial',
+    pushed,
+    attachments: attachmentCount,
+    skipped,
+    listed: items.length,
+    lastPushAt: now,
+    ...(failures.length === 0 ? {} : { reason: failures.slice(0, 3).join('；') }),
+  }
+}
+
+function failed(reason: string): PushResult {
+  return {
+    status: 'failed',
+    reason,
+    pushed: 0,
+    attachments: 0,
+    skipped: 0,
+    listed: 0,
+  }
+}
+
+function unconfigured(reason: string): PushResult {
+  return { ...failed(reason), status: 'unconfigured' }
+}
+
+function reasonOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}

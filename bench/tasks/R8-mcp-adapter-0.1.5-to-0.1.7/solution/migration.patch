@@ -1,0 +1,2535 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 9072e07..bfda8fa 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,30 @@ All notable changes to this project are documented in this file.
+ 
+ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+ 
++## [Unreleased]
++
++### Fixed
++
++- The Host entry no longer dies on start with `Error: cannot get property "config" without inject`. v0.4.0 read the Adapter's Loader-entry Config from `ctx.config`, but cordis 4 has no `config` service or accessor — the context proxy refuses any property the plugin did not declare in `inject`, so every DSH start that mounted the `mcp-adapter` entry threw inside `createMcpConfigScope` and the Adapter never came up. The validated Config is the second `apply` argument (`apply(ctx, config)`, the shape the shipped DSH plugins use), and its volatile fields are references the Loader commits through in place, so the scope stays live for the whole activation. `createMcpConfigScope(ctx, config)` now takes it explicitly; `test/settings.test.js` pins the contract against a real cordis fiber and its fakes refuse a `config` context property the way the proxy does. [ADR 0010](docs/adr/0010-loader-entry-config-model.md) records the correction.
++
++## [v0.4.0] - 2026-09-27
++
++### Added
++
++- One-time legacy import: after the Loader settles on DSH 0.1.7, a still-untouched `mcp-adapter` entry adopts the legacy `mcp:` section of the profile's `settings.yaml` (validated, then written through the settings service once, with a `mcp-adapter.legacy-imported` marker in the profile home so clearing every Server never resurrects the old list). Failures warn with manual copy instructions and never throw. `test/legacy-import.test.js`.
++
++### Changed
++
++- **Breaking: DSH 0.1.7 only.** The settings model the Adapter was built on is gone in 0.1.7 — `ctx.settings.register(namespace, schema)` was replaced by profile Loader-entry Config — and carrying the old generations alongside it would have meant two parallel settings subsystems, so support drops to DSH `0.1.7-rc.1` and newer (peer `@deepseek-ai/dsh-settings` `^0.1.7-rc.1`, `@deepseek-ai/schemastery` `^3.18.4`; stay on v0.3.x for older harnesses). The host half now exports `Config` with `mcpServers` and `skillInstall` marked volatile, reads live values off `ctx.config` (committed without a fiber restart via `loader/volatile-update`), and writes through `ctx.settings`; `createMcpConfigScope` keeps the `{ get, watch, update, mutate }` surface all consumers use. The settings namespace identity is the Loader entry id: `mcp-adapter` (was `mcp`). `src/host/index.js`, [ADR 0010](docs/adr/0010-loader-entry-config-model.md).
++- The client reads the entry through the `configForms` service (`configForms.get('mcp-adapter')` plus the shared `describe()` mirror) instead of the removed `settingsScope`; the `settings.section` page, the `remote.settings` positional wire, and its `{ ok, value | error }` envelope are unchanged. An entry whose mirrored value fails the schema now shows an explicit invalid state instead of a permanent spinner.
++- Cross-field validation moved from before-persist (the removed settings provider hook) to Host consumption: a Config section that passes schemastery but violates the transport rules serves no Servers with one deduplicated warning, so hand-edited profile Config cannot brick the manager.
++- `test/client-apply.test.js` collapses to a single 0.1.7 generation fake pinning the `mcp-adapter` entry id on the wire.
++
++### Removed
++
++- The DSH 0.1.1-rc.2 `connection.api.settings` client fallback, the 0.1.2/0.1.5 generation fakes, and the dead `@deepseek-ai/dsh-client-runtime` entry (last published for 0.1.1) from `dsh.client.inject`.
++- The `installMcpSettings` export (replaced by `createMcpConfigScope`); the nav-icon patch script now targets 0.1.7's renamed `*Medium` icon members with `IconLinkOutlineMedium` as the default.
++
+ ## [v0.3.0] - 2026-09-13
+ 
+ ### Changed
+diff --git a/CONTEXT.md b/CONTEXT.md
+index c7cfb28..f312835 100644
+--- a/CONTEXT.md
++++ b/CONTEXT.md
+@@ -29,9 +29,13 @@ A per-server toggle that lets that server's tool calls run without asking the us
+ _Avoid_: trust, bypass, whitelist
+ 
+ **Config**:
+-The standard `mcpServers`-shaped JSON stored in the adapter's DSH settings namespace, editable in Settings > MCP. Global: one list for every DSH session.
++The standard `mcpServers`-shaped JSON stored as the Adapter's profile Loader-entry Config (entry id `mcp-adapter`), editable in Settings > MCP. Global: one list for every DSH session.
+ _Avoid_: manifest, registry file
+ 
++**Entry Config**:
++The DSH 0.1.7 configuration model: a plugin's `Config` schema validated by the cordis Loader and handed to the plugin's `apply` as its second argument — cordis has no `config` service, so `ctx.config` is not readable — persisted in the profile composition. Fields marked volatile are edited live through the settings forms and commit into the running plugin's references without a restart.
++_Avoid_: settings namespace, settings document
++
+ **Lazy Lifecycle**:
+ The connection policy: a server connects on first use and disconnects after an idle timeout. Opposite of eager connect at startup.
+ _Avoid_: on-demand boot, cold start
+diff --git a/README.md b/README.md
+index 79636ae..ff404fe 100644
+--- a/README.md
++++ b/README.md
+@@ -6,7 +6,7 @@
+ 
+ DSH plugin connecting the agent to MCP servers through one mcp proxy tool and a Settings > MCP page.
+ 
+-A [Deepseek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) plugin that mirrors the major features of [pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter): one token-efficient `mcp` proxy tool over every configured server, optional per-tool promotion to native DSH tools, and configurable Server lifecycles (`lazy` by default). Servers are added and configured in the DSH web UI under **Settings > MCP**; configuration persists in the DSH settings document (`$DSH_HOME/settings.yaml`, namespace `mcp`).
++A [Deepseek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) plugin that mirrors the major features of [pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter): one token-efficient `mcp` proxy tool over every configured server, optional per-tool promotion to native DSH tools, and configurable Server lifecycles (`lazy` by default). Servers are added and configured in the DSH web UI under **Settings > MCP**; configuration persists as the Adapter's DSH profile entry config (entry `mcp-adapter`).
+ 
+ Vocabulary lives in [CONTEXT.md](./CONTEXT.md). Design decisions live in [docs/adr/](./docs/adr/). Work is tracked as [GitHub issues](https://github.com/auggie246/dsh-mcp-adapter/issues), and released changes are listed in [CHANGELOG.md](./CHANGELOG.md).
+ 
+@@ -50,7 +50,7 @@ Vocabulary lives in [CONTEXT.md](./CONTEXT.md). Design decisions live in [docs/a
+ 
+ [pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter) established a workflow for driving many MCP servers from one agent: a single token-efficient proxy tool, lazy connections, and per-tool promotion. This plugin brings that workflow to [Deepseek Harness](https://github.com/deepseek-ai/deepseek-harness) natively.
+ 
+-Server Config is stored in the Adapter's `mcp` namespace of the DSH settings service (persisted to `$DSH_HOME/settings.yaml`, hot-reloaded, revision-fenced) rather than pi-mcp-adapter's layered `.mcp.json` files, while still adopting the standard `mcpServers`-shaped JSON so configs paste over from pi, Claude Desktop, Cursor, or VS Code. See [ADR 0002](./docs/adr/0002-config-in-dsh-settings-namespace.md) for the reasoning. The v1 end-to-end verification lives in [docs/verification/v1-e2e.md](./docs/verification/v1-e2e.md).
++Server Config is stored as the Adapter's DSH Loader-entry Config (the `Config` schema the host module exports, persisted in the active profile composition, hot-reloaded through volatile updates, revision-fenced) rather than pi-mcp-adapter's layered `.mcp.json` files, while still adopting the standard `mcpServers`-shaped JSON so configs paste over from pi, Claude Desktop, Cursor, or VS Code. See [ADR 0010](./docs/adr/0010-loader-entry-config-model.md) for the reasoning. The v1 end-to-end verification lives in [docs/verification/v1-e2e.md](./docs/verification/v1-e2e.md).
+ 
+ ## Install
+ 
+@@ -66,11 +66,10 @@ Then restart DSH. The Settings panel (`⌘,` / sidebar foot) gains an **MCP** se
+ 
+ | DSH release | Support |
+ | --- | --- |
+-| 0.1.2-rc.1 and newer 0.1.x | Supported. Settings writes go through the typed `remote.settings` face mounted by the `@deepseek-ai/dsh-api-remotes` client bundle. |
+-| 0.1.1-rc.2 | Supported. The client falls back to the legacy `connection.api.settings` face when its module applies. |
+-| Anything else | Unsupported. The client fails with an explicit "No DSH settings write API" error instead of a crash. |
++| 0.1.7-rc.1 and newer 0.1.x | Supported. Configuration is the plugin's Loader-entry Config: the Host reads the validated Config cordis passes to `apply` (there is no `ctx.config`) plus its live-committed volatile updates, writes go through the settings service, and the page reads the `configForms` service and writes through the `remote.settings` face mounted by the `@deepseek-ai/dsh-api-remotes` client bundle. |
++| Older 0.1.x | Unsupported. Those releases require the registered-namespace settings model this plugin used through v0.3.x; upgrade DSH or stay on that release line. |
+ 
+-Both generations run the same host seam: the peer dependency accepts `@deepseek-ai/dsh-settings` `^0.1.1-rc.2 || ^0.1.2-rc.1 || ^0.1.5-rc.1`, and the Settings page, commands, and tools behave identically on either. The Adapter picks the right face when its client module applies. See [ADR 0009](./docs/adr/0009-dual-generation-settings-api.md).
++Upgrading from v0.3.x on DSH 0.1.7: at the first start after the upgrade, the Adapter imports the legacy `mcp:` section of the profile's `settings.yaml` into the `mcp-adapter` entry once. A `mcp-adapter.legacy-imported` marker records the import; anything the import refuses to accept (for example an invalid section) stays in `settings.yaml.imported` and a Host warning names the manual copy path. See [ADR 0010](./docs/adr/0010-loader-entry-config-model.md).
+ 
+ ### Local development
+ 
+@@ -113,37 +112,40 @@ The Host registers three human commands. A bare `/mcp` or `/mcp status` prints o
+ 
+ ### Config
+ 
+-The Host registers one live DSH settings namespace, `mcp`. Its user layer lives under `mcp:` in `$DSH_HOME/settings.yaml`; the Settings > MCP page owns normal edits.
++The Adapter's global Config is its DSH Loader-entry Config: the `Config` schema the host module exports, persisted in the active profile composition and validated when the entry loads. The Settings > MCP page owns normal edits; for manual edits the entry looks like this in the profile's patch layer:
+ 
+ ```yaml
+-mcp:
+-  mcpServers:
+-    filesystem:
+-      command: npx
+-      args: [-y, "@modelcontextprotocol/server-filesystem", /workspace]
+-      autoAllow: false
+-    hosted:
+-      url: https://mcp.example.com/api
+-      headers:
+-        Authorization: Bearer example-token
+-    github:
+-      url: https://mcp.example.com/other
+-      auth: oauth
+-      scopes: [repo, read:org]
+-  skillInstall: file
++# cordis.patch.yml — the mcp-adapter entry's config
++- id: mcp-adapter
++  name: "@auggieteo/dsh-mcp-adapter"
++  config:
++    mcpServers:
++      filesystem:
++        command: npx
++        args: [-y, "@modelcontextprotocol/server-filesystem", /workspace]
++        autoAllow: false
++      hosted:
++        url: https://mcp.example.com/api
++        headers:
++          Authorization: Bearer example-token
++      github:
++        url: https://mcp.example.com/other
++        auth: oauth
++        scopes: [repo, read:org]
++    skillInstall: file
+ ```
+ 
+ Each Server configures exactly one Transport: `command` for stdio, or `url` for streamable HTTP with SSE fallback. Adapter extension fields are `auth` (`headers` by default, or `oauth` for HTTP Servers), `scopes` (OAuth scopes, requires `auth: oauth`), `disabled`, `autoAllow`, `lifecycle` (`lazy`, `eager`, `keep-alive`, or `lazy-keep-alive`; default `lazy`), `idleTimeoutMinutes` (default `10`), and `promotedTools`.
+ 
+ The one top-level Adapter field is `skillInstall` (`file` by default, `runtime`, or `off`); see [Agent skill](#agent-skill).
+ 
+-The schema rejects unknown fields and invalid transport combinations before they reach `$DSH_HOME/settings.yaml`. Each `env` and `headers` value has the DSH `secret` schema role. Wire views retain each key and redact its value.
++Schemastery validates the shape when the entry loads, and the Adapter enforces the full rule set — unknown fields, transport exclusivity, scope and lifecycle sanity — every time it serves the Config: a section that fails validation serves no Servers with one Host warning, never a partially applied or bricked configuration. Each `env` and `headers` value has the DSH `secret` schema role. Wire views retain each key and redact its value.
+ 
+ #### Workspace Config layer
+ 
+-The Host also reads `.dsh/mcp.json` under its workspace root and merges it over the global namespace at resolve time. A workspace Server entry with the same name replaces the global entry wholesale; workspace-only names are added; global-only names pass through. Disable or override a Server from the workspace by defining it there with `disabled: true`.
++The Host also reads `.dsh/mcp.json` under its workspace root and merges it over the global entry Config at resolve time. A workspace Server entry with the same name replaces the global entry wholesale; workspace-only names are added; global-only names pass through. Disable or override a Server from the workspace by defining it there with `disabled: true`.
+ 
+-The workspace file uses the same `mcpServers` shape and validation as the global Config. Unknown top-level keys (only `mcpServers` is allowed) or an invalid Server entry reject the whole layer, which fails closed to the global-only Config with a Host warning; a missing file is an empty layer. Values are never environment-variable-interpolated. The Adapter never writes the workspace file: page edits, imports, and API writes all stay on the global namespace, which the workspace file overrides. See [ADR 0005](./docs/adr/0005-per-workspace-config.md).
++The workspace file uses the same `mcpServers` shape and validation as the global Config. Unknown top-level keys (only `mcpServers` is allowed) or an invalid Server entry reject the whole layer, which fails closed to the global-only Config with a Host warning; a missing file is an empty layer. Values are never environment-variable-interpolated. The Adapter never writes the workspace file: page edits, imports, and API writes all stay on the global entry Config, which the workspace file overrides. See [ADR 0005](./docs/adr/0005-per-workspace-config.md).
+ 
+ ### Settings page
+ 
+@@ -153,7 +155,7 @@ Servers whose Config comes from the workspace `.dsh/mcp.json` show a `workspace`
+ 
+ JSON import accepts the standard `{ "mcpServers": { ... } }` shape. Import replaces matching Server entries and preserves Servers absent from the import.
+ 
+-Every page write carries the latest namespace revision. Field edits use path mutations.
++Every page write carries the latest entry revision. Field edits use path mutations.
+ 
+ ### Server lifecycle
+ 
+@@ -224,7 +226,7 @@ The installed file is never overwritten. If `$DSH_HOME/skills/mcp-adapter/SKILL.
+ 
+ ## Architecture
+ 
+-The package ships two faces. The host half (`src/host/`) is plain ESM with no build step; it registers the settings namespace, the manager, the proxy tool, promotions, commands, OAuth services, and the bundled skill. The client half (`src/client/`) is JSX bundled by esbuild (`build.mjs`) into `lib/client.js`, a loader-compatible bundle shaped for `window.__ModuleLoader__.load`. The client declares its service dependencies through `package.json`'s `dsh.client.inject`; `cordis.patch.yml` inserts the host composition row on install.
++The package ships two faces. The host half (`src/host/`) is plain ESM with no build step; it exports the Loader-entry `Config` schema and installs the manager, the proxy tool, promotions, commands, OAuth services, and the bundled skill. The client half (`src/client/`) is JSX bundled by esbuild (`build.mjs`) into `lib/client.js`, a loader-compatible bundle shaped for `window.__ModuleLoader__.load`. The client declares its service dependencies through `package.json`'s `dsh.client.inject`; `cordis.patch.yml` inserts the host composition row on install.
+ 
+ The host exposes one Connection RPC channel, `/mcp-adapter`, with endpoints `status`, `catalog`, `overview`, `layers`, `reconnect`, `oauth-status`, `oauth-login`, and `oauth-logout`. The Settings page polls `overview` and `layers` for detached snapshots (a `layers` refresh also re-reads the workspace layer); `reconnect` restarts one named Server; the OAuth endpoints drive and report the per-Server sign-in state.
+ 
+@@ -269,7 +271,7 @@ CHANGELOG.md       released changes
+ 
+ Feel free to dive in! [Open an issue](https://github.com/auggie246/dsh-mcp-adapter/issues/new) or submit PRs; questions go through the issue tracker.
+ 
+-- Run `pnpm test` before submitting. The suite covers the host, the client settings controller, and the dual-generation settings faces (`test/client-apply.test.js`).
++- Run `pnpm test` before submitting. The suite covers the host, the client settings controller, the 0.1.7 entry-config wire (`test/client-apply.test.js`), and the legacy `settings.yaml` import (`test/legacy-import.test.js`).
+ - New project vocabulary belongs in [CONTEXT.md](./CONTEXT.md); design decisions get an [ADR](./docs/adr/) before or with the change.
+ 
+ ## License
+diff --git a/docs/adr/0002-config-in-dsh-settings-namespace.md b/docs/adr/0002-config-in-dsh-settings-namespace.md
+index fe5b760..766c8ff 100644
+--- a/docs/adr/0002-config-in-dsh-settings-namespace.md
++++ b/docs/adr/0002-config-in-dsh-settings-namespace.md
+@@ -5,3 +5,5 @@ Server Config is stored in the Adapter's `mcp` namespace of the DSH settings ser
+ Considered options: pi's multi-file merge chain (`~/.config/mcp/mcp.json` → agent dirs → workspace `.mcp.json`, plus cross-tool `imports`) was rejected because DSH users interact through the web UI, not dotfiles; a single global namespace with a Settings > MCP form matches how every other DSH settings surface works, and gives us validation, conflict detection, and live update events for free.
+ 
+ Consequences: per-workspace servers and config-file imports become a later feature layered on top of the namespace (a workspace source merged at resolve time), not a change to where the global Config lives. The settings page needs an explicit JSON import action, since there is no file to copy-paste into.
++
++*Amended (0.1.7):* DSH 0.1.7 replaced the settings service's registered namespaces with profile Loader-entry Config, so global Server Config now persists in the active profile composition under the `mcp-adapter` entry rather than an `mcp:` section of `settings.yaml`. The decisions that outlive the seam — standard `mcpServers`-shaped JSON, one global list edited through Settings > MCP, workspace sources layered at resolve time — all hold; see [ADR 0010](./0010-loader-entry-config-model.md).
+diff --git a/docs/adr/0009-dual-generation-settings-api.md b/docs/adr/0009-dual-generation-settings-api.md
+index 056c764..dca2a1b 100644
+--- a/docs/adr/0009-dual-generation-settings-api.md
++++ b/docs/adr/0009-dual-generation-settings-api.md
+@@ -11,3 +11,5 @@ Considered options: shipping a 0.1.2-only release and telling 0.1.1-rc.2 users t
+ Consequences: the `apply`-level test suite (`test/client-apply.test.js`) compiles the real client entry and drives both fake generations, locking the fallback contract. When DSH drops 0.1.1-rc.2 support, the fallback branch, the legacy fake, and the README note are the removal surface — the controller and host need no changes.
+ 
+ *Widening (0.1.5 check):* the DSH 0.1.2-rc.1 → 0.1.5-rc.2 diff leaves every face this ADR pins on untouched — `packages/settings/settings` and `packages/api/settings-controller` change version strings only, the remotes mount list still includes the settings controller (two remotes added, none removed), and the `connection` service keeps its `rpc` face while refactoring reconnect internals. The one rename in range (`CommandInputDescriptor.images` → `attachments`) does not touch the Adapter's commands, which declare only `input.hint`. The peer dependency therefore widens to `^0.1.1-rc.2 || ^0.1.2-rc.1 || ^0.1.5-rc.1` with no code change; `test/client-apply.test.js` locks the 0.1.5-rc.1 shape with its own generation fake.
++
++*Superseded (0.1.7):* DSH 0.1.7 is the third shape this ADR anticipated and hard-failed on: `ctx.settings.register` is gone, configuration is the plugin's Loader-entry Config, and the client reads through the `configForms` service while the `remote.settings` wire keeps the positional shape and flat envelope pinned here. The 0.1.1 fallback and its fake are deleted; the surviving `remote.settings` wrapper now addresses the `mcp-adapter` entry id. See [ADR 0010](./0010-loader-entry-config-model.md).
+diff --git a/docs/adr/0010-loader-entry-config-model.md b/docs/adr/0010-loader-entry-config-model.md
+new file mode 100644
+index 0000000..e8b644e
+--- /dev/null
++++ b/docs/adr/0010-loader-entry-config-model.md
+@@ -0,0 +1,15 @@
++# Configuration is the plugin's Loader-entry Config (DSH 0.1.7)
++
++DSH 0.1.7 removed the settings model the Adapter was built on. `ctx.settings.register(namespace, schema)` — the `SettingsProvider` seam where plugins registered their own namespace — is gone: `@deepseek-ai/dsh-settings` now exports a single `SettingsForms` service that projects the cordis **Loader entries' Config schemas** into editable profile forms (verified against the 0.1.7-rc.2 packages). Host plugins `export const Config`; the Loader validates the entry's profile config and cordis hands the validated object to the plugin as the **second `apply` argument** (`new runtime.callback(ctx, fiber.config)`) — there is no `config` service or accessor, so reading `ctx.config` throws `cannot get property "config" without inject`; fields marked `.volatile()` (schemastery `~3.18.4`) resolve to cosmokit volatile references, and a config edit touching only volatile fields is committed into the running fiber's references by cordis-plugin-loader without a restart, emitting `loader/volatile-update` — everything else restarts the entry. `SettingsForms` reads and writes by **profile entry id** (ours is `mcp-adapter`, the id `cordis.patch.yml` registers), refuses writes to non-volatile paths, and `configure({ auto })` decides whether the Settings shell auto-generates a form page for the entry. On the client `settingsScope` is replaced by the `configForms` service — `get(entryId)` answers a per-entry form controller (`{ status, value, base, user, revision, writable, mode }` snapshots, `subscribe`, `mutate`) and `describe()` a shared document mirror — while the `remote.settings` wire face (positional args, flat `{ ok, value | error }` envelope, `settings/document-updated` invalidation) and the `settings.section` slot (now owned by `dsh-client-ui-settings-general`) survive. This supersedes [ADR 0002](./0002-config-in-dsh-settings-namespace.md) (where global Config lives) and completes [ADR 0009](./0009-dual-generation-settings-api.md) (whose predicted third shape is exactly this one).
++
++The Adapter's Config becomes its entry Config: `src/host/index.js` exports `Config = z.object({ mcpServers: …volatile(), skillInstall: …volatile() })`. Both marks sit on the top-level fields because schemastery rejects volatile fields below a dict or beneath another volatile field, and SettingsForms only accepts writes on schema-declared volatile paths. `MCP_SETTINGS_NAMESPACE` changes from `'mcp'` to `'mcp-adapter'`: under 0.1.7 the namespace identity is the entry id, so the client's `configForms.get()`, the `remote.settings` writes, and the host's `settings.update()` all address the entry. `createMcpConfigScope(ctx, config)` wraps the entry Config in the same `{ get, watch, update, mutate }` surface the old scope provided — `get()` unwraps the volatile refs off the Config object cordis passed to `apply`, `watch` notifies `(next, previous)` on `loader/volatile-update` when the value actually changed, and the write methods forward to `ctx.get('settings')` — so the workspace layer, manager, promotions, OAuth, and commands consume the port unchanged. The scope holds the object for the whole activation, which is sound because a volatile commit writes through the references inside it (cosmokit freezes them; the shared `Symbol.for('cosmokit.volatile.write')` member is the only writer) and any ordinary edit replaces `fiber.config` and restarts the entry, so a fresh `apply` receives the new object.
++
++Considered options: keeping any legacy generation alongside 0.1.7 was rejected because the model replaced both faces at once — supporting 0.1.2/0.1.5 too means two parallel settings subsystems in Host and client (register-scope plus volatile-Config, `settingsScope` plus `configForms`) and doubled generation fakes; the release is 0.1.7-only, deleting the `connection.api.settings` fallback, the legacy fakes, and the dead `@deepseek-ai/dsh-client-runtime` entry (last published for 0.1.1) from `dsh.client.inject`. Restarting the whole entry on every form edit (the platform default for non-volatile fields) was rejected for `mcpServers` because a single keystroke in a Server dialog would drop every live connection; live volatile commits plus `loader/volatile-update` keep the manager reconciling exactly as it watched the old scope. The alternative to the scope facade — rewriting every consumer against the entry Config refs — was rejected as a wide diff with no behavior benefit.
++
++Cross-field validation had to move. The old `SettingsProvider` ran `validateMcpSettings` before every persist; the Config write path validates only the schema, so structure errors now surface as a failed entry start, and `validateMcpSettings` runs inside the scope's `get()` instead: a section that passes the schema but fails the cross-field rules serves an empty server list with one deduplicated Host warning, so a hand-edited profile can never brick the connection manager. The client writes keep the direct `remote.settings` wrapper rather than the form controller's queue so conflict messages still reach the page as text, and the controller reports a mirrored-but-schema-invalid entry (whose form stays `loading` by contract) as an `invalid` state instead of spinning.
++
++Legacy data needs one explicit bridge. 0.1.7 renames the profile's `settings.yaml` to `settings.yaml.imported` and imports only sections whose name matches an entry id — the Adapter's legacy `mcp` section under its `mcp-adapter` entry would be silently stranded. After the Loader settles (the platform import runs first and skips the mismatched name), if the entry is untouched — no user section, no non-default servers — the section is validated against the Config schema and written once through `settings.update`, and an `mcp-adapter.legacy-imported` marker file in the profile home records the import so a later deliberate "remove every Server" never resurrects the old list. Every failure warns with manual copy instructions and never throws.
++
++Consequences: peers widen to `@deepseek-ai/dsh-settings` `^0.1.7-rc.1` and `@deepseek-ai/schemastery` `^3.18.4`; `yaml` becomes a runtime dependency of the migration module. Global Servers persist in the active profile composition (through Settings > MCP or the profile document) instead of a settings document, and README/CONTEXT vocabulary follows. `test/client-apply.test.js` collapses to a single 0.1.7 generation fake pinning ns `mcp-adapter` on the wire; `test/legacy-import.test.js` locks the migration. The nav-icon patch script targets 0.1.7's renamed `*Medium` icon members: its `MODELS_BRANCH` pattern now pins only the `Icon` prefix and the default icon is `IconLinkOutlineMedium`.
++
++Correction (v0.4.1): this ADR originally said the Loader validates the entry Config *into `ctx.config`*, and the shipped v0.4.0 entry acted on that — it died on start with `cannot get property "config" without inject`. cordis 4 resolves every context property through a proxy that refuses anything the plugin did not declare in `inject`, and there is no `config` service or accessor to declare, so `ctx.config` is unreachable by construction. The validated Config is the second `apply` argument (`apply(ctx, config)`), which is how the shipped DSH plugins take it. `createMcpConfigScope` now receives that argument and `src/host/index.js` threads it through; the test fakes refuse a `config` context property the way the cordis proxy does, and a probe mounted through a real cordis fiber pins the contract, so the assumption cannot come back unnoticed.
+diff --git a/package.json b/package.json
+index 37e9570..d7761a0 100644
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "@auggieteo/dsh-mcp-adapter",
+-  "version": "0.3.0",
++  "version": "0.4.0",
+   "description": "DSH plugin connecting the agent to MCP servers through one mcp proxy tool and a Settings > MCP page.",
+   "type": "module",
+   "license": "MIT",
+@@ -39,7 +39,6 @@
+       "inject": [
+         "@deepseek-ai/dsh-client-connection",
+         "@deepseek-ai/dsh-api-remotes",
+-        "@deepseek-ai/dsh-client-runtime",
+         "@deepseek-ai/dsh-client-ui-settings"
+       ],
+       "platform": "web",
+@@ -57,16 +56,17 @@
+     "provenance": true
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/dsh-settings": "^0.1.1-rc.2 || ^0.1.2-rc.1 || ^0.1.5-rc.1",
+-    "@deepseek-ai/schemastery": "^3.18.1"
++    "@deepseek-ai/dsh-settings": "^0.1.7-rc.1",
++    "@deepseek-ai/schemastery": "^3.18.4"
+   },
+   "devDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.1",
+-    "@deepseek-ai/dsh-settings": "0.1.1-rc.2",
+-    "@deepseek-ai/schemastery": "^3.18.1",
++    "@deepseek-ai/cordis": "^4.0.4",
++    "@deepseek-ai/dsh-settings": "0.1.7-rc.2",
++    "@deepseek-ai/schemastery": "^3.18.4",
+     "esbuild": "^0.25.0"
+   },
+   "dependencies": {
+-    "@modelcontextprotocol/sdk": "1.30.0"
++    "@modelcontextprotocol/sdk": "1.30.0",
++    "yaml": "^2.8.1"
+   }
+ }
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index c6498d8..121b1d6 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -11,58 +11,170 @@ importers:
+       '@modelcontextprotocol/sdk':
+         specifier: 1.30.0
+         version: 1.30.0(zod@4.4.3)
++      yaml:
++        specifier: ^2.8.1
++        version: 2.9.1
+     devDependencies:
+       '@deepseek-ai/cordis':
+-        specifier: ^4.0.1
+-        version: 4.0.1
++        specifier: ^4.0.4
++        version: 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+       '@deepseek-ai/dsh-settings':
+-        specifier: 0.1.1-rc.2
+-        version: 0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-brand@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/schemastery@3.18.1)
++        specifier: 0.1.7-rc.2
++        version: 0.1.7-rc.2(e27f754382d4b039489286535994df68)
+       '@deepseek-ai/schemastery':
+-        specifier: ^3.18.1
+-        version: 3.18.1
++        specifier: ^3.18.4
++        version: 3.18.4
+       esbuild:
+         specifier: ^0.25.0
+         version: 0.25.12
+ 
+ packages:
+ 
+-  '@deepseek-ai/cordis@4.0.1':
+-    resolution: {integrity: sha512-YBdskTU2Po1kru3GgcUWUbkTsPMA9LkSQDAY8rBkFJeajdgcQad3QPJZE26JyK99Xb6HaASvoXg2DSUTeN/0Nw==}
++  '@deepseek-ai/cordis-plugin-group@1.0.4':
++    resolution: {integrity: sha512-/7tuY5pMQetHava4v6QUeOa4CwZA+mleNvbIoj+iqEmzkYUtlXbLqhzJIcbnDa/Hxgr1jaCwROrI77nuLyeCFg==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
++
++  '@deepseek-ai/cordis-plugin-include@1.0.9':
++    resolution: {integrity: sha512-Xmekm7u5Kpeym6nABL4T1/Mg6aQYFZxsipB0WycmCctvX1DqAv8nCFwRmg2XMx/f7EbZgNEbXQwJfabcMu8zxQ==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
++
++  '@deepseek-ai/cordis-plugin-loader@1.0.5':
++    resolution: {integrity: sha512-200huL2ttWcjyeYllvPYn+qMR7I89qy8MhZasbHltPzB/KMrSfsyoCYKdCGc5KqPGj5iJugcmibQzjINMO9I+Q==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      node-addon-require-builtin: ^0.1.6
++    peerDependenciesMeta:
++      node-addon-require-builtin:
++        optional: true
++
++  '@deepseek-ai/cordis@4.0.4':
++    resolution: {integrity: sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==}
+     hasBin: true
+     peerDependencies:
+-      '@deepseek-ai/cordis-plugin-include': ^1.0.6
+-      '@deepseek-ai/cordis-plugin-loader': ^1.0.2
++      '@deepseek-ai/cordis-plugin-include': ~1.0.9
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
+     peerDependenciesMeta:
+       '@deepseek-ai/cordis-plugin-include':
+         optional: true
+       '@deepseek-ai/cordis-plugin-loader':
+         optional: true
+ 
+-  '@deepseek-ai/cosmokit@1.8.2':
+-    resolution: {integrity: sha512-muBOKtSrUKU5m/xpq8ZXWL6hQ/jgd4PhU2PqH97bcxIiLEJfNwZOGQEx4t/aS/GgxRAR+ra9pMHPMtTHU4sqqA==}
++  '@deepseek-ai/cosmokit@1.8.5':
++    resolution: {integrity: sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==}
+ 
+-  '@deepseek-ai/dsh-brand@0.1.1-rc.2':
+-    resolution: {integrity: sha512-8vXsAXoUdzKAgvd/E9DgyT6HKmR6ZM4rtJ3fs/XoJ6n2kBk4tWil8Lv+jxCMWJeMOnTJF55gu2+NWQ3ECFPtJw==}
++  '@deepseek-ai/dsh-app-boot@0.1.7-rc.2':
++    resolution: {integrity: sha512-d0QWMMXxT6kICO9QRrXTqJRKP6bWNes7SVGJK6OOEzX6Ua9mzCx1KghPIf7tjW/ZmX0b8n1FoySr4IHElBkrOg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.1
+-      '@deepseek-ai/dsh-invariants': ^0.1.1-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/cordis-plugin-group': ~1.0.4
++      '@deepseek-ai/cordis-plugin-include': ~1.0.9
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
++      '@deepseek-ai/dsh-home-paths': 0.1.7-rc.2
++      '@deepseek-ai/dsh-launch-environment': 0.1.7-rc.2
++      '@deepseek-ai/dsh-system-prompt': 0.1.7-rc.2
++
++  '@deepseek-ai/dsh-atomic-write@0.1.7-rc.2':
++    resolution: {integrity: sha512-gdUVkVv5DXBgnEDB1Dh/lL+HV/8mKR3AGUqNjLhQJSEqE9MIYyiHC+3zwzaWjeWhiTdLXd5rkA4HVCiS3KIcUg==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-invariants@0.1.1-rc.2':
+-    resolution: {integrity: sha512-l+1Om/EDFyMjhgSuEx2WDLLA2fia/+ga9mBTCoT/MMslsnWaK5G0/lWwbwlTBSaJ6OfmYc3DuBgox8DbgIGHRQ==}
++  '@deepseek-ai/dsh-brand@0.1.7-rc.2':
++    resolution: {integrity: sha512-cvcvlNRuiFqZNNqyxdu7wcpiBjd9xa/0MpuhRvee43zBp9uED2p5JolZr5/2EKJf57gYx9k9bedb+Zbyiqnpkw==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.1
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-settings@0.1.1-rc.2':
+-    resolution: {integrity: sha512-iGdKEt91Im3gE7xA9CzRfTJsPcFcxDeDOCLhAjzbpjEv7TAjx/EoYP7lPtiy+QmOjKSKy206SEtAKol9PXWbOw==}
++  '@deepseek-ai/dsh-config-editor@0.1.7-rc.2':
++    resolution: {integrity: sha512-UgNqOUqI9ZNABnb7TvoJ9d6EbaScVymL54YV/s8rU06cl4bTKuz/ahA8uLclyutCoRANkwh/eMiA+othLyhooA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.1
+-      '@deepseek-ai/dsh-brand': ^0.1.1-rc.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.1-rc.2
+-      '@deepseek-ai/schemastery': ^3.18.1
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/cordis-plugin-include': ~1.0.9
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
++      '@deepseek-ai/dsh-app-boot': 0.1.7-rc.2
++      '@deepseek-ai/dsh-hmr': 0.1.7-rc.2
++    peerDependenciesMeta:
++      '@deepseek-ai/dsh-hmr':
++        optional: true
+ 
+-  '@deepseek-ai/schemastery@3.18.1':
+-    resolution: {integrity: sha512-Qn0FCSwCQnpnj6SB31I6i2sIKgKWnkbJM8O0EU91Gv2UsYVvtZTl6IA0sCwk2e2MZf5S8w5hpq9QkeVvK9qwxg==}
++  '@deepseek-ai/dsh-home-paths@0.1.7-rc.2':
++    resolution: {integrity: sha512-LafnefS9IttUziet9cQfCNfyBVce+aCPBGFrZGxsQJZYZXvkDQH94QHzDIxOIJfwwHuKC36fP5riD+Eajpx5jw==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-invariants@0.1.7-rc.2':
++    resolution: {integrity: sha512-GY2lY2TUUH2Qk1ZnrB3Q5+lXSh4webn1kbt5nQfhojVmNbist/f3dJC8JJa7XXOUNvqAgqRN9IZ4egbDZ9LLxQ==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-launch-environment@0.1.7-rc.2':
++    resolution: {integrity: sha512-i8U15ebCS4tWtL2mnuhfl0h5XXBagtbiGO63/OMeHpfWb5sHUvTYBNWTDxmlMjLDkTNQgPsXmRl0UrbWKCSJwg==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-llm@0.1.7-rc.2':
++    resolution: {integrity: sha512-hNT3ovFnbNDQ8g544bh2Q9ORX40aI6Y+jhjer1lETeHS4g0jTjqUUVfARCTA7uAFvHucSBg2rFgbisIktmJCxw==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-package-manifest@0.1.7-rc.2':
++    resolution: {integrity: sha512-oS6OD0emk+HD25B8FomvuAkqCg0aEooQEs/Tk7sZj9ww0uMXwYtU69Wnh4rFBQzp8pkZBYv9HeIzw67iBwDH0w==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-scope@0.1.7-rc.2':
++    resolution: {integrity: sha512-rk/OM5ej6/V8pCNczEqQ3BkKx3DuPeFGzNUsEZo8hF+tnkF/EhsxMWSXC/yP/uLKeNkSsVHzjFpaQR0qr0J3gQ==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.1.7-rc.2
++
++  '@deepseek-ai/dsh-session@0.1.7-rc.2':
++    resolution: {integrity: sha512-0dXv1t4Zox/yHkZ4PfPNSBWJfIc72PDqOvjz43EMoHpbmoKTVpit2UpUI+yTtX01e4MVBbDMxBZ95oJW/Oydnw==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-scope': 0.1.7-rc.2
++
++  '@deepseek-ai/dsh-settings@0.1.7-rc.2':
++    resolution: {integrity: sha512-xS48//SMs3xp5qI+brj0T4BsJ1vgcv2LteZO6lW4X0YZVUOIe6H9aS2sRPh2OAWTFHrzPep4NwVkAOCD8NvBzQ==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-brand': 0.1.7-rc.2
++      '@deepseek-ai/dsh-invariants': 0.1.7-rc.2
++      '@deepseek-ai/dsh-session': 0.1.7-rc.2
++      '@deepseek-ai/schemastery': ~3.18.4
++
++  '@deepseek-ai/dsh-system-prompt@0.1.7-rc.2':
++    resolution: {integrity: sha512-vxKcADh7XOuWJOfa0WeEOhvFiUbMOdoK4w6M7KVCI0S99c9ktxrgY4wKdmAxap+nQjwTEPme3QuOlY3Na+cz9w==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.1.7-rc.2
++      '@deepseek-ai/dsh-llm': 0.1.7-rc.2
++      '@deepseek-ai/dsh-scope': 0.1.7-rc.2
++
++  '@deepseek-ai/dsh-timeout@0.1.7-rc.2':
++    resolution: {integrity: sha512-YunLoLZSF8Ld9eYwyvKoBnxgy3GZrIQpw98HfFS15ZfZlqcFiZcchFhYmStLtUbtX+gjhoeXc8Xz913YbVifNA==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-typert-protocol@0.1.7-rc.2':
++    resolution: {integrity: sha512-oJm03zqMQlvt16Ejw7VWy3/gqlJGrBCZj3Z4KL8ydLJeeTToKIR49WVCxMbJTlH0F9QFljruLtHguA5B99AeUQ==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-util-crypto@0.1.7-rc.2':
++    resolution: {integrity: sha512-BGc55/bSj/1LcDTQ5fpok4U24X9SFyN+TB23/hBlbe2TBUKVuwO8+X5FFKKje2MLO8PWYEDkXv/LrV6jRVKZEg==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-util-values@0.1.7-rc.2':
++    resolution: {integrity: sha512-UX8nh5SbtZcPVVEvjd+9PCPcbybA6OpVzJGgFxYn59ao/7QQGyYbByS8KXr+THU5JtqmDDVb9xGUSJaF2IYmeQ==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/schemastery@3.18.4':
++    resolution: {integrity: sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==}
+ 
+   '@esbuild/aix-ppc64@0.25.12':
+     resolution: {integrity: sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA==}
+@@ -220,6 +332,10 @@ packages:
+     cpu: [x64]
+     os: [win32]
+ 
++  '@eslint-community/regexpp@4.12.2':
++    resolution: {integrity: sha512-EriSTlt5OC9/7SXkRSCAhfSxxoSUgBm33OH+IkwbdpgoqsSsUg7y3uh+IICI/Qg4BBWr3U2i39RpmycbxMq4ew==}
++    engines: {node: ^12.0.0 || ^14.0.0 || >=16.0.0}
++
+   '@hono/node-server@2.1.1':
+     resolution: {integrity: sha512-ELuehkj5VCBdgEw9zs+ivkKwyzzUCSQuE96YmiPvn1ECBoZCczbFXJLeEGMTYjphP6gydh4pHMqEYPVMYUVgQg==}
+     engines: {node: '>=20'}
+@@ -254,6 +370,9 @@ packages:
+   ajv@8.20.0:
+     resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
+ 
++  argparse@2.0.1:
++    resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
++
+   body-parser@2.3.0:
+     resolution: {integrity: sha512-2cGmJupaNgg+QUwVLAucDuWuoMZ6EX9iHDRswZ5lsNYEmwPaRknMPCLZz07yTzVq/83p4o/wzbDZbBrTvGGTIw==}
+     engines: {node: '>=18'}
+@@ -437,6 +556,10 @@ packages:
+   jose@6.2.10:
+     resolution: {integrity: sha512-iiW7J9qRFlGxvCOIBDBDxFePQSn7ZMAnrYGhrrOo6siO/MIqwfyilLR27pkfDgUk+raLuzADS8A3S/KLBisc0g==}
+ 
++  js-yaml@4.3.2:
++    resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
++    hasBin: true
++
+   json-schema-traverse@1.0.0:
+     resolution: {integrity: sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==}
+ 
+@@ -470,6 +593,58 @@ packages:
+     resolution: {integrity: sha512-NMPBRMJgiQHjbd8phG3Vebdx4kZ1H121rbl5IkMqeOsahptB9BKo/d7oJ3zTXqTgagn2bWlNSXkh0QUGM31RYg==}
+     engines: {node: '>=18'}
+ 
++  node-addon-native-custom-loader@0.1.6:
++    resolution: {integrity: sha512-QaW7d8lTcGCXrpNVyFDtID3vrpa7vFdpcY9pql2/9FGFSe7tcSnhQOKZX+1aOWq+pB1d2ZwNnKAdQI5nD9wAXA==}
++    engines: {node: '>=20'}
++
++  node-addon-require-builtin-darwin-arm64@0.1.6:
++    resolution: {integrity: sha512-KpaAh0mDcIScoJs7gD/mjXREcENJ023/DgWW3GrlLXFVzCE6bK6wFrTFpNfnkxZZP8yWsEWOg1o5T+uQ7olgTQ==}
++    engines: {node: '>=20'}
++    cpu: [arm64]
++    os: [darwin]
++
++  node-addon-require-builtin-darwin-x64@0.1.6:
++    resolution: {integrity: sha512-lh9o5rCvmkH8MZgBBmhyKzJRc1M1hJzgXLTFzB6iomRXNH9P1DKjN2nAJLmvGrdTij47Wcch1JVnlV5AG0cRCQ==}
++    engines: {node: '>=20'}
++    cpu: [x64]
++    os: [darwin]
++
++  node-addon-require-builtin-linux-arm64-gnu@0.1.6:
++    resolution: {integrity: sha512-DrQA3aS1LBn4NgrewbZkzSAWdSSRPD/fYO5AkQfvriQ/TQD3E2adB012sZ5eac6p9TAcTjUIYhk395AYVxo4Zw==}
++    engines: {node: '>=20'}
++    cpu: [arm64]
++    os: [linux]
++    libc: [glibc]
++
++  node-addon-require-builtin-linux-x64-gnu@0.1.6:
++    resolution: {integrity: sha512-8wCxrFlB2Ld5DhxIm2P+nNFnQ0wjzDE5sXF68EUhLH0X+z313B07TUQFMBKCOkyhZIIBh590dBmhHCuA43No2A==}
++    engines: {node: '>=20'}
++    cpu: [x64]
++    os: [linux]
++    libc: [glibc]
++
++  node-addon-require-builtin-win32-arm64-msvc@0.1.6:
++    resolution: {integrity: sha512-NET6DiLnKrK2DHuO4NNN+zJz0CFas+RwpJlGY0d3A3A3tc5dJQqZXgw8DzLOn4cSTAQCaDq6+LbPyYX7jE2F3Q==}
++    engines: {node: '>=20'}
++    cpu: [arm64]
++    os: [win32]
++
++  node-addon-require-builtin-win32-ia32-msvc@0.1.6:
++    resolution: {integrity: sha512-oj4G51r81kJ3E2t5KknKhBNb8TmTWzc/t9x7jkBF9JeRd+1a0kr99mVJVYwJNxq9d3jpt7dgBdI8mxaomuXOEQ==}
++    engines: {node: '>=20 <23'}
++    cpu: [ia32]
++    os: [win32]
++
++  node-addon-require-builtin-win32-x64-msvc@0.1.6:
++    resolution: {integrity: sha512-ZQ+6thVzQBOFamW7s3t2YqHsw99EEPBNH1uAjvCx4QfnjFJTsu6I/H3prpN8i6cSt6gjnQtArfWc2LXN2ufcJQ==}
++    engines: {node: '>=20'}
++    cpu: [x64]
++    os: [win32]
++
++  node-addon-require-builtin@0.1.6:
++    resolution: {integrity: sha512-P9ZGMDkloktirLJSggfpxsJ9jog5FItE1Omxpj50UBn3LhD6TS6/yx0jEBXsCGK3P9EtW1EpQVA1QL5gb11GaQ==}
++    engines: {node: '>=20'}
++
+   object-assign@4.1.1:
+     resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
+     engines: {node: '>=0.10.0'}
+@@ -520,6 +695,10 @@ packages:
+     resolution: {integrity: sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw==}
+     engines: {node: '>=0.10.0'}
+ 
++  resolve.exports@2.0.3:
++    resolution: {integrity: sha512-OcXjMsGdhL4XnbShKpAcSqPMzQoYkYyhbEaeSko47MjRP9NfEQMhZkXL1DoFlt9LWQn4YttrdnV6X2OiyzBi+A==}
++    engines: {node: '>=10'}
++
+   router@2.2.0:
+     resolution: {integrity: sha512-nLTrUKm2UyiL7rlhapu/Zl45FwNgkZGaCpZbIHajDYgwlJCOzLSk+cIPAnsEqV955GjILJnKbdQC1nVPz+gAYQ==}
+     engines: {node: '>= 18'}
+@@ -527,6 +706,11 @@ packages:
+   safer-buffer@2.1.2:
+     resolution: {integrity: sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==}
+ 
++  semver@7.8.5:
++    resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
++    engines: {node: '>=10'}
++    hasBin: true
++
+   send@1.2.1:
+     resolution: {integrity: sha512-1gnZf7DFcoIcajTjTwjwuDjzuz4PPcY2StKPlsGAQ1+YH20IRVrBaXSWmdjowTJ6u8Rc01PoYOGHXfP1mYcZNQ==}
+     engines: {node: '>= 18'}
+@@ -590,6 +774,11 @@ packages:
+   wrappy@1.0.2:
+     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
+ 
++  yaml@2.9.1:
++    resolution: {integrity: sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==}
++    engines: {node: '>= 14.6'}
++    hasBin: true
++
+   zod-to-json-schema@3.25.2:
+     resolution: {integrity: sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA==}
+     peerDependencies:
+@@ -600,33 +789,159 @@ packages:
+ 
+ snapshots:
+ 
+-  '@deepseek-ai/cordis@4.0.1':
++  '@deepseek-ai/cordis-plugin-group@1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.6)
++
++  '@deepseek-ai/cordis-plugin-include@1.0.9(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.6)
++      '@deepseek-ai/cosmokit': 1.8.5
++      js-yaml: 4.3.2
++
++  '@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.6)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/cosmokit': 1.8.5
++      '@deepseek-ai/schemastery': 3.18.4
++    optionalDependencies:
++      node-addon-require-builtin: 0.1.6
++
++  '@deepseek-ai/cordis@4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)':
+     dependencies:
+-      '@deepseek-ai/cosmokit': 1.8.2
++      '@deepseek-ai/cosmokit': 1.8.5
+       '@standard-schema/spec': 1.1.0
++    optionalDependencies:
++      '@deepseek-ai/cordis-plugin-include': 1.0.9(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.6)
++
++  '@deepseek-ai/cosmokit@1.8.5': {}
++
++  '@deepseek-ai/dsh-app-boot@0.1.7-rc.2(@deepseek-ai/cordis-plugin-group@1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-home-paths@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-launch-environment@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-system-prompt@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/cordis-plugin-group': 1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/cordis-plugin-include': 1.0.9(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.6)
++      '@deepseek-ai/dsh-atomic-write': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-home-paths': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-launch-environment': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-package-manifest': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-system-prompt': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@eslint-community/regexpp': 4.12.2
++      ajv: 8.20.0
++      js-yaml: 4.3.2
++      node-addon-require-builtin: 0.1.6
++      resolve.exports: 2.0.3
++      semver: 7.8.5
++
++  '@deepseek-ai/dsh-atomic-write@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++
++  '@deepseek-ai/dsh-brand@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+ 
+-  '@deepseek-ai/cosmokit@1.8.2': {}
++  '@deepseek-ai/dsh-config-editor@0.1.7-rc.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-app-boot@0.1.7-rc.2(@deepseek-ai/cordis-plugin-group@1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-home-paths@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-launch-environment@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-system-prompt@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)))))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/cordis-plugin-include': 1.0.9(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.6)
++      '@deepseek-ai/dsh-app-boot': 0.1.7-rc.2(@deepseek-ai/cordis-plugin-group@1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-home-paths@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-launch-environment@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-system-prompt@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))))
++      '@deepseek-ai/dsh-atomic-write': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      js-yaml: 4.3.2
++      yaml: 2.9.1
++
++  '@deepseek-ai/dsh-home-paths@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++
++  '@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/schemastery': 3.18.4
++
++  '@deepseek-ai/dsh-launch-environment@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++
++  '@deepseek-ai/dsh-llm@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-brand': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-timeout': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-typert-protocol': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-util-crypto': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-util-values': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/schemastery': 3.18.4
++      zod: 4.4.3
++
++  '@deepseek-ai/dsh-package-manifest@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++
++  '@deepseek-ai/dsh-scope@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-invariants': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++
++  '@deepseek-ai/dsh-session@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-brand': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-scope': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-util-values': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++
++  '@deepseek-ai/dsh-settings@0.1.7-rc.2(e27f754382d4b039489286535994df68)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.6)
++      '@deepseek-ai/cosmokit': 1.8.5
++      '@deepseek-ai/dsh-brand': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-config-editor': 0.1.7-rc.2(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-app-boot@0.1.7-rc.2(@deepseek-ai/cordis-plugin-group@1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-home-paths@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-launch-environment@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-system-prompt@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)))))
++      '@deepseek-ai/dsh-invariants': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-session': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-util-values': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/schemastery': 3.18.4
++      yaml: 2.9.1
++    transitivePeerDependencies:
++      - '@deepseek-ai/cordis-plugin-include'
++      - '@deepseek-ai/dsh-app-boot'
++      - '@deepseek-ai/dsh-hmr'
++      - node-addon-require-builtin
+ 
+-  '@deepseek-ai/dsh-brand@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))':
++  '@deepseek-ai/dsh-system-prompt@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.1
+-      '@deepseek-ai/dsh-invariants': 0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-invariants': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-scope': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)':
++  '@deepseek-ai/dsh-timeout@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.1
+-      '@deepseek-ai/schemastery': 3.18.1
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+ 
+-  '@deepseek-ai/dsh-settings@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-brand@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/schemastery@3.18.1)':
++  '@deepseek-ai/dsh-typert-protocol@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.1
+-      '@deepseek-ai/dsh-brand': 0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))
+-      '@deepseek-ai/dsh-invariants': 0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)
+-      '@deepseek-ai/schemastery': 3.18.1
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-brand': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/schemastery@3.18.1':
++  '@deepseek-ai/dsh-util-crypto@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cosmokit': 1.8.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++
++  '@deepseek-ai/dsh-util-values@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++
++  '@deepseek-ai/schemastery@3.18.4':
++    dependencies:
++      '@deepseek-ai/cosmokit': 1.8.5
+       '@standard-schema/spec': 1.1.0
+ 
+   '@esbuild/aix-ppc64@0.25.12':
+@@ -707,6 +1022,8 @@ snapshots:
+   '@esbuild/win32-x64@0.25.12':
+     optional: true
+ 
++  '@eslint-community/regexpp@4.12.2': {}
++
+   '@hono/node-server@2.1.1(hono@4.13.5)':
+     dependencies:
+       hono: 4.13.5
+@@ -751,6 +1068,8 @@ snapshots:
+       json-schema-traverse: 1.0.0
+       require-from-string: 2.0.2
+ 
++  argparse@2.0.1: {}
++
+   body-parser@2.3.0:
+     dependencies:
+       bytes: 3.1.2
+@@ -975,6 +1294,10 @@ snapshots:
+ 
+   jose@6.2.10: {}
+ 
++  js-yaml@4.3.2:
++    dependencies:
++      argparse: 2.0.1
++
+   json-schema-traverse@1.0.0: {}
+ 
+   json-schema-typed@8.0.2: {}
+@@ -997,6 +1320,55 @@ snapshots:
+     dependencies:
+       content-type: 2.1.0
+ 
++  node-addon-native-custom-loader@0.1.6: {}
++
++  node-addon-require-builtin-darwin-arm64@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optional: true
++
++  node-addon-require-builtin-darwin-x64@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optional: true
++
++  node-addon-require-builtin-linux-arm64-gnu@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optional: true
++
++  node-addon-require-builtin-linux-x64-gnu@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optional: true
++
++  node-addon-require-builtin-win32-arm64-msvc@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optional: true
++
++  node-addon-require-builtin-win32-ia32-msvc@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optional: true
++
++  node-addon-require-builtin-win32-x64-msvc@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optional: true
++
++  node-addon-require-builtin@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optionalDependencies:
++      node-addon-require-builtin-darwin-arm64: 0.1.6
++      node-addon-require-builtin-darwin-x64: 0.1.6
++      node-addon-require-builtin-linux-arm64-gnu: 0.1.6
++      node-addon-require-builtin-linux-x64-gnu: 0.1.6
++      node-addon-require-builtin-win32-arm64-msvc: 0.1.6
++      node-addon-require-builtin-win32-ia32-msvc: 0.1.6
++      node-addon-require-builtin-win32-x64-msvc: 0.1.6
++
+   object-assign@4.1.1: {}
+ 
+   object-inspect@1.13.4: {}
+@@ -1038,6 +1410,8 @@ snapshots:
+ 
+   require-from-string@2.0.2: {}
+ 
++  resolve.exports@2.0.3: {}
++
+   router@2.2.0:
+     dependencies:
+       debug: 4.4.3
+@@ -1050,6 +1424,8 @@ snapshots:
+ 
+   safer-buffer@2.1.2: {}
+ 
++  semver@7.8.5: {}
++
+   send@1.2.1:
+     dependencies:
+       debug: 4.4.3
+@@ -1131,6 +1507,8 @@ snapshots:
+ 
+   wrappy@1.0.2: {}
+ 
++  yaml@2.9.1: {}
++
+   zod-to-json-schema@3.25.2(zod@4.4.3):
+     dependencies:
+       zod: 4.4.3
+diff --git a/scripts/patch-dsh-settings-nav-icon.mjs b/scripts/patch-dsh-settings-nav-icon.mjs
+index 6dff00a..6eaca4e 100644
+--- a/scripts/patch-dsh-settings-nav-icon.mjs
++++ b/scripts/patch-dsh-settings-nav-icon.mjs
+@@ -23,7 +23,7 @@ const SHELL_RELATIVE = join(
+ )
+ 
+ function parseArgs(argv) {
+-  const options = { revert: false, icon: 'IconLinkOutline16', dshRoot: process.env.DSH_ROOT }
++  const options = { revert: false, icon: 'IconLinkOutlineMedium', dshRoot: process.env.DSH_ROOT }
+   for (let index = 0; index < argv.length; index += 1) {
+     const arg = argv[index]
+     if (arg === '--revert') options.revert = true
+@@ -61,8 +61,10 @@ function locateShellFile(dshRoot) {
+   process.exit(1)
+ }
+ 
+-/** The models branch, with every build-generated identifier captured. */
+-const MODELS_BRANCH = /(\t+)if \(id === "models"\) return \(0, ([A-Za-z_$][\w$]*)\.jsx\)\(([A-Za-z_$][\w$]*)\.IconDataOutline16, \{\n\t+className: ([A-Za-z_$][\w$]*)\.navIcon,\n\t+size: 16\n\t+\}\);/
++/** The models branch, with every build-generated identifier captured. 0.1.7
++ * renamed the icon exports from `*16` to `*Medium` sizes, so only the `Icon`
++ * prefix is pinned. */
++const MODELS_BRANCH = /(\t+)if \(id === "models"\) return \(0, ([A-Za-z_$][\w$]*)\.jsx\)\(([A-Za-z_$][\w$]*)\.Icon\w+, \{\n\t+className: ([A-Za-z_$][\w$]*)\.navIcon,\n\t+size: 16\n\t+\}\);/
+ 
+ function buildMcpBranch(indent, jsxRuntime, primitivesModule, cssModule, iconName) {
+   return [
+diff --git a/src/client/index.jsx b/src/client/index.jsx
+index 8d5e13b..00322e5 100644
+--- a/src/client/index.jsx
++++ b/src/client/index.jsx
+@@ -7,18 +7,17 @@ import {
+ import { createSettingsApi } from './settings-api.js'
+ import { installMcpSettingsStyles } from './styles.js'
+ 
+-// `remote` rides the 0.1.2-rc.1+ settings write surface (see settings-api.js);
+-// it exists on every harness generation, while `connection.api` only on
+-// 0.1.1-rc.2, so both stay declared and the resolution happens at apply time.
+-// `remote.settings` deliberately stays UNDECLARED: on 0.1.2-rc.1 it is a
+-// mounted dotted service read through the inject-free `ctx.get`, and
+-// declaring it would park the plugin forever on 0.1.1-rc.2, where the
+-// namespace is never mounted.
+-export const inject = ['slots', 'settingsScope', 'connection', 'remote']
++// `remote` carries the settings write face (see settings-api.js); it exists on
++// every supported harness, while the mounted dotted `remote.settings`
++// namespace deliberately stays UNDECLARED — declaring it would park the
++// plugin on a profile that never mounts the remotes bundle. `configForms` is
++// the settings-domain base service: `get(entryId)` owns the per-entry read
++// mirror and write queue, `describe()` the shared document mirror.
++export const inject = ['slots', 'configForms', 'connection', 'remote']
+ 
+ export function apply(ctx) {
+-  const scope = ctx.settingsScope.bind({ namespace: MCP_SETTINGS_NAMESPACE })
+-  const describe = ctx.settingsScope.describe()
++  const scope = ctx.configForms.get(MCP_SETTINGS_NAMESPACE)
++  const describe = ctx.configForms.describe()
+   const controller = new McpSettingsController({
+     scope,
+     describe,
+diff --git a/src/client/settings-api.js b/src/client/settings-api.js
+index 3db2e2f..84ff196 100644
+--- a/src/client/settings-api.js
++++ b/src/client/settings-api.js
+@@ -1,48 +1,36 @@
+ /**
+- * Resolve the Settings write face across DSH harness generations.
++ * Resolve the Settings write face on the DSH 0.1.7 harness.
+  *
+- * DSH 0.1.2-rc.1 removed the `connection` service's `api` face, moving the
+- * settings write surface onto the `remote` service (its `settings` namespace is
+- * mounted by the @deepseek-ai/dsh-api-remotes client bundle). The new face
+- * takes positional `(ns, patch | ops, expectedRevision)` arguments and answers
+- * a flat `{ ok, value | error }` envelope. DSH 0.1.1-rc.2 keeps the write
+- * surface on `connection.api.settings`, with one request-object argument and a
+- * `{ result: { ok, value | error } }` envelope.
++ * The settings write surface is the `remote` service's `settings` namespace
++ * (mounted by the @deepseek-ai/dsh-api-remotes client bundle): positional
++ * `(ns, patch | ops, expectedRevision)` arguments answering a flat
++ * `{ ok, value | error }` envelope, where `ns` is a profile Loader ENTRY id —
++ * for the Adapter that is `mcp-adapter`, the id cordis.patch.yml registers.
+  *
+- * Both faces normalize to the controller's contract: `update` and `mutate`
+- * take one request object and answer `{ result: { ok, value, error } }`, so
+- * callers stay unaware of which harness generation is running. Prefer the
+- * `remote` face when it exists: it is the only one DSH 0.1.2-rc.1 provides.
++ * The face normalizes to the controller's contract: `update` and `mutate`
++ * take one request object and answer `{ result: { ok, value, error } }`.
+  */
+ export function createSettingsApi(ctx) {
+   const remoteSettings = readRemoteSettings(ctx)
+   if (remoteSettings !== undefined) return remoteSettingsApi(remoteSettings)
+ 
+-  const connectionSettings = ctx.connection?.api?.settings
+-  if (connectionSettings !== undefined) return connectionSettings
+-
+   throw new Error(
+-    'No DSH settings write API: expected ctx.remote.settings (DSH 0.1.2+) '
+-    + 'or ctx.connection.api.settings (DSH 0.1.1-rc.2). Upgrade '
++    'No DSH settings write API: expected the ctx.remote.settings namespace '
++    + '(DSH 0.1.7 with @deepseek-ai/dsh-api-remotes). Upgrade '
+     + '@auggieteo/dsh-mcp-adapter to a release supporting this harness.',
+   )
+ }
+ 
+ /**
+- * Read the mounted `remote.settings` namespace across generations without
+- * declaring it in `inject`.
+- *
+- * On DSH 0.1.2-rc.1 the namespace is a traced dotted service: reading it as
++ * Read the mounted `remote.settings` namespace without declaring it in
++ * `inject`. It is a traced dotted service: reading it as
+  * `ctx.remote.settings` makes cordis compose the `remote.settings` key and
+- * throw `cannot get property "remote.settings" without inject` unless the
+- * plugin declares that exact service. It must stay undeclared anyway — on
+- * 0.1.1-rc.2 the namespace is never mounted, and a declared-but-missing
+- * service keeps the plugin fiber from ever applying. `ctx.get` is cordis's
+- * documented inject-free read: on 0.1.2-rc.1 it resolves the mounted
+- * namespace through the root isolate; on 0.1.1-rc.2 it answers undefined,
+- * leaving the `connection.api.settings` fallback reachable. The direct
+- * `ctx.remote?.settings` read stays as the fallback for runner generations
+- * that expose the face as a plain property (and for test doubles).
++ * throw `cannot get property "remote.settings" without inject` for any plugin
++ * that did not declare the exact service, and declaring it would park the
++ * fiber forever on a profile that never mounts the remotes bundle. `ctx.get`
++ * is cordis's inject-free read and resolves the mounted namespace through the
++ * root isolate. The direct `ctx.remote?.settings` read stays as a fallback
++ * for runners and test doubles that expose the face as a plain property.
+  */
+ function readRemoteSettings(ctx) {
+   if (typeof ctx.get === 'function') {
+@@ -53,11 +41,11 @@ function readRemoteSettings(ctx) {
+   }
+   try {
+     return ctx.remote?.settings
+-  } catch { /* the governed dotted read on 0.1.2-rc.1 — ctx.get already covered it */ }
++  } catch { /* the governed dotted read — ctx.get already covered it */ }
+   return undefined
+ }
+ 
+-/** Wrap the 0.1.2-rc.1 `remote.settings` face in the controller's contract. */
++/** Wrap the `remote.settings` face in the controller's contract. */
+ function remoteSettingsApi(remote) {
+   return {
+     async update({ ns, patch, expectedRevision }) {
+diff --git a/src/client/settings-controller.js b/src/client/settings-controller.js
+index 8c82cda..9b4b78c 100644
+--- a/src/client/settings-controller.js
++++ b/src/client/settings-controller.js
+@@ -1,6 +1,14 @@
+-export const MCP_SETTINGS_NAMESPACE = 'mcp'
++// 0.1.7 settings namespaces are profile Loader entry ids; `mcp-adapter` is the
++// id cordis.patch.yml registers for this plugin.
++export const MCP_SETTINGS_NAMESPACE = 'mcp-adapter'
+ export const MCP_RPC_CHANNEL = '/mcp-adapter'
+ 
++// The configForms controller validates every mirrored namespace value against
++// the entry schema and simply never reaches `ready` when validation fails;
++// surface that state instead of spinning forever.
++const INVALID_SETTINGS_MESSAGE =
++  'The saved MCP configuration failed validation. Fix or remove the invalid fields in the profile, then reopen Settings.'
++
+ const SERVER_FIELDS = new Set([
+   'command',
+   'args',
+@@ -228,6 +236,18 @@ function overviewEmpty() {
+   return { status: { servers: [] }, catalog: { servers: [] } }
+ }
+ 
++/**
++ * A form whose mirrored namespace holds a value the entry schema rejects stays
++ * `loading` forever by contract, so report it as `invalid` with the message
++ * the Settings page renders for non-ready states.
++ */
++function projectSettingsStatus(settings, document) {
++  if (settings.status !== 'loading') return settings
++  const row = document.view?.namespaces?.find((entry) => entry.ns === MCP_SETTINGS_NAMESPACE)
++  if (row === undefined || row.value === undefined) return settings
++  return { ...settings, status: 'invalid', error: { message: INVALID_SETTINGS_MESSAGE } }
++}
++
+ /**
+  * Resolve the Config source of one Server from the workspace layer snapshot
+  * delivered by the `layers` Connection RPC endpoint. Without a snapshot —
+@@ -275,9 +295,10 @@ export class McpSettingsController {
+   }
+ 
+   projection() {
++    const settingsDocument = this.describe.getSnapshot()
+     return {
+-      settings: this.scope.getSnapshot(),
+-      settingsDocument: this.describe.getSnapshot(),
++      settings: projectSettingsStatus(this.scope.getSnapshot(), settingsDocument),
++      settingsDocument,
+       overview: this.overview,
+       layers: this.layers,
+       oauthStatuses: this.oauthStatuses,
+diff --git a/src/host/index.js b/src/host/index.js
+index 2cdc8d6..7bfa527 100644
+--- a/src/host/index.js
++++ b/src/host/index.js
+@@ -4,69 +4,94 @@ import { createMcpConnection } from './mcp-connection.js'
+ import { installMcpOauthCommands } from './oauth-commands.js'
+ import { createFileTokenStore } from './oauth.js'
+ import { installMcpOauth } from './oauth-service.js'
++import { importLegacyMcpSettings } from './legacy-import.js'
+ import { installMcpPromptCommand } from './prompt-commands.js'
+ import { installMcpPromotions } from './promotions.js'
+ import { installMcpProxyTool } from './proxy-tool.js'
+-import { installMcpSettings } from './settings.js'
++import { createMcpConfigScope, McpConfigSchema } from './settings.js'
+ import { installMcpSkill } from './skill.js'
+ import { installWorkspaceLayer } from './workspace-config.js'
+ 
+ export const name = 'dsh-mcp-adapter'
+ 
+-// Settings and Timer are optional at the Adapter row. The manager starts only
+-// while both Services exist, but the Config namespace can exist without Timer.
++// 0.1.7 model: the Adapter's configuration is its Loader-entry Config (the
++// `Config` schema below). cordis validates it and passes it to `apply` as the
++// second argument — there is no `config` service, so `ctx.config` is not a
++// thing. Timer is only needed by the connection manager, and Settings by
++// writes and the page.
+ export const inject = []
+ 
+-export function apply(ctx) {
++export const Config = McpConfigSchema
++
++export function apply(ctx, config) {
+   // The bundled agent skill is independent of every other Adapter feature: a
+-  // deployment without the skills service simply gets no skill entry. Sibling
+-  // inject fibers run in registration order while the services exist, so the
+-  // settings callback reads `skillInstall` before the skills callback runs;
+-  // without the settings service the skill module's 'file' default applies.
+-  let skillInstall
+-  installMcpSettings(ctx, (settingsCtx, scope) => {
+-    skillInstall = scope.get()?.skillInstall
+-    const layeredScope = installWorkspaceLayer(settingsCtx, scope)
+-    settingsCtx.inject(['timer'], (managerCtx) => {
+-      const store = createFileTokenStore()
+-      let oauth
+-      const manager = installMcpManager(managerCtx, layeredScope, {
+-        connectionFactory: (serverName, config, callbacks, signal, sdk) =>
+-          createMcpConnection(serverName, config, callbacks, signal, sdk, {
+-            store,
+-            onAuthorizationRequired: (url) =>
+-              oauth?.noteAuthorizationRequired(serverName, url),
+-          }),
+-      })
+-      // The OAuth controller and every command read the LAYERED scope, so a
+-      // workspace-defined Server is signable and status-visible. Writes still
+-      // land in the global namespace: the layered scope forwards them there.
+-      oauth = installMcpOauth(managerCtx, manager, layeredScope, { store })
+-      managerCtx.inject(['connection'], (rpcCtx) => {
+-        installMcpManagerRpc(rpcCtx, manager, {
+-          // Refresh the workspace layer before each snapshot, giving the
+-          // Settings page poll a real refresh path for a file created after
+-          // startup.
+-          layerSnapshot: async () => {
+-            await layeredScope.refreshLayers()
+-            return layeredScope.layerSnapshot()
+-          },
+-          oauth,
+-        })
+-      })
+-      installMcpCommands(managerCtx, manager, layeredScope)
+-      installMcpOauthCommands(managerCtx, layeredScope, oauth)
+-      installMcpPromptCommand(managerCtx, manager)
+-      managerCtx.inject(['tools'], (toolCtx) => {
+-        installMcpProxyTool(toolCtx, manager)
+-        installMcpPromotions(toolCtx, manager, layeredScope)
++  // deployment without the skills service simply gets no skill entry.
++  // `skillInstall` is read once here, from the entry Config.
++  const scope = createMcpConfigScope(ctx, config)
++  ctx.effect(() => () => scope.dispose(), 'dsh-mcp-adapter: config scope')
++  const skillInstall = scope.get().skillInstall
++  const layeredScope = installWorkspaceLayer(ctx, scope)
++
++  // The Adapter owns a hand-built Settings page, so the shell must not also
++  // auto-generate a form page for this entry. While the settings service is
++  // mounted, also finish the one-time legacy import after the Loader settles:
++  // the platform renames settings.yaml and imports same-named sections only,
++  // so the `mcp` section under our `mcp-adapter` entry id is left behind.
++  let disposed = false
++  ctx.effect(() => () => {
++    disposed = true
++  }, 'dsh-mcp-adapter: fiber disposal flag')
++  ctx.inject(['settings'], (settingsCtx) => {
++    settingsCtx.effect(
++      () => settingsCtx.settings.configure({ auto: false }, ctx.fiber),
++      'dsh-mcp-adapter: settings presentation',
++    )
++    void ctx.root.loader
++      .await()
++      .then(() => (disposed ? undefined : importLegacyMcpSettings(settingsCtx)))
++      .catch((error) => settingsCtx.logger?.warn?.(error))
++  })
++
++  ctx.inject(['timer'], (managerCtx) => {
++    const store = createFileTokenStore()
++    let oauth
++    const manager = installMcpManager(managerCtx, layeredScope, {
++      connectionFactory: (serverName, config, callbacks, signal, sdk) =>
++        createMcpConnection(serverName, config, callbacks, signal, sdk, {
++          store,
++          onAuthorizationRequired: (url) =>
++            oauth?.noteAuthorizationRequired(serverName, url),
++        }),
++    })
++    // The OAuth controller and every command read the LAYERED scope, so a
++    // workspace-defined Server is signable and status-visible. Writes still
++    // land in the entry Config: the layered scope forwards them there.
++    oauth = installMcpOauth(managerCtx, manager, layeredScope, { store })
++    managerCtx.inject(['connection'], (rpcCtx) => {
++      installMcpManagerRpc(rpcCtx, manager, {
++        // Refresh the workspace layer before each snapshot, giving the
++        // Settings page poll a real refresh path for a file created after
++        // startup.
++        layerSnapshot: async () => {
++          await layeredScope.refreshLayers()
++          return layeredScope.layerSnapshot()
++        },
++        oauth,
+       })
+     })
++    installMcpCommands(managerCtx, manager, layeredScope)
++    installMcpOauthCommands(managerCtx, layeredScope, oauth)
++    installMcpPromptCommand(managerCtx, manager)
++    managerCtx.inject(['tools'], (toolCtx) => {
++      installMcpProxyTool(toolCtx, manager)
++      installMcpPromotions(toolCtx, manager, layeredScope)
++    })
+   })
+   ctx.inject(['skills'], (skillCtx) => installMcpSkill(skillCtx, { skillInstall }))
+ }
+ 
+ export * from './commands.js'
++export * from './legacy-import.js'
+ export * from './manager.js'
+ export * from './mcp-connection.js'
+ export * from './oauth-commands.js'
+diff --git a/src/host/legacy-import.js b/src/host/legacy-import.js
+new file mode 100644
+index 0000000..9d6b8e0
+--- /dev/null
++++ b/src/host/legacy-import.js
+@@ -0,0 +1,121 @@
++import { readFile, writeFile } from 'node:fs/promises'
++import { join } from 'node:path'
++import { parse as parseYaml } from 'yaml'
++
++import {
++  MCP_SETTINGS_NAMESPACE,
++  McpConfigSchema,
++  validateMcpSettings,
++} from './settings.js'
++import { errorMessage } from './errors.js'
++
++// 0.1.7 importLegacyDocument renames the profile's settings.yaml to
++// settings.yaml.imported and moves only sections whose name matches a Loader
++// entry id. The Adapter's legacy section is `mcp` while its entry id is
++// `mcp-adapter`, so the platform leaves it behind; this import finishes the
++// migration exactly once per profile.
++const LEGACY_DOCUMENT_NAMES = ['settings.yaml.imported', 'settings.yaml']
++const LEGACY_SECTION = 'mcp'
++const MARKER_NAME = 'mcp-adapter.legacy-imported'
++
++function isPlainObject(value) {
++  return typeof value === 'object' && value !== null && !Array.isArray(value)
++}
++
++/** Whether the entry still answers with pure defaults and no user section. */
++function isUntouched(descriptor) {
++  if (descriptor === undefined) return false
++  const user = descriptor.user
++  if (user !== undefined && Object.keys(user).length > 0) return false
++  const value = descriptor.value
++  if (!isPlainObject(value)) return true
++  return Object.keys(value.mcpServers ?? {}).length === 0
++}
++
++/**
++ * Import the removed settings.yaml `mcp` section into this entry's profile
++ * Config once. Runs after the Loader settles (the platform import runs first
++ * and skips our mismatched section name). A `user` section or non-default
++ * servers on the entry mean the config was already written, so the legacy
++ * data stays untouched in the imported document; failures only warn, they
++ * never throw. On success a marker file prevents re-import, so deliberately
++ * clearing every Server later never resurrects the legacy list.
++ */
++export async function importLegacyMcpSettings(ctx, deps = {}) {
++  const settings = deps.settings ?? ctx.get('settings')
++  const profileContext = deps.profileContext ?? ctx.get('profileContext')
++  const logger = deps.logger ?? ctx.logger
++  if (settings === undefined || profileContext?.home === undefined) return
++
++  const home = profileContext.home
++  const readFileFn = deps.readFile ?? ((path) => readFile(path, 'utf8'))
++  const writeFileFn = deps.writeFile ?? ((path, text) => writeFile(path, text))
++  const markerPath = join(home, MARKER_NAME)
++
++  try {
++    try {
++      await readFileFn(markerPath)
++      return // already imported for this profile
++    } catch {
++      // No marker yet; continue.
++    }
++
++    let documentPath
++    let sections
++    for (const name of LEGACY_DOCUMENT_NAMES) {
++      let text
++      try {
++        text = await readFileFn(join(home, name))
++      } catch {
++        continue
++      }
++      const parsed = parseYaml(text)
++      if (isPlainObject(parsed) && isPlainObject(parsed[LEGACY_SECTION])) {
++        documentPath = join(home, name)
++        sections = parsed
++        break
++      }
++    }
++    if (documentPath === undefined) return
++
++    const descriptor = settings
++      .describe({ redactSecrets: true })
++      .find((entry) => entry.ns === MCP_SETTINGS_NAMESPACE)
++    if (!isUntouched(descriptor)) {
++      logger?.info?.(
++        'dsh-mcp-adapter: %s already has written Config; the legacy "mcp" section in %s was left in place',
++        MCP_SETTINGS_NAMESPACE,
++        documentPath,
++      )
++      return
++    }
++
++    // Keep only fields this entry declares; anything else in the legacy
++    // section would make the reloaded entry fail schema validation.
++    const legacy = sections[LEGACY_SECTION]
++    const section = {
++      mcpServers: isPlainObject(legacy.mcpServers) ? legacy.mcpServers : {},
++      ...(typeof legacy.skillInstall === 'string'
++        ? { skillInstall: legacy.skillInstall }
++        : {}),
++    }
++    const resolved = McpConfigSchema(section)
++    validateMcpSettings({
++      mcpServers: resolved.mcpServers.get(),
++      skillInstall: resolved.skillInstall.get(),
++    })
++
++    await settings.update(MCP_SETTINGS_NAMESPACE, section)
++    await writeFileFn(markerPath, `imported the "${LEGACY_SECTION}" section of ${documentPath}\n`)
++    logger?.info?.(
++      'dsh-mcp-adapter: imported the legacy "mcp" settings section from %s into the %s entry',
++      documentPath,
++      MCP_SETTINGS_NAMESPACE,
++    )
++  } catch (error) {
++    logger?.warn?.(
++      'dsh-mcp-adapter: legacy "mcp" settings import failed; copy the "mcp" section into the profile manually: %s',
++      errorMessage(error),
++    )
++  }
++}
+diff --git a/src/host/settings.js b/src/host/settings.js
+index 52b7148..5c812cd 100644
+--- a/src/host/settings.js
++++ b/src/host/settings.js
+@@ -1,10 +1,11 @@
+ import z from '@deepseek-ai/schemastery'
+ 
+-// The plain namespace string works on both supported harness generations:
+-// DSH 0.1.1-rc.2 brands it via the (removed-in-0.1.2-rc.1) `settingsNamespace`
+-// export, while 0.1.2-rc.1 validates the raw string inside `register` itself.
+-// Branding was type-only, so no runtime behavior changes either way.
+-export const MCP_SETTINGS_NAMESPACE = 'mcp'
++import { errorMessage } from './errors.js'
++
++// DSH 0.1.7 replaced the registered-namespace settings model with profile
++// Loader-entry Config: the Adapter's configuration IS its entry Config, so
++// the settings namespace identity is the entry id from cordis.patch.yml.
++export const MCP_SETTINGS_NAMESPACE = 'mcp-adapter'
+ 
+ const optionalString = () => z.string().required(false)
+ 
+@@ -64,14 +65,21 @@ export const McpServerSchema = z
+   })
+   .description('One configured MCP server.')
+ 
+-export const McpSettingsSchema = z.object({
++// Every Adapter-managed field is volatile: the Loader commits form edits into
++// the running fiber without a restart, and the Settings page / profile editor
++// may only write schema-declared volatile paths. Volatile fields must sit at
++// fixed object paths, so the marks stay on the two top-level fields — server
++// entries inside the dict cannot carry their own volatile marks.
++export const McpConfigSchema = z.object({
+   mcpServers: z
+     .dict(McpServerSchema)
+     .default({})
++    .volatile()
+     .description('Global MCP servers, keyed by their unique server name.'),
+   skillInstall: z
+     .union(['file', 'runtime', 'off'])
+     .default('file')
++    .volatile()
+     .description(
+       'How the bundled mcp-adapter agent skill is installed: file (copy to '
+       + '$DSH_HOME/skills/mcp-adapter/ so Settings > Skills lists it; an '
+@@ -109,7 +117,9 @@ function rejectUnknownKeys(value, allowed, path) {
+ 
+ /**
+  * Cross-field checks that the serializable Schemastery shape cannot express.
+- * SettingsProvider runs this after schema validation and before every persist.
++ * The old SettingsProvider ran this before every persist; the 0.1.7 Config
++ * write path validates only the schema, so this runs at Host consumption
++ * instead (the Adapter serves no Servers for a semantically invalid section).
+  */
+ export function validateMcpSettings(value) {
+   rejectUnknownKeys(value, TOP_LEVEL_KEYS, 'mcp')
+@@ -181,18 +191,120 @@ export function validateMcpSettings(value) {
+   }
+ }
+ 
++// Cosmokit identifies volatile references across library copies through this
++// shared symbol; reading it directly keeps the Host free of a cosmokit import.
++const VOLATILE_WRITE = Symbol.for('cosmokit.volatile.write')
++
++function unwrapVolatile(value, fallback) {
++  if (typeof value === 'object' && value !== null && VOLATILE_WRITE in value) {
++    return value.get()
++  }
++  return value ?? fallback
++}
++
++export function stableJson(value) {
++  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`
++  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'undefined'
++  const keys = Object.keys(value).sort()
++  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`
++}
++
++/**
++ * Read the live Adapter Config from the fiber and enforce the cross-field
++ * rules. A section that schemastery accepts but these rules reject fails
++ * closed to an empty server list with one deduplicated warning, so a
++ * hand-edited profile can never brick the connection manager.
++ */
++export function readMcpConfig(config = {}, onInvalid) {
++  const value = {
++    ...config,
++    mcpServers: unwrapVolatile(config.mcpServers, {}),
++    skillInstall: unwrapVolatile(config.skillInstall, 'file'),
++  }
++  try {
++    // Validation sees the whole resolved Config, so unknown fields still
++    // reject the section; the returned value only carries declared fields.
++    validateMcpSettings(value)
++    return { mcpServers: value.mcpServers, skillInstall: value.skillInstall }
++  } catch (error) {
++    onInvalid?.(errorMessage(error))
++    return { mcpServers: {}, skillInstall: 'file' }
++  }
++}
++
+ /**
+- * Register Config while the optional Host settings service exists. The scope
+- * belongs to the injected fiber, so provider reload or Adapter disposal removes
+- * the namespace and every watcher cleanly.
++ * Wrap the fiber's volatile entry Config in the scope surface every Adapter
++ * feature consumes (the same { get, watch, update, mutate } the old settings
++ * scope provided):
++ *  - `get()` unwraps the volatile references and fail-closes on invalid data;
++ *  - `watch(listener)` fires `(next, previous)` after committed volatile
++ *    updates (`loader/volatile-update`) whose value actually changed;
++ *  - `update(patch)` / `mutate(ops)` write through the settings service onto
++ *    this entry and throw when no settings service is mounted.
++ *
++ * `config` is the validated Config cordis hands the plugin as the second
++ * `apply` argument. Schema-declared volatile fields are stable references
++ * inside that object and the Loader commits edits into them in place, so the
++ * object stays live for the whole activation (an ordinary edit restarts the
++ * entry instead). It is the only way to read the entry Config: cordis has no
++ * `config` service, so touching `ctx.config` throws
++ * `cannot get property "config" without inject`.
+  */
+-export function installMcpSettings(ctx, activate) {
+-  ctx.inject(['settings'], (settingsCtx) => {
+-    const scope = settingsCtx.settings.register(
+-      MCP_SETTINGS_NAMESPACE,
+-      McpSettingsSchema,
+-      { validate: validateMcpSettings },
+-    )
+-    return activate?.(settingsCtx, scope)
++export function createMcpConfigScope(ctx, config, options = {}) {
++  const warn = options.warn ?? ((message) => ctx.logger?.warn?.(message))
++  const settingsService = options.settings ?? (() => ctx.get('settings'))
++  const listeners = new Set()
++  let warnedInvalid
++  let last = readCurrent()
++
++  function readCurrent() {
++    return readMcpConfig(config, (message) => {
++      if (message === warnedInvalid) return
++      warnedInvalid = message
++      warn(`dsh-mcp-adapter: invalid MCP Config, serving no Servers: ${message}`)
++    })
++  }
++
++  const off = ctx.on('loader/volatile-update', () => {
++    const next = readCurrent()
++    if (stableJson(next) === stableJson(last)) return
++    const previous = last
++    last = next
++    for (const listener of [...listeners]) {
++      try {
++        listener(next, previous)
++      } catch {
++        // A stale or failing listener must not break Config notification.
++      }
++    }
+   })
++
++  function requireSettings(method) {
++    const settings = settingsService()
++    if (settings === undefined) {
++      throw new Error(
++        `dsh-mcp-adapter: settings ${method} unavailable: the DSH settings service is not `
++        + 'mounted in this profile, so MCP Config cannot be written.',
++      )
++    }
++    return settings
++  }
++
++  return {
++    get: () => readCurrent(),
++    watch(listener) {
++      listeners.add(listener)
++      return () => listeners.delete(listener)
++    },
++    update(patch) {
++      return requireSettings('update').update(MCP_SETTINGS_NAMESPACE, patch)
++    },
++    mutate(ops) {
++      return requireSettings('mutate').mutate(MCP_SETTINGS_NAMESPACE, ops)
++    },
++    dispose() {
++      off?.()
++      listeners.clear()
++    },
++  }
+ }
+diff --git a/src/host/workspace-config.js b/src/host/workspace-config.js
+index 265ad95..625ffb8 100644
+--- a/src/host/workspace-config.js
++++ b/src/host/workspace-config.js
+@@ -2,7 +2,7 @@ import { watch as fsWatch } from 'node:fs'
+ import { readFile as fsReadFile } from 'node:fs/promises'
+ import { join } from 'node:path'
+ 
+-import { McpServerSchema, validateMcpSettings } from './settings.js'
++import { McpServerSchema, stableJson, validateMcpSettings } from './settings.js'
+ import { errorMessage } from './errors.js'
+ 
+ function isRecord(value) {
+@@ -95,13 +95,6 @@ export function mergeMcpConfigs(globalServers, workspaceServers) {
+   return { servers, sources }
+ }
+ 
+-function stableJson(value) {
+-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`
+-  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'undefined'
+-  const keys = Object.keys(value).sort()
+-  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`
+-}
+-
+ function defaultWatchDirectory(directory, onChange) {
+   const watcher = fsWatch(directory, () => onChange())
+   watcher.on('error', () => {
+@@ -120,7 +113,7 @@ function publicServerSummary(config) {
+ }
+ 
+ /**
+- * Wrap the registered global Config scope with the workspace layer.
++ * Wrap the entry Config scope with the workspace layer.
+  *
+  * `get()` returns the merged namespace value and `layerSnapshot()` reports
+  * which source each Server came from. Watch listeners see global Config edits
+@@ -287,7 +280,7 @@ export function createLayeredScope(globalScope, options = {}) {
+ }
+ 
+ /**
+- * Register the workspace Config layer on the settings fiber. Disposing the
++ * Register the workspace Config layer on the Adapter fiber. Disposing the
+  * fiber stops the global watch and the best-effort `.dsh` directory watch.
+  */
+ export function installWorkspaceLayer(ctx, scope, options = {}) {
+diff --git a/test/client-apply.test.js b/test/client-apply.test.js
+index dcafe8b..b5bd598 100644
+--- a/test/client-apply.test.js
++++ b/test/client-apply.test.js
+@@ -37,9 +37,18 @@ function fakeDocument() {
+   }
+ }
+ 
+-function snapshotStore(value, revision) {
++/** One configForms entry controller, in the 0.1.7 snapshot shape. */
++function fakeForm(value, revision) {
+   return {
+-    snapshot: { status: 'ready', value, revision, writable: true },
++    snapshot: {
++      status: 'ready',
++      value,
++      base: undefined,
++      user: {},
++      revision,
++      writable: true,
++      mode: 'host',
++    },
+     listeners: new Set(),
+     getSnapshot() {
+       return this.snapshot
+@@ -53,7 +62,11 @@ function snapshotStore(value, revision) {
+ 
+ function fakeDescribe() {
+   return {
+-    snapshot: { status: 'ready', view: { namespaces: [] }, error: null },
++    snapshot: {
++      status: 'ready',
++      view: { writable: true, hasDocument: true, namespaces: [] },
++      error: null,
++    },
+     listeners: new Set(),
+     getSnapshot() {
+       return this.snapshot
+@@ -64,27 +77,44 @@ function fakeDescribe() {
+     },
+     async ensure() {},
+     acceptView(view) {
+-      this.snapshot = { ...this.snapshot, view }
++      const namespaces = this.snapshot.view.namespaces
++      this.snapshot = {
++        ...this.snapshot,
++        view: {
++          ...this.snapshot.view,
++          namespaces: namespaces.some((row) => row.ns === view.ns)
++            ? namespaces.map((row) => (row.ns === view.ns ? view : row))
++            : [...namespaces, view],
++        },
++      }
+     },
+   }
+ }
+ 
+ /**
+- * A fake client context in the shape of one harness generation.
++ * A fake client context in the DSH 0.1.7 shape.
+  *
+- * 0.1.2-rc.1 and every newer generation checked so far (through 0.1.5-rc.2)
+- * mount the settings write face as the traced dotted service `remote.settings`
+- * (positional arguments, flat `{ ok, value }` envelope): reading it through
++ * Reads and the write queue live behind the `configForms` service:
++ * `get(entryId)` answers the per-entry form controller and `describe()` the
++ * shared document mirror. The write face is the `remote` service's
++ * `settings` namespace: a traced dotted service with positional arguments
++ * and a flat `{ ok, value }` envelope — reading it through
+  * `ctx.remote.settings` throws the runner's governance error, and only the
+- * inject-free `ctx.get('remote.settings')` reaches it. The `connection`
+- * service lost its `api` face entirely.
+- * 0.1.1-rc.2 keeps the settings write surface on `connection.api.settings`
+- * with a single request-object argument and a `{ result }` envelope, and
+- * never mounts `remote.settings` (`ctx.get` answers undefined).
++ * inject-free `ctx.get('remote.settings')` reaches it.
+  */
+-function fakeCtx({ generation, scopeRevision = 7, views, calls }) {
+-  const scope = snapshotStore({ mcpServers: {} }, scopeRevision)
++function fakeCtx({ scopeRevision = 7, views, calls }) {
++  const form = fakeForm({ mcpServers: {} }, scopeRevision)
+   const describe = fakeDescribe()
++  const settingsFace = {
++    async update(ns, patch, expectedRevision) {
++      calls.push(['remote.update', ns, patch, expectedRevision])
++      return views.update(ns, patch, expectedRevision)
++    },
++    async mutate(ns, ops, expectedRevision) {
++      calls.push(['remote.mutate', ns, ops, expectedRevision])
++      return views.mutate(ns, ops, expectedRevision)
++    },
++  }
+   const ctx = {
+     disposals: [],
+     lastRegistered: undefined,
+@@ -93,8 +123,11 @@ function fakeCtx({ generation, scopeRevision = 7, views, calls }) {
+       if (typeof dispose === 'function') ctx.disposals.push([name, dispose])
+       return dispose
+     },
+-    settingsScope: {
+-      bind: () => scope,
++    configForms: {
++      get: (entryId) => {
++        calls.push(['configForms.get', entryId])
++        return form
++      },
+       describe: () => describe,
+     },
+     slots: {
+@@ -115,45 +148,16 @@ function fakeCtx({ generation, scopeRevision = 7, views, calls }) {
+       },
+     },
+   }
+-  // Every generation except 0.1.1-rc.2 mounts the face identically: the
+-  // 0.1.2-rc.1 → 0.1.5-rc.2 diff leaves the settings-controller source and the
+-  // remotes mount list untouched.
+-  if (generation !== '0.1.1-rc.2') {
+-    const settingsFace = {
+-      async update(ns, patch, expectedRevision) {
+-        calls.push(['remote.update', ns, patch, expectedRevision])
+-        return views.update(ns, patch, expectedRevision)
+-      },
+-      async mutate(ns, ops, expectedRevision) {
+-        calls.push(['remote.mutate', ns, ops, expectedRevision])
+-        return views.mutate(ns, ops, expectedRevision)
+-      },
+-    }
+-    // The transport service is bare: the namespace lives only behind the
+-    // mount, and the governed dotted access throws exactly like the runner.
+-    ctx.remote = {}
+-    Object.defineProperty(ctx.remote, 'settings', {
+-      get() {
+-        throw new Error('cannot get property "remote.settings" without inject')
+-      },
+-    })
+-    ctx.get = (name) => (name === 'remote.settings' ? settingsFace : undefined)
+-  } else {
+-    ctx.get = () => undefined
+-    ctx.connection.api = {
+-      settings: {
+-        async update(request) {
+-          calls.push(['api.update', request])
+-          return { result: await views.update(request.ns, request.patch, request.expectedRevision) }
+-        },
+-        async mutate(request) {
+-          calls.push(['api.mutate', request])
+-          return { result: await views.mutate(request.ns, request.ops, request.expectedRevision) }
+-        },
+-      },
+-    }
+-  }
+-  return { ctx, scope, describe }
++  // The transport service is bare: the namespace lives only behind the
++  // mount, and the governed dotted access throws exactly like the runner.
++  ctx.remote = {}
++  Object.defineProperty(ctx.remote, 'settings', {
++    get() {
++      throw new Error('cannot get property "remote.settings" without inject')
++    },
++  })
++  ctx.get = (name) => (name === 'remote.settings' ? settingsFace : undefined)
++  return { ctx, form, describe }
+ }
+ 
+ function okView(ns, value, expectedRevision) {
+@@ -161,6 +165,7 @@ function okView(ns, value, expectedRevision) {
+     ok: true,
+     value: {
+       ns,
++      autoGenerate: true,
+       schema: {},
+       value,
+       applies: 'live',
+@@ -202,27 +207,45 @@ function applyWithFakeDocument(ctx, mod) {
+   }
+ }
+ 
+-test('client inject declares every service it reads, including remote', async () => {
++test('client inject declares every service it reads, including configForms and remote', async () => {
+   const mod = await loadClientModule()
+   assert.deepEqual(
+     [...mod.inject].sort(),
+-    ['connection', 'remote', 'settingsScope', 'slots'],
++    ['configForms', 'connection', 'remote', 'slots'],
+   )
+ })
+ 
+-test('client inject omits remote.settings: governed on 0.1.2-rc.1, never mounted on 0.1.1-rc.2', async () => {
+-  // Declaring the dotted service would park the plugin fiber forever on
+-  // 0.1.1-rc.2, where no provider ever mounts it; on 0.1.2-rc.1 the mounted
+-  // namespace is reached through the inject-free `ctx.get` read instead.
++test('client inject omits remote.settings: it is governed and optional per profile', async () => {
++  // Declaring the dotted service would park the plugin fiber on a profile
++  // that never mounts the remotes bundle; the mounted namespace is reached
++  // through the inject-free `ctx.get` read instead.
+   const mod = await loadClientModule()
+   assert.equal(mod.inject.includes('remote.settings'), false)
+ })
+ 
++test('apply reads the entry form from configForms under the Loader entry id', async () => {
++  const mod = await loadClientModule()
++  const calls = []
++  const { ctx } = fakeCtx({
++    calls,
++    views: {
++      update: (ns, patch, expectedRevision) => okView(ns, patch, expectedRevision),
++      mutate: (ns, ops, expectedRevision) => okView(ns, {}, expectedRevision),
++    },
++  })
++  await applyWithFakeDocument(ctx, mod)
++
++  assert.deepEqual(calls[0], ['configForms.get', 'mcp-adapter'])
++  const controller = ctx.lastRegistered.inject().controller
++  const added = await controller.addServer('fixture', { command: 'node', args: ['server.mjs'] })
++  assert.equal(added, true)
++  await controller.dispose()
++})
++
+ test('apply resolves the mounted remote.settings namespace through ctx.get', async () => {
+   const mod = await loadClientModule()
+   const calls = []
+   const { ctx } = fakeCtx({
+-    generation: '0.1.2-rc.1',
+     calls,
+     views: {
+       update: (ns, patch, expectedRevision) => okView(ns, patch, expectedRevision),
+@@ -234,26 +257,21 @@ test('apply resolves the mounted remote.settings namespace through ctx.get', asy
+   const controller = ctx.lastRegistered.inject().controller
+   const added = await controller.addServer('fixture', { command: 'node', args: ['server.mjs'] })
+   assert.equal(added, true)
+-  assert.equal(calls[0][0], 'remote.update')
++  assert.equal(calls.some(([method]) => method === 'remote.update'), true)
+   await controller.dispose()
+ })
+ 
+-test('apply still resolves a plain remote.settings property face (legacy runner shape)', async () => {
++test('apply still resolves a plain remote.settings property face (test-double shape)', async () => {
+   const mod = await loadClientModule()
+   const calls = []
+   const views = {
+     update: (ns, patch, expectedRevision) => okView(ns, patch, expectedRevision),
+     mutate: (ns, ops, expectedRevision) => okView(ns, {}, expectedRevision),
+   }
+-  const { ctx } = fakeCtx({
+-    generation: '0.1.1-rc.2',
+-    calls,
+-    views,
+-  })
++  const { ctx } = fakeCtx({ calls, views })
+   // A runner (or test double) that exposes the face as a plain property and
+   // offers no inject-free `ctx.get` must still resolve through the direct read.
+   delete ctx.get
+-  delete ctx.connection.api
+   ctx.remote = {
+     settings: {
+       async update(ns, patch, expectedRevision) {
+@@ -271,15 +289,14 @@ test('apply still resolves a plain remote.settings property face (legacy runner
+   const controller = ctx.lastRegistered.inject().controller
+   const added = await controller.addServer('fixture', { command: 'node', args: ['server.mjs'] })
+   assert.equal(added, true)
+-  assert.equal(calls[0][0], 'remote.update')
++  assert.equal(calls.at(-1)[0], 'remote.update')
+   await controller.dispose()
+ })
+ 
+-test('apply wires the 0.1.2-rc.1 remote settings face with positional writes', async () => {
++test('apply wires the remote settings face with positional writes on the entry id', async () => {
+   const mod = await loadClientModule()
+   const calls = []
+   const { ctx, describe } = fakeCtx({
+-    generation: '0.1.2-rc.1',
+     calls,
+     views: {
+       update: (ns, patch, expectedRevision) => okView(ns, patch, expectedRevision),
+@@ -291,78 +308,31 @@ test('apply wires the 0.1.2-rc.1 remote settings face with positional writes', a
+   const controller = ctx.lastRegistered.inject().controller
+   const added = await controller.addServer('fixture', { command: 'node', args: ['server.mjs'] })
+   assert.equal(added, true)
+-  assert.deepEqual(calls, [[
+-    'remote.update',
+-    'mcp',
+-    {
+-      mcpServers: {
+-        fixture: normalizeServerConfig('fixture', { command: 'node', args: ['server.mjs'] }),
++  assert.deepEqual(
++    calls.filter(([method]) => method.startsWith('remote.')),
++    [[
++      'remote.update',
++      'mcp-adapter',
++      {
++        mcpServers: {
++          fixture: normalizeServerConfig('fixture', { command: 'node', args: ['server.mjs'] }),
++        },
+       },
+-    },
+-    7,
+-  ]])
++      7,
++    ]],
++  )
+   // The write answer folds back into the describe mirror and the revision.
+-  assert.equal(describe.getSnapshot().view.revision, 8)
+-  await controller.dispose()
+-})
+-
+-test('apply wires the 0.1.5-rc.1 remote settings face identically', async () => {
+-  const mod = await loadClientModule()
+-  const calls = []
+-  const { ctx, describe } = fakeCtx({
+-    generation: '0.1.5-rc.1',
+-    calls,
+-    views: {
+-      update: (ns, patch, expectedRevision) => okView(ns, patch, expectedRevision),
+-      mutate: (ns, ops, expectedRevision) => okView(ns, {}, expectedRevision),
+-    },
+-  })
+-  await applyWithFakeDocument(ctx, mod)
+-
+-  const controller = ctx.lastRegistered.inject().controller
+-  const added = await controller.addServer('fixture', { command: 'node', args: ['server.mjs'] })
+-  assert.equal(added, true)
+-  assert.deepEqual(calls, [[
+-    'remote.update',
+-    'mcp',
+-    {
+-      mcpServers: {
+-        fixture: normalizeServerConfig('fixture', { command: 'node', args: ['server.mjs'] }),
+-      },
+-    },
+-    7,
+-  ]])
+-  assert.equal(describe.getSnapshot().view.revision, 8)
+-  await controller.dispose()
+-})
+-
+-test('apply falls back to connection.api.settings on 0.1.1-rc.2', async () => {
+-  const mod = await loadClientModule()
+-  const calls = []
+-  const { ctx, describe } = fakeCtx({
+-    generation: '0.1.1-rc.2',
+-    calls,
+-    views: {
+-      update: (ns, patch, expectedRevision) => okView(ns, patch, expectedRevision),
+-      mutate: (ns, ops, expectedRevision) => okView(ns, {}, expectedRevision),
+-    },
+-  })
+-  await applyWithFakeDocument(ctx, mod)
+-
+-  const controller = ctx.lastRegistered.inject().controller
+-  const added = await controller.addServer('fixture', { command: 'node', args: ['server.mjs'] })
+-  assert.equal(added, true)
+-  assert.equal(calls[0][0], 'api.update')
+-  assert.equal(calls[0][1].ns, 'mcp')
+-  assert.equal(calls[0][1].expectedRevision, 7)
+-  assert.equal(describe.getSnapshot().view.revision, 8)
++  const row = describe
++    .getSnapshot()
++    .view.namespaces
++    .find((entry) => entry.ns === 'mcp-adapter')
++  assert.equal(row.revision, 8)
+   await controller.dispose()
+ })
+ 
+ test('apply reports a failed remote write through the controller error', async () => {
+   const mod = await loadClientModule()
+   const { ctx } = fakeCtx({
+-    generation: '0.1.2-rc.1',
+     calls: [],
+     views: {
+       update: () => ({ ok: false, error: { code: 'conflict', message: 'revision moved' } }),
+@@ -380,8 +350,9 @@ test('apply reports a failed remote write through the controller error', async (
+ 
+ test('apply fails with guidance when no settings write face exists', async () => {
+   const mod = await loadClientModule()
+-  const { ctx } = fakeCtx({ generation: '0.1.1-rc.2', calls: [], views: {} })
+-  delete ctx.connection.api
++  const { ctx } = fakeCtx({ calls: [], views: {} })
++  delete ctx.get
++  ctx.remote = {}
+   // apply is synchronous: a missing write face throws before the loader ever
+   // receives a plugin handle.
+   assert.throws(() => mod.apply(ctx), /settings write API/)
+diff --git a/test/client-settings-controller.test.js b/test/client-settings-controller.test.js
+index c2e824d..9b48591 100644
+--- a/test/client-settings-controller.test.js
++++ b/test/client-settings-controller.test.js
+@@ -168,7 +168,7 @@ test('oauth actions call the RPC endpoints and surface the authorization URL', a
+ test('secret metadata exposes keys while path operations preserve blank existing values', () => {
+   const view = {
+     namespaces: [{
+-      ns: 'mcp',
++      ns: 'mcp-adapter',
+       secrets: [
+         { path: ['mcpServers', 'fixture', 'env', 'API_TOKEN'], set: true },
+         { path: ['mcpServers', 'fixture', 'env', 'REMOVED'], set: false },
+@@ -252,7 +252,7 @@ test('controller loads the workspace layer snapshot through the Connection RPC',
+         result: {
+           ok: true,
+           value: {
+-            ns: 'mcp',
++            ns: 'mcp-adapter',
+             schema: {},
+             value: {},
+             applies: 'live',
+@@ -346,7 +346,7 @@ test('controller writes through the current namespace revision and folds the ans
+         result: {
+           ok: true,
+           value: {
+-            ns: 'mcp',
++            ns: 'mcp-adapter',
+             schema: {},
+             value: payload.patch,
+             applies: 'live',
+@@ -418,7 +418,7 @@ test('the write path carries a top-level skillInstall mutation through untouched
+           result: {
+             ok: true,
+             value: {
+-              ns: 'mcp',
++              ns: 'mcp-adapter',
+               schema: {},
+               value: { mcpServers: {}, skillInstall: 'runtime' },
+               applies: 'live',
+@@ -491,3 +491,45 @@ test('loadOauthStatuses probes OAuth Servers defined only in the workspace layer
+   assert.deepEqual(statusCalls, [['oauth-status', { server: 'workspaceOnly' }]])
+   await controller.dispose()
+ })
++
++test('a mirrored value the entry schema rejects reports an invalid settings state', () => {
++  const scope = {
++    getSnapshot: () => ({
++      status: 'loading',
++      value: undefined,
++      revision: 4,
++      writable: true,
++      mode: 'host',
++    }),
++    subscribe() {
++      return () => {}
++    },
++  }
++  const describe = {
++    getSnapshot: () => ({
++      status: 'ready',
++      view: {
++        writable: true,
++        hasDocument: true,
++        namespaces: [{ ns: 'mcp-adapter', schema: {}, value: { mcpServers: 5 }, revision: 4 }],
++      },
++      error: null,
++    }),
++    subscribe() {
++      return () => {}
++    },
++    async ensure() {},
++    acceptView() {},
++  }
++  const controller = new McpSettingsController({
++    scope,
++    describe,
++    settingsApi: {},
++    rpc: async () => ({ ok: true, value: { status: { servers: [] }, catalog: { servers: [] } } }),
++  })
++
++  const settings = controller.getSnapshot().settings
++  assert.equal(settings.status, 'invalid')
++  assert.match(settings.error.message, /failed validation/)
++  return controller.dispose()
++})
+diff --git a/test/legacy-import.test.js b/test/legacy-import.test.js
+new file mode 100644
+index 0000000..3fbda4a
+--- /dev/null
++++ b/test/legacy-import.test.js
+@@ -0,0 +1,191 @@
++import assert from 'node:assert/strict'
++import test from 'node:test'
++
++import { importLegacyMcpSettings } from '../src/host/legacy-import.js'
++
++const LEGACY_YAML = `ui:
++  theme: dark
++mcp:
++  mcpServers:
++    demo:
++      command: node
++      args:
++        - server.mjs
++  skillInstall: runtime
++`
++
++function defaults() {
++  return { mcpServers: {}, skillInstall: 'file' }
++}
++
++function fakeEnv({
++  files = { '/profile/settings.yaml.imported': LEGACY_YAML },
++  row = { ns: 'mcp-adapter', value: defaults(), revision: 0 },
++  withSettings = true,
++} = {}) {
++  const updates = []
++  const writes = new Map()
++  const logs = { info: [], warn: [] }
++  const settings = {
++    describe: () => (row === undefined ? [] : [row]),
++    update: async (ns, patch) => {
++      updates.push([ns, patch])
++    },
++  }
++  const ctx = {
++    logger: {
++      info: (message, ...args) => logs.info.push([message, ...args]),
++      warn: (message, ...args) => logs.warn.push([message, ...args]),
++    },
++    get: (name) => {
++      if (name === 'settings') return withSettings ? settings : undefined
++      if (name === 'profileContext') return { home: '/profile' }
++      return undefined
++    },
++  }
++  const deps = {
++    ...(withSettings ? { settings } : {}),
++    profileContext: { home: '/profile' },
++    logger: ctx.logger,
++    readFile: async (path) => {
++      if (!Object.hasOwn(files, path)) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
++      return files[path]
++    },
++    writeFile: async (path, text) => {
++      writes.set(path, text)
++    },
++  }
++  return { ctx, deps, updates, writes, logs, files }
++}
++
++test('imports the untouched entry once and records a marker', async () => {
++  const { ctx, deps, updates, writes, logs } = fakeEnv()
++
++  await importLegacyMcpSettings(ctx, deps)
++
++  assert.deepEqual(updates, [[
++    'mcp-adapter',
++    {
++      mcpServers: { demo: { command: 'node', args: ['server.mjs'] } },
++      skillInstall: 'runtime',
++    },
++  ]])
++  assert.equal(
++    writes.has('/profile/mcp-adapter.legacy-imported'),
++    true,
++    'a marker prevents a later re-import',
++  )
++  assert.equal(logs.warn.length, 0)
++  assert.equal(logs.info.length, 1)
++})
++
++test('the marker makes a second run a no-op even with the document still present', async () => {
++  const { ctx, deps, updates } = fakeEnv({
++    files: {
++      '/profile/settings.yaml.imported': LEGACY_YAML,
++      '/profile/mcp-adapter.legacy-imported': 'done\n',
++    },
++  })
++
++  await importLegacyMcpSettings(ctx, deps)
++  assert.deepEqual(updates, [])
++})
++
++test('leaves the legacy section in place when the entry already has written Config', async () => {
++  const { ctx, deps, updates, writes, logs } = fakeEnv({
++    row: {
++      ns: 'mcp-adapter',
++      value: { mcpServers: { mine: { command: 'node' } }, skillInstall: 'file' },
++      user: { mcpServers: { mine: { command: 'node' } } },
++      revision: 4,
++    },
++  })
++
++  await importLegacyMcpSettings(ctx, deps)
++  assert.deepEqual(updates, [])
++  assert.equal(writes.size, 0)
++  assert.match(logs.info.map((entry) => entry.join(' ')).join('\n'), /already has written Config/)
++})
++
++test('an entry holding non-default servers is treated as touched', async () => {
++  const { ctx, deps, updates } = fakeEnv({
++    row: {
++      ns: 'mcp-adapter',
++      value: { mcpServers: { base: { command: 'node' } }, skillInstall: 'file' },
++      revision: 0,
++    },
++  })
++
++  await importLegacyMcpSettings(ctx, deps)
++  assert.deepEqual(updates, [])
++})
++
++test('an invalid legacy section warns, writes nothing, and leaves recovery manual', async () => {
++  const { ctx, deps, updates, writes, logs } = fakeEnv({
++    files: {
++      '/profile/settings.yaml.imported': `mcp:
++  mcpServers:
++    broken:
++      command: node
++      url: https://example.test/mcp
++`,
++    },
++  })
++
++  await importLegacyMcpSettings(ctx, deps)
++  assert.deepEqual(updates, [])
++  assert.equal(writes.size, 0)
++  assert.match(logs.warn.map((entry) => entry.join(' ')).join('\n'), /configure exactly one transport/)
++  assert.match(logs.warn.map((entry) => entry.join(' ')).join('\n'), /copy the "mcp" section/)
++})
++
++test('a legacy document without an mcp section is ignored', async () => {
++  const { ctx, deps, updates } = fakeEnv({
++    files: { '/profile/settings.yaml.imported': 'ui:\n  theme: dark\n' },
++  })
++
++  await importLegacyMcpSettings(ctx, deps)
++  assert.deepEqual(updates, [])
++})
++
++test('reads settings.yaml directly when the platform rename has not happened yet', async () => {
++  const { ctx, deps, updates } = fakeEnv({
++    files: { '/profile/settings.yaml': LEGACY_YAML },
++  })
++
++  await importLegacyMcpSettings(ctx, deps)
++  assert.equal(updates.length, 1)
++})
++
++test('does nothing without the settings service or a profile context', async () => {
++  const noSettings = fakeEnv({ withSettings: false })
++  await importLegacyMcpSettings(noSettings.ctx, noSettings.deps)
++  assert.deepEqual(noSettings.updates, [])
++
++  const bareCtx = { logger: { info: () => {}, warn: () => {} }, get: () => undefined }
++  await importLegacyMcpSettings(bareCtx, {
++    readFile: async () => {
++      throw new Error('must not read')
++    },
++    writeFile: async () => {},
++  })
++})
++
++test('unknown fields in the legacy section are dropped, never imported', async () => {
++  const { ctx, deps, updates } = fakeEnv({
++    files: {
++      '/profile/settings.yaml.imported': `mcp:
++  mcpServers:
++    demo:
++      command: node
++  retiredFlag: true
++`,
++    },
++  })
++
++  await importLegacyMcpSettings(ctx, deps)
++  assert.deepEqual(updates, [[
++    'mcp-adapter',
++    { mcpServers: { demo: { command: 'node' } } },
++  ]])
++})
+diff --git a/test/settings.test.js b/test/settings.test.js
+index 5da83da..ba45431 100644
+--- a/test/settings.test.js
++++ b/test/settings.test.js
+@@ -1,35 +1,97 @@
+ import assert from 'node:assert/strict'
+ import test from 'node:test'
+ 
+-import { Context } from '@deepseek-ai/cordis'
+-import { SettingsProvider, redactSecrets } from '@deepseek-ai/dsh-settings'
++import { redactSecrets } from '@deepseek-ai/dsh-settings'
+ 
+ import * as Adapter from '../src/host/index.js'
+ import {
++  createMcpConfigScope,
+   MCP_SETTINGS_NAMESPACE,
+-  McpSettingsSchema,
++  McpConfigSchema,
++  readMcpConfig,
+   validateMcpSettings,
+ } from '../src/host/settings.js'
+ 
++// The 0.1.7 Config model wraps every schema-declared volatile field in a
++// cosmokit reference; this mirrors what the Host reads from the entry Config.
+ function resolve(value) {
+-  const resolved = McpSettingsSchema(value)
+-  validateMcpSettings(resolved)
+-  return resolved
++  const resolved = McpConfigSchema(value)
++  const plain = {
++    ...resolved,
++    mcpServers: resolved.mcpServers.get(),
++    skillInstall: resolved.skillInstall.get(),
++  }
++  validateMcpSettings(plain)
++  return { mcpServers: plain.mcpServers, skillInstall: plain.skillInstall }
+ }
+ 
+-class MemorySettings extends SettingsProvider {
+-  writable = true
+-  document = {}
++// cordis resolves a volatile field into a frozen reference read through
++// `get()` and written only through cosmokit's shared write member — the same
++// symbol the Host uses to recognise a reference.
++const VOLATILE_WRITE = Symbol.for('cosmokit.volatile.write')
++
++function volatileRef(value) {
++  let current = value
++  return Object.freeze({
++    get: () => current,
++    [VOLATILE_WRITE]: (next) => (current = next),
++  })
++}
+ 
+-  async load() {
+-    return structuredClone(this.document)
++// A resolved entry Config shaped like the object cordis hands `apply`.
++function fakeConfig(value = {}) {
++  const resolved = McpConfigSchema(value)
++  return {
++    mcpServers: volatileRef(resolved.mcpServers.get()),
++    skillInstall: volatileRef(resolved.skillInstall.get()),
+   }
++}
++
++// What cordis-plugin-loader does on a committed volatile update: re-resolve
++// the new raw Config and push the value through the reference the running
++// fiber already holds.
++function commitVolatile(ref, value) {
++  ref[VOLATILE_WRITE](value)
++}
++
++function resolvedServers(value) {
++  return McpConfigSchema({ mcpServers: value }).mcpServers.get()
++}
+ 
+-  async persist(ns, section) {
+-    this.document[ns] = structuredClone(section)
++// The Host fiber context, minus Config: cordis 4 resolves every context
++// property through its proxy and refuses anything the plugin did not declare
++// in `inject`, and `config` is not a service. A fake that carried Config on
++// the context would hide the crash it is supposed to catch.
++function fakeHostCtx({ settings } = {}) {
++  const handlers = new Map()
++  const warnings = []
++  const target = {
++    logger: { warn: (message) => warnings.push(message) },
++    on(event, handler) {
++      handlers.set(event, handler)
++      return () => handlers.delete(event)
++    },
++    emit(event, ...args) {
++      handlers.get(event)?.(...args)
++    },
++    get: (name) => (name === 'settings' ? settings : undefined),
+   }
++  const ctx = new Proxy(target, {
++    get(obj, prop) {
++      if (prop === 'config') throw new Error('cannot get property "config" without inject')
++      return obj[prop]
++    },
++  })
++  return { ctx, warnings }
+ }
+ 
++test('the plugin exports its Config schema with both managed fields volatile', () => {
++  assert.equal(Adapter.Config, McpConfigSchema)
++  assert.equal(McpConfigSchema.dict.mcpServers.meta.volatile, true)
++  assert.equal(McpConfigSchema.dict.skillInstall.meta.volatile, true)
++  assert.equal(MCP_SETTINGS_NAMESPACE, 'mcp-adapter')
++})
++
+ test('resolves an absent Config to an empty server list and the default skill mode', () => {
+   assert.deepEqual(resolve({}), { mcpServers: {}, skillInstall: 'file' })
+ })
+@@ -125,7 +187,7 @@ test('rejects OAuth on stdio Servers and scopes without OAuth', () => {
+ })
+ 
+ test('redacts secret values while preserving their editable key paths', () => {
+-  const config = resolve({
++  const config = {
+     mcpServers: {
+       stdio: { command: 'node', env: { API_TOKEN: 'secret' } },
+       remote: {
+@@ -133,8 +195,8 @@ test('redacts secret values while preserving their editable key paths', () => {
+         headers: { Authorization: 'Bearer secret' },
+       },
+     },
+-  })
+-  const redacted = redactSecrets(McpSettingsSchema, config)
++  }
++  const redacted = redactSecrets(McpConfigSchema, config)
+   assert.deepEqual(redacted.value.mcpServers.stdio.env, {})
+   assert.deepEqual(redacted.value.mcpServers.remote.headers, {})
+   assert.deepEqual(
+@@ -218,43 +280,121 @@ test('accepts every lifecycle value and rejects invalid ones', () => {
+   )
+ })
+ 
+-test('registers mcp, round-trips a valid update, and emits settings/updated', async () => {
+-  const root = new Context()
+-  const updates = []
+-  root.on('settings/updated', (ns, next, prev, source) => {
+-    updates.push({ ns, next, prev, source })
++test('readMcpConfig unwraps volatile refs and fail-closes on invalid sections', () => {
++  const valid = readMcpConfig(
++    McpConfigSchema({ mcpServers: { demo: { command: 'node' } }, skillInstall: 'runtime' }),
++  )
++  assert.equal(valid.mcpServers.demo.command, 'node')
++  assert.equal(valid.skillInstall, 'runtime')
++
++  const invalid = []
++  const broken = readMcpConfig(
++    McpConfigSchema({ mcpServers: { broken: { command: 'node', url: 'https://x.test' } } }),
++    (message) => invalid.push(message),
++  )
++  assert.deepEqual(broken, { mcpServers: {}, skillInstall: 'file' })
++  assert.match(invalid.join('\n'), /configure exactly one transport/)
++
++  // Unknown profile fields reject the section too, even though the read
++  // returns only declared fields.
++  assert.deepEqual(
++    readMcpConfig({ ...McpConfigSchema({}), imports: [] }, () => {}),
++    { mcpServers: {}, skillInstall: 'file' },
++  )
++})
++
++test('the scope serves unwrapped Config and watches committed volatile updates', () => {
++  const config = fakeConfig({ mcpServers: { demo: { command: 'node' } } })
++  const { ctx } = fakeHostCtx()
++  const scope = createMcpConfigScope(ctx, config)
++
++  assert.deepEqual(scope.get().mcpServers.demo.command, 'node')
++
++  const seen = []
++  scope.watch((next, previous) => seen.push([next, previous]))
++
++  // A committed volatile update writes through the reference the scope already
++  // holds; the scope reports the changed value with its predecessor.
++  commitVolatile(config.mcpServers, resolvedServers({ demo: { command: 'node' }, added: { url: 'https://x.test/api' } }))
++  ctx.emit('loader/volatile-update', [['mcpServers']])
++  assert.equal(seen.length, 1)
++  assert.deepEqual(Object.keys(seen[0][0].mcpServers).sort(), ['added', 'demo'])
++  assert.deepEqual(Object.keys(seen[0][1].mcpServers), ['demo'])
++
++  // A volatile commit that changes nothing notifies nobody.
++  ctx.emit('loader/volatile-update', [['mcpServers']])
++  assert.equal(seen.length, 1)
++
++  scope.dispose()
++})
++
++test('scope writes land on the settings service under the entry id', async () => {
++  const calls = []
++  const settings = {
++    update: async (ns, patch) => calls.push(['update', ns, patch]),
++    mutate: async (ns, ops) => calls.push(['mutate', ns, ops]),
++  }
++  const { ctx } = fakeHostCtx({ settings })
++  const scope = createMcpConfigScope(ctx, fakeConfig())
++
++  await scope.update({ mcpServers: { demo: { disabled: true } } })
++  await scope.mutate([{ op: 'unset', path: ['mcpServers', 'demo'] }])
++  assert.deepEqual(calls, [
++    ['update', 'mcp-adapter', { mcpServers: { demo: { disabled: true } } }],
++    ['mutate', 'mcp-adapter', [{ op: 'unset', path: ['mcpServers', 'demo'] }]],
++  ])
++  scope.dispose()
++})
++
++test('scope writes explain the missing settings service instead of crashing obscurely', () => {
++  const { ctx, warnings } = fakeHostCtx()
++  const scope = createMcpConfigScope(ctx, fakeConfig())
++  assert.throws(() => scope.update({ mcpServers: {} }), /settings service is not mounted/)
++  assert.deepEqual(warnings, [])
++  scope.dispose()
++})
++
++test('an invalid Config warns once and serves an empty server list', () => {
++  const config = McpConfigSchema({
++    mcpServers: { broken: { command: 'node', url: 'https://x.test/api' } },
+   })
++  const { ctx, warnings } = fakeHostCtx()
++  const scope = createMcpConfigScope(ctx, config)
+ 
+-  try {
+-    await root.plugin(MemorySettings)
+-    await root.plugin(Adapter)
+-
+-    const settings = root.get('settings')
+-    const initial = settings.describe().find(({ ns }) => ns === MCP_SETTINGS_NAMESPACE)
+-    assert.ok(initial)
+-    assert.deepEqual(initial.value, { mcpServers: {}, skillInstall: 'file' })
+-    assert.equal(initial.applies, 'live')
+-
+-    await settings.update(MCP_SETTINGS_NAMESPACE, {
+-      mcpServers: { demo: { command: 'node', args: ['server.js'] } },
+-    })
+-
+-    const updated = settings.describe().find(({ ns }) => ns === MCP_SETTINGS_NAMESPACE)
+-    assert.equal(updated.revision, 1)
+-    assert.equal(updated.value.mcpServers.demo.command, 'node')
+-    assert.deepEqual(settings.document.mcp.mcpServers.demo.args, ['server.js'])
+-    assert.equal(updates.length, 1)
+-    assert.equal(updates[0].ns, MCP_SETTINGS_NAMESPACE)
+-    assert.equal(updates[0].source, 'update')
+-
+-    await assert.rejects(
+-      settings.update(MCP_SETTINGS_NAMESPACE, {
+-        mcpServers: { demo: { command: 'node', url: 'https://example.test' } },
+-      }),
+-      /configure exactly one transport/,
+-    )
+-    assert.equal(settings.describe().find(({ ns }) => ns === MCP_SETTINGS_NAMESPACE).revision, 1)
+-  } finally {
+-    await root.fiber.dispose()
++  assert.deepEqual(scope.get(), { mcpServers: {}, skillInstall: 'file' })
++  scope.get()
++  assert.equal(warnings.length, 1)
++  assert.match(warnings[0], /invalid MCP Config, serving no Servers/)
++  scope.dispose()
++})
++
++// The reported crash: cordis has no `config` service, so a Host reaching for
++// `ctx.config` dies on start with `cannot get property "config" without
++// inject`. Mount the Adapter's plugin shape through a real cordis fiber and
++// pin the contract the Host actually relies on.
++test('the entry Config arrives as the apply argument, never as a context property', async () => {
++  const { Context } = await import('@deepseek-ai/cordis')
++  const probe = {
++    name: 'mcp-config-probe',
++    inject: [],
++    Config: McpConfigSchema,
++    apply(fiberCtx, config) {
++      const scope = createMcpConfigScope(fiberCtx, config)
++      let configProperty
++      try {
++        configProperty = fiberCtx.config
++      } catch (error) {
++        configProperty = error.message
++      }
++      probe.reads = [Object.keys(scope.get().mcpServers), configProperty]
++      fiberCtx.effect(() => scope.dispose(), 'mcp-config-probe: config scope')
++    },
+   }
++
++  const ctx = new Context()
++  ctx.plugin(probe, { mcpServers: { demo: { command: 'node' } } })
++  await ctx.provide()
++  ctx.fiber.dispose()
++
++  assert.deepEqual(probe.reads, [['demo'], 'cannot get property "config" without inject'])
+ })

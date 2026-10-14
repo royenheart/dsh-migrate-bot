@@ -1,0 +1,654 @@
+/**
+ * The panel's wire: the exact Fetch routes the browser half calls, exercised
+ * through their real handlers and the real vault.
+ *
+ * The attachment store is the one stand-in, deliberately: the shipped backend
+ * decodes images with a native encoder we do not want as a test dependency. The
+ * stand-in keeps the two things this plugin actually depends on — the method
+ * names and the reference shape — including the `sha256:<hex>` id that once
+ * broke the per-record key. The real store is covered by the live run.
+ */
+
+import { createHash } from 'node:crypto'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
+import type { Context } from '@deepseek-ai/cordis'
+import { Context as CordisContext } from '@deepseek-ai/cordis'
+import Storage from '@deepseek-ai/dsh-storage'
+import * as storageDomain from '@deepseek-ai/dsh-storage-domain'
+import * as storageJson from '@deepseek-ai/dsh-storage-json'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+
+import { registerInboxRpc } from '../src/host/rpc.js'
+import type { WebFetchSeam } from '../src/host/link-title.js'
+import { Vault } from '../src/host/vault/vault.js'
+import {
+  INBOX_API_PREFIX,
+  INBOX_ENDPOINT_ATTACHMENT,
+  INBOX_ENDPOINT_CAPTURE,
+  INBOX_ENDPOINT_DELETE,
+  INBOX_ENDPOINT_DETAIL,
+  INBOX_ENDPOINT_LIST,
+  INBOX_ENDPOINT_PURGE,
+  INBOX_ENDPOINT_RESTORE,
+  INBOX_ENDPOINT_UPDATE,
+  INBOX_ENDPOINT_WEBDAV,
+  INBOX_ENDPOINT_PULL,
+  INBOX_ENDPOINT_PUSH,
+  INBOX_ENDPOINT_PROBE,
+  INBOX_ENDPOINT_UI,
+  INBOX_ENDPOINT_TAGS,
+  INBOX_ENDPOINT_SECRET,
+  type CaptureResult,
+  type DetailResult,
+  type InboxRpcResult,
+  type ListResult,
+  type PurgeResult,
+  type SecretStatus,
+  type UpdateResult,
+} from '../src/shared/panel-wire.js'
+
+/**
+ * Content-addressed stand-in: ids look exactly like the shipped store's, and the
+ * bytes land in a directory the host can read back — the attachment route serves
+ * pictures and plays videos off the filesystem, so a stand-in that kept nothing
+ * could not exercise it.
+ */
+class FakeAttachmentStore {
+  readonly objects = new Map<string, { mediaType: string; name?: string }>()
+
+  constructor(private readonly root: string) {}
+
+  private save(bytes: Uint8Array, mediaType: string, name?: string): string {
+    const id = `sha256:${createHash('sha256').update(bytes).digest('hex')}`
+    this.objects.set(id, { mediaType, ...(name === undefined ? {} : { name }) })
+    const directory = join(this.root, 'objects')
+    mkdirSync(directory, { recursive: true })
+    writeFileSync(this.pathOf(id), bytes)
+    return id
+  }
+
+  /** One file per id, named the way the store's own ids travel. */
+  private pathOf(id: string): string {
+    return join(this.root, 'objects', id.replace(':', '-'))
+  }
+
+  async saveImages(
+    inputs: readonly { data: Uint8Array; mediaType: string; name?: string }[],
+  ): Promise<unknown[]> {
+    return inputs.map((input) => ({
+      attachmentId: this.save(input.data, input.mediaType, input.name),
+      mediaType: input.mediaType,
+      bytes: input.data.byteLength,
+      width: 800,
+      height: 600,
+      ...(input.name === undefined ? {} : { name: input.name }),
+    }))
+  }
+
+  async saveFile(input: { data: Uint8Array; name?: string }): Promise<unknown> {
+    return {
+      attachmentId: this.save(input.data, 'application/octet-stream', input.name),
+      name: input.name ?? 'file',
+      bytes: input.data.byteLength,
+    }
+  }
+
+  imageHostPath(ref: { attachmentId: string }): string {
+    return this.pathOf(ref.attachmentId)
+  }
+
+  fileHostPath(ref: { attachmentId: string }): string {
+    return this.pathOf(ref.attachmentId)
+  }
+}
+
+let root: string
+let ctx: Context
+let vault: Vault | undefined
+let routes: Map<string, ConnectionFetchRoute>
+let store: FakeAttachmentStore
+/** The web seam the fake context exposes, or undefined for "no seam mounted". */
+let webSeam: WebFetchSeam | undefined
+
+/** Capture the routes the host registers, without a live connection service. */
+function mount(): void {
+  const fake = {
+    inject: (_deps: readonly string[], run: (scoped: unknown) => void) => {
+      run({
+        connection: {
+          fetch: {
+            register: (route: ConnectionFetchRoute) => {
+              routes.set(route.path, route)
+              return Promise.resolve()
+            },
+          },
+        },
+        attachments: store as unknown as AttachmentStore,
+        effect: (body: () => unknown) => {
+          body()
+          return () => {}
+        },
+        /*
+          `ctx.get('web')`: the capture route hands *this* scoped context to
+          `capture()`, which asks the web seam for a page headline. Undefined
+          means "this composition has no web seam"; one test swaps in a fake to
+          exercise the other path.
+        */
+        get: (name: string) => (name === 'web' ? webSeam : undefined),
+      })
+    },
+  } as unknown as Context
+  registerInboxRpc(fake, () => vault)
+}
+
+/** POST one payload the way the panel's `fetch` call does. */
+async function post(
+  endpoint: string,
+  payload: unknown,
+  raw?: string,
+): Promise<{ status: number; body: InboxRpcResult<unknown> }> {
+  const route = routes.get(`${INBOX_API_PREFIX}/${endpoint}`)
+  if (route === undefined) throw new Error(`route ${endpoint} was not registered`)
+  const request = new Request(`http://127.0.0.1${route.path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: raw ?? JSON.stringify(payload),
+  })
+  const response = await route.fetch(request)
+  return { status: response.status, body: (await response.json()) as InboxRpcResult<unknown> }
+}
+
+/** GET one attachment the way an `<img src>` or a media element does. */
+async function getAttachment(id: string, headers?: Record<string, string>): Promise<Response> {
+  const route = routes.get(`${INBOX_API_PREFIX}/${INBOX_ENDPOINT_ATTACHMENT}`)
+  if (route === undefined) throw new Error('attachment route was not registered')
+  return route.fetch(
+    new Request(`http://127.0.0.1${route.path}?id=${encodeURIComponent(id)}`, {
+      method: 'GET',
+      ...(headers === undefined ? {} : { headers }),
+    }),
+  )
+}
+
+/** Assert success and hand back the value. */
+function value<T>(result: { status: number; body: InboxRpcResult<unknown> }): T {
+  if (!result.body.ok) {
+    throw new Error(`expected success, got ${result.body.error.code}: ${result.body.error.message}`)
+  }
+  return result.body.value as T
+}
+
+/** The failure code of a call that was refused. */
+function codeOf(result: { status: number; body: InboxRpcResult<unknown> }): string {
+  if (result.body.ok) throw new Error('expected a failure')
+  return result.body.error.code
+}
+
+async function file(text: string, extra: Record<string, unknown> = {}): Promise<string> {
+  return value<CaptureResult>(await post(INBOX_ENDPOINT_CAPTURE, { text, ...extra })).stored === 1
+    ? value<ListResult>(await post(INBOX_ENDPOINT_LIST, { text })).entries[0]?.id ?? ''
+    : ''
+}
+
+const PNG_BASE64_PLAIN = 'not-really-a-png-but-canonical-base64'
+const PNG_BASE64 = Buffer.from(PNG_BASE64_PLAIN).toString('base64')
+
+beforeEach(async () => {
+  root = await mkdtemp(join(tmpdir(), 'dsh-inbox-rpc-'))
+  ctx = new CordisContext()
+  await ctx.plugin(Storage).await()
+  await ctx.plugin(storageJson, { root }).await()
+  await ctx.plugin(storageDomain, { backend: 'json' }).await()
+  vault = await Vault.open(ctx)
+  routes = new Map()
+  store = new FakeAttachmentStore(root)
+  webSeam = undefined
+  mount()
+})
+
+afterEach(async () => {
+  await vault?.close()
+  vault = undefined
+  await rm(root, { recursive: true, force: true })
+})
+
+describe('capture', () => {
+  it('files pasted text and reports it back through the list', async () => {
+    expect(value<CaptureResult>(await post(INBOX_ENDPOINT_CAPTURE, { text: '一段灵感' }))).toEqual({
+      stored: 1,
+      merged: 0,
+      restored: 0,
+    })
+
+    const listed = value<ListResult>(await post(INBOX_ENDPOINT_LIST, {}))
+    expect(listed.total).toBe(1)
+    // Capturing does not flag anything: 待看 is the user's mark to make.
+    expect(listed.watchLater).toBe(0)
+    expect(listed.entries[0]).toMatchObject({ kind: 'text', preview: '一段灵感' })
+  })
+
+  it('merges a repeated link instead of storing it twice', async () => {
+    const url = 'https://www.bilibili.com/video/BV1xx411c7mD'
+    await post(INBOX_ENDPOINT_CAPTURE, { text: url })
+    const again = value<CaptureResult>(
+      await post(INBOX_ENDPOINT_CAPTURE, { text: `${url}?spm_id_from=333.999` }),
+    )
+    expect(again).toEqual({ stored: 0, merged: 1, restored: 0 })
+    expect(vault?.size).toBe(1)
+  })
+
+  it('names a pasted link from the page it points at, after storing it', async () => {
+    webSeam = {
+      async fetch(request) {
+        return {
+          url: request.url,
+          statusCode: 200,
+          body: { kind: 'html', content: '<title>三体读后感</title>' },
+          truncated: false,
+        }
+      },
+    }
+
+    expect(
+      value<CaptureResult>(
+        await post(INBOX_ENDPOINT_CAPTURE, { text: 'https://mp.weixin.qq.com/s/abc' }),
+      ),
+    ).toEqual({ stored: 1, merged: 0, restored: 0 })
+
+    // The route deliberately does not wait for the page: the paste must not sit
+    // behind the network. Poll for the headline the background fetch writes.
+    const id = value<ListResult>(await post(INBOX_ENDPOINT_LIST, {})).entries[0]?.id ?? ''
+    for (let attempt = 0; attempt < 100 && vault?.get(id)?.linkTitle === undefined; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+
+    const listed = value<ListResult>(await post(INBOX_ENDPOINT_LIST, {})).entries[0]
+    expect(listed?.linkTitle).toBe('三体读后感')
+    // Still nobody's `title`: that field belongs to the person.
+    expect(listed?.title).toBeUndefined()
+  })
+
+  it('reports a missed headline on the record, so the pane can explain it', async () => {
+    // WeChat's shape: HTTP 200, an empty <title>, an anti-bot page.
+    webSeam = {
+      async fetch(request) {
+        return {
+          url: request.url,
+          statusCode: 200,
+          body: { kind: 'html', content: '<html><head><title></title></head></html>' },
+          truncated: false,
+        }
+      },
+    }
+
+    await post(INBOX_ENDPOINT_CAPTURE, { text: 'https://mp.weixin.qq.com/s/vTv0Vu4RgrMkmLbXGvnSug' })
+    const id = value<ListResult>(await post(INBOX_ENDPOINT_LIST, {})).entries[0]?.id ?? ''
+    for (let attempt = 0; attempt < 100 && vault?.get(id)?.linkTitleError === undefined; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+
+    const entry = value<ListResult>(await post(INBOX_ENDPOINT_LIST, {})).entries[0]
+    expect(entry?.linkTitleError).toBe('no-title')
+    expect(entry?.linkTitle).toBeUndefined()
+  })
+
+  it('stores a pasted image through the attachment store, not the domain', async () => {
+    const captured = value<CaptureResult>(
+      await post(INBOX_ENDPOINT_CAPTURE, {
+        text: '测试图片',
+        images: [{ mediaType: 'image/png', data: PNG_BASE64, name: 'shot.png' }],
+      }),
+    )
+    expect(captured).toEqual({ stored: 2, merged: 0, restored: 0 })
+    expect(store.objects.size).toBe(1)
+
+    // The store named it `sha256:<hex>`; the domain must still hold a path-safe
+    // key, with the store id kept beside it.
+    const image = vault?.list({ kinds: ['image'] })[0]
+    const attachmentId = image?.attachmentIds[0] ?? ''
+    expect(attachmentId).toMatch(/^[a-zA-Z0-9_-]+$/)
+    expect(vault?.getAttachment(attachmentId)?.storeId).toMatch(/^sha256:[a-f0-9]{64}$/)
+  })
+
+  it('refuses non-canonical base64 as a business failure, not a crash', async () => {
+    const result = await post(INBOX_ENDPOINT_CAPTURE, {
+      images: [{ mediaType: 'image/png', data: 'not base64 !!' }],
+    })
+    expect(result.status).toBe(200)
+    expect(codeOf(result)).toBe('inbox/attachment-refused')
+  })
+
+  it('answers a malformed body with HTTP 400', async () => {
+    const result = await post(INBOX_ENDPOINT_CAPTURE, null, '{not json')
+    expect(result.status).toBe(400)
+    expect(result.body.ok).toBe(false)
+  })
+
+  it('rejects an oversized text paste at the schema boundary', async () => {
+    expect(codeOf(await post(INBOX_ENDPOINT_CAPTURE, { text: 'x'.repeat(200_001) }))).toBe(
+      'inbox/bad-request',
+    )
+  })
+})
+
+describe('list', () => {
+  it('registers every endpoint the panel uses', () => {
+    expect([...routes.keys()].sort()).toEqual(
+      [
+        INBOX_ENDPOINT_ATTACHMENT,
+        INBOX_ENDPOINT_CAPTURE,
+        INBOX_ENDPOINT_DELETE,
+        INBOX_ENDPOINT_DETAIL,
+        INBOX_ENDPOINT_LIST,
+        INBOX_ENDPOINT_PURGE,
+        INBOX_ENDPOINT_RESTORE,
+        INBOX_ENDPOINT_UPDATE,
+        INBOX_ENDPOINT_WEBDAV,
+        INBOX_ENDPOINT_PULL,
+        INBOX_ENDPOINT_PUSH,
+        INBOX_ENDPOINT_PROBE,
+        INBOX_ENDPOINT_UI,
+        INBOX_ENDPOINT_TAGS,
+        INBOX_ENDPOINT_SECRET,
+      ]
+        .map((endpoint) => `${INBOX_API_PREFIX}/${endpoint}`)
+        .sort(),
+    )
+  })
+
+  it('filters by the 待看 flag and reports matching and overall counts separately', async () => {
+    const first = await file('第一条')
+    await file('第二条')
+    await post(INBOX_ENDPOINT_UPDATE, { id: first, watchLater: true })
+
+    const everything = value<ListResult>(await post(INBOX_ENDPOINT_LIST, {}))
+    expect(everything.matched).toBe(2)
+    expect(everything.total).toBe(2)
+    expect(everything.watchLater).toBe(1)
+
+    const unread = value<ListResult>(
+      await post(INBOX_ENDPOINT_LIST, { watchLater: false }),
+    )
+    expect(unread.matched).toBe(1)
+    expect(unread.entries[0]?.preview).toBe('第二条')
+  })
+
+  it('filters by category, tag and free text, and counts facets over live records', async () => {
+    const link = await file('https://mp.weixin.qq.com/s/abc')
+    await post(INBOX_ENDPOINT_UPDATE, { id: link, category: 'article', tags: ['待看', '缓存'] })
+    await file('一段灵感')
+
+    const byCategory = value<ListResult>(
+      await post(INBOX_ENDPOINT_LIST, { categories: ['article'] }),
+    )
+    expect(byCategory.matched).toBe(1)
+    expect(byCategory.categories).toEqual(
+      expect.arrayContaining([
+        { value: 'article', count: 1 },
+        { value: 'other', count: 1 },
+      ]),
+    )
+    expect(byCategory.tags).toEqual(
+      expect.arrayContaining([
+        { value: '待看', count: 1 },
+        { value: '缓存', count: 1 },
+      ]),
+    )
+
+    expect(value<ListResult>(await post(INBOX_ENDPOINT_LIST, { tags: ['待看'] })).matched).toBe(1)
+    expect(value<ListResult>(await post(INBOX_ENDPOINT_LIST, { tags: ['待看', '缓存'] })).matched).toBe(1)
+    expect(value<ListResult>(await post(INBOX_ENDPOINT_LIST, { tags: ['待看', '前端'] })).matched).toBe(0)
+    expect(value<ListResult>(await post(INBOX_ENDPOINT_LIST, { text: '灵感' })).matched).toBe(1)
+  })
+
+  it('pages without losing the match count', async () => {
+    await file('第一条')
+    await file('第二条')
+    await file('第三条')
+
+    const page = value<ListResult>(await post(INBOX_ENDPOINT_LIST, { limit: 2 }))
+    expect(page.entries).toHaveLength(2)
+    expect(page.matched).toBe(3)
+
+    const rest = value<ListResult>(await post(INBOX_ENDPOINT_LIST, { limit: 2, offset: 2 }))
+    expect(rest.entries).toHaveLength(1)
+  })
+})
+
+describe('credentials at rest', () => {
+  const CREDENTIAL = 'secretid=AKIDexample secretkey=abcdef123456'
+
+  it('says it is unconfigured, and refuses to file a credential', async () => {
+    expect(value<SecretStatus>(await post(INBOX_ENDPOINT_SECRET, { action: 'status' }))).toEqual({
+      configured: false,
+      unlocked: false,
+    })
+
+    const refused = await post(INBOX_ENDPOINT_CAPTURE, { text: 'password=hunter2' })
+    expect(codeOf(refused)).toBe('inbox/locked')
+    expect(vault?.size).toBe(0)
+  })
+
+  it('seals once it has a password, hides when locked, and shows again after unlocking', async () => {
+    const set = value<SecretStatus>(
+      await post(INBOX_ENDPOINT_SECRET, { action: 'set', password: '主密码' }),
+    )
+    expect(set).toMatchObject({ configured: true, unlocked: true })
+
+    await post(INBOX_ENDPOINT_CAPTURE, { text: CREDENTIAL })
+    const id = value<ListResult>(await post(INBOX_ENDPOINT_LIST, {})).entries[0]?.id ?? ''
+
+    // The list never carries a body — not even an excerpt.
+    const listed = value<ListResult>(await post(INBOX_ENDPOINT_LIST, {})).entries[0]
+    expect(listed?.preview).toBeUndefined()
+    expect(listed?.category).toBe('secret')
+    expect(JSON.stringify(listed)).not.toContain('abcdef')
+
+    const unlocked = value<DetailResult>(await post(INBOX_ENDPOINT_DETAIL, { id })).entry
+    expect(unlocked.text).toBe(CREDENTIAL)
+
+    await post(INBOX_ENDPOINT_SECRET, { action: 'lock' })
+    const locked = value<DetailResult>(await post(INBOX_ENDPOINT_DETAIL, { id })).entry
+    expect(locked.text).toBeUndefined()
+    expect(JSON.stringify(locked)).not.toContain('abcdef')
+
+    expect(codeOf(await post(INBOX_ENDPOINT_SECRET, { action: 'unlock', password: '猜的' }))).toBe(
+      'inbox/wrong-password',
+    )
+    expect(
+      value<SecretStatus>(await post(INBOX_ENDPOINT_SECRET, { action: 'unlock', password: '主密码' }))
+        .unlocked,
+    ).toBe(true)
+    expect(
+      value<DetailResult>(await post(INBOX_ENDPOINT_DETAIL, { id })).entry.text,
+    ).toBe(CREDENTIAL)
+  })
+})
+
+describe('detail, edit and the recycle bin', () => {
+  it('returns the full record with its attachment metadata', async () => {
+    await post(INBOX_ENDPOINT_CAPTURE, {
+      text: '带附件的记录',
+      images: [{ mediaType: 'image/png', data: PNG_BASE64, name: 'shot.png' }],
+    })
+    const image = vault?.list({ kinds: ['image'] })[0]
+    const detail = value<DetailResult>(
+      await post(INBOX_ENDPOINT_DETAIL, { id: image?.id ?? '' }),
+    ).entry
+
+    expect(detail.attachmentCount).toBe(1)
+    expect(detail.attachments[0]).toMatchObject({ mime: 'image/png', image: true, filename: 'shot.png' })
+  })
+
+  it('edits category, note and tags, and reports the updated record', async () => {
+    const id = await file('这条要改')
+    const updated = value<UpdateResult>(
+      await post(INBOX_ENDPOINT_UPDATE, {
+        id,
+        category: 'document',
+        note: '身份证照',
+        tags: ['证件', '私密'],
+      }),
+    ).entry
+
+    expect(updated).toMatchObject({ category: 'document', note: '身份证照', tags: ['证件', '私密'] })
+    expect(vault?.get(id)?.updatedAt).not.toBe(vault?.get(id)?.createdAt)
+  })
+
+  it('names an uploaded photo by its file, and lets the user rename it', async () => {
+    await post(INBOX_ENDPOINT_CAPTURE, {
+      images: [{ mediaType: 'image/png', data: PNG_BASE64, name: 'IMG_20260918.jpg' }],
+    })
+    // What the list row can call this record without the user typing anything:
+    // the name the file arrived with. Before this it had only 「（无标题）」.
+    const listed = value<ListResult>(await post(INBOX_ENDPOINT_LIST, {}))
+    expect(listed.entries[0]?.attachmentName).toBe('IMG_20260918.jpg')
+    const id = listed.entries[0]?.id ?? ''
+
+    await post(INBOX_ENDPOINT_UPDATE, { id, title: '身份证正面' })
+    expect(value<ListResult>(await post(INBOX_ENDPOINT_LIST, {})).entries[0]?.title).toBe(
+      '身份证正面',
+    )
+
+    // Emptying the field means "no name again", not "a name that is blank": the
+    // heading must fall back to the file name rather than to an empty row.
+    await post(INBOX_ENDPOINT_UPDATE, { id, title: '' })
+    const cleared = value<ListResult>(await post(INBOX_ENDPOINT_LIST, {})).entries[0]
+    expect(cleared?.title).toBeUndefined()
+    expect(cleared?.attachmentName).toBe('IMG_20260918.jpg')
+  })
+
+  it('refuses an edit or a delete for a record that is gone', async () => {
+    expect(codeOf(await post(INBOX_ENDPOINT_UPDATE, { id: 'nope', watchLater: true }))).toBe(
+      'inbox/not-found',
+    )
+    expect(codeOf(await post(INBOX_ENDPOINT_DELETE, { id: 'nope' }))).toBe('inbox/not-found')
+  })
+
+  it('moves a record to the bin, restores it, and empties the bin for real', async () => {
+    const id = await file('会被删掉的')
+
+    await post(INBOX_ENDPOINT_DELETE, { id })
+    const live = value<ListResult>(await post(INBOX_ENDPOINT_LIST, {}))
+    expect(live.total).toBe(0)
+    expect(live.deleted).toBe(1)
+    expect(live.categories).toEqual([])
+    expect(value<ListResult>(await post(INBOX_ENDPOINT_LIST, { scope: 'bin' })).matched).toBe(1)
+
+    await post(INBOX_ENDPOINT_RESTORE, { id })
+    expect(value<ListResult>(await post(INBOX_ENDPOINT_LIST, {})).total).toBe(1)
+
+    await post(INBOX_ENDPOINT_DELETE, { id })
+    expect(value<PurgeResult>(await post(INBOX_ENDPOINT_PURGE, {})).removed).toBe(1)
+    expect(vault?.get(id)).toBeUndefined()
+    expect(value<ListResult>(await post(INBOX_ENDPOINT_LIST, { scope: 'bin' })).matched).toBe(0)
+  })
+
+  it('pulls a record back out of the bin when the same thing is captured again', async () => {
+    const id = await file('回收站里的那条')
+    await post(INBOX_ENDPOINT_DELETE, { id })
+    expect(value<ListResult>(await post(INBOX_ENDPOINT_LIST, {})).total).toBe(0)
+
+    const again = value<CaptureResult>(await post(INBOX_ENDPOINT_CAPTURE, { text: '回收站里的那条' }))
+
+    expect(again).toEqual({ stored: 0, merged: 1, restored: 1 })
+    // The same record, back in the live list and out of the bin.
+    const live = value<ListResult>(await post(INBOX_ENDPOINT_LIST, {}))
+    expect(live.total).toBe(1)
+    expect(live.deleted).toBe(0)
+    expect(live.entries[0]?.id).toBe(id)
+  })
+
+  it('drops the attachment rows when the bin is emptied', async () => {
+    await post(INBOX_ENDPOINT_CAPTURE, {
+      images: [{ mediaType: 'image/png', data: PNG_BASE64, name: 'shot.png' }],
+    })
+
+    const image = vault?.list({ kinds: ['image'] })[0]
+    const attachmentId = image?.attachmentIds[0] ?? ''
+
+    await post(INBOX_ENDPOINT_DELETE, { id: image?.id ?? '' })
+    await post(INBOX_ENDPOINT_PURGE, {})
+
+    expect(vault?.getAttachment(attachmentId)).toBeUndefined()
+    expect(vault?.findAttachmentByStoreId(`sha256:${createHash('sha256').update('not-really-a-png-but-canonical-base64').digest('hex')}`)).toBeUndefined()
+  })
+
+  it('serves attachment bytes only for the media it can render', async () => {
+    await post(INBOX_ENDPOINT_CAPTURE, {
+      images: [{ mediaType: 'image/png', data: PNG_BASE64, name: 'shot.png' }],
+    })
+    await post(INBOX_ENDPOINT_CAPTURE, {
+      files: [{ data: Buffer.from('a plain document').toString('base64'), name: 'notes.pdf' }],
+    })
+    const image = vault?.list({ kinds: ['image'] })[0]
+    const file = vault?.list({ kinds: ['file'] })[0]
+
+    expect((await getAttachment('nope')).status).toBe(404)
+
+    const picture = await getAttachment(image?.attachmentIds[0] ?? '')
+    expect(picture.status).toBe(200)
+    expect(picture.headers.get('content-type')).toBe('image/png')
+    expect(picture.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(Buffer.from(await picture.arrayBuffer()).toString()).toBe(PNG_BASE64_PLAIN)
+
+    // A document has no player and no `<img>`; the route says so instead of
+    // handing the browser bytes it would have to guess about.
+    const refused = await getAttachment(file?.attachmentIds[0] ?? '')
+    expect(refused.status).toBe(415)
+    expect((await refused.json()).error.code).toBe('inbox/attachment-not-renderable')
+  })
+
+  it('plays a video by ranges, so a player can seek without the whole file', async () => {
+    const bytes = '0123456789abcdef'
+    await post(INBOX_ENDPOINT_CAPTURE, {
+      files: [
+        {
+          data: Buffer.from(bytes).toString('base64'),
+          name: 'clip.mp4',
+          mediaType: 'video/mp4',
+        },
+      ],
+    })
+
+    const listed = value<ListResult>(await post(INBOX_ENDPOINT_LIST, {}))
+    const clip = listed.entries.find((entry) => entry.kind === 'file')
+    // The card gets a preview slot for it — that is what makes it clickable.
+    expect(clip?.previewMime).toBe('video/mp4')
+    expect(clip?.previewId).toBeTruthy()
+
+    const whole = await getAttachment(clip?.previewId ?? '')
+    expect(whole.status).toBe(200)
+    expect(whole.headers.get('content-type')).toBe('video/mp4')
+    expect(whole.headers.get('accept-ranges')).toBe('bytes')
+
+    const part = await getAttachment(clip?.previewId ?? '', { range: 'bytes=4-7' })
+    expect(part.status).toBe(206)
+    expect(part.headers.get('content-range')).toBe(`bytes 4-7/${String(bytes.length)}`)
+    expect(Buffer.from(await part.arrayBuffer()).toString()).toBe('4567')
+
+    // A suffix range is how a player asks for the tail (the moov atom).
+    const tail = await getAttachment(clip?.previewId ?? '', { range: 'bytes=-3' })
+    expect(tail.status).toBe(206)
+    expect(Buffer.from(await tail.arrayBuffer()).toString()).toBe('def')
+  })
+
+  it('explains itself while the vault is closed', async () => {
+    await vault?.close()
+    vault = undefined
+
+    expect(codeOf(await post(INBOX_ENDPOINT_CAPTURE, { text: 'anything' }))).toBe('inbox/vault-closed')
+    expect(codeOf(await post(INBOX_ENDPOINT_LIST, {}))).toBe('inbox/vault-closed')
+    expect(codeOf(await post(INBOX_ENDPOINT_DETAIL, { id: 'x' }))).toBe('inbox/vault-closed')
+    expect(codeOf(await post(INBOX_ENDPOINT_UPDATE, { id: 'x' }))).toBe('inbox/vault-closed')
+    expect(codeOf(await post(INBOX_ENDPOINT_DELETE, { id: 'x' }))).toBe('inbox/vault-closed')
+    expect(codeOf(await post(INBOX_ENDPOINT_RESTORE, { id: 'x' }))).toBe('inbox/vault-closed')
+    expect(codeOf(await post(INBOX_ENDPOINT_PURGE, {}))).toBe('inbox/vault-closed')
+  })
+})
