@@ -176,7 +176,9 @@ class DshAgent(BaseAgent):
             f"{instruction}\n\n---\n\n"
             "An automated migration pipeline, dsh-migrate, already handled this task without seeing the statement above. "
             "Its result is in /app/fixture: `git -C /app diff HEAD -- fixture` shows what it changed. "
-            f"Its reviews, repair reports, patch reports and event log are under {evidence}/migrations/{target}/. "
+            f"Its reviews, repair reports, patch reports and event log are under {evidence}/migrations/{target}/, "
+            "with its ledger of the upgrade skill's change cards in cards.json there when it kept one: "
+            "cite the IDs of the cards that apply where the report explains the change they describe. "
             f"Your only job is the written deliverable the statement asks for under {REPORT_DIR}: "
             "write it at the paths the statement names, from that evidence and your own reading of the fixture. "
             "Do not modify /app/fixture."
@@ -189,6 +191,8 @@ class DshAgent(BaseAgent):
         config = {
             "secrets": {"apiKeyEnv": "DEEPSEEK_API_KEY"},
             "agent": {"provider": self._provider, "model": self._model, "upgradeSkills": self._skills},
+            # The suite written after the conclusion changes nothing a task scores, and its session ran trials out of time.
+            "checks": {"e2e": {"publish": False}},
         }
         await self._exec(environment, (
             f"rm -rf {plugin} && cp -R /app/fixture {plugin} && rm -rf {plugin}/.git && cd {plugin} && git init -q && git add -A"
