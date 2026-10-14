@@ -84,6 +84,7 @@ export const configSchema = z.strictObject({
       branch: branchName.default('dsh-migrate/e2e').describe('Branch that holds the end-to-end suite and nothing else.'),
       dir: relativeDir.default('e2e').describe('Directory of the suite on its branch.')
         .transform(normalizeDir),
+      publish: z.boolean().default(true).describe('After the migration concludes, keep the suite on its branch, writing it first when no end-to-end baseline was recorded. Off, the suite is still read, recorded and checked against, but never written after the conclusion or pushed.'),
       failurePolicy: z.enum(E2E_FAILURE_POLICIES).default('advisory')
         .describe('`advisory` never lets an end-to-end failure stop a migration: a test that failed on the way through the host\'s UI is reported at once, one that failed in the plugin\'s part is repaired and reported when the repairs do not fix it. `blocking` repairs every failure and fails the migration when the repairs do not fix it.'),
     }).prefault({}),

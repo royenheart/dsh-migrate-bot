@@ -51,6 +51,8 @@ export const settingsSchema = z.strictObject({
   reviewPolicy: z.enum(REVIEW_POLICIES),
   maxAttempts: z.number().int().min(1),
   e2eFailurePolicy: z.enum(E2E_FAILURE_POLICIES),
+  /** Whether the end-to-end suite is kept on its branch after the conclusion; a log started before the setting existed kept it. */
+  e2ePublish: z.boolean().default(true),
   // A log started before the cards check existed ran without it.
   checks: z.strictObject({ cards: z.boolean().default(false), boot: z.boolean(), web: z.boolean(), e2e: z.boolean() }),
   /** Whether a changed tree becomes a proposal on GitHub. */

@@ -169,7 +169,7 @@ Transitions of one state are tried in order; the first whose guard holds is take
 | `advisoryHostE2EFailure` | The failing check is the end-to-end check, no test failed in a step that checks the plugin's own part, and the failure policy is `advisory`. |
 | `advisoryE2EFailure` | The failing check is the end-to-end check and the failure policy is `advisory`. |
 | `characterizable` | The end-to-end check is enabled and a source release is known. |
-| `publishesE2E` | The end-to-end check is enabled, and an end-to-end baseline was recorded or the tree went through a review. |
+| `publishesE2E` | The end-to-end check is enabled, the suite is kept on its branch, and an end-to-end baseline was recorded or the tree went through a review. |
 | `concludedIn` | The migration concluded in the given state. |
 | `changedAndPublish` | The tree changed and publishing is on. |
 | `changed` | The tree changed. |

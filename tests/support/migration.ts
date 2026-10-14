@@ -15,6 +15,7 @@ export function settings(overrides: Partial<Settings> = {}): Settings {
     reviewPolicy: 'when-checks-fail',
     maxAttempts: 2,
     e2eFailurePolicy: 'advisory',
+    e2ePublish: true,
     checks: { cards: false, boot: false, web: false, e2e: false },
     publish: true,
     reportChannels: [],

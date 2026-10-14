@@ -67,6 +67,7 @@ function migrationLog(options: {
       reviewPolicy: 'when-checks-fail',
       maxAttempts: 1,
       e2eFailurePolicy: 'advisory',
+      e2ePublish: true,
       checks: { cards: false, boot: false, web: false, e2e: false },
       publish: true,
       reportChannels: options.channels ?? [],

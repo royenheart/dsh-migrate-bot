@@ -26,6 +26,7 @@ const inputArbitrary: fc.Arbitrary<MigrationInput> = fc.record({
   web: fc.boolean(),
   e2e: fc.boolean(),
   cards: fc.boolean(),
+  e2ePublish: fc.boolean(),
   publish: fc.boolean(),
   channels: fc.subarray(CHANNELS),
 }).map(drawn => ({
@@ -35,6 +36,7 @@ const inputArbitrary: fc.Arbitrary<MigrationInput> = fc.record({
     reviewPolicy: drawn.reviewPolicy,
     maxAttempts: drawn.maxAttempts,
     e2eFailurePolicy: drawn.e2eFailurePolicy,
+    e2ePublish: drawn.e2ePublish,
     checks: { cards: drawn.cards, boot: drawn.boot, web: drawn.web, e2e: drawn.e2e },
     publish: drawn.publish,
     reportChannels: drawn.channels,
@@ -217,12 +219,12 @@ test('I4 nothing is concluded from a tree whose last checks failed, except an ad
   }), { numRuns: 1000 })
 })
 
-test('a suite that recorded an end-to-end baseline is published once the migration concluded, and only then', () => {
+test('a suite that recorded an end-to-end baseline is published once the migration concluded, only then, and only when it is kept', () => {
   fc.assert(fc.property(runArbitrary, ([input, values, withErrors]) => {
     const run = drive(input, values, withErrors)
     const publishes = run.requests.findIndex(request => request.activity === 'publishE2E')
     if (publishes >= 0) assert.ok(run.requests.slice(0, publishes).some(request => request.activity === 'inspectTree'))
-    if (run.snapshot.context.e2eBaseline.length > 0 && run.snapshot.context.concluded !== undefined) assert.ok(publishes >= 0)
+    if (run.snapshot.context.e2eBaseline.length > 0 && run.snapshot.context.concluded !== undefined) assert.equal(publishes >= 0, run.input.settings.e2ePublish)
   }), { numRuns: 1000 })
 })
 
