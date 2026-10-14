@@ -1,0 +1,630 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index bc9bde1..43d6f3b 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -3,9 +3,20 @@
+ A browser game overlay plugin: while the model generates, a teaser pops up in
+ the bottom-right corner of the web UI and clicking it opens a game menu
+ (wordle / match-3, extensible game registry). Client-only plugin — the host
+-half is a no-op stub. Written in the 0.1.1-era style (the browser half pulls
+-its client context type from the client-runtime package). The host is moving
+-to dsh 0.1.2-alpha.2.
++half is a no-op stub. Targets dsh 0.1.2-alpha.2:
++
++- the browser half takes its client context from `@deepseek-ai/cordis`;
++- the teaser occupies the official frame-wide floating seat `shell.overlay`
++  (declared by `@deepseek-ai/dsh-client-ui-layout`) and reads the generating
++  signal through that seat's root-scope `useSessions` standard hook, which is
++  bound to the sessions list store (`ctx.sessions.list`, owning
++  `SessionListState` from `@deepseek-ai/dsh-api-session-controller/client`);
++- the shipped `./client` artifact is a client-module bundle registering under
++  the package name (DSH-0.1.2-A1-26), and `dsh.bundle.patch` composes the row;
++- third-party plugins add games through the `d399Games` client service;
++- `enabled` / `message` / `buttonText` are set in the bundle row's `config`
++  block (`cordis.patch.yml`), with the browser half applying the documented
++  defaults when a row carries none.
+ 
+ Release procedure (internal):
+ 
+diff --git a/fixture/client-types.d.ts b/fixture/client-types.d.ts
+new file mode 100644
+index 0000000..5e843cd
+--- /dev/null
++++ b/fixture/client-types.d.ts
+@@ -0,0 +1,64 @@
++/**
++ * Type-only companion for `client.js`: loads the owning declarations this
++ * browser half consumes — `ctx.sessions` (`@deepseek-ai/dsh-api-session-controller/client`),
++ * `ctx.locale` (`@deepseek-ai/dsh-client-locale/client`), `ctx.slots`
++ * (`@deepseek-ai/dsh-client-ui-renderer/client`), and the `shell.overlay`
++ * SlotMap entry (`@deepseek-ai/dsh-client-ui-layout/client`) — and declares
++ * this plugin's locale namespace plus the `d399Games` service it provides.
++ *
++ * Everything here is erased at build time and contributes no runtime module
++ * request; `client.js` references this file so importers of the plugin get the
++ * same augmentations. Not named `client.d.ts`: a declaration file with the JS
++ * entry's basename would shadow `client.js` and hide its JSDoc type surface
++ * from the program.
++ */
++import type {} from '@deepseek-ai/dsh-api-session-controller/client'
++import type {} from '@deepseek-ai/dsh-client-locale/client'
++import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
++import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
++import type {} from '@deepseek-ai/dsh-client-ui-slots'
++
++/** One game entry of the `d399Games` registry, as third-party registrants pass it. */
++export interface D399Game {
++  /** Registry identity (also the menu's React key). */
++  id: string
++  /** Display name shown in the game menu. */
++  name: string
++  /** Optional menu icon. */
++  icon?: string
++  /** Optional collapse group for same-family variants. */
++  group?: { id: string; name: string; icon?: string }
++  /** The game body component, bound by the registrant. */
++  Component?: unknown
++}
++
++/** The plugin-owned game registry provided as `ctx.d399Games`. */
++export interface D399GamesService {
++  /**
++   * Register one game.
++   * @param game - the game entry.
++   * @returns the unregister disposer.
++   */
++  register(game: D399Game): () => void
++  /** @returns the registered games in registration order. */
++  list(): D399Game[]
++}
++
++/** The overlay's own copy namespace, registered at runtime by `ctx.locale.register`. */
++declare module '@deepseek-ai/dsh-client-ui-slots' {
++  interface LocaleNamespaceMap {
++    /**
++     * Teaser and game-menu copy. The fixture elides the game dictionaries, so
++     * the key union stays open until that copy lands and narrows it.
++     */
++    'dsh-d399': string
++  }
++}
++
++/** The service this plugin provides for third-party game registrants. */
++declare module '@deepseek-ai/cordis' {
++  interface Context {
++    /** The d399 game registry, provided while this plugin's client half is active. */
++    d399Games: D399GamesService
++  }
++}
+diff --git a/fixture/client.js b/fixture/client.js
+index e9ec395..e3df31b 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,68 +1,291 @@
+-// Browser half (game overlay): watches the current session's `running` flag
+-// (the model-generating signal) and mounts a `position: fixed` teaser in the
+-// bottom-right corner while the model generates; clicking the teaser button
+-// opens the game menu (wordle / match-3 / parametric registry games).
++/// <reference path="./client-types.d.ts" />
++// Browser half (game overlay) — this package's shipped `./client` bundle.
+ //
+-// The overlay is NOT a slot registration: it is a `position: fixed` DOM
+-// contribution portaled to document.body, so it subscribes to the sessions
+-// list snapshot store itself instead of receiving session-scoped hooks.
++// While the current session's model is generating, a teaser pops up in the
++// bottom-right corner; clicking its button opens the game menu (wordle /
++// match-3, extensible through the `d399Games` client service).
+ //
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the client context type lived on the
+-// client-runtime package.
+-//
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.x era):
+-//   "ctx.sessions.list is the same store object as before — the type just
+-//    moved packages; skip the ISessions annotation to keep the bundle lean."
+-// ────────────────────────────────────────────────────────────
+-
+-export const name = 'bench-d399-overlay-client'
+-
+-// Required services: sessions (drives the model-generating flag) + locale.
+-export const inject = ['sessions', 'locale']
+-
+-/** Slice of the sessions list store the overlay reads. */
+-const SessionListSlice = undefined // { current?: string, byId: Record<string, { running?: boolean }> }
+-
+-/** Cached snapshot: same reference until `running` actually flips. */
+-const RunningCache = undefined // { id: string | undefined, running: boolean }
+-
+-/**
+- * Distilled from useSessionRunning: reads the current session's `running`
+- * flag off the sessions list snapshot store (useSyncExternalStore in the
+- * real hook; the subscription shape below is the same store contract).
+- *
+- * Type surface as it stands (type-only, erased at build time — this is
+- * where the client-plane break lives):
+- *   import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+- *
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
+- * @returns {boolean} whether the current session's model is generating.
+- */
+-function readSessionRunning(ctx) {
+-  const list = ctx.sessions.list
+-  const snap = list.getSnapshot()
+-  const id = snap.current
+-  const running = id !== undefined ? (snap.byId[id]?.running ?? false) : false
+-  const unsubscribe = list.subscribe(() => {})
+-  unsubscribe()
+-  return running
+-}
+-
+-/**
+- * Client plugin body: register the locale namespace and mount the overlay.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
+- * @param {unknown} config - cordis row config (loosely typed).
+- */
+-export function apply(ctx, config) {
+-  console.error('[bench-d399-overlay-client] apply() on the 0.1.1-era cohort: ClientContext from the client-runtime package')
+-
+-  ctx.effect(() => {
+-    ctx.locale.register('dsh-d399', { zh: {}, en: {} })
+-  }, 'bench-d399-overlay-client: own copy namespace')
+-
+-  ctx.effect(() => {
+-    const running = readSessionRunning(ctx)
+-    console.error(`[bench-d399-overlay-client] overlay teaser ${running ? 'shown' : 'hidden'} (React root + portal mount elided in fixture)`)
+-  }, 'bench-d399-overlay-client: overlay mount')
+-}
++// 0.1.2-alpha.2 cohort:
++//   - The client context is the plain Cordis `Context`; every service it
++//     carries is declared by its owning package — `ctx.sessions` by
++//     `@deepseek-ai/dsh-api-session-controller/client`, `ctx.locale` by
++//     `@deepseek-ai/dsh-client-locale/client`, `ctx.slots` by
++//     `@deepseek-ai/dsh-client-ui-renderer/client`.
++//   - The overlay occupies the official frame-wide floating seat,
++//     `shell.overlay` (declared by `@deepseek-ai/dsh-client-ui-layout`): the
++//     additive, click-through layer the shell renders above every column. The
++//     entry reads the generating signal through that seat's root-scope
++//     `useSessions` standard hook, which is bound to the same sessions list
++//     store (`ctx.sessions.list`, the owning `SnapshotStore<SessionListState>`)
++//     the hand-mounted overlay used to subscribe to itself.
++//   - This file is the shipped client artifact. The module system serves it as
++//     a classic script and keys entries / modules / plugin registrations by
++//     package name, so the registration id is package.json#name
++//     (DSH-0.1.2-A1-26); the harness `clientBundle()` preset stamps the same
++//     banner for built client packages.
++window.__ModuleLoader__.load({ id: '@bench/dsh-bench-d399-overlay', factory: (require) => {
++  var module = { exports: {} }; var exports = module.exports;
++
++  const React = require('react')
++
++  /** Plugin id: package.json name, boot-graph entry id, bundle registration id. */
++  const PLUGIN_ID = '@bench/dsh-bench-d399-overlay'
++
++  /** The official frame-wide floating seat this overlay occupies. */
++  const OVERLAY_SLOT = 'shell.overlay'
++
++  /** This plugin's own copy namespace, registered with the locale service. */
++  const NS = 'dsh-d399'
++
++  exports.name = 'bench-d399-overlay-client'
++
++  // Required services: sessions (the generating signal), locale (own copy),
++  // slots (the shell.overlay seat). Every service this half touches is
++  // declared here; none is reached for through an undeclared read.
++  exports.inject = ['sessions', 'locale', 'slots']
++
++  /**
++   * The sessions list state the overlay reads: the owning
++   * `ISessions['list']` snapshot type (`SnapshotStore<SessionListState>`) from
++   * `@deepseek-ai/dsh-api-session-controller/client`. The seat's `useSessions`
++   * hook selects over this same state, so the selector below is typed against
++   * the owning declaration instead of a locally re-typed slice.
++   * @typedef {import('@deepseek-ai/dsh-api-session-controller/client').SessionListState} SessionListState
++   */
++
++  /**
++   * One registered game. `Component` is the game body; the registry stores it
++   * for the menu and for third-party registrants.
++   * @typedef {{ id: string, name: string, icon?: string, group?: { id: string, name: string, icon?: string }, Component?: unknown }} D399Game
++   */
++
++  /**
++   * Teaser/menu configuration — the documented `cordis.patch.yml` `config`
++   * block (`enabled` / `message` / `buttonText`).
++   * @typedef {{ enabled: boolean, message: string, buttonText: string }} D399Config
++   */
++
++  /**
++   * Composed props of the overlay entry: the `shell.overlay` root-scope
++   * standard seats (`useSessions`), the locale `t` seat of the declared
++   * namespace, and this plugin's own inject face.
++   * @typedef {{
++   *   useSessions: <S>(sel: (snap: SessionListState) => S, eq?: (a: S, b: S) => boolean) => S,
++   *   t: (key: string) => string,
++   *   config: D399Config,
++   *   games: () => D399Game[],
++   * }} D399OverlayProps
++   */
++
++  /** Documented defaults for the row `config` block. */
++  const DEFAULT_CONFIG = {
++    enabled: true,
++    message: '❤深❤夜❤寂❤寞❤，❤来❤玩❤ D399❤',
++    buttonText: '来♂',
++  }
++
++  /**
++   * Resolve the loosely-typed cordis row config into the documented shape.
++   * @param {unknown} raw - the row's `config` value (absent on rows that set none).
++   * @returns {D399Config} the resolved configuration.
++   */
++  function resolveConfig(raw) {
++    if (raw === null || typeof raw !== 'object') return { ...DEFAULT_CONFIG }
++    const r = /** @type {Record<string, unknown>} */ (raw)
++    return {
++      enabled: typeof r.enabled === 'boolean' ? r.enabled : DEFAULT_CONFIG.enabled,
++      message: typeof r.message === 'string' && r.message !== '' ? r.message : DEFAULT_CONFIG.message,
++      buttonText: typeof r.buttonText === 'string' && r.buttonText !== '' ? r.buttonText : DEFAULT_CONFIG.buttonText,
++    }
++  }
++
++  /**
++   * Pure selector over the sessions list state: whether the current session's
++   * model is generating. Type surface: `snap.current` selects the current
++   * session id and `snap.byId[id].running` is the generating flag.
++   * @param {SessionListState} snap - the seat's sessions list snapshot.
++   * @returns {boolean} whether the current session's model is generating.
++   */
++  function selectRunning(snap) {
++    const id = snap.current
++    return id !== undefined && (snap.byId[id]?.running ?? false)
++  }
++
++  /** Teaser shell: the entry places itself in the seat's bottom-right corner. */
++  const TEASER_STYLE = {
++    position: 'fixed',
++    right: '16px',
++    bottom: '16px',
++    display: 'flex',
++    gap: '8px',
++    alignItems: 'center',
++    padding: '8px 10px',
++    borderRadius: '10px',
++    background: 'var(--dsw-alias-bg-raised, rgba(22, 22, 26, 0.92))',
++    color: 'var(--dsw-alias-text-base, #f5f5f5)',
++    font: '13px/1.4 system-ui, sans-serif',
++    boxShadow: '0 6px 24px rgba(0, 0, 0, 0.35)',
++  }
++
++  /** Teaser button chrome. */
++  const BUTTON_STYLE = {
++    border: '1px solid currentColor',
++    borderRadius: '8px',
++    background: 'transparent',
++    color: 'inherit',
++    font: 'inherit',
++    padding: '2px 8px',
++    cursor: 'pointer',
++  }
++
++  /** Game-menu panel chrome, stacked above the teaser row. */
++  const MENU_STYLE = {
++    position: 'absolute',
++    right: '16px',
++    bottom: '56px',
++    display: 'grid',
++    gap: '4px',
++    minWidth: '180px',
++    maxHeight: '60vh',
++    overflowY: 'auto',
++    padding: '8px',
++    borderRadius: '10px',
++    background: 'var(--dsw-alias-bg-raised, rgba(22, 22, 26, 0.96))',
++    boxShadow: '0 6px 24px rgba(0, 0, 0, 0.35)',
++  }
++
++  /** One game row in the menu. */
++  const MENU_ITEM_STYLE = {
++    display: 'flex',
++    gap: '8px',
++    alignItems: 'center',
++    border: 'none',
++    borderRadius: '8px',
++    background: 'transparent',
++    color: 'inherit',
++    font: 'inherit',
++    padding: '6px 8px',
++    textAlign: 'left',
++    cursor: 'pointer',
++  }
++
++  /**
++   * The game menu: one row per registered game plus the localized close
++   * action. The game bodies are the registry's `Component` values (wordle /
++   * match-3 / the parametric catalog); they are elided in this fixture.
++   * @param {{ games: D399Game[], t: (key: string) => string, onClose: () => void }} props - menu props.
++   * @returns {import('react').ReactElement} the menu element.
++   */
++  function D399GameMenu(props) {
++    return React.createElement('div', { 'data-dsh-d399-menu': '', role: 'menu', style: MENU_STYLE },
++      ...props.games.map(game => React.createElement('button', {
++        key: game.id,
++        type: 'button',
++        role: 'menuitem',
++        'data-dsh-d399-game': game.id,
++        style: MENU_ITEM_STYLE,
++      }, `${game.icon ?? ''} ${game.name}`.trim())),
++      React.createElement('button', {
++        type: 'button',
++        'data-dsh-d399-close': '',
++        onClick: props.onClose,
++        style: MENU_ITEM_STYLE,
++      }, props.t('close')),
++    )
++  }
++
++  /**
++   * Overlay entry component, registered into `shell.overlay`. Shown while the
++   * current session's model is generating (the documented teaser), or while
++   * the user has the menu open; the button toggles the game menu.
++   * @param {D399OverlayProps} props - the entry's composed props.
++   * @returns {import('react').ReactElement | null} the teaser, or null while hidden.
++   */
++  function D399OverlayEntry(props) {
++    const running = props.useSessions(selectRunning)
++    const [menuOpen, setMenuOpen] = React.useState(false)
++    // The real plugin's teaser state machine (the once-per-generation edge and
++    // the keep-the-menu-open rule) lives here.
++    if (!props.config.enabled || (!running && !menuOpen)) return null
++    return React.createElement('div', { 'data-dsh-d399': '', style: TEASER_STYLE },
++      React.createElement('span', { 'data-dsh-d399-message': '' }, props.config.message),
++      React.createElement('button', {
++        type: 'button',
++        'data-dsh-d399-button': '',
++        onClick: () => { setMenuOpen(open => !open) },
++        style: BUTTON_STYLE,
++      }, props.config.buttonText),
++      menuOpen
++        ? React.createElement(D399GameMenu, {
++          games: props.games(),
++          t: props.t,
++          onClose: () => { setMenuOpen(false) },
++        })
++        : null,
++    )
++  }
++
++  /**
++   * The plugin-owned game registry: `ctx.d399Games`, the documented extension
++   * point third-party plugins reach with `inject: ['d399Games']` and
++   * `ctx.d399Games.register({ id, name, icon, Component })`.
++   */
++  class D399GamesService {
++    constructor() {
++      /** @type {Map<string, D399Game>} */
++      this.games = new Map()
++    }
++
++    /**
++     * Register one game. A fresh `id` adds an entry; a duplicate is a
++     * composition error.
++     * @param {D399Game} game - the game entry.
++     * @returns {() => void} the unregister disposer.
++     */
++    register(game) {
++      if (this.games.has(game.id)) {
++        throw new Error(`[bench-d399-overlay] duplicate game id ${JSON.stringify(game.id)}`)
++      }
++      this.games.set(game.id, game)
++      return () => { this.games.delete(game.id) }
++    }
++
++    /**
++     * @returns {D399Game[]} the registered games in registration order.
++     */
++    list() {
++      return [...this.games.values()]
++    }
++  }
++
++  /**
++   * Client plugin body: provide `d399Games`, register the copy namespace, and
++   * mount the teaser into the official `shell.overlay` seat.
++   * @param {import('@deepseek-ai/cordis').Context} ctx - the client context.
++   * @param {unknown} config - cordis row config (loosely typed).
++   */
++  function apply(ctx, config) {
++    const resolved = resolveConfig(config)
++    const registry = new D399GamesService()
++
++    ctx.effect(() => ctx.provide('d399Games', registry), 'bench-d399-overlay-client: d399Games registry')
++
++    ctx.effect(() => ctx.locale.register(NS, { zh: {}, en: {} }), 'bench-d399-overlay-client: own copy namespace')
++
++    // The seat is declared by ui-layout's `root` registration; `slots.inject`
++    // waits for the declaration and removes this entry when it collapses.
++    ctx.slots.inject(OVERLAY_SLOT, () => ctx.slots.register({
++      name: OVERLAY_SLOT,
++      id: PLUGIN_ID,
++      order: 100,
++      locale: NS,
++      inject: () => ({ config: resolved, games: () => registry.list() }),
++    }, D399OverlayEntry))
++
++    console.error(`[bench-d399-overlay-client] apply(): ${OVERLAY_SLOT} entry registered (enabled=${String(resolved.enabled)}, row config ${config === undefined ? 'absent' : 'present'})`)
++  }
++
++  exports.apply = apply
++
++  return module.exports;
++} });
+diff --git a/fixture/cordis.patch.yml b/fixture/cordis.patch.yml
+index 5b6f2b4..15689d8 100644
+--- a/fixture/cordis.patch.yml
++++ b/fixture/cordis.patch.yml
+@@ -1,8 +1,13 @@
+ # bench-d399-overlay bundle layer: inserts the plugin row.
+ # (exam fixture, distilled from @huanlin/dsh-plugin-d399; game bodies elided)
+-# When the model is generating, a teaser pops up in the bottom-right corner;
+-# clicking the button opens the game menu (wordle / match-3, extensible via
+-# the d399Games client service).
++# When the model is generating, a teaser pops up in the bottom-right corner
++# (the `shell.overlay` seat); clicking the button opens the game menu
++# (wordle / match-3, extensible via the d399Games client service).
++#
++# The `config` block is the plugin's documented configuration entry: `enabled`
++# switches the teaser off, `message` / `buttonText` are the teaser copy. The
++# browser half resolves them with these values as defaults; the row config
++# itself reaches it only once the host boot graph forwards row config.
+ - insert:
+     - id: bench-d399-overlay
+       name: '@bench/dsh-bench-d399-overlay'
+diff --git a/fixture/index.js b/fixture/index.js
+index 3c0f6b0..2579d70 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,23 +1,26 @@
+ // Host half (minimal): the d399 overlay is a client-only UI contribution —
+ // the host half has no runtime work (mirrors the real plugin's src/index.ts).
+ //
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the browser half pulled its client
+-// context type from the client-runtime package, and the sessions list store
+-// had no typed home of its own.
++// 0.1.2-alpha.2 cohort: client services are declared by their owning packages
++// (`sessions` in @deepseek-ai/dsh-api-session-controller/client, `locale` in
++// @deepseek-ai/dsh-client-locale/client); the host half still injects nothing.
+ 
+ export const name = 'bench-d399-overlay'
+ 
+ // Client-only plugin: the host half declares no injections.
++/** @type {string[]} */
+ export const inject = []
+ 
+ /**
+  * Host apply — no-op. The overlay is mounted entirely by the browser half.
+  * @param {import('@deepseek-ai/cordis').Context} ctx
++ * @param {unknown} config - cordis row config (loosely typed).
+  */
+ export function apply(ctx, config) {
+   console.error('[bench-d399-overlay] host apply(): client-only overlay plugin; the browser half mounts the bottom-right teaser while the model generates')
+ 
+   ctx.effect(() => {
+     console.error('[bench-d399-overlay] no host-plane registrations (overlay is client-only)')
++    return () => {}
+   }, 'bench-d399-overlay: host')
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..a75f557
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,56 @@
++{
++  "name": "@bench/dsh-bench-d399-overlay",
++  "version": "0.1.3",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-d399-overlay",
++      "version": "0.1.3",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.1",
++        "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-store": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-layout": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++        "react": "^18.2.0",
++        "react-dom": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-api-session-controller": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-store": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-layout": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-renderer": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-invariants": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        },
++        "react-dom": {
++          "optional": true
++        }
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 8dd4dc1..89edb66 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-d399-overlay",
+   "version": "0.1.3",
+-  "description": "Browser game overlay: a bottom-right teaser pops up while the model generates (0.1.1-era cohort; exam material only)",
++  "description": "Browser game overlay: a bottom-right teaser pops up while the model generates (dsh 0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -15,22 +15,33 @@
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime"
++        "@deepseek-ai/dsh-api-session-controller",
++        "@deepseek-ai/dsh-client-locale"
+       ],
+       "platform": "web"
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-invariants": "^0.0.1-rc.1",
+-    "@deepseek-ai/cordis": "^4.0.1-rc.1",
++    "@deepseek-ai/cordis": "^4.0.1",
++    "@deepseek-ai/dsh-api-session-controller": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-store": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-layout": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+-    "@deepseek-ai/dsh-invariants": { "optional": true },
+     "@deepseek-ai/cordis": { "optional": true },
++    "@deepseek-ai/dsh-api-session-controller": { "optional": true },
++    "@deepseek-ai/dsh-client-locale": { "optional": true },
++    "@deepseek-ai/dsh-client-store": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-layout": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
++    "@deepseek-ai/dsh-invariants": { "optional": true },
+     "react": { "optional": true },
+     "react-dom": { "optional": true }
+   },

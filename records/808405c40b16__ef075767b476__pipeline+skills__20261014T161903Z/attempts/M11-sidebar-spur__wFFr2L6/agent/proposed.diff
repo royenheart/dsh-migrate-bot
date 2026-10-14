@@ -1,0 +1,428 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index d790dc4..8f3e18f 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -3,7 +3,22 @@
+ A decorative "braided whip" (辫子) plugin for the chat flow — a client-only
+ dock widget registered into the conversation composer's dock slot, with the
+ braid's tooltip/flash copy shipped as a plugin locale namespace. Written in
+-the 0.1.1-era style. The host is moving to dsh 0.1.2-alpha.2.
++the 0.1.1-era style; migrated to the dsh 0.1.2-alpha.2 cohort (the
++`@deepseek-ai/dsh-client-runtime` inject entry is gone; `ctx.slots` comes from
++`@deepseek-ai/dsh-client-ui-renderer` and `ctx.locale` from
++`@deepseek-ai/dsh-client-locale`).
++
++Packaging (dsh 0.1.2-alpha.2): the package is a self-contained dsh bundle — it
++declares `dsh.bundle.patch` and `cordis.patch.yml` inserts its own row — so it
++installs through the single official profile path,
++`dsh plugin --profile web add @bench/dsh-bench-sidebar-spur`. There is no
++repository-plugin row and no `dsh.plugin.json` manifest.
++
++The browser half is served from `exports["./client"]`, which points at the
++built `lib/client.js` closure factory (`window.__ModuleLoader__.load({ id:
++"@bench/dsh-bench-sidebar-spur", … })`). `client.js` is the authoring source;
++`npm run build` regenerates the committed bundle — no published preset exposes
++this out-of-tree format, so the build is a dependency-free wrapper script.
+ 
+ Release procedure (internal):
+ 
+diff --git a/fixture/client.js b/fixture/client.js
+index 3d75b73..10103c2 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -4,15 +4,31 @@
+ // plugin's own locale namespace.
+ //
+ // ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.1 era):
+-//   "The ctx.slots service still lives in dsh-client-runtime on alpha — it
+-//    was only renamed internally; keep the runtime inject entry so the dock
+-//    keeps mounting."
++// Migration note (dsh 0.1.2-alpha.2): `@deepseek-ai/dsh-client-runtime` was
++// removed in alpha.1, and the aggregated client context went with it. The two
++// services this half consumes keep their names and now live in their domain
++// packages:
++//   ctx.slots  → @deepseek-ai/dsh-client-ui-renderer/client (runtime service;
++//                the pure slot/locale contract types live in
++//                @deepseek-ai/dsh-client-ui-slots, a platform seed word)
++//   ctx.locale → @deepseek-ai/dsh-client-locale/client
++//   ctx        → @deepseek-ai/cordis (type only)
++// `dsh.client.inject` now names the dynamic rows this half needs: the two
++// service owners above plus @deepseek-ai/dsh-client-ui-conversation, which
++// declares and renders the `conversation.composer.dock` seat. The removed
++// runtime is gone from the cohort, and dsh-client-ui-slots /
++// dsh-client-ui-primitives are not client rows (both are platform seed
++// words), so listing any of the three would be a phantom inject edge. The
++// slot key, id, order and locale namespace are unchanged.
+ // ────────────────────────────────────────────────────────────
+ //
+-// 0.1.1-era type surface: the client context type comes from the client
+-// runtime package; the ctx.slots merge and the ctx.locale runtime arrive
+-// with it.
++// Type surface: the client context is Cordis `Context` plus the declaration
++// merges the owning packages contribute. Elided in this artefact, a typed
++// source carries `import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'`
++// (ctx.slots), `import type {} from '@deepseek-ai/dsh-client-locale/client'`
++// (ctx.locale), the slot key `conversation.composer.dock` from
++// @deepseek-ai/dsh-client-ui-conversation/client, and the registration /
++// locale types from @deepseek-ai/dsh-client-ui-slots.
+ 
+ export const name = 'bench-sidebar-spur-client'
+ 
+@@ -34,7 +50,9 @@ function braidStub() {
+ 
+ /**
+  * Client plugin body: register the braid in the composer dock.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * The `slots` / `locale` services are the same two the 0.1.1-era half used;
++ * only their owning packages changed (see the migration note above).
++ * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx) {
+   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'bench-sidebar-spur: dictionaries')
+@@ -51,6 +69,12 @@ export function apply(ctx) {
+     }, braidStub))
+ 
+   // Elided: the type-level locale namespace declaration for the plugin
+-  // namespace, and the better-locale override dicts registration (optional
+-  // service, re-synced on every locale revision bump).
++  // namespace — `declare module '@deepseek-ai/dsh-client-ui-slots'` merging
++  // `LocaleNamespaceMap['dsh-spur']` with the zh/en dictionary keys, required
++  // to typecheck the typed `locale.register(NS, { zh, en })` overload — and
++  // the better-locale override dicts registration (optional third-party
++  // service, re-synced on every locale revision bump). The official locale
++  // service is single-occupant: a second `register(ns, locale)` for an
++  // already-registered pair throws, so overriding built-in copy is not an
++  // official seam.
+ }
+diff --git a/fixture/index.js b/fixture/index.js
+index fa79c4a..74a84f6 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,6 +1,8 @@
+-// 0.1.1-era cohort (pre v0.1.2-alpha): the browser half pulled its client
+-// context type from the client runtime package, and the ctx.slots service
+-// shipped inside that runtime.
++// dsh 0.1.2-alpha.2 cohort: the browser half takes its client context type
++// from `@deepseek-ai/cordis` (the `@deepseek-ai/dsh-client-runtime` aggregation
++// package was removed in alpha.1); `ctx.slots` is provided by
++// `@deepseek-ai/dsh-client-ui-renderer` and `ctx.locale` by
++// `@deepseek-ai/dsh-client-locale`.
+ //
+ // Host half: client-only plugin — the host plane has no runtime work. The
+ // browser half (client.js) registers a `conversation.composer.dock` entry
+@@ -13,5 +15,5 @@
+  * @param {import('@deepseek-ai/cordis').Context} _ctx
+  */
+ export function apply(_ctx) {
+-  console.error('[bench-sidebar-spur] host apply(): client-only plugin, no host-plane work (0.1.1-era cohort)')
++  console.error('[bench-sidebar-spur] host apply(): client-only plugin, no host-plane work (0.1.2-alpha.2 cohort)')
+ }
+diff --git a/fixture/lib/client.js b/fixture/lib/client.js
+new file mode 100644
+index 0000000..53d5ed0
+--- /dev/null
++++ b/fixture/lib/client.js
+@@ -0,0 +1,93 @@
++// Generated by scripts/build.mjs from client.js — do not edit in place.
++// Browser half of @bench/dsh-bench-sidebar-spur: a lazy-CJS factory registered under the package name.
++window.__ModuleLoader__.load({
++  id: "@bench/dsh-bench-sidebar-spur",
++  factory: (require) => {
++    var module = { exports: {} }
++    var exports = module.exports
++    // Browser half: registers the decorative "braided whip" into the chat flow's
++    // `conversation.composer.dock` list slot (id `dsh-spur`, order 50) — the band
++    // under the composer card — and ships the braid's tooltip/flash copy as the
++    // plugin's own locale namespace.
++    //
++    // ────────────────────────────────────────────────────────────
++    // Migration note (dsh 0.1.2-alpha.2): `@deepseek-ai/dsh-client-runtime` was
++    // removed in alpha.1, and the aggregated client context went with it. The two
++    // services this half consumes keep their names and now live in their domain
++    // packages:
++    //   ctx.slots  → @deepseek-ai/dsh-client-ui-renderer/client (runtime service;
++    //                the pure slot/locale contract types live in
++    //                @deepseek-ai/dsh-client-ui-slots, a platform seed word)
++    //   ctx.locale → @deepseek-ai/dsh-client-locale/client
++    //   ctx        → @deepseek-ai/cordis (type only)
++    // `dsh.client.inject` now names the dynamic rows this half needs: the two
++    // service owners above plus @deepseek-ai/dsh-client-ui-conversation, which
++    // declares and renders the `conversation.composer.dock` seat. The removed
++    // runtime is gone from the cohort, and dsh-client-ui-slots /
++    // dsh-client-ui-primitives are not client rows (both are platform seed
++    // words), so listing any of the three would be a phantom inject edge. The
++    // slot key, id, order and locale namespace are unchanged.
++    // ────────────────────────────────────────────────────────────
++    //
++    // Type surface: the client context is Cordis `Context` plus the declaration
++    // merges the owning packages contribute. Elided in this artefact, a typed
++    // source carries `import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'`
++    // (ctx.slots), `import type {} from '@deepseek-ai/dsh-client-locale/client'`
++    // (ctx.locale), the slot key `conversation.composer.dock` from
++    // @deepseek-ai/dsh-client-ui-conversation/client, and the registration /
++    // locale types from @deepseek-ai/dsh-client-ui-slots.
++    
++    const name = 'bench-sidebar-spur-client'
++    
++    // slots (conversation.composer.dock) + locale (braid copy zh/en).
++    const inject = ['slots', 'locale']
++    
++    const NS = 'dsh-spur'
++    
++    // Braid copy, distilled from the real locales module.
++    const zh = { tooltip: '抓住辫子甩动，鞭策 agent 去干活！', whipped: '去干活！', busy: 'Agent 正忙，稍等一下' }
++    const en = { tooltip: 'Grab and swing the braid to whip the agent → "go work!"', whipped: 'go work!', busy: 'Agent is busy — wait a moment' }
++    
++    // The braid component (a position:fixed SVG overlay hanging into the chat
++    // area from a screen-fixed anchor) is elided; the dock renderer mounts it as
++    // a function component.
++    function braidStub() {
++      return null
++    }
++    
++    /**
++     * Client plugin body: register the braid in the composer dock.
++     * The `slots` / `locale` services are the same two the 0.1.1-era half used;
++     * only their owning packages changed (see the migration note above).
++     * @param {import('@deepseek-ai/cordis').Context} ctx
++     */
++    function apply(ctx) {
++      ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'bench-sidebar-spur: dictionaries')
++    
++      // The braid hangs from a screen-fixed anchor (top-right of the viewport)
++      // and is always visible while a session is active (the dock is session-
++      // scoped, so hero mode — no session — naturally hides it).
++      ctx.slots.inject('conversation.composer.dock', () =>
++        ctx.slots.register({
++          name: 'conversation.composer.dock',
++          id: 'dsh-spur',
++          order: 50,
++          locale: NS,
++        }, braidStub))
++    
++      // Elided: the type-level locale namespace declaration for the plugin
++      // namespace — `declare module '@deepseek-ai/dsh-client-ui-slots'` merging
++      // `LocaleNamespaceMap['dsh-spur']` with the zh/en dictionary keys, required
++      // to typecheck the typed `locale.register(NS, { zh, en })` overload — and
++      // the better-locale override dicts registration (optional third-party
++      // service, re-synced on every locale revision bump). The official locale
++      // service is single-occupant: a second `register(ns, locale)` for an
++      // already-registered pair throws, so overriding built-in copy is not an
++      // official seam.
++    }
++    exports.name = name
++    exports.inject = inject
++    exports.apply = apply
++    return module.exports
++  },
++})
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..0d5a3a3
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,52 @@
++{
++  "name": "@bench/dsh-bench-sidebar-spur",
++  "version": "0.2.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-sidebar-spur",
++      "version": "0.2.0",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.1",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++        "react": "^18.2.0",
++        "react-dom": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-conversation": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-primitives": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-renderer": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-invariants": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        },
++        "react-dom": {
++          "optional": true
++        }
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index adb998a..b4a4d5f 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,14 +1,24 @@
+ {
+   "name": "@bench/dsh-bench-sidebar-spur",
+-  "version": "0.1.2",
+-  "description": "Decorative braided-whip dock widget for the chat flow — client-only conversation.composer.dock contribution (0.1.1-era cohort; exam material only)",
++  "version": "0.2.0",
++  "description": "Decorative braided-whip dock widget for the chat flow — client-only conversation.composer.dock contribution (dsh 0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+     ".": "./index.js",
+-    "./client": "./client.js",
++    "./client": "./lib/client.js",
+     "./cordis.patch.yml": "./cordis.patch.yml"
+   },
++  "files": [
++    "index.js",
++    "client.js",
++    "lib",
++    "scripts",
++    "cordis.patch.yml"
++  ],
++  "scripts": {
++    "build": "node scripts/build.mjs"
++  },
+   "dsh": {
+     "bundle": {
+       "patch": "./cordis.patch.yml"
+@@ -16,30 +26,28 @@
+     "client": {
+       "platform": "web",
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+         "@deepseek-ai/dsh-client-locale",
+-        "@deepseek-ai/dsh-client-ui-slots",
+-        "@deepseek-ai/dsh-client-ui-primitives",
+-        "@deepseek-ai/dsh-client-ui-conversation"
++        "@deepseek-ai/dsh-client-ui-conversation",
++        "@deepseek-ai/dsh-client-ui-renderer"
+       ]
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/dsh-client-locale": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-conversation": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-invariants": "^0.0.1-rc.1",
+-    "@deepseek-ai/cordis": "^4.0.1-rc.1",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2",
++    "@deepseek-ai/cordis": "^4.0.1",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
+     "@deepseek-ai/dsh-client-locale": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-conversation": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+     "@deepseek-ai/dsh-invariants": { "optional": true },
+     "@deepseek-ai/cordis": { "optional": true },
+diff --git a/fixture/scripts/build.mjs b/fixture/scripts/build.mjs
+new file mode 100644
+index 0000000..16c2cc6
+--- /dev/null
++++ b/fixture/scripts/build.mjs
+@@ -0,0 +1,72 @@
++// Build the browser half into the closure-factory artifact the dsh client
++// module system serves.
++//
++// `client.js` is the authoring source: a Cordis plugin module (named exports
++// `name` / `inject` / `apply`) that a test can import directly. The web host
++// serves `exports["./client"]` to the page as a classic script and the browser
++// materializes it through `window.__ModuleLoader__.load({ id, factory })`
++// (packages/client/modules/src/client/manifest.ts at dsh-v0.1.2-alpha.2). The
++// registration id must equal the package's own name: the boot manifest keys
++// entries, modules and plugin registrations by package name, and a bundle that
++// registers under another id fails with `loaded without registering "<id>"`.
++//
++// No published preset exposes this format for out-of-tree plugins
++// (docs/cookbook/adding-a-settings-card.md), so this script reproduces the
++// minimal wrapper the harness's own tsdown.client.ts emits. The output is
++// committed because a git install does not run a build.
++//
++// Usage: npm run build   (or: node scripts/build.mjs)
++import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
++import { dirname, join } from 'node:path'
++import { fileURLToPath } from 'node:url'
++
++const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
++const SOURCE = join(ROOT, 'client.js')
++const OUTPUT = join(ROOT, 'lib', 'client.js')
++
++const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
++const id = pkg?.name
++if (typeof id !== 'string' || id.length === 0) {
++  throw new Error('build: package.json has no name to register the client bundle under')
++}
++
++const source = readFileSync(SOURCE, 'utf8')
++const exported = []
++const body = source
++  .replace(/^export const ([A-Za-z_$][\w$]*)/gm, (_match, name) => {
++    exported.push(name)
++    return `const ${name}`
++  })
++  .replace(/^export function ([A-Za-z_$][\w$]*)/gm, (_match, name) => {
++    exported.push(name)
++    return `function ${name}`
++  })
++
++const leftover = body.match(/^export\s+\S+/m)
++if (leftover !== null) {
++  throw new Error(`build: client.js uses an export form this build does not support: ${leftover[0]}`)
++}
++if (exported.length === 0) {
++  throw new Error('build: client.js exports no plugin members')
++}
++
++const bundle = `// Generated by scripts/build.mjs from client.js — do not edit in place.
++// Browser half of ${id}: a lazy-CJS factory registered under the package name.
++window.__ModuleLoader__.load({
++  id: ${JSON.stringify(id)},
++  factory: (require) => {
++    var module = { exports: {} }
++    var exports = module.exports
++${body.replace(/^/gm, '    ').trimEnd()}
++    ${exported.map(name => `exports.${name} = ${name}`).join('\n    ')}
++    return module.exports
++  },
++})
++`
++
++if (!bundle.includes(`window.__ModuleLoader__.load({`) || !bundle.includes(`id: ${JSON.stringify(id)}`)) {
++  throw new Error(`build: generated bundle does not register under ${id}`)
++}
++mkdirSync(dirname(OUTPUT), { recursive: true })
++writeFileSync(OUTPUT, bundle)
++console.log(`build: wrote ${OUTPUT} (${String(bundle.length)} bytes, id ${id})`)

@@ -1,0 +1,233 @@
+{
+  "schema": 3,
+  "id": "0455caffe79d__fbfdae01410d__oracle__20261013T151254Z",
+  "createdAt": "2026-10-13T15:12:54Z",
+  "producer": {
+    "commit": "0455caffe79d491140e8e496b450bf4b3aa88515",
+    "version": "0.3.4",
+    "dirty": false,
+    "message": "fix(bench): boot a plugin in the span verifier without HMR",
+    "snapshot": "72c9e51480e1bcde"
+  },
+  "subject": {
+    "id": "oracle",
+    "agentRuntime": "none",
+    "attempts": 1,
+    "agentTimeoutMultiplier": 1
+  },
+  "suite": {
+    "repository": "royenheart/dsh-migrate-bot",
+    "commit": "fbfdae01410d9f71bc2595dc82f0ceab46825935",
+    "tasks": [
+      {
+        "id": "R1-router-0.1.5-to-0.2.0",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R2-skill-hub-0.1.6-to-0.1.7",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R3-better-display-0.1.7-rc1-to-rc2",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R4-skill-hub-0.2.0-to-0.2.1-control",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      }
+    ]
+  },
+  "model": {
+    "provider": "none",
+    "model": "none"
+  },
+  "environment": {
+    "harbor": "0.24.0",
+    "docker": "29.6.1",
+    "os": "Linux 6.12.101+deb13-cloud-amd64",
+    "concurrency": 4
+  },
+  "attempts": [
+    {
+      "task": "R1-router-0.1.5-to-0.2.0",
+      "attempt": 1,
+      "trial": "R1-router-0.1.5-to-0.2.0__rgiJ3nz",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 43.2,
+        "totalSec": 161.6
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__rgiJ3nz/verifier/judge.log",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__rgiJ3nz/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__rgiJ3nz/verifier/test-stdout.txt",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        }
+      }
+    },
+    {
+      "task": "R2-skill-hub-0.1.6-to-0.1.7",
+      "attempt": 1,
+      "trial": "R2-skill-hub-0.1.6-to-0.1.7__5anymq6",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 22.8,
+        "totalSec": 142.8
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__5anymq6/verifier/judge.log",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__5anymq6/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__5anymq6/verifier/test-stdout.txt",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        }
+      }
+    },
+    {
+      "task": "R3-better-display-0.1.7-rc1-to-rc2",
+      "attempt": 1,
+      "trial": "R3-better-display-0.1.7-rc1-to-r__J3LsCW9",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 46.3,
+        "totalSec": 163.5
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__J3LsCW9/verifier/judge.log",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__J3LsCW9/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__J3LsCW9/verifier/test-stdout.txt",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        }
+      }
+    },
+    {
+      "task": "R4-skill-hub-0.2.0-to-0.2.1-control",
+      "attempt": 1,
+      "trial": "R4-skill-hub-0.2.0-to-0.2.1-cont__JZMcvhm",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 21.3,
+        "totalSec": 141.8
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__JZMcvhm/verifier/judge.log",
+          "sha256": "c534b506ea8cd587d8254d55e092c285eaa2a6ed5fe62bafdef4b5cff12c9534",
+          "bytes": 179
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__JZMcvhm/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__JZMcvhm/verifier/test-stdout.txt",
+          "sha256": "c534b506ea8cd587d8254d55e092c285eaa2a6ed5fe62bafdef4b5cff12c9534",
+          "bytes": 179
+        }
+      }
+    }
+  ],
+  "metrics": {
+    "formula": "v1",
+    "values": {
+      "meanReward": 1,
+      "passRate@1.0": 1,
+      "passRate@0.7": 1,
+      "passAtK": 1,
+      "meanReward.S": null,
+      "meanReward.M": null,
+      "meanReward.H": null,
+      "passHatK": 1,
+      "fragility": 0,
+      "dispersion": null,
+      "unstableTaskShare": 0,
+      "inputTokens": null,
+      "outputTokens": null,
+      "cacheHitRatio": null,
+      "costPerAttempt": null,
+      "costPerSuccess": null,
+      "agentSecP50": 0.3,
+      "agentSecP90": 0.3,
+      "timeoutRate": 0,
+      "infrastructureRate": 0,
+      "eligibleTasks": 4,
+      "infeasibleTasks": 0
+    },
+    "intervals": {
+      "meanReward": [
+        1,
+        1
+      ],
+      "passRate@1.0": [
+        1,
+        1
+      ]
+    }
+  }
+}

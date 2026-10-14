@@ -1,0 +1,328 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 59d49d8..67c05a9 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,8 +1,43 @@
+ # M4 fixture · legacy peer lower bound
+ 
+-A dsh plugin declaring `@deepseek-ai/dsh-agent: ^0.1.0-rc.8` in peer and dev
+-dependencies. Under npm semver's prerelease rule this range does **not** match
+-`0.1.2-alpha.2`, so installing into an alpha.2 profile emits "Issues with peer
+-dependencies" warnings regardless of actual host compatibility (rollup R-08 #3).
+-The README claim "the range guarantees host compatibility" is wrong. **Test
+-material only — do not execute or publish** (`"private": true`).
++A dsh **bundle** plugin, `@demo/dsh-peer-bench`, for hosts on the `0.1.x` line.
++It ships three things:
++
++- `cordis.patch.yml` — the `dsh.bundle.patch` layer. It inserts the `peer-bench`
++  row into a profile; the row's module is this package's `index.js`.
++- a declared host range on `@deepseek-ai/dsh-agent`, mirrored in
++  `peerDependencies` and `devDependencies`.
++- `apply()` — logs `[peer-bench] apply() executed` through `ctx.effect()` when
++  the row mounts.
++
++## Why the declared range is a union
++
++npm excludes a prerelease version from a range unless the range carries a
++prerelease comparator on the same `[major, minor, patch]` tuple (semver's
++`includePrerelease` option is off by default). The legacy single range
++`^0.1.0-rc.8` therefore admits `0.1.0-rc.8` but **not** the newer
++`0.1.2-alpha.2` host, even though `0.1.2-alpha.2` is the higher version; npm
++reports `ERESOLVE` on a tarball install of the plugin.
++
++Each supported prerelease line needs its own segment. The declared range is now
++the union of the two lines this package supports:
++
++| Declared range | 0.1.0-rc.8 host | 0.1.2-alpha.2 host |
++| --- | --- | --- |
++| `^0.1.0-rc.8` | admits | **refuses** (npm ERESOLVE) |
++| `^0.1.0-rc.8 \|\| ^0.1.2-alpha.2` | admits | admits |
++
++No static range admits an arbitrary future prerelease tuple: under npm's
++prerelease rule a `0.1.5-rc.1` host is not admitted by either range above,
++because the comparator set has no prerelease at `0.1.5`; each supported line
++needs its own segment. The profile-load check in
++`.dsh-migrate/patch-reports/dsh-plugin-compatibility-gate/report.md` covers the
++tracks npm does not: it reads prereleases permissively (like the harness gate
++that shipped later) and refuses a declared floor above the running host, which
++is what pnpm and `link:` installs otherwise accept in silence.
++
++pnpm (the installer `dsh plugin` forwards to) and `link:` installs do not
++reject the legacy range, so the defect only appears on the published-tarball
++npm path. Do not treat the pnpm path as host compatibility.
++
++**Test material only — do not execute or publish** (`"private": true`).
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..6690b5b
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,251 @@
++{
++  "name": "@demo/dsh-peer-bench",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-peer-bench",
++      "version": "0.1.0",
++      "devDependencies": {
++        "@deepseek-ai/dsh-agent": "^0.1.0-rc.8 || ^0.1.2-alpha.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/dsh-agent": "^0.1.0-rc.8 || ^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/cordis": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.4.tgz",
++      "integrity": "sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      },
++      "bin": {
++        "cordis": "bin.js"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis-plugin-include": {
++          "optional": true
++        },
++        "@deepseek-ai/cordis-plugin-loader": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/@deepseek-ai/dsh-agent": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-agent/-/dsh-agent-0.1.2-rc.1.tgz",
++      "integrity": "sha512-lfaqN34vUCWvbn1kJVHrhfJ6Dvt1HDHCm33ZCpmKkl07/5q6FxWqVv6rOdVX5QnM/9xz/uYiN0nQwUtBg4+Skg==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-session-projection": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-brand": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-brand/-/dsh-brand-0.1.2-rc.1.tgz",
++      "integrity": "sha512-y2RHIag3kzLdY8kTBuSUSTsKzWPscJrysNObXTiNM7stXLpa3jXpshsB1caqGzNx50vYcmHeN1gFVECgx3NZHg==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-invariants": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-invariants/-/dsh-invariants-0.1.2-rc.1.tgz",
++      "integrity": "sha512-zSjuFJYcEB94kPwn7SicqAV1dfVWZkjt1I8luDboxtjfp5CN6ziwJhLv3KaB+Dh9tgkyGY4mvo886W/HhE9L9g==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-llm": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-llm/-/dsh-llm-0.1.2-rc.1.tgz",
++      "integrity": "sha512-7VYsha5AXsVLnsAwYJffWXz9bwUbElw8i5N8tlTSdai9Bupk3sMbsotzPf8ZbsuGAxQYErahMwQwgGEu4qZO6g==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-timeout": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-crypto": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1",
++        "@deepseek-ai/schemastery": "^3.18.2",
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-scope": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-scope/-/dsh-scope-0.1.2-rc.1.tgz",
++      "integrity": "sha512-GHwbzWrGbmE0ZGzAZsXBudpyCM9ENCpXxlKODIaPFbIWhRePh6nH2jW47TAOqCIsPPedWC2p3w8Tx5WAa3I/2A==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session/-/dsh-session-0.1.2-rc.1.tgz",
++      "integrity": "sha512-jRGNPTbQcvIx1F2MVmmkoiHLgpC3Btqo1wkl/3JDLlOWRVWKOuaC+5fQiMrFPOYfno6YiX/c2UvmA0td8qB92w==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/dsh-brand": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.2-rc.1"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session-projection": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-projection/-/dsh-session-projection-0.1.2-rc.1.tgz",
++      "integrity": "sha512-qVWlIzPm4u9vzQ5G/QtE6jeSJ3b3b42hWVJj664BurEZlHbAfdqkhYc1QsoBU+5k5kUEJFHh07z8HxuXA9kTnQ==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "zod": "^4.4.3"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-session": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-system-prompt": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-system-prompt/-/dsh-system-prompt-0.1.2-rc.1.tgz",
++      "integrity": "sha512-7W93PZKIk4CHvjZGgLIxrrEKpk+6t8nQXje1vKR5vG73dfXH0t1MJ5WWH/fngadYc7c6KzM84ihQ66tJqJqyNQ==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-llm": "^0.1.2-rc.1",
++        "@deepseek-ai/dsh-scope": "^0.1.2-rc.1"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-timeout": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-timeout/-/dsh-timeout-0.1.2-rc.1.tgz",
++      "integrity": "sha512-llz11yxWeJB8suKCa6hRLjNBWVaPn3Fbd0XoBS0bkZLhPFzO1mDorx/XMca2GhI7XF9A86CURQcDt+aGjjvqJA==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-typert-protocol": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-typert-protocol/-/dsh-typert-protocol-0.1.2-rc.1.tgz",
++      "integrity": "sha512-vBWD0NpriPd96ltbWaAw+iKeWFIEjiAcCWYtmqEcV1Ms+FaV02usjjm7LCmhSQhMZpBSBc7EZUX0spGlpjI1bA==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-crypto": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-crypto/-/dsh-util-crypto-0.1.2-rc.1.tgz",
++      "integrity": "sha512-gE8FznQ1hkknw9QMrHNSlm3UEyRYuj3MLVvlJ6NyH1kmOsdjnbrVbSs+Pn72k2oIV4Fiyu3Umg0sLznUEcsiXw==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-values": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.2-rc.1.tgz",
++      "integrity": "sha512-FQdgoK+KYVR0pBQb9fTsajvGb3gzUxEzJQEYnFOt+Qdwc4nkxJOPwJJdIvXuqvZaQ33DaOoqpnpcr2p5HpLu4g==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/schemastery": {
++      "version": "3.18.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.4.tgz",
++      "integrity": "sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      }
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/zod": {
++      "version": "4.6.7",
++      "resolved": "https://registry.npmjs.org/zod/-/zod-4.6.7.tgz",
++      "integrity": "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==",
++      "dev": true,
++      "license": "MIT",
++      "peer": true,
++      "funding": {
++        "url": "https://github.com/sponsors/colinhacks"
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 95821f8..a684f25 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -14,10 +14,10 @@
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/dsh-agent": "^0.1.0-rc.8"
++    "@deepseek-ai/dsh-agent": "^0.1.0-rc.8 || ^0.1.2-alpha.2"
+   },
+   "devDependencies": {
+-    "@deepseek-ai/dsh-agent": "^0.1.0-rc.8"
++    "@deepseek-ai/dsh-agent": "^0.1.0-rc.8 || ^0.1.2-alpha.2"
+   },
+   "private": true
+ }

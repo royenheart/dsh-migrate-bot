@@ -1,0 +1,804 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 10bce69..c4491eb 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -2,8 +2,52 @@
+ 
+ Terminal-style prompt history navigation for the DSH composer
+ (ArrowUp/ArrowDown cycles through recently sent messages, persisted in
+-localStorage), written in the 0.1.1-era style. The host is moving to
+-dsh 0.1.2-alpha.2.
++localStorage), written in the 0.1.2-alpha.2 era. The host half is a no-op;
++the browser half owns every behavior.
++
++Feature surface (unchanged by the migration):
++
++- ArrowUp walks to older prompts, ArrowDown back to newer ones; walking past
++  the newest entry restores the draft that was in flight.
++- History is collected from the session's `user` and `steering` conversation
++  nodes and persisted to localStorage (FIFO, 500 entries), shared across all
++  sessions in the browser profile.
++- The collector is an invisible entry in `conversation.composer.dock`
++  (id `bench-history-dock`, order 100).
++- Arrow handling is attached as a document-level `keydown` listener in the
++  plugin's `apply` body — not inside the dock component — so navigation stays
++  active in hero/blank mode, where the session-scoped dock is suppressed.
++  Line-boundary gating, the IME guard, and deferral to the composer's own key
++  handling are preserved.
++- `conversation.input.dock` additionally carries a renderless input bridge:
++  the fallback path that keeps the live input handle reachable in hero mode on
++  hosts that do not apply `patches/dsh-composer-dock-hero.patch`.
++
++Harness compatibility:
++
++- Targets dsh `0.1.2-alpha.2`. The composer is a shell-owned Lexical
++  contenteditable; drafts are read from the slot's `input.draft` and written
++  through `inputActions.setDraft`, and conversation nodes are read from the
++  Chat target's keyed snapshot delivered as the slot's `useChat` standard prop
++  (`order` + `nodes.get()`; each entry is a Chat view node whose conversation
++  record sits under `data`, with `legacy.nodes` as the older-host fallback).
++- The dock entry point is the official `conversation.composer.dock` list slot
++  (session scope, `InputZone` owner props); the hero bridge is the official
++  `conversation.input.dock` list slot. The client half injects `slots` and
++  `locale`; `@deepseek-ai/dsh-client-ui-renderer` owns the `slots` service and
++  `@deepseek-ai/dsh-client-ui-chat` contributes the `chat` standard hook, so
++  both are declared as client-inject edges and peers, with
++  `@deepseek-ai/dsh-client-ui-slots` kept as the type owner.
++- Install path: an npm profile bundle. A profile lists
++  `@bench/dsh-bench-history-dock` in its `dsh.profile.bundles`; this package's
++  `dsh.bundle.patch` inserts the host row and its `dsh.client` declaration
++  supplies the browser half.
++- `patches/dsh-composer-dock-hero.patch` is the dsh-side change this plugin
++  still needs for its documented entry point to be complete: the shell
++  hero-gates `conversation.composer.dock` (`ConversationRoot.tsx`,
++  `footer: !hero && …`), so the documented dock is absent exactly on the
++  blank-session hero. The plugin keeps the `conversation.input.dock` bridge as
++  the unpatched-host degrade; the patch removes that need.
+ 
+ Release procedure (internal):
+ 
+diff --git a/fixture/client.js b/fixture/client.js
+index c8cae4c..e1def8c 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,28 +1,43 @@
+-// bench-history-dock — browser half (0.1.1-era cohort, pre v0.1.2-alpha).
++// bench-history-dock — browser half (dsh 0.1.2-alpha.2 cohort).
+ //
+-// The DSH composer (InputBar) is a <textarea>: the plugin locates it with
+-// document.querySelector('textarea') and feeds history text back through the
+-// native prototype value setter + a dispatched 'input' event, which fires
+-// InputBar's controlled-component onChange → keyboard.setDraft — the same
+-// path the user's typing takes.
++// Terminal-style prompt history navigation for the DSH composer: ArrowUp walks
++// to older prompts, ArrowDown back to newer ones, and walking past the newest
++// entry restores the draft that was in flight when navigation started. History
++// is collected from the session's conversation nodes, persisted to
++// localStorage (FIFO, 500 entries), and shared across all sessions in the
++// browser profile.
+ //
+-// Two registrations (distilled from the real PRE client sources):
+-//   - the conversation.composer.dock list entry (id `bench-history-dock`,
+-//     order 100) — the invisible dock that collects history from the
+-//     session's conversation-node slice (session.nodes) on every render;
+-//   - a document-level 'keydown' listener attached in the plugin's apply
+-//     body (NOT in the dock component), so the listener stays active in
+-//     hero/blank mode where the session-scoped dock is suppressed.
+-//
+-// History is collected from user/steering nodes, persisted to localStorage
+-// (FIFO, 500 entries), and shared across all sessions in the browser profile.
++// The browser half carries three things (distilled from the real client
++// sources):
++//   - the `conversation.composer.dock` list entry (id `bench-history-dock`,
++//     order 100) — the documented invisible dock that collects history from the
++//     session's conversation nodes on every render and publishes the live input
++//     handle used by the keydown listener;
++//   - a document-level 'keydown' listener attached in the plugin's `apply` body
++//     (NOT in the dock component), so navigation stays active in hero/blank
++//     mode where the session-scoped dock is suppressed;
++//   - `conversation.input.dock` gets a second invisible entry, the hero input
++//     bridge: `conversation.composer.dock` is hero-gated by the shell
++//     (`footer: !hero && …`), so on stock hosts the bridge is what keeps the
++//     live input handle reachable exactly while a blank session's composer is
++//     on screen. Where the dsh-composer-dock-hero patch is applied the dock
++//     itself is live in hero mode and the bridge publishes the same handle.
+ //
+ // ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.1 era):
+-//   "The composer is still a <textarea> under the hood — only its styling
+-//    changed. Keep querySelector('textarea') and the apply-level keydown
+-//    listener so history navigation also works in hero mode; a session-
+-//    scoped listener would go dark exactly when the composer is on screen."
++// Migration notes (0.1.1-era → 0.1.2-alpha.2):
++//   - The composer is a shell-owned Lexical contenteditable, not a <textarea>:
++//     drafts are read from the slot's `input.draft` and written with
++//     `inputActions.setDraft(text)`. The old native-prototype setter +
++//     dispatched 'input' event cannot drive a Lexical editor.
++//   - Conversation nodes moved behind the Chat target: the dock reads
++//     `useChat(snapshot => snapshot)` and walks the keyed `order` + `nodes.get`
++//     store. Those keyed entries are Chat view nodes — the conversation record
++//     (`kind`, `content`) sits under `data`; the `legacy.nodes` slice (the
++//     staged-compatibility projection) carries records directly, so one
++//     normalizer reads both.
++//   - The composer element is located through the shell's `[data-composer-input]`
++//     / `[data-composer-card]` markers; a bare `textarea` fallback keeps older
++//     0.1.1-era hosts working.
+ // ────────────────────────────────────────────────────────────
+ 
+ export const name = 'bench-history-dock-client'
+@@ -31,6 +46,8 @@ export const name = 'bench-history-dock-client'
+ export const inject = ['slots', 'locale']
+ 
+ const NS = 'bench-history-dock'
++const DOCK_ID = 'bench-history-dock'
++const BRIDGE_ID = 'bench-history-dock:input-bridge'
+ const STORAGE_KEY = 'bench-history-dock:v1'
+ const CAPACITY = 500
+ 
+@@ -41,63 +58,108 @@ let navCursor = null
+ let savedDraft = null
+ 
+ /**
+- * Client plugin body: register the dock + attach the document keydown
+- * listener.
++ * Live view of the current session's input machine, published by whichever
++ * composer-adjacent entry is mounted. The keydown listener lives outside React,
++ * so it cannot call `useInput`; this handle is how it reaches the machine.
++ * @type {{ getDraft: () => string, setDraft: (text: string) => void } | null}
++ */
++let liveInput = null
++
++/**
++ * Publish the input machine of the session currently rendering this entry.
++ * @param {object | undefined} input - the entry's `InputState` snapshot.
++ * @param {object | undefined} inputActions - the entry's stable input actions.
++ */
++function publishLiveInput(input, inputActions) {
++  liveInput = input === undefined || inputActions === undefined
++    ? null
++    : {
++        getDraft: () => input.draft,
++        setDraft: (text) => { inputActions.setDraft(text) },
++      }
++}
++
++/**
++ * Client plugin body: register the dock + hero bridge + attach the document
++ * keydown listener.
+  *
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx - client root context.
+  */
+ export function apply(ctx) {
+   ctx.effect(() => ctx.locale.register(NS, { zh: {}, en: {} }), 'bench-history-dock: dictionaries')
+ 
+-  // The dock collects history from the session's conversation-node slice.
+-  // Session-scoped: DSH suppresses the dock in hero/blank mode (blank
+-  // sessions render as hero), so collection only runs in active sessions.
++  // The documented entry point: the invisible dock collects history from the
++  // session's conversation nodes and publishes the live input handle. Session
++  // scope, so DSH suppresses it in hero/blank mode (blank sessions render as
++  // hero) — the hero bridge below and the apply-level listener cover that gap.
+   ctx.slots.inject('conversation.composer.dock', () =>
+     ctx.slots.register(
+-      { name: 'conversation.composer.dock', id: 'bench-history-dock', order: 100, locale: NS },
++      { name: 'conversation.composer.dock', id: DOCK_ID, order: 100, locale: NS },
+       HistoryDock,
+     ),
+   )
+ 
+-  // Attach the document-level keydown listener. This lives in `apply` (not
+-  // in the dock component) so navigation stays active even when the dock is
++  // Hero fallback for hosts without the dsh-composer-dock-hero patch:
++  // `conversation.input.dock` renders in both phases, so this renderless entry
++  // keeps the live input handle reachable while the hero composer is on screen.
++  // It never collects history; the documented dock remains the single
++  // collection point.
++  ctx.slots.inject('conversation.input.dock', () =>
++    ctx.slots.register(
++      { name: 'conversation.input.dock', id: BRIDGE_ID },
++      HeroInputBridge,
++    ),
++  )
++
++  // Attach the document-level keydown listener. This lives in `apply` (not in
++  // the dock component) so navigation stays active even when the dock is
+   // suppressed in hero/blank mode. Bubble phase — the composer's own key
+-// handling runs first, and the handler below defers to it.
++  // handling runs first, and the handler below defers to it.
+   ctx.effect(() => {
+     if (typeof document === 'undefined') return undefined
+     const handler = (event) => {
+       if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+       if (isImeComposition(event)) return
+-      // Slash/@ menu arbitration: the 0.1.1-era heuristic — InputBar marks
+-      // menu-navigated arrows as handled, and this handler defers to any
+-      // earlier consumer via the defaultPrevented branch.
++      // Defer to any earlier consumer: the composer's own keymap, the `/`/`@`
++      // trigger menu, or a claimed/submitting input machine.
+       if (event.defaultPrevented) return
+-      const textarea = findComposerTextarea(event.target)
+-      if (textarea === null || event.target !== textarea) return
+-      if (textarea.readOnly || textarea.disabled) return
++      const composer = findComposerInput(event.target)
++      if (composer === null) return
++      if (!isComposerEditable(composer)) return
++      // A Lexical composer is driven through the published input machine only;
++      // without a handle (no entry mounted yet) the gesture is left alone.
++      if (liveInput === null && !(composer instanceof HTMLTextAreaElement)) return
+ 
+-      const history = getHistoryStore().list
+-      const info = cursorLineInfo(textarea.value, textarea.selectionStart, textarea.selectionEnd)
++      const draft = readDraft(composer)
++      const info = cursorLineInfo(composer, draft)
++      if (info === null) return
+       if (event.key === 'ArrowUp' && !info.atFirstLine) return
+       if (event.key === 'ArrowDown' && !info.atLastLine) return
+ 
++      const history = getHistoryStore().list
+       const dir = event.key === 'ArrowUp' ? 'up' : 'down'
+       const next = nextIndex(navCursor, history.length, dir)
+       if (next === null) {
++        // ArrowDown with no navigation in flight: nothing to restore, but the
++        // gesture still belongs to the history cursor, not to the caret.
++        event.preventDefault()
++        return
++      }
++      const entry = entryAt(history, next)
++      if (entry === null) {
++        // Walking past the newest entry restores the draft saved when
++        // navigation started (ArrowUp past the oldest stays put).
++        if (dir !== 'down') return
+         const saved = savedDraft
+         navCursor = null
+-        if (saved !== null) {
+-          setNativeTextareaValue(textarea, saved)
+-          savedDraft = null
+-        }
++        savedDraft = null
++        if (saved !== null) writeDraft(composer, saved)
+         event.preventDefault()
+         return
+       }
+-      if (navCursor === null && savedDraft === null) savedDraft = textarea.value
+-      const entry = entryAt(history, next)
+-      if (entry === null) return
++      if (navCursor === null && savedDraft === null) savedDraft = draft
+       navCursor = next
+-      setNativeTextareaValue(textarea, entry)
++      writeDraft(composer, entry)
+       event.preventDefault()
+     }
+     document.addEventListener('keydown', handler, false)
+@@ -108,9 +170,77 @@ export function apply(ctx) {
+ }
+ 
+ /**
+- * Set the textarea value via the native prototype setter and dispatch an
+- * `input` event so React's controlled-component onChange fires — the same
+- * technique browser-automation libraries use on React controlled inputs.
++ * Resolve the composer text surface from a keydown target. The alpha.2 shell
++ * marks the Lexical contenteditable `[data-composer-input]` inside the
++ * `[data-composer-card]`; a bare `textarea` keeps older hosts working.
++ *
++ * @param {EventTarget | null} target - the keydown target.
++ * @returns {HTMLElement | HTMLTextAreaElement | null} the composer surface.
++ */
++function findComposerInput(target) {
++  if (typeof document === 'undefined') return null
++  if (!(target instanceof Element)) return null
++  const input = target.closest('[data-composer-input]')
++  if (input !== null) return input
++  const card = target.closest('[data-composer-card]')
++  if (card !== null) return card.querySelector('textarea')
++  return null
++}
++
++/**
++ * Whether the composer surface accepts navigation right now. Lexical surfaces
++ * expose the live submission phase as `data-phase`; disabled/read-only states
++ * flip `contenteditable`/`aria-disabled`. Absent markers keep the old textarea
++ * semantics (readOnly/disabled).
++ *
++ * @param {HTMLElement | HTMLTextAreaElement} composer - the composer surface.
++ * @returns {boolean} whether history navigation may act on it.
++ */
++function isComposerEditable(composer) {
++  if (composer instanceof HTMLTextAreaElement) {
++    return !composer.readOnly && !composer.disabled
++  }
++  if (composer.getAttribute('contenteditable') === 'false') return false
++  if (composer.getAttribute('aria-disabled') === 'true') return false
++  const phase = composer.getAttribute('data-phase')
++  return phase === null || phase === 'plain'
++}
++
++/**
++ * Read the current draft through the live input machine, falling back to the
++ * DOM value on older textarea hosts.
++ *
++ * @param {HTMLElement | HTMLTextAreaElement} composer - the composer surface.
++ * @returns {string} the current draft.
++ */
++function readDraft(composer) {
++  if (liveInput !== null) return liveInput.getDraft()
++  return composer instanceof HTMLTextAreaElement ? composer.value : ''
++}
++
++/**
++ * Write a history entry into the composer: the live input machine when one is
++ * published (Lexical-composer hosts), otherwise the native textarea setter for
++ * 0.1.1-era hosts.
++ *
++ * @param {HTMLElement | HTMLTextAreaElement} composer - the composer surface.
++ * @param {string} value - the draft text to install.
++ */
++function writeDraft(composer, value) {
++  if (liveInput !== null) {
++    liveInput.setDraft(value)
++    return
++  }
++  if (composer instanceof HTMLTextAreaElement) setNativeTextareaValue(composer, value)
++}
++
++/**
++ * Set a textarea value via the native prototype setter and dispatch an `input`
++ * event so React's controlled-component onChange fires — the pre-Lexical
++ * composer path, kept for older hosts.
++ *
++ * @param {HTMLTextAreaElement} textarea - the old composer surface.
++ * @param {string} value - the value to install.
+  */
+ function setNativeTextareaValue(textarea, value) {
+   const descriptor = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')
+@@ -123,61 +253,96 @@ function setNativeTextareaValue(textarea, value) {
+ }
+ 
+ /**
+- * Locate the DSH composer textarea. The real locator scopes the query to the
+- * composer card's stable internal attribute; the distilled fixture keeps the
+- * document-level shape the exam anchors on.
++ * Caret line information for the composer surface: textareas report through
++ * selectionStart/End, Lexical contenteditables through visual line boxes
++ * (their DOM text offsets cannot be mapped to the draft: line breaks are
++ * `<br>` and reference chips are decorator portals). `null` means the boundary
++ * cannot be determined, and the caller must not navigate.
++ *
++ * @param {HTMLElement | HTMLTextAreaElement} composer - the composer surface.
++ * @param {string} value - the current draft text (textarea path only).
++ * @returns {{ atFirstLine: boolean, atLastLine: boolean } | null} line facts.
+  */
+-function findComposerTextarea(from) {
+-  if (typeof document === 'undefined') return null
+-  if (from instanceof Element) {
+-    const card = from.closest('[data-composer-card]')
+-    if (card !== null) {
+-      const ta = card.querySelector('textarea')
+-      if (ta !== null) return ta
+-    }
++function cursorLineInfo(composer, value) {
++  if (composer instanceof HTMLTextAreaElement) {
++    return offsetsLineInfo(value, composer.selectionStart, composer.selectionEnd)
+   }
+-  return document.querySelector('textarea')
++  return caretLineBoundary(composer)
+ }
+ 
+ /**
+- * The invisible dock entry: collects prompt history from the session's
+- * conversation-node slice (session.nodes) on every render. Session-scoped;
+- * suppressed in hero/blank mode.
++ * Collapsed-caret boundary inside the Lexical editable, measured against the
++ * content's visual line tops (`Range.getClientRects()`). A range selection and
++ * a geometry-less environment both answer `null`; an empty editable is one
++ * virtual line, so both flags are true.
+  *
+- * @param {{ session: { nodes: Array<{ kind: string, content?: Array<{ type: string, text?: string }> }> }}} props
++ * @param {HTMLElement} editable - the composer editable.
++ * @returns {{ atFirstLine: boolean, atLastLine: boolean } | null} line facts.
+  */
+-function HistoryDock(props) {
+-  const lastText = latestUserOrSteeringText(props.session.nodes)
+-  if (lastText !== null) getHistoryStore().append(lastText)
+-  return null // aria-hidden anchor elided in the fixture
++function caretLineBoundary(editable) {
++  if (typeof document.createRange !== 'function') return null
++  const selection = window.getSelection()
++  if (selection === null || selection.rangeCount === 0 || !selection.isCollapsed) return null
++  if (!editable.contains(selection.anchorNode)) return null
++  const caretTop = caretTopOf(selection)
++  if (caretTop === null) return null
++  const lineTops = contentLineTops(editable)
++  if (lineTops === null) return null
++  if (lineTops.length === 0) return { atFirstLine: true, atLastLine: true }
++  const tolerance = 4
++  return {
++    atFirstLine: caretTop <= lineTops[0] + tolerance,
++    atLastLine: caretTop >= lineTops[lineTops.length - 1] - tolerance,
++  }
+ }
+ 
+-/** Latest user/steering text from a conversation snapshot's nodes list. */
+-function latestUserOrSteeringText(nodes) {
+-  for (let i = nodes.length - 1; i >= 0; i--) {
+-    const node = nodes[i]
+-    if (node.kind !== 'user' && node.kind !== 'steering') continue
+-    if (node.content === undefined) continue
+-    let text = ''
+-    for (const block of node.content) {
+-      if (block.type === 'text' && typeof block.text === 'string') text += block.text
+-    }
+-    return text
++/** Viewport `top` of the collapsed caret box, or null when unmeasurable. */
++function caretTopOf(selection) {
++  const rects = selection.getRangeAt(0).getClientRects()
++  for (let i = 0; i < rects.length; i++) {
++    const rect = rects[i]
++    if (rect.height === 0 && rect.width === 0) continue
++    return rect.top
+   }
+-  return null
++  const anchor = selection.anchorNode
++  const el = anchor instanceof HTMLElement ? anchor : anchor?.parentElement
++  return el === undefined || el === null ? null : el.getBoundingClientRect().top
+ }
+ 
+-/** Caret line information for a multi-line textarea value. */
+-function cursorLineInfo(value, selectionStart, selectionEnd) {
++/** Ascending, deduped visual line tops of the editable; null without geometry. */
++function contentLineTops(editable) {
++  const range = document.createRange()
++  if (typeof range.getClientRects !== 'function') return null
++  range.selectNodeContents(editable)
++  const rects = range.getClientRects()
++  const tops = []
++  for (let i = 0; i < rects.length; i++) {
++    const rect = rects[i]
++    if (rect.height === 0 && rect.width === 0) continue
++    // Fragments of one visual line share a top within subpixel slop; real
++    // lines differ by a full line height.
++    if (tops.length === 0 || Math.abs(rect.top - tops[tops.length - 1]) > 2) tops.push(rect.top)
++  }
++  return tops
++}
++
++/**
++ * Line facts for a collapsed-or-range selection over a textarea value.
++ *
++ * @param {string} value - the draft text.
++ * @param {number} selectionStart - selection start offset.
++ * @param {number} selectionEnd - selection end offset.
++ * @returns {{ atFirstLine: boolean, atLastLine: boolean }} line facts.
++ */
++function offsetsLineInfo(value, selectionStart, selectionEnd) {
+   const end = selectionEnd ?? selectionStart
+   const collapsed = selectionStart === end
+   const totalLines = value.split('\n').length
+   const currentLine = value.slice(0, selectionStart).split('\n').length - 1
++  const line = Math.max(0, Math.min(currentLine, totalLines - 1))
+   return {
+-    currentLine: Math.max(0, Math.min(currentLine, totalLines - 1)),
+-    totalLines,
+-    atFirstLine: collapsed && currentLine === 0,
+-    atLastLine: collapsed && currentLine === totalLines - 1,
++    atFirstLine: collapsed && line === 0,
++    atLastLine: collapsed && line === totalLines - 1,
+   }
+ }
+ 
+@@ -198,14 +363,94 @@ function entryAt(history, index) {
+   return index >= 0 && index < history.length ? history[index] : null
+ }
+ 
++/**
++ * The invisible dock entry: collects prompt history from the session's
++ * conversation nodes on every render and publishes the live input handle.
++ * Session-scoped; suppressed in hero/blank mode (where the hero bridge takes
++ * over the handle).
++ *
++ * @param {{ input?: object, inputActions?: object, useChat: (select: (chat: object) => unknown) => object }} props
++ */
++function HistoryDock(props) {
++  publishLiveInput(props.input, props.inputActions)
++  const chat = props.useChat((snapshot) => snapshot)
++  const lastText = latestUserOrSteeringText(orderedNodes(chat))
++  if (lastText !== null) getHistoryStore().append(lastText)
++  return null // aria-hidden anchor elided in the fixture
++}
++
++/**
++ * The renderless hero bridge: publishes the input handle while the session is
++ * blank (hero), where `conversation.composer.dock` is not rendered. It never
++ * collects history.
++ *
++ * @param {{ input?: object, inputActions?: object }} props
++ */
++function HeroInputBridge(props) {
++  publishLiveInput(props.input, props.inputActions)
++  return null
++}
++
++/**
++ * Ordered conversation nodes from the Chat target snapshot: the alpha.2 keyed
++ * store (`order` + `nodes.get`), with the staged legacy slice as fallback.
++ * Keyed entries are Chat view nodes; the legacy slice holds conversation
++ * records — {@link nodeRecord} normalizes the two.
++ *
++ * @param {object | undefined} chat - the Chat snapshot.
++ * @returns {Array<object>} the nodes in render order.
++ */
++function orderedNodes(chat) {
++  if (chat === undefined || chat === null) return []
++  if (Array.isArray(chat.order) && chat.nodes !== undefined && typeof chat.nodes.get === 'function') {
++    const nodes = []
++    for (const id of chat.order) {
++      const node = chat.nodes.get(id)
++      if (node !== undefined) nodes.push(node)
++    }
++    return nodes
++  }
++  return Array.isArray(chat.legacy?.nodes) ? chat.legacy.nodes : []
++}
++
++/**
++ * The conversation record behind one Chat node: a keyed view node carries the
++ * record (`kind`, `content`) under `data`, while a legacy-slice entry is the
++ * record itself.
++ *
++ * @param {object} node - a keyed Chat view node or a legacy record.
++ * @returns {object | null} the record, when the node has one.
++ */
++function nodeRecord(node) {
++  if (node === null || node === undefined) return null
++  const data = node.data
++  if (data !== null && data !== undefined && typeof data === 'object') return data
++  return node
++}
++
++/** Latest user/steering text from a conversation snapshot's nodes list. */
++function latestUserOrSteeringText(nodes) {
++  for (let i = nodes.length - 1; i >= 0; i--) {
++    const record = nodeRecord(nodes[i])
++    if (record === null) continue
++    if (record.kind !== 'user' && record.kind !== 'steering') continue
++    if (!Array.isArray(record.content)) continue
++    let text = ''
++    for (const block of record.content) {
++      if (block?.type === 'text' && typeof block.text === 'string') text += block.text
++    }
++    return text
++  }
++  return null
++}
++
+ /** Module-scope history store: FIFO list of unique prompts in localStorage. */
+ let historyStore = null
+ function getHistoryStore() {
+   if (historyStore === null) {
+-    const key = 'bench-history-dock:v1'
+     let list = []
+     try {
+-      list = JSON.parse(window.localStorage.getItem(key) ?? '[]')
++      list = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '[]')
+     } catch {
+       list = []
+     }
+@@ -218,9 +463,9 @@ function getHistoryStore() {
+         if (trimmed === '') return
+         const filtered = list.filter((item) => item !== trimmed)
+         filtered.push(trimmed)
+-        list = filtered.slice(-500)
++        list = filtered.slice(-CAPACITY)
+         try {
+-          window.localStorage.setItem(key, JSON.stringify(list))
++          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
+         } catch {
+           // Storage unavailable: degrade to the in-memory list.
+         }
+diff --git a/fixture/index.js b/fixture/index.js
+index c1dec70..608ca59 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,10 +1,17 @@
+-// bench-history-dock — host plugin entry (0.1.1-era cohort).
++// bench-history-dock — host plugin entry (0.1.2-alpha.2 cohort).
+ //
+ // Client-only plugin: the host half has no runtime work. The browser half
+-// (./client.js) registers an invisible entry in `conversation.composer.dock`
+-// that collects prompt history from the session's conversation-node slice
+-// and implements terminal-style history navigation (ArrowUp/ArrowDown) over
+-// the composer textarea.
++// (./client.js) registers:
++//   - an invisible entry in `conversation.composer.dock` that collects prompt
++//     history from the Chat target's user/steering nodes;
++//   - a renderless bridge in `conversation.input.dock` that keeps the live
++//     input handle reachable in hero/blank mode, where the composer dock is
++//     suppressed (see `patches/dsh-composer-dock-hero.patch`);
++//   - a document-level ArrowUp/ArrowDown keydown listener attached in `apply`
++//     that performs terminal-style history navigation over the composer.
++//
++// The row below is inserted by the bundle layer (./cordis.patch.yml); the
++// `capacity: 500` entry restates the browser half's documented FIFO size.
+ 
+ export const name = 'bench-history-dock'
+ 
+@@ -18,5 +25,5 @@ export const inject = []
+  * @param {import('@deepseek-ai/cordis').Context} _ctx - host context (unused).
+  */
+ export function apply(_ctx, config) {
+-  console.error('[bench-history-dock] host apply(): client-only plugin (0.1.1-era cohort); no host-side resources')
++  console.error('[bench-history-dock] host apply(): client-only plugin (0.1.2-alpha.2 cohort); no host-side resources')
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..918fcd9
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,52 @@
++{
++  "name": "@bench/dsh-bench-history-dock",
++  "version": "0.2.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-history-dock",
++      "version": "0.2.0",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.1",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-chat": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-llm": "^0.1.2-alpha.2",
++        "react": "^18.2.0",
++        "react-dom": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-chat": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-conversation": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-renderer": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-llm": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        },
++        "react-dom": {
++          "optional": true
++        }
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index c0ec4de..a6dd184 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-history-dock",
+-  "version": "0.1.2",
+-  "description": "Terminal-style prompt history navigation for the DSH composer: ArrowUp/ArrowDown cycles through recently sent messages (0.1.1-era cohort; exam material only)",
++  "version": "0.2.0",
++  "description": "Terminal-style prompt history navigation for the DSH composer: ArrowUp/ArrowDown cycles through recently sent messages (0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -16,30 +16,32 @@
+     "client": {
+       "platform": "web",
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+         "@deepseek-ai/dsh-client-locale",
+-        "@deepseek-ai/dsh-client-ui-slots",
+-        "@deepseek-ai/dsh-client-ui-conversation"
++        "@deepseek-ai/dsh-client-ui-chat",
++        "@deepseek-ai/dsh-client-ui-conversation",
++        "@deepseek-ai/dsh-client-ui-renderer"
+       ]
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/dsh-client-locale": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-conversation": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-invariants": "^0.0.1-rc.1",
+-    "@deepseek-ai/cordis": "^4.0.1-rc.1",
++    "@deepseek-ai/cordis": "^4.0.1",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-chat": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-llm": "^0.1.2-alpha.2",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
++    "@deepseek-ai/cordis": { "optional": true },
+     "@deepseek-ai/dsh-client-locale": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-chat": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-conversation": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+-    "@deepseek-ai/dsh-invariants": { "optional": true },
+-    "@deepseek-ai/cordis": { "optional": true },
++    "@deepseek-ai/dsh-llm": { "optional": true },
+     "react": { "optional": true },
+     "react-dom": { "optional": true }
+   },
+diff --git a/fixture/patches/README.md b/fixture/patches/README.md
+new file mode 100644
+index 0000000..d02eefa
+--- /dev/null
++++ b/fixture/patches/README.md
+@@ -0,0 +1,25 @@
++# patches/
++
++Harness-side patches this plugin still needs. Each patch targets the pinned
++`dsh-v0.1.2-alpha.2` checkout (`0a53fb55bea101816fa226bb964ae2bed71c343b`) and
++applies from its root with `git apply`.
++
++| Patch | Target | Why the plugin needs it |
++|---|---|---|
++| `dsh-composer-dock-hero.patch` | `packages/client/ui-conversation/src/client/skeleton/ConversationRoot.tsx` | Renders `conversation.composer.dock` on the hero (blank-session) composer as well as the docked one. The documented entry point of this plugin is that slot; the shell currently skips it with `!hero`, so the dock — and the live input handle it publishes — goes dark exactly in hero/blank mode, the mode the plugin's documented `apply`-level listener is there to cover. The `conversation.input.dock` bridge in `client.js` is the degrade for unpatched hosts; it is not a reason to drop the patch. |
++
++Applying the patch on the checkout (do not commit to the pinned checkout):
++
++```sh
++git -C .dsh-migrate/harness apply patches/dsh-composer-dock-hero.patch
++```
++
++Re-verified against the exact tag: `git apply --check` passes on the pristine
++`HEAD` file, and the checkout's working tree equals the patch result
++(`git apply --check -R` passes). The patch stays required — the hero bridge in
++`client.js` registers in `conversation.input.dock`, which is a different slot
++(full-width strip above the card), so it does not replace the documented
++`conversation.composer.dock` entry.
++
++A discussion draft for this patch lives at
++`.dsh-migrate/patch-reports/composer-dock-hero/report.md`.
+diff --git a/fixture/patches/dsh-composer-dock-hero.patch b/fixture/patches/dsh-composer-dock-hero.patch
+new file mode 100644
+index 0000000..1d9be01
+--- /dev/null
++++ b/fixture/patches/dsh-composer-dock-hero.patch
+@@ -0,0 +1,19 @@
++diff --git a/packages/client/ui-conversation/src/client/skeleton/ConversationRoot.tsx b/packages/client/ui-conversation/src/client/skeleton/ConversationRoot.tsx
++index eb9a3be..ce634d6 100644
++--- a/packages/client/ui-conversation/src/client/skeleton/ConversationRoot.tsx
+++++ b/packages/client/ui-conversation/src/client/skeleton/ConversationRoot.tsx
++@@ -344,8 +344,12 @@ export function ConversationRoot({
++     overlay: sessionId === undefined ? undefined : renderSlot('conversation.input.overlay', {}),
++     leftItems: zone === undefined ? null : renderSlot('conversation.input.left', zone),
++     rightItems: zone === undefined ? null : renderSlot('conversation.input.right', zone),
++-    // Ambient dock under the card shares the composer's width constraint.
++-    footer: !hero && zone !== undefined ? renderSlot('conversation.composer.dock', zone) : null,
+++    // Ambient dock under the card shares the composer's width constraint. It
+++    // rides the card in every phase: the hero composer is the same
+++    // session-maybe card (variant 'hero'), so a registered entry that needs the
+++    // input machine must not disappear exactly when a blank session opens.
+++    // Entries with nothing to show render null (StatsLine reports no groups).
+++    footer: zone !== undefined ? renderSlot('conversation.composer.dock', zone) : null,
++   })
++ 
++   const composerBar = (

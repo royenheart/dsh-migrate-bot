@@ -1,0 +1,152 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.5-rc.1",
+      "target": {
+        "tag": "dsh-v0.1.5-rc.1",
+        "version": "0.1.5-rc.1"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.5-rc.1",
+            "version": "0.1.5-rc.1"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.2-rc.1",
+              "version": "0.1.2-rc.1"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "e2ePublish": false,
+            "checks": {
+              "cards": true,
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [
+          "e2e"
+        ],
+        "reviewed": true,
+        "attempts": 1,
+        "lastFingerprint": "mechanical: npm error Cannot read properties of null (reading 'matches') | npm error A complete log of this run can be found in: /root/.npm/_logs/<n>-<n>-14T20_40_03_049Z-debug-<n>.log",
+        "failure": {
+          "check": "e2e",
+          "outcome": "fail",
+          "fingerprint": "e2e: the suite exceeded its <n> watchdog",
+          "detail": "the suite exceeded its 1200s watchdog\n"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [],
+        "warnings": [
+          "no end-to-end baseline: no test of the suite passes on the source release",
+          "end-to-end tests that passed before the migration fail now (advisory, see the checks): e2e: the suite exceeded its <n> watchdog"
+        ],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-14T19-54-13-445Z",
+      "startedAt": "2026-10-14T19:54:14.259Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.5-rc.1",
+    "target": {
+      "tag": "dsh-v0.1.5-rc.1",
+      "version": "0.1.5-rc.1"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.5-rc.1",
+          "version": "0.1.5-rc.1"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.2-rc.1",
+            "version": "0.1.2-rc.1"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "e2ePublish": false,
+          "checks": {
+            "cards": true,
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [
+        "e2e"
+      ],
+      "reviewed": true,
+      "attempts": 1,
+      "lastFingerprint": "mechanical: npm error Cannot read properties of null (reading 'matches') | npm error A complete log of this run can be found in: /root/.npm/_logs/<n>-<n>-14T20_40_03_049Z-debug-<n>.log",
+      "failure": {
+        "check": "e2e",
+        "outcome": "fail",
+        "fingerprint": "e2e: the suite exceeded its <n> watchdog",
+        "detail": "the suite exceeded its 1200s watchdog\n"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [],
+      "warnings": [
+        "no end-to-end baseline: no test of the suite passes on the source release",
+        "end-to-end tests that passed before the migration fail now (advisory, see the checks): e2e: the suite exceeded its <n> watchdog"
+      ],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-14T19-54-13-445Z",
+    "startedAt": "2026-10-14T19:54:14.259Z"
+  }
+}

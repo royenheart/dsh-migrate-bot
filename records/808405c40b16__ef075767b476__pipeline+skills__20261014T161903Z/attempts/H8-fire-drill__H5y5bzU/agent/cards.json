@@ -1,0 +1,68 @@
+{
+  "cards": [
+    {
+      "id": "DSH-0.1.2-A2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["drill-host/index.js:6", "drill-tools/index.js:3", "drill-web/index.js:21"],
+      "note": "No plugin produces, persists, reloads, or transports SessionEvents (the three apply() bodies only call llm.listProviders, tools.register, and webServer.register); no ignorable marker is written or filtered."
+    },
+    {
+      "id": "DSH-0.1.2-A2-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["drill-host/index.js:12", "drill-tools/index.js:15", "drill-web/index.js:21"],
+      "note": "No plugin touches ctx.remote or RemoteResult/RemoteError: drill-host is host-plane and reads the llm domain service, drill-tools registers a tool, drill-web registers a raw webServer route."
+    },
+    {
+      "id": "DSH-0.1.2-A2-03",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["drill-host/package.json:16", "drill-tools/package.json:16", "drill-web/package.json:16", "README.md:10"],
+      "note": "The manifests' dependency edges were reviewed for the alpha.2 cohort; the repository has no lockfile and no installed dependency tree (README publishes via pnpm and packages stay private), so the card's frozen-lockfile condition cannot be met and no override, pruned peer, or workaround exists to retire."
+    },
+    {
+      "id": "DSH-0.1.2-A2-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["README.md:6", "drill-web/package.json:11"],
+      "note": "The repository ships no startup wrapper or CI matrix: no workflow files, no scripts, no Node pin, and no branch that forces Node 22 or skips dsh web; all three packages load as plugin rows inside the harness process."
+    },
+    {
+      "id": "DSH-0.1.2-A2-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["drill-host/index.js:6", "drill-tools/index.js:3", "drill-web/index.js:21"],
+      "note": "No plugin consumes pluginInventory/list or validates PluginInventorySnapshot; the plugin-inventory surface appears nowhere in the tree, so the optional agentPresets grouping has no reader to update."
+    },
+    {
+      "id": "DSH-0.1.2-A2-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["drill-web/index.js:21", "drill-web/package.json:17"],
+      "note": "No client-plane code exists (no dsh.client manifest, no ctx.remote use, no host.describe caller), so ctx.remote.$host.home/isLoopback has no consumer and no reconnect path."
+    },
+    {
+      "id": "DSH-0.1.2-A2-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["drill-tools/package.json:17", "drill-tools/index.js:3", "drill-host/package.json:17", "drill-web/package.json:18"],
+      "note": "No plugin lists dsh-tool-todo, dsh-tool-subagent, dsh-agent, dsh-agent-loop, dsh-terminal-bash, or any other sessionProjections-injecting package as a peer: the only DSH peers are dsh-llm, dsh-tools, dsh-client-connection, and dsh-host-webserver (dsh-tools itself carries session-projection as a devDependency only), and the shipped base bundle mounts session-projection."
+    },
+    {
+      "id": "DSH-0.1.2-A2-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["drill-host/index.js:6", "drill-tools/index.js:3", "drill-web/index.js:21"],
+      "note": "No plugin registers, reads, or writes a settings namespace (no ctx.settings use, no settingsNamespace import, no SettingsConflictError test double), so the compile-time SettingsNamespaceInput migration has no call site here."
+    }
+  ]
+}

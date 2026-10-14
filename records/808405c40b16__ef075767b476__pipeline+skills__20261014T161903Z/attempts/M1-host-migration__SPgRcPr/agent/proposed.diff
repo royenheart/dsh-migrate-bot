@@ -1,0 +1,90 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 80a63e7..d87b6e1 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,8 +1,10 @@
+ # M1 fixture · Legacy-Style Host Plugin (0.1.1-rc.2 Era)
+ 
+-Test fixture, **do not publish**. The content is copied verbatim from the `/tmp/demo-plugin` of the historical validation environment (legacy style written against the real interface of `@deepseek-ai/dsh-host-apiproxy@0.0.1-rc.1`); the only additions are `"private": true` in package.json and this README.
++Test fixture, **do not publish**. The baseline content is copied verbatim from the `/tmp/demo-plugin` of the historical validation environment (legacy style written against the real interface of `@deepseek-ai/dsh-host-apiproxy@0.0.1-rc.1`); the baseline's only additions are `"private": true` in package.json and this README. The tree now carries the migration recorded at the end of this file.
+ 
+-Activation facts (from `benchmark/results/validation-report-2026-08-30.md`):
++Activation facts (recorded pre-migration, from `benchmark/results/validation-report-2026-08-30.md`):
+ 
+-- With this plugin attached, dsh 0.1.2-alpha.2 cold boot immediately fails with `plugin tree failed ... pending (waiting for service: apiProxy)` and exit 1;
++- With the legacy copy attached, dsh 0.1.2-alpha.2 cold boot immediately failed with `plugin tree failed ... pending (waiting for service: apiProxy)` and exit 1;
+ - After migrating per the skill card (`inject: ["llm"]` + `ctx.llm.listProviders()` + removing the dead dependency), activation succeeds; with no API key in the container, a route count of 0 is expected — as long as the calls go through.
++
++Migration applied (2026-10-14, this tree): `index.js` injects the `llm` domain service and enumerates provider routes with `ctx.llm.listProviders()`, the documented Host-plane replacement for the removed `ctx.apiProxy.llm.providers()` gateway call; `package.json` no longer declares the dead `@deepseek-ai/dsh-host-apiproxy@0.0.1-rc.1` dependency. Verified against the 0.1.2-alpha.2 install: the entry activates and logs `route count 0`, and the host proceeds to the model call (the probe's dead-endpoint `TRANSPORT` failure, not a plugin failure).
+diff --git a/fixture/index.js b/fixture/index.js
+index c3e0c80..d91d95a 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,14 +1,21 @@
+-// 0.1.1-rc.2-era style: inject apiProxy and call through the dot-domain API
+-export const inject = ["apiProxy"]
++// 0.1.2-alpha.2 style: inject the owning domain service and call through it.
++// The legacy `apiProxy` gateway (and the `ctx.apiProxy.llm.providers()` call it
++// carried) has no service at this tag; `llm/listProviders` on `LlmRuntime` is
++// the same Host-plane provider enumeration, so the demo calls it directly.
++export const inject = ["llm"]
+ 
+ export function apply(ctx) {
+-  console.error("[upgrade-demo] apply() 执行 — 旧 API（apiProxy）路径")
++  console.error("[upgrade-demo] apply() 执行 — 新 API（llm 领域服务）路径")
+   ctx.effect(async () => {
+     try {
+-      const providers = await ctx.apiProxy.llm.providers()
+-      console.error("[upgrade-demo] apiProxy.llm.providers() 成功 →", JSON.stringify(providers).slice(0, 160))
++      const providers = await ctx.llm.listProviders()
++      console.error(
++        "[upgrade-demo] ctx.llm.listProviders() 成功 → route count",
++        providers.length,
++        JSON.stringify(providers).slice(0, 160),
++      )
+     } catch (error) {
+-      console.error("[upgrade-demo] apiProxy.llm.providers() 失败 →", error.message)
++      console.error("[upgrade-demo] ctx.llm.listProviders() 失败 →", error.message)
+     }
+   })
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..45b1a6d
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-upgrade-demo",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-upgrade-demo",
++      "version": "0.1.0"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 623271c..b87c8f7 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@demo/dsh-upgrade-demo",
+   "version": "0.1.0",
+-  "description": "DSH plugin upgrade validation demo (migrated to 0.1.2-alpha.2 @Remote)",
++  "description": "DSH plugin upgrade validation demo (migrated to 0.1.2-alpha.2: llm domain service)",
+   "type": "module",
+   "main": "index.js",
+   "exports": {
+@@ -13,8 +13,5 @@
+       "patch": "./cordis.patch.yml"
+     }
+   },
+-  "dependencies": {
+-    "@deepseek-ai/dsh-host-apiproxy": "0.0.1-rc.1"
+-  },
+   "private": true
+ }

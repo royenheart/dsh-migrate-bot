@@ -1,0 +1,22 @@
+FAIL contract: does not admit 0.2.0-rc.1: peerDependencies @deepseek-ai/dsh-client-locale@^0.1.5-rc.2, peerDependencies @deepseek-ai/dsh-client-ui-primitives@^0.1.5-rc.2, peerDependencies @deepseek-ai/dsh-client-ui-slots@^0.1.5-rc.2, peerDependencies @deepseek-ai/dsh-llm@^0.1.5-rc.2, peerDependencies @deepseek-ai/dsh-settings@^0.1.5-rc.2
+FAIL typecheck: > dsh-router-core@0.4.2 typecheck
+  > tsc --noEmit
+  
+  src/llm/adapter.ts(218,55): error TS2367: This comparison appears to be unintentional because the types '"file" | "image" | "reasoning" | "text" | "tool-addition" | "tool-call" | "tool-removal"' and '"tool-result"' have no overlap.
+  src/llm/adapter.ts(221,37): error TS2367: This comparison appears to be unintentional because the types '"file" | "image" | "reasoning" | "text" | "tool-addition" | "tool-call" | "tool-removal"' and '"tool-result"' have no overlap.
+  src/llm/adapter.ts(238,47): error TS2339: Property 'content' does not exist on type 'never'.
+  src/llm/adapter.ts(243,53): error TS2339: Property 'toolCallId' does not exist on type 'never'.
+PASS test
+FAIL build: > dsh-router-core@0.4.2 build
+  > node scripts/check-css.mjs && node scripts/check-publish.mjs --source && rm -rf lib && tsc -p tsconfig.build.json && tsdown && node scripts/copy-row-meta.mjs && npm run build:client && node scripts/check-publish.mjs
+  
+  ✓ CSS 花括号平衡（3777 行）
+  · --source：跳过产物断言（构建前那一趟）
+  ✓ 发布身份一致：dsh-router-core（patch / bundle id / export name 全对）
+  src/llm/adapter.ts(218,55): error TS2367: This comparison appears to be unintentional because the types '"file" | "image" | "reasoning" | "text" | "tool-addition" | "tool-call" | "tool-removal"' and '"tool-result"' have no overlap.
+  src/llm/adapter.ts(221,37): error TS2367: This comparison appears to be unintentional because the types '"file" | "image" | "reasoning" | "text" | "tool-addition" | "tool-call" | "tool-removal"' and '"tool-result"' have no overlap.
+  src/llm/adapter.ts(238,47): error TS2339: Property 'content' does not exist on type 'never'.
+  src/llm/adapter.ts(243,53): error TS2339: Property 'toolCallId' does not exist on type 'never'.
+FAIL boot: dsh: skipping profile bundle "dsh-router-core": Error: Plugin dsh-router-core@0.4.2 is incompatible with dsh 0.2.0-rc.1: peerDependencies {"@deepseek-ai/dsh-client-locale":"^0.1.5-rc.2","@deepseek-ai/dsh-client-ui-primitives":"^0.1.5-rc.2","@deepseek-ai/dsh-client-ui-slots":"^0.1.5-rc.2","@deepseek-ai/dsh-llm":"^0.1.5-rc.2","@deepseek-ai/dsh-settings":"^0.1.5-rc.2"}. Running it may cause crashes or data loss. Update the plugin or install a plugin version compatible with this dsh runtime. To accept this risk explicitly, grant the exact-version exemption for dsh-router-core@0.4.2 on dsh 0.2.0-rc.1 with `dsh plugin allow-version` or the plugin manager, then retry the installation or restart dsh. Exact-version exemption: not active.
+  dsh web: http://127.0.0.1:40409/?token=<redacted>
+{"score":30,"max":100,"checks":{"contract":0,"typecheck":0,"test":1,"build":0,"boot":0}}

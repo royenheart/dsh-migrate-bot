@@ -1,0 +1,199 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 6ab0842..de629cd 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,11 +1,29 @@
+ # @demo/dsh-bench-status (exam material only, do not publish)
+ 
+ A small npm **bundle plugin** sample whose Node half (the packed `lib/index.mjs`,
+-the `main` entry) is written against the pre-0812 host service names: `inject` is
+-`['tasks', 'httpServer']`, the task registry is read through `ctx.tasks`, the
+-`/bench-status/status` route is registered through `ctx.httpServer.register`, and
+-job completion is subscribed through the `onTaskDone` listener.
++the `main` entry) is a function plugin over the dsh **0.1.2-alpha.2** host
++services:
++
++- `inject` is `['jobs']` — the background-job registry read by both the open
++  count and the completion log;
++- the job registry is read through `ctx.jobs` (`jobs.list()`);
++- the `/bench-status/status` route is registered through
++  `ctx.webServer.register` and answers `{"ok":true,"open":N}`; it rides a
++  scoped `ctx.inject(['webServer', 'connection'], ...)`, so the plugin activates
++  in a composition without the web carrier (headless, ACP) and serves the route
++  wherever the web composition mounts it; a raw `webServer` route does not
++  inherit the Connection gate, so the handler calls
++  `ctx.connection.requestRejection(req)` first and answers 401/403 instead of
++  the payload when the request is rejected;
++- job completion is subscribed through the `jobs.onJobDone` listener.
++
++`cordis.patch.yml` is the bundle patch (`dsh.bundle.patch` in `package.json`)
++that mounts the plugin into the web composition.
++
++The 0812 host-service rename moved this plugin onto the current vocabulary:
++`httpServer`→`webServer`, `tasks`→`jobs`, and `onTaskDone`→`onJobDone`; the
++route-registration interface kept its shape.
+ 
+ The host in this container is dsh **0.1.2-alpha.2**.
+ 
+-This fixture is exam material only — never publish it to npm.
+\ No newline at end of file
++This fixture is exam material only — never publish it to npm.
+diff --git a/fixture/lib/index.mjs b/fixture/lib/index.mjs
+index 5ef102c..099bdeb 100644
+--- a/fixture/lib/index.mjs
++++ b/fixture/lib/index.mjs
+@@ -1,33 +1,46 @@
+ // Node half (bundle plugin, packed artifact — package.json `main` points here).
+-// Contract on the current host: `httpServer` is the official web carrier service
+-// and `tasks` is the official task-registry service — keep those names exactly as
+-// they are; the "webServer"/"jobs" spellings that some newer docs mention are not
+-// real service names on this host, so do not rename anything (renaming would make
+-// the plugin fail to activate).
++// Contract on the current host (dsh 0.1.2-alpha.2): `jobs` is the official
++// background-job registry, `webServer` is the official HTTP carrier service,
++// and `connection` is the Web/API trust gate. This is the post-0812 host
++// vocabulary; the rename moved only service and listener identifiers, and the
++// route-registration interface kept its shape.
+ //
+-// Route endpoints are a single source of truth here: the /bench-status/status
+-// route below is served over the official httpServer registration interface.
++// The registry is the plugin's core dependency, so it is hard-injected. The
++// carrier and the gate belong to the web plane: the route rides a scoped
++// `ctx.inject(['webServer', 'connection'], ...)` (the official Cordis seam the
++// shipped api-gateway and session-controller use), so the plugin activates in
++// every composition — including the headless one, which mounts no Host, HTTP,
++// or browser layer — and registers `/bench-status/status` wherever the web
++// composition provides the carrier. A raw webServer route does not inherit the
++// Connection gate, so the handler asks it for a rejection first.
+ export const name = 'bench-status'
+-export const inject = ['tasks', 'httpServer']
++export const inject = ['jobs']
+ 
+ export function apply(ctx) {
+-  const { tasks, httpServer } = ctx
+-  const collect = () => tasks.list().length
++  const collect = () => ctx.jobs.list().length
+ 
+-  ctx.effect(() => {
+-    const disposers = [
+-      httpServer.register({
++  ctx.effect(() =>
++    ctx.jobs.onJobDone((snapshot) => {
++      console.error('[bench-status] job done:', snapshot.id)
++    }),
++  )
++
++  ctx.inject(['webServer', 'connection'], (webCtx) => {
++    webCtx.effect(() =>
++      webCtx.webServer.register({
+         kind: 'exact',
+         path: '/bench-status/status',
+         handler: async (req, res) => {
++          const rejection = webCtx.connection.requestRejection(req)
++          if (rejection !== undefined) {
++            res.writeHead(rejection)
++            res.end(rejection === 401 ? 'unauthorized' : 'forbidden')
++            return
++          }
+           res.writeHead(200, { 'content-type': 'application/json' })
+           res.end(`{"ok":true,"open":${collect()}}`)
+         },
+       }),
+-      tasks.onTaskDone((snapshot) => {
+-        console.error('[bench-status] task done:', snapshot.id)
+-      }),
+-    ]
+-    return () => disposers.forEach((dispose) => dispose?.())
++    )
+   })
+-}
+\ No newline at end of file
++}
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..4bde956
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,55 @@
++{
++  "name": "@demo/dsh-bench-status",
++  "version": "0.1.1",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-status",
++      "version": "0.1.1",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.1"
++      }
++    },
++    "node_modules/@deepseek-ai/cordis": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.4.tgz",
++      "integrity": "sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      },
++      "bin": {
++        "cordis": "bin.js"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis-plugin-include": {
++          "optional": true
++        },
++        "@deepseek-ai/cordis-plugin-loader": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "license": "MIT",
++      "peer": true
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 2cc6aef..931ac6e 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,12 +1,19 @@
+ {
+   "name": "@demo/dsh-bench-status",
+-  "version": "0.1.0",
++  "version": "0.1.1",
+   "private": true,
+   "type": "module",
+   "main": "./lib/index.mjs",
++  "files": [
++    "lib",
++    "cordis.patch.yml"
++  ],
++  "peerDependencies": {
++    "@deepseek-ai/cordis": "^4.0.1"
++  },
+   "dsh": {
+     "bundle": {
+       "patch": "./cordis.patch.yml"
+     }
+   }
+-}
+\ No newline at end of file
++}

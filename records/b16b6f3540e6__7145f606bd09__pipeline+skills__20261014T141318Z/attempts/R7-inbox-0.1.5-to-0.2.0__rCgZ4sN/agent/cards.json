@@ -1,0 +1,580 @@
+{
+  "cards": [
+    {
+      "id": "DSH-0.1.6-A1-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "no agent/session lifecycle listener anywhere in src/; the plugin never sees agent/created"
+    },
+    {
+      "id": "DSH-0.1.6-A1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "cli.ts shells out to `dsh --dump-config`, it does not use @deepseek-ai/dsh-app-boot's assertEntries*/auditStartupEntries"
+    },
+    {
+      "id": "DSH-0.1.6-A1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "reads no Session history: no eventAt/snapshotEvents/ownEvents call"
+    },
+    {
+      "id": "DSH-0.1.6-A1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "declares no SessionEventMap member, so no @messageProjection or registerMessageProjection duty"
+    },
+    {
+      "id": "DSH-0.1.6-A1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "no ctx.hmr use and no cordis.yml watcher; the CLI does not hot-reload config"
+    },
+    {
+      "id": "DSH-0.1.6-A1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "does not mount or override session-log-deepseek and builds no profile composition that does"
+    },
+    {
+      "id": "DSH-0.1.6-A1-07",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "no codeRuntime/ptcRuntime use; the plugin executes nothing"
+    },
+    {
+      "id": "DSH-0.1.6-A1-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "implements no SandboxProvider and calls ctx.sandbox nowhere"
+    },
+    {
+      "id": "DSH-0.1.6-A1-09",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "implements no ShellExecutor and calls ctx.shell nowhere"
+    },
+    {
+      "id": "DSH-0.1.6-A1-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "implements no context.subprocess provider"
+    },
+    {
+      "id": "DSH-0.1.6-A1-11",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "mounts no workflow engine; no workflow-worker-thread row in cordis.patch.yml"
+    },
+    {
+      "id": "DSH-0.1.6-A1-12",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "no MCP client row, no @modelcontextprotocol/sdk import"
+    },
+    {
+      "id": "DSH-0.1.6-A1-13",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "no MCP server and no ctx.mcpResources consumer"
+    },
+    {
+      "id": "DSH-0.1.6-A1-14",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "local-only execution; no ctx.ssh / dsh-fs-ssh / dsh-subprocess-ssh"
+    },
+    {
+      "id": "DSH-0.1.6-A1-15",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "implements no LlmAdapter and calls none of offloadRequestImagesWithPolicy / RequestImageOffloadPolicy / offloadedImagePrefixCount (grep: no hits); it is a plain ctx.llm.stream consumer, so the offload duty belongs to the adapter it calls"
+    },
+    {
+      "id": "DSH-0.1.6-A1-16",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/host/classify/model.ts",
+        "cordis.patch.yml"
+      ],
+      "note": "the classification fallback names the shipped provider route `deepseek-official` and model `deepseek-flash` (both still the base bundle's defaults at 0.2.0-rc.2); the plugin overrides no endpoint, so the Messages-protocol default needs no action, and its cordis.patch.yml touches web-fetch-http only"
+    },
+    {
+      "id": "DSH-0.1.6-A1-17",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "imports nothing from @deepseek-ai/dsh-llm-deepseek and ships no model catalog"
+    },
+    {
+      "id": "DSH-0.1.6-A1-18",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "does not read token measurement or persisted projection state; no contextBreakdown/contextPressure fixture"
+    },
+    {
+      "id": "DSH-0.1.6-A1-19",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "does not import the assistant provenance/replay type"
+    },
+    {
+      "id": "DSH-0.1.6-A1-20",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "the client half imports no dsh client node types (only React; AGENTS.md constraint 11)"
+    },
+    {
+      "id": "DSH-0.1.6-A1-21",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "registers a host command through ctx.commands.register; it builds no CommandClaim (no InputTriggerSource)"
+    },
+    {
+      "id": "DSH-0.1.6-A1-22",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "never touches the permission projection or the composer tool-row permission control"
+    },
+    {
+      "id": "DSH-0.1.6-A1-23",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "src/client/dock.tsx",
+        "test/dock.test.ts"
+      ],
+      "note": "guide entry now carries a stable id (inbox-vault); one page per kind so `multiple` stays default and the tab owns no process, so no close handler is registered"
+    },
+    {
+      "id": "DSH-0.1.6-A1-24",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "renders no ui-primitives ConnectionIndicator (no primitives import at all)"
+    },
+    {
+      "id": "DSH-0.1.6-A1-25",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "does not use DiffBlock or diffTotals"
+    },
+    {
+      "id": "DSH-0.1.6-A1-26",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "no ?fixture use; development and verification run a real host (docs/help/dev-setup.md)"
+    },
+    {
+      "id": "DSH-0.1.6-A1-27",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "the patch layer inserts its own row and overrides web-fetch-http; it names no workflow-worker-thread"
+    },
+    {
+      "id": "DSH-0.1.6-A1-28",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "reads no session log; its two outbound image paths (the classification request and inbox_get's explicit withImage content part) build normal ImageBlocks for ctx.llm, so the image/offload arm is the adapter's and the reader's business, not this plugin's"
+    },
+    {
+      "id": "DSH-0.1.6-A1-29",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "does not use the ralph tool and does not re-enable it"
+    },
+    {
+      "id": "DSH-0.1.6-A1-30",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "no mcp-resources row added by the plugin's patch"
+    },
+    {
+      "id": "DSH-0.1.6-A1-31",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "no code-runtime row in the plugin patch; the web overlay it layers on is untouched by it"
+    },
+    {
+      "id": "DSH-0.1.6-A1-32",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "depends on none of the retired packages; every peer it names exists at 0.2.0-rc.2 (verified in the installed cohort)"
+    },
+    {
+      "id": "DSH-0.1.6-A1-33",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "the CLI drives `dsh plugin add` / `--dump-config`, never headless task runs"
+    },
+    {
+      "id": "DSH-0.1.6-A1-34",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "imports no type from @deepseek-ai/dsh-package-manifest; its dsh.bundle.patch string stays valid"
+    },
+    {
+      "id": "DSH-0.1.6-A1-35",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "not a harness publisher; no mirrored release set to re-derive"
+    },
+    {
+      "id": "DSH-0.1.6-A1-36",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "no node-addon-require-builtin in the plugin's own lockfile"
+    },
+    {
+      "id": "DSH-0.1.6-A1-37",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "targets the Web profile only (README says Windows/web); Desktop is not a supported install target"
+    },
+    {
+      "id": "DSH-0.1.6-A1-38",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "negative evidence: nothing to act on"
+    },
+    {
+      "id": "DSH-0.1.6-A2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "resolves no current Session: no sessions.list / useSessions read anywhere (the dock reads tab params, not the session list)"
+    },
+    {
+      "id": "DSH-0.1.6-A2-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "consumes no useSessionPendingInteraction; dock props use only useTabInfo"
+    },
+    {
+      "id": "DSH-0.1.6-A2-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "informational: install path is `dsh plugin add`, which lands the package in dsh.profile.bundles, so the Plugin Manager already manages it"
+    },
+    {
+      "id": "DSH-0.1.6-A2-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "informational: the plugin's own update path already pins exact versions (README update note, docs/help/dev-setup.md)"
+    },
+    {
+      "id": "DSH-0.1.7-A1-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "imports no *16 icon from ui-primitives; the panel draws with lucide-react and inline SVG"
+    },
+    {
+      "id": "DSH-0.1.7-A1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "uses no workspaceFiles Remote; attachment bytes come back through the plugin's own authenticated fetch route"
+    },
+    {
+      "id": "DSH-0.1.7-A1-03",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "src/host/config.ts",
+        "src/host/webdav/config.ts",
+        "src/host/ui/config.ts",
+        "test/config.test.ts",
+        "package.json"
+      ],
+      "note": "settings moved onto the plugin's own Cordis Config with .volatile() fields, read through refs and written through ctx.configEditor.edit(ctx.fiber.entry, ...); the legacy settings.yaml sections are adopted once by the plugin because the harness import only maps section id = entry id"
+    },
+    {
+      "id": "DSH-0.1.7-A1-04",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "src/cli.ts",
+        "test/cli.test.ts",
+        "docs/help/dsh-plugin-platform.md"
+      ],
+      "note": "the directory-preset copy and the agent-presets.default write are retired; the documented outcome (the assistant sees the inbox tools) is carried by the host tool layer, and a self-declared preset would either replace the agent's whole composition or freeze the shipped standard children"
+    },
+    {
+      "id": "DSH-0.1.7-A1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "never parses raw session logs"
+    },
+    {
+      "id": "DSH-0.1.7-A1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "configures no DeepSeek provider row; the patch touches web-fetch-http only"
+    },
+    {
+      "id": "DSH-0.1.7-A1-07",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json",
+        "src/host/config.ts"
+      ],
+      "note": "optional: one patch file is enough for this bundle, and the no-reload half is already satisfied by the new .volatile() Config fields (a live edit does not remount the plugin)"
+    },
+    {
+      "id": "DSH-0.1.7-A1-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "informational: nothing in the plugin assumes a boot crash means a missing plugin"
+    },
+    {
+      "id": "DSH-0.1.7-A1-09",
+      "applies": true,
+      "required": false,
+      "status": "done",
+      "evidence": [
+        "locale/en.json",
+        "locale/zh.json",
+        "package.json"
+      ],
+      "note": "optional capability adopted while here: localized Plugin Manager title/description (resolved through the harness's own readPluginMeta); no package-local icon asset under the 256 KiB cap, so the icon field is left out"
+    },
+    {
+      "id": "DSH-0.1.7-A1-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "stores attachment bytes in dsh's attachment store and metadata in its own storage domain; nothing is carried in custom session events"
+    },
+    {
+      "id": "DSH-0.1.7-A1-11",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "adds no settings-page seat; the panel's own settings app is a different entry point"
+    },
+    {
+      "id": "DSH-0.1.7-A2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "configures no spill-policy row"
+    },
+    {
+      "id": "DSH-0.1.7-A2-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "informational: no action for a plugin"
+    },
+    {
+      "id": "DSH-0.1.7-A2-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "informational: plugin installation UX is the host's"
+    },
+    {
+      "id": "DSH-0.1.7-A2-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "informational: recorded in docs/help/dev-setup.md that a client-bundle edit needs a host restart before the page sees it"
+    },
+    {
+      "id": "DSH-0.1.7-RC1-01",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "package.json",
+        "pnpm-lock.yaml"
+      ],
+      "note": "every @deepseek-ai/dsh* peer floored at ^0.2.0-rc.1 (^0.1.5-rc.2 is refused for 0.2.0-rc.2 and ^0.2.0 does not admit the prerelease); cordis ~4.0.4; verified by the install-time preflight on the isolated profile"
+    },
+    {
+      "id": "DSH-0.1.7-RC1-02",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "src/client/card.tsx",
+        "test/card.test.ts"
+      ],
+      "note": "the toolview card reads the settled content from the phase: 'result' arm only; preparing/start show the pending line instead of an empty result"
+    },
+    {
+      "id": "DSH-0.1.7-RC1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "implements no ConversationNodeDefinition"
+    },
+    {
+      "id": "DSH-0.1.7-RC1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "never reads or writes the transcriptView setting"
+    },
+    {
+      "id": "DSH-0.1.7-RC1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "informational: installs go through dsh plugin add / pnpm as before"
+    },
+    {
+      "id": "DSH-0.2.0-RC1-01",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "package.json",
+        "pnpm-lock.yaml"
+      ],
+      "note": "host cohort crossed to 0.2.0-rc.2 with ^0.2.0-rc.1 peers; the install-time compatibility preflight accepts every row (dump-config shows the inserted row)"
+    },
+    {
+      "id": "DSH-0.2.0-RC1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "hard-codes no transcriptView fallback"
+    },
+    {
+      "id": "DSH-0.2.0-RC1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "the patch inserts its own row and overrides web-fetch-http; it references no schedule/time-context/ui-schedule id"
+    },
+    {
+      "id": "DSH-0.2.0-RC1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "no otel/analytics ids in the plugin patch; no id collision"
+    },
+    {
+      "id": "DSH-0.2.0-RC1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "never forks sessions"
+    },
+    {
+      "id": "DSH-0.2.0-RC1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [],
+      "note": "carries no local patch to @deepseek-ai/dsh-native-command"
+    }
+  ]
+}

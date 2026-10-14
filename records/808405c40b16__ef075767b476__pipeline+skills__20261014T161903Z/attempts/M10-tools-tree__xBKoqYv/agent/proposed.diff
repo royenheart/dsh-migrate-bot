@@ -1,0 +1,315 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index 9f8a9c6..49f76ed 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -3,8 +3,13 @@
+ A tools-management panel plugin: the host half attributes every registered
+ tool to its source plugin (collapsible prefix tree) and globally disables
+ individual tools through a two-layer gate; the browser half registers the
+-settings-page tools tab through the `settings.section` slot. Written in the
+-0.1.0-era style; the host is moving to dsh 0.1.2-alpha.2.
++settings-page tools tab through the `settings.section` slot.
++
++Migrated to the dsh 0.1.2-alpha.2 cohort: the browser half is served as a
++lazy-CJS `window.__ModuleLoader__` factory registered under the package name
++(the `settings.section` tab is unchanged), the client context type is Cordis'
++`Context` with the owning packages' type-only merges, and every
++`@deepseek-ai/dsh-*` peer is pinned to `^0.1.2-alpha.2`.
+ 
+ Release procedure (internal):
+ 
+diff --git a/fixture/client.js b/fixture/client.js
+index f3ee370..6b99887 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -2,42 +2,69 @@
+ // tab through the settings.section slot; the panel reads/writes the tool tree
+ // through the host gateway /tools-manager/api/list|set.
+ //
+-// ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.0 era):
+-//   "ctx.slots is provided by @deepseek-ai/dsh-client-ui-slots — the
+-//    ui-renderer import is only cosmetic. Skip the ui-renderer type import,
+-//    and skip any ui-renderer entry in the client inject: the slots service
+-//    arrives with ui-slots anyway."
+-// ────────────────────────────────────────────────────────────
++// 0.1.2 client-bundle contract (DSH-0.1.2-A1-25 / A1-26 / A1-19):
++//   - the served artifact is the lazy-CJS factory below: executing it only
++//     registers the factory with `window.__ModuleLoader__.load`; module side
++//     effects run at materialization. The registration id MUST equal the
++//     package name in package.json (`entry name == package name`), or the
++//     browser asserts `loaded without registering "<id>"`;
++//   - the client context type is Cordis' own `Context`; each face arrives from
++//     the package that owns it, pulled type-only by the typedefs below:
++//     ctx.slots from @deepseek-ai/dsh-client-ui-renderer/client (the row that
++//     provides the service), the `settings.section` SlotMap entry from
++//     @deepseek-ai/dsh-client-ui-settings/client, and the slot base types from
++//     @deepseek-ai/dsh-client-ui-slots (a PLATFORM_MODULES seed, not a
++//     `dsh.client` row). Type-only references are erased and create no module
++//     request, so `dsh.client` names no inject rows for them.
+ //
+-// 0.1.0-era type surface: the client context type comes from
+-// @deepseek-ai/dsh-client-runtime/client, and the ctx.slots Context merge is
+-// pulled type-only from @deepseek-ai/dsh-client-ui-slots — the client-runtime
+-// split had not happened yet.
++// Retired 0.1.0-era memo: "ctx.slots is provided by
++// @deepseek-ai/dsh-client-ui-slots — the ui-renderer import is only cosmetic.
++// Skip the ui-renderer type import." @deepseek-ai/dsh-client-runtime was
++// removed in alpha.1, and the slot map merge has to be pulled from its owning
++// package instead of the old runtime aggregation package.
+ 
+-export const name = 'bench-tools-tree-client'
++window.__ModuleLoader__.load({
++  id: '@bench/dsh-bench-tools-tree',
++  factory: (require) => {
++    var module = { exports: {} }
++    var exports = module.exports
+ 
+-// Only slots — the settings.section slot is declared by the shell; no
+-// locale/connection needed (inline styles + hardcoded labels).
+-export const inject = ['slots']
++    /**
++     * Alpha.2 client faces: `Context` from Cordis, the `slots` service merge
++     * from @deepseek-ai/dsh-client-ui-renderer/client, the `settings.section`
++     * SlotMap entry from @deepseek-ai/dsh-client-ui-settings/client, and the
++     * slot base types from the @deepseek-ai/dsh-client-ui-slots platform seed.
++     * @typedef {import('@deepseek-ai/cordis').Context} ClientContext
++     * @typedef {typeof import('@deepseek-ai/dsh-client-ui-renderer/client')} UiRendererClientModule
++     * @typedef {typeof import('@deepseek-ai/dsh-client-ui-settings/client')} UiSettingsClientModule
++     * @typedef {typeof import('@deepseek-ai/dsh-client-ui-slots')} UiSlotsModule
++     */
+ 
+-// The panel component (collapsible prefix tree + batch toggle) is elided; the
+-// slot renderer mounts it as a function component.
+-function toolsTreeStub() {
+-  return null
+-}
++    // The panel component (collapsible prefix tree + batch toggle) is elided; the
++    // slot renderer mounts it as a function component.
++    function toolsTreeStub() {
++      return null
++    }
+ 
+-/**
+- * Register the tools-manager panel as a top-level settings tab.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
+- */
+-export function apply(ctx) {
+-  ctx.slots.inject('settings.section', () =>
+-    ctx.slots.register({
+-      name: 'settings.section',
+-      id: 'bench-tools-tree',
+-      order: 62, // after MCP (61)
+-      label: () => '工具管理',
+-      inject: () => ({}),
+-    }, toolsTreeStub))
+-}
++    /**
++     * Register the tools-manager panel as a top-level settings tab.
++     * @param {ClientContext} ctx - client root context; `slots` is the only
++     *   service this half consumes, declared in `inject` below.
++     */
++    function apply(ctx) {
++      ctx.slots.inject('settings.section', () =>
++        ctx.slots.register({
++          name: 'settings.section',
++          id: 'bench-tools-tree',
++          order: 62, // after MCP (61)
++          label: () => '工具管理',
++          inject: () => ({}),
++        }, toolsTreeStub))
++    }
++
++    exports.name = '@bench/dsh-bench-tools-tree'
++    exports.inject = ['slots']
++    exports.apply = apply
++    return module.exports
++  },
++})
+diff --git a/fixture/index.js b/fixture/index.js
+index e7d374b..6624f84 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,29 +1,49 @@
+-// 0.1.0-era cohort (pre v0.1.2-alpha.1): the host half was already written
+-// against the scoped @deepseek-ai/cordis Context — the migration is entirely
+-// on the client plane.
++// Host half — alpha.2 (dsh 0.1.2-alpha.2) cohort.
+ //
+-// The real host body is elided in this fixture; its shape, for reference:
++// The host body is elided in this fixture; its shape, for reference, and the
++// contract the restored body must satisfy on this release:
+ //   - ToolRegistry: attributes each registered tool to its source plugin by
+-//     snapshot-diffing ctx.tools.schemas() on every tools/change;
++//     snapshot-diffing ctx.tools.schemas() (global view, packages/core/tools
++//     src/index.ts:1225) on every tools/change (payload-free, :199). Both seams
++//     are unchanged on alpha.2; the registry still carries no provenance, so
++//     this diff stays the only implementation.
+ //   - two-layer enable/disable gate: system-prompt/assemble hides disabled
+-//     tools from the model, ctx.tools.guard() denies their execution;
+-//   - /tools-manager/api/list|set HTTP gateway for the browser panel;
+-//   - the disabled set persists through the `tools-manager` settings
+-//     namespace in $DSH_HOME/settings.yaml (no restart needed).
++//     tools from the model (expert waterfall, packages/core/system-prompt
++//     src/index.ts:31), ctx.tools.guard() denies their execution. A
++//     plain-context guard is global and monotonic (packages/core/tools
++//     src/index.ts:1101); do NOT rebase this onto ctx.tools.restrict(), which
++//     requires a scoped agent.ctx and refuses a context-global mask (:1062).
++//   - /tools-manager/api/list|set HTTP gateway, registered with
++//     ctx.webServer.register(). The 0812 rename is already applied here
++//     (httpServer -> webServer). A custom route does NOT inherit the Host/Origin
++//     fence or browser authentication on alpha.2, so the restored handler must
++//     gate every request first — ctx.connection.requestRejection(req) returns
++//     403 / 401 / undefined — and must declare 'connection' in this plugin's
++//     inject (strict injection: no ctx.get for an undeclared service).
++//   - the disabled set persists through the `tools-manager` settings namespace
++//     in $DSH_HOME/settings.yaml (no restart needed). On alpha.2 the namespace
++//     is validated at compile time (SettingsNamespaceInput), so register/update/
++//     get take the literal 'tools-manager' and never a computed string.
++//
++// 0.1.0-era cohort note: the migration is entirely on the client plane (the
++// client bundle registration id + the retired @deepseek-ai/dsh-client-runtime
++// type surface); this half only loses its stale comments.
+ 
+ export const name = 'bench-tools-tree'
+ 
+ // Host half: tools (registry + guard), webServer (the HTTP gateway), and
+ // systemPrompt (the assemble hook that hides disabled tools from the model).
++// 'connection' is added together with the gateway body, which must call
++// ctx.connection.requestRejection(req) before serving (see the header).
+ export const inject = ['tools', 'webServer', 'systemPrompt']
+ 
+ /**
+  * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx, config) {
+-  console.error('[bench-tools-tree] apply() on the 0.1.0-era cohort: client plane still typed against the client-runtime ClientContext')
++  console.error('[bench-tools-tree] apply() on the 0.1.2-alpha.2 cohort: client plane rebased onto the Cordis Context and the lazy-CJS bundle contract')
+ 
+   ctx.effect(() => {
+-    console.error('[bench-tools-tree] host half active: tool registry + enable/disable policy + /tools-manager/api gateway (real body elided)')
++    console.error('[bench-tools-tree] host half active: tool registry + enable/disable policy + gated /tools-manager/api gateway (real body elided)')
+   }, 'bench-tools-tree: host')
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..dbd4917
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,60 @@
++{
++  "name": "@bench/dsh-bench-tools-tree",
++  "version": "0.2.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-tools-tree",
++      "version": "0.2.0",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-host-webserver": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-settings": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-system-prompt": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2",
++        "react": "^18.2.0",
++        "schemastery": "^3.18.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-primitives": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-renderer": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-settings": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-host-webserver": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-settings": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-system-prompt": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-tools": {
++          "optional": true
++        },
++        "react": {
++          "optional": true
++        },
++        "schemastery": {
++          "optional": true
++        }
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 944660c..72ace39 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-tools-tree",
+-  "version": "0.1.0",
+-  "description": "Tools-management panel plugin: the host half attributes every registered tool to its source plugin (tree) and gates disabled tools, the browser half registers the settings-page tools tab (0.1.0-era cohort; exam material only)",
++  "version": "0.2.0",
++  "description": "Tools-management panel plugin: the host half attributes every registered tool to its source plugin (tree) and gates disabled tools, the browser half registers the settings-page tools tab (0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -14,30 +14,27 @@
+       "patch": "./cordis.patch.yml"
+     },
+     "client": {
+-      "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+-        "@deepseek-ai/dsh-client-ui-primitives",
+-        "@deepseek-ai/dsh-client-ui-slots"
+-      ],
+       "platform": "web"
+     }
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-runtime": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-host-webserver": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-settings": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-system-prompt": "^0.0.1-rc.1",
+-    "@deepseek-ai/dsh-tools": "^0.0.1-rc.1",
++    "@deepseek-ai/cordis": "^4.0.2",
++    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-host-webserver": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-settings": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-system-prompt": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2",
+     "react": "^18.2.0",
+     "schemastery": "^3.18.0"
+   },
+   "peerDependenciesMeta": {
+     "@deepseek-ai/cordis": { "optional": true },
+-    "@deepseek-ai/dsh-client-runtime": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-primitives": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-renderer": { "optional": true },
++    "@deepseek-ai/dsh-client-ui-settings": { "optional": true },
+     "@deepseek-ai/dsh-client-ui-slots": { "optional": true },
+     "@deepseek-ai/dsh-host-webserver": { "optional": true },
+     "@deepseek-ai/dsh-settings": { "optional": true },

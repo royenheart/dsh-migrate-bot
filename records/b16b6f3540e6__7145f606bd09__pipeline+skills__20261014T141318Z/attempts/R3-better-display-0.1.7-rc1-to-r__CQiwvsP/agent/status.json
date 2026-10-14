@@ -1,0 +1,152 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.7-rc.2",
+      "target": {
+        "tag": "dsh-v0.1.7-rc.2",
+        "version": "0.1.7-rc.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.7-rc.2",
+            "version": "0.1.7-rc.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.7-rc.1",
+              "version": "0.1.7-rc.1"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "e2ePublish": false,
+            "checks": {
+              "cards": true,
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [
+          "e2e"
+        ],
+        "reviewed": true,
+        "attempts": 0,
+        "failure": {
+          "check": "e2e",
+          "outcome": "fail",
+          "fingerprint": "e2e: reader-auto-fold.spec.ts \u203a automatic process folding \u203a the reading toolbar toggles auto-fold and keeps the choice | reader-live-turn.spec.ts \u203a a running turn in the reader \u203a the reader reports the wait, the retry record and the failed end of a turn",
+          "detail": "These tests fail:\n- reader-auto-fold.spec.ts \u203a automatic process folding \u203a the reading toolbar toggles auto-fold and keeps the choice (failed in a reach step, on the way through the host's UI): Test timeout of 180000ms exceeded.\n- reader-live-turn.spec.ts \u203a a running turn in the reader \u203a the reader reports the wait, the retry record and the failed end of a turn (failed in a reach step, on the way through the host's UI): Test timeout of 180000ms exceeded.\n\n",
+          "blame": "host"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [],
+        "warnings": [
+          "no end-to-end baseline: dsh session (e2e-authoring) exceeded its 3600s watchdog and was killed\n--- last stderr ---\ntputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3510,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3520,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3530,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3540,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3550,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3560,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3570,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3580,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3590,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3599,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}",
+          "end-to-end tests that passed before the migration fail now (advisory, see the checks): e2e: reader-auto-fold.spec.ts \u203a automatic process folding \u203a the reading toolbar toggles auto-fold and keeps the choice | reader-live-turn.spec.ts \u203a a running turn in the reader \u203a the reader reports the wait, the retry record and the failed end of a turn"
+        ],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-14T14-21-21-479Z",
+      "startedAt": "2026-10-14T14:22:16.834Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.7-rc.2",
+    "target": {
+      "tag": "dsh-v0.1.7-rc.2",
+      "version": "0.1.7-rc.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.7-rc.2",
+          "version": "0.1.7-rc.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.7-rc.1",
+            "version": "0.1.7-rc.1"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "e2ePublish": false,
+          "checks": {
+            "cards": true,
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [
+        "e2e"
+      ],
+      "reviewed": true,
+      "attempts": 0,
+      "failure": {
+        "check": "e2e",
+        "outcome": "fail",
+        "fingerprint": "e2e: reader-auto-fold.spec.ts \u203a automatic process folding \u203a the reading toolbar toggles auto-fold and keeps the choice | reader-live-turn.spec.ts \u203a a running turn in the reader \u203a the reader reports the wait, the retry record and the failed end of a turn",
+        "detail": "These tests fail:\n- reader-auto-fold.spec.ts \u203a automatic process folding \u203a the reading toolbar toggles auto-fold and keeps the choice (failed in a reach step, on the way through the host's UI): Test timeout of 180000ms exceeded.\n- reader-live-turn.spec.ts \u203a a running turn in the reader \u203a the reader reports the wait, the retry record and the failed end of a turn (failed in a reach step, on the way through the host's UI): Test timeout of 180000ms exceeded.\n\n",
+        "blame": "host"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [],
+      "warnings": [
+        "no end-to-end baseline: dsh session (e2e-authoring) exceeded its 3600s watchdog and was killed\n--- last stderr ---\ntputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3510,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3520,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3530,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3540,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3550,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3560,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3570,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3580,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3590,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}\ndsh-migrate-status: {\"turns\":1,\"steps\":140,\"elapsedSeconds\":3599,\"inputTokens\":116560,\"outputTokens\":100529,\"cacheHitTokens\":16205568,\"cacheMissTokens\":116560,\"costUsd\":0.12641810399999995}",
+        "end-to-end tests that passed before the migration fail now (advisory, see the checks): e2e: reader-auto-fold.spec.ts \u203a automatic process folding \u203a the reading toolbar toggles auto-fold and keeps the choice | reader-live-turn.spec.ts \u203a a running turn in the reader \u203a the reader reports the wait, the retry record and the failed end of a turn"
+      ],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-14T14-21-21-479Z",
+    "startedAt": "2026-10-14T14:22:16.834Z"
+  }
+}

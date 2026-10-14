@@ -1,0 +1,719 @@
+{
+  "cards": [
+    {
+      "id": "DSH-0.1.6-A1-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/index.ts"
+      ],
+      "note": "No agent/session-start listener and no ctx.agents use; the plugin registers no agent lifecycle hook."
+    },
+    {
+      "id": "DSH-0.1.6-A1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json",
+        "src/index.ts"
+      ],
+      "note": "No @deepseek-ai/dsh-app-boot dependency; the plugin never boots or audits a config tree."
+    },
+    {
+      "id": "DSH-0.1.6-A1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/router/usage-store.ts",
+        "src/index.ts"
+      ],
+      "note": "Reads no Session history (eventAt/snapshotEvents/ownEvents absent); usage comes from its own usage.json fold."
+    },
+    {
+      "id": "DSH-0.1.6-A1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/index.ts"
+      ],
+      "note": "Owns no SessionEventMap event and registers no message projection; it rewrites no message content."
+    },
+    {
+      "id": "DSH-0.1.6-A1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/index.ts"
+      ],
+      "note": "No ctx.hmr use, no config-reload watcher and no programmatic entry mutation."
+    },
+    {
+      "id": "DSH-0.1.6-A1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "cordis.patch.yml",
+        "package.json"
+      ],
+      "note": "Mounts no session-log-deepseek row and ships no test profile composition that would."
+    },
+    {
+      "id": "DSH-0.1.6-A1-07",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json",
+        "src/llm/adapter.ts"
+      ],
+      "note": "No code-runtime/ptc-runtime dependency, import, row or provider; execution is out of this plugin's scope."
+    },
+    {
+      "id": "DSH-0.1.6-A1-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/suppliers/contract.ts",
+        "src/index.ts"
+      ],
+      "note": "Implements no SandboxProvider and calls no ctx.sandbox.confine."
+    },
+    {
+      "id": "DSH-0.1.6-A1-09",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/index.ts"
+      ],
+      "note": "No ctx.shell implementor or consumer; no background command is started."
+    },
+    {
+      "id": "DSH-0.1.6-A1-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json",
+        "src/suppliers/contract.ts"
+      ],
+      "note": "No SubprocessRuntime implementor; supplier modules run in-process and the plugin never spawns a child."
+    },
+    {
+      "id": "DSH-0.1.6-A1-11",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "cordis.patch.yml",
+        "package.json"
+      ],
+      "note": "Mounts/registers no workflowEngine provider and names no workflow row."
+    },
+    {
+      "id": "DSH-0.1.6-A1-12",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json",
+        "cordis.patch.yml"
+      ],
+      "note": "No MCP client row/config and no @modelcontextprotocol/sdk import."
+    },
+    {
+      "id": "DSH-0.1.6-A1-13",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json"
+      ],
+      "note": "No ctx.mcpResources consumer and no custom MCP bridge."
+    },
+    {
+      "id": "DSH-0.1.6-A1-14",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/sidebar-entry.ts"
+      ],
+      "note": "No ctx.ssh use; the only 'ssh' token is a sidebar DOM selector in the slot-less fallback."
+    },
+    {
+      "id": "DSH-0.1.6-A1-15",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "src/llm/adapter.ts",
+        "src/llm/adapter.test.ts"
+      ],
+      "note": "Adapter already reads images via readImageRequest(ref,{width,height,maxBytes}); none of the three removed offload symbols are used, and durable offloaded marks are now projected (no self-shrinking). No request-wide route image budget exists by design, so nothing to report via IMAGE_OFFLOAD_REQUIRED - documented at adapter.ts:207."
+    },
+    {
+      "id": "DSH-0.1.6-A1-16",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/index.ts",
+        "src/llm/adapter.ts"
+      ],
+      "note": "Never configures llm-deepseek / DEEPSEEK_BASE_URL; it registers its own 'router' provider speaking OpenAI to its own /v1."
+    },
+    {
+      "id": "DSH-0.1.6-A1-17",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/llm/adapter.ts",
+        "package.json"
+      ],
+      "note": "No @deepseek-ai/dsh-llm-deepseek import and no imagePixelBudget catalog; MAX_REQUEST_PIXELS/MAX_REQUEST_BYTES are plugin-local."
+    },
+    {
+      "id": "DSH-0.1.6-A1-18",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/router/usage-tokens.ts",
+        "src/llm/adapter.ts"
+      ],
+      "note": "Does not read contextBreakdown/contextPressure or any token-meter projection state; it only emits DSH TokenUsage."
+    },
+    {
+      "id": "DSH-0.1.6-A1-19",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/llm/adapter.ts",
+        "src/client/index.tsx"
+      ],
+      "note": "No AssistantProvenance/AssistantProviderMetadata import or read on either half."
+    },
+    {
+      "id": "DSH-0.1.6-A1-20",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/index.tsx"
+      ],
+      "note": "Client renders no conversation/chat nodes and imports no provenance/producer view types."
+    },
+    {
+      "id": "DSH-0.1.6-A1-21",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/index.tsx"
+      ],
+      "note": "Registers no InputTriggerSource and builds no CommandClaim."
+    },
+    {
+      "id": "DSH-0.1.6-A1-22",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/index.tsx"
+      ],
+      "note": "Renders no composer permission control and reads no permissions projection."
+    },
+    {
+      "id": "DSH-0.1.6-A1-23",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/index.tsx"
+      ],
+      "note": "No sidebarRightTabs registration, guide entries or close handlers."
+    },
+    {
+      "id": "DSH-0.1.6-A1-24",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/env.d.ts",
+        "src/client/ExtTestPanel.tsx"
+      ],
+      "note": "Renders no ConnectionIndicator; primitives use is limited to Switch and Button."
+    },
+    {
+      "id": "DSH-0.1.6-A1-25",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/env.d.ts"
+      ],
+      "note": "No DiffBlock/diffTotals use (not exported through the plugin's primitives face)."
+    },
+    {
+      "id": "DSH-0.1.6-A1-26",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client/vite.config.ts",
+        "package.json"
+      ],
+      "note": "No ?fixture page mode and no CI lane that opens the served client with it."
+    },
+    {
+      "id": "DSH-0.1.6-A1-27",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "cordis.patch.yml"
+      ],
+      "note": "Patch inserts only dsh-router* rows; workflow-worker-thread is never named or depended on."
+    },
+    {
+      "id": "DSH-0.1.6-A1-28",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "src/llm/adapter.ts",
+        "src/llm/adapter.test.ts"
+      ],
+      "note": "ImageBlock.offloaded marks are projected with projectOffloadedImages/offloadedImageText (adapter.ts:213) and defensively for nested legacy tool-result content (adapter.ts:361); offloaded bytes are never read or sent. Two regression tests added."
+    },
+    {
+      "id": "DSH-0.1.6-A1-29",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "cordis.patch.yml"
+      ],
+      "note": "No ralph tool dependency or prompt/automation that assumes it."
+    },
+    {
+      "id": "DSH-0.1.6-A1-30",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "cordis.patch.yml"
+      ],
+      "note": "Never mounted an mcp-resources row, so there is no hand-added row to drop."
+    },
+    {
+      "id": "DSH-0.1.6-A1-31",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "cordis.patch.yml",
+        "src/client/index.tsx"
+      ],
+      "note": "Patch names no code-runtime row; the client reads the slot registry instead of hardcoding sidebar/settings composition."
+    },
+    {
+      "id": "DSH-0.1.6-A1-32",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json"
+      ],
+      "note": "Only @deepseek-ai/schemastery plus host-provided peers; no retired package coordinate in manifest or lockfile."
+    },
+    {
+      "id": "DSH-0.1.6-A1-33",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json"
+      ],
+      "note": "No headless invocation or CLI output parsing in-tree."
+    },
+    {
+      "id": "DSH-0.1.6-A1-34",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "scripts/check-publish.mjs",
+        "package.json"
+      ],
+      "note": "No @deepseek-ai/dsh-package-manifest import; the dsh.bundle shape is declared locally and checked by its own script."
+    },
+    {
+      "id": "DSH-0.1.6-A1-35",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json"
+      ],
+      "note": "No mirrored release set and no experimental first-party package dependency."
+    },
+    {
+      "id": "DSH-0.1.6-A1-36",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "pnpm-lock.yaml",
+        "package.json"
+      ],
+      "note": "No node-addon-require-builtin resolution in the manifest or either lockfile."
+    },
+    {
+      "id": "DSH-0.1.6-A1-37",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "README.md",
+        "package.json"
+      ],
+      "note": "README documents the built-in patch as web-profile only; Desktop install is not a target, so the shared-package peer rules are not triggered."
+    },
+    {
+      "id": "DSH-0.1.6-A1-38",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "cordis.patch.yml",
+        "package.json"
+      ],
+      "note": "Negative evidence for every plugin upgrading from rc.2; no session-format, engine-floor or CLI-grammar action to take."
+    },
+    {
+      "id": "DSH-0.1.6-A2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/LastHitDock.tsx",
+        "src/client/last-hit-store.ts"
+      ],
+      "note": "Never reads sessions.list/SessionListState.current; the current session id arrives through the slot's session scope."
+    },
+    {
+      "id": "DSH-0.1.6-A2-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/LastHitDock.tsx"
+      ],
+      "note": "Does not use useSessionPendingInteraction; the dock's only standard prop is sessionId."
+    },
+    {
+      "id": "DSH-0.1.6-A2-03",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json",
+        "cordis.patch.yml"
+      ],
+      "note": "Already shipped as a bundle with dsh.bundle.patch, so it is managed through the Plugin Manager / dsh plugin path; no link-only install to migrate."
+    },
+    {
+      "id": "DSH-0.1.6-A2-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json"
+      ],
+      "note": "Release-process awareness for host upgrades (npm publish lag); no plugin source surface."
+    },
+    {
+      "id": "DSH-0.1.7-A1-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/env.d.ts",
+        "src/client/index.tsx"
+      ],
+      "note": "Imports no primitives icons at all; the *16 -> *Medium/*Regular rename cannot hit Switch/Button."
+    },
+    {
+      "id": "DSH-0.1.7-A1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/index.ts",
+        "src/client/index.tsx"
+      ],
+      "note": "No workspaceFiles Remote read on either half; panel data comes from its own /router/api routes."
+    },
+    {
+      "id": "DSH-0.1.7-A1-03",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "src/index.ts",
+        "package.json"
+      ],
+      "note": "Settings registration is on the new scheme: 0.1.7+ takes the mirror row from the exported volatile Config keyed by the bundle row id, and settings.installSection is only probed on 0.1.5 hosts (index.ts:744-764); panel values stay in the plugin's own state.json by documented design. Verified on 0.2.0-rc.1 (Router card present)."
+    },
+    {
+      "id": "DSH-0.1.7-A1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "cordis.patch.yml",
+        "package.json"
+      ],
+      "note": "Ships no agent presets and declares no preset bundle field."
+    },
+    {
+      "id": "DSH-0.1.7-A1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/router/usage-store.ts",
+        "src/data-dir.ts"
+      ],
+      "note": "Parses no raw session logs; every durable file it owns (state.json, usage.json, ext.json, credentials.sqlite) is plugin-private."
+    },
+    {
+      "id": "DSH-0.1.7-A1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/llm/adapter.ts",
+        "src/index.ts"
+      ],
+      "note": "Does not configure the official DeepSeek provider; its adapter speaks OpenAI chat-completions to its own /v1 gateway."
+    },
+    {
+      "id": "DSH-0.1.7-A1-07",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json",
+        "cordis.patch.yml"
+      ],
+      "note": "Single small cordis.patch.yml is still valid (bundlePatchFiles accepts a string or an ordered list); the Config is empty so there are no no-reload fields to declare."
+    },
+    {
+      "id": "DSH-0.1.7-A1-08",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json"
+      ],
+      "note": "Loader-level tolerance only; no plugin action. Boot roster is the check that the row still mounted."
+    },
+    {
+      "id": "DSH-0.1.7-A1-09",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json",
+        "scripts/copy-row-meta.mjs"
+      ],
+      "note": "Optional Plugin Manager display metadata; the shipped subpath rows already carry locale meta, and no root icon/localized title is required for the documented entry points."
+    },
+    {
+      "id": "DSH-0.1.7-A1-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/index.ts",
+        "src/credential-store.ts"
+      ],
+      "note": "Stores no attachment payloads in custom session events; credentials and usage live in plugin-owned stores."
+    },
+    {
+      "id": "DSH-0.1.7-A1-11",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/index.tsx"
+      ],
+      "note": "Uses neither settings.launcher nor settings.models.sign-in."
+    },
+    {
+      "id": "DSH-0.1.7-A2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "cordis.patch.yml",
+        "package.json"
+      ],
+      "note": "Carries no spill-policy configuration row or maxInlineBytes key."
+    },
+    {
+      "id": "DSH-0.1.7-A2-02",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json"
+      ],
+      "note": "Cordis is a host-provided peer, not a vendored dependency of this plugin; no lockfile action requested by the card."
+    },
+    {
+      "id": "DSH-0.1.7-A2-03",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json",
+        "README.md"
+      ],
+      "note": "Plugin Manager install-UX change only; the documented install command is unchanged and no plugin code touches registry selection."
+    },
+    {
+      "id": "DSH-0.1.7-A2-04",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client/vite.config.ts"
+      ],
+      "note": "Client bundles are cached at host boot, so a client-bundle edit needs a host restart; no plugin source action."
+    },
+    {
+      "id": "DSH-0.1.7-RC1-01",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "package.json"
+      ],
+      "note": "Every DSH peer is now '^0.1.5-rc.2 || ^0.2.0-rc.1' (package.json:103-107), so 0.1.7-rc.1 is admitted and the host's startup peer check no longer disables the rows."
+    },
+    {
+      "id": "DSH-0.1.7-RC1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/index.tsx"
+      ],
+      "note": "Registers no tool.call.toolview entry and reads no RunningToolCall/ToolCallBlock records."
+    },
+    {
+      "id": "DSH-0.1.7-RC1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/index.tsx"
+      ],
+      "note": "Implements no ConversationNodeDefinition / UiConversation.events."
+    },
+    {
+      "id": "DSH-0.1.7-RC1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/index.tsx"
+      ],
+      "note": "Reads/writes no chat transcriptView setting and branches on no TranscriptViewMode."
+    },
+    {
+      "id": "DSH-0.1.7-RC1-05",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "README.md",
+        "package.json"
+      ],
+      "note": "Install-path behavior only; the documented dsh plugin CLI inherits the terminal, and the plugin has no install automation in-tree."
+    },
+    {
+      "id": "DSH-0.2.0-RC1-01",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "package.json"
+      ],
+      "note": "Peers use '... || ^0.2.0-rc.1' (package.json:103-107): 0.2.0-rc.1 is admitted and the future 0.2.0 final stays admitted; plain ^0.2.0 would be refused."
+    },
+    {
+      "id": "DSH-0.2.0-RC1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/index.tsx"
+      ],
+      "note": "Does not read the Chat settings schema or assume a transcriptView default."
+    },
+    {
+      "id": "DSH-0.2.0-RC1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "cordis.patch.yml"
+      ],
+      "note": "Patch inserts only dsh-router* ids and references no schedule/time-context/ui-schedule row."
+    },
+    {
+      "id": "DSH-0.2.0-RC1-04",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "cordis.patch.yml"
+      ],
+      "note": "Inserts rows into the same composition, but its ids (dsh-router*) do not collide with otel/product-analytics; nothing to rename or gate."
+    },
+    {
+      "id": "DSH-0.2.0-RC1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/index.tsx"
+      ],
+      "note": "Does not fork sessions; no ISessions.fork call site."
+    },
+    {
+      "id": "DSH-0.2.0-RC1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/index.ts"
+      ],
+      "note": "Carries no local native-command or Explorer reveal patch."
+    }
+  ]
+}

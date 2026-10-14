@@ -1,0 +1,200 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index a710418..6e14381 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,12 +1,36 @@
+-# H3 fixture · Browser Plugin (Missing dsh.client Declaration Trap)
++# H3 fixture · Browser Plugin (dual-plane, `dsh.client` declaration)
+ 
+ Test fixture — **do not publish**. A dual-plane plugin written in the `dsh-paste-input`
+ shape: the host half `index.js` has no coupling, and the browser half `client.js` goes
+ through `ctx.remote`.
+ 
+-The trap is in `package.json`: the browser plugin declaration sits in the **top-level
+-`client` field** (the 0.1.1 legacy convention, which the alpha host does not read), and
+-the **`dsh.client` declaration required by alpha is missing**. The symptom is silent:
+-`dsh plugin add` succeeds, the host half activates, but the plugin never appears in the
+-browser `__DSH_BOOT__.entries`. The comments in `client.js` even discourage you from
+-touching package.json.
++## What this plugin ships
++
++- **Host half** — `index.js` mounts as an ordinary profile-bundle layer: `cordis.patch.yml`
++  inserts the `bench-paste` row, reached through the package's `dsh.bundle.patch`
++  declaration, so `dsh plugin add` of this package activates it.
++- **Browser half** — `client.js` is a vanilla bundle (no build step) that contributes a
++  floating `📋` control through the official `shell.overlay` slot; on click it reads the
++  provider directory through `ctx.remote.llm.listProviders()` and pastes the count into
++  the resident composer.
++- **Browser-plane delivery** — the package declares `dsh.client` (`platform: "web"`) and
++  exports `./client`, so the alpha client module system composes the package into
++  `window.__DSH_BOOT__.entries` and serves the bundle under `/plugins`.
++- **Legacy hosts** — the retired 0.1.1 top-level `client` field is kept as the
++  old-host fallback declaration. Nothing on alpha.2 reads it, and it is harmless
++  beside `dsh.client`; removing it would only drop hosts older than alpha.
++- **Service dependency** — the browser half injects the Remote projection, its LLM
++  namespace, and the slot registry (`inject: ['remote', 'remote.llm', 'slots']`). On
++  alpha.2 the graph-level `dsh.client.inject` is a *package-row* edge list, so the old
++  service-level `client.inject: ["remote"]` fact lives in the bundle exports instead.
++- **Composer write** — the count enters the draft through the public input facade
++  (`ctx.conversation.input.for(sessionScope).setDraft(...)`), resolved from the current
++  session's scope. `sessions` and `conversation` are read weakly (`ctx.get`) so the row
++  still serves a composition without the conversation UI, and the pre-contenteditable
++  `textarea` append is kept as the fallback for older hosts.
++
++`client.js` must stay a closure-factory classic script — `window.__ModuleLoader__.load({ id,
++factory })` — because the module system loads client bundles as same-origin classic
++scripts and materializes the registered factory lazily. A plain ESM file with named
++`export`s is not loadable as a client bundle. `react` comes from the platform module
++table, so using a slot adds no build step.
+diff --git a/fixture/client.js b/fixture/client.js
+index ba1e4d6..9bf064b 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,19 +1,97 @@
+-// Browser half (dsh-paste-input shape): a vanilla lib that pastes clipboard text into an input box.
++// Browser half (dsh-paste-input shape): a vanilla bundle with no build step
++// that contributes a floating 📋 control, reads the provider directory through
++// the Remote projection, and pastes the count into the resident composer.
+ //
+-// Note: the 0.1.1-era host read the browser plugin declaration from the top-level client
+-// field of package.json, and this convention was in use for a long time — don't touch
+-// package.json, since changing it would only stop old hosts from recognizing the plugin.
+-// The remote injection takes effect automatically when the host scans the client field;
+-// just use it directly.
+-export function apply(ctx) {
+-  const button = document.createElement('button')
+-  button.textContent = '📋'
+-  button.addEventListener('click', async () => {
+-    // Legacy pattern: await the return value directly
+-    const providers = await ctx.remote.llm.listProviders()
+-    console.log('[bench-paste] providers:', providers)
+-    const input = document.querySelector('textarea')
+-    if (input) input.value += String(providers?.length ?? '')
+-  })
+-  document.body.appendChild(button)
+-}
++// Alpha.2 serves a browser half as a closure-factory classic script: the file
++// registers one factory through the host-injected `window.__ModuleLoader__.load`
++// facade, and the client module system materializes that factory on first
++// import. The package's `dsh.client` declaration is what puts this file into
++// `window.__DSH_BOOT__.entries`; the retired 0.1.1 top-level `client` field is
++// kept beside it for old hosts and is read by nothing on alpha.2.
++window.__ModuleLoader__.load({
++  id: '@demo/dsh-bench-paste',
++  factory: (require) => {
++    // React is a platform module: the shell seeds it into the frozen module
++    // table, so composing a slot entry still needs no build step.
++    const React = require('react')
++
++    // The paste target is the resident composer, reached through the public
++    // input facade rather than the composer DOM. `sessions` and `conversation`
++    // are read weakly so a composition without the conversation UI still serves
++    // this row; the control then falls back to the legacy textarea field.
++    function residentDraft(ctx) {
++      const sessions = ctx.get('sessions')
++      const conversation = ctx.get('conversation')
++      if (sessions === undefined || conversation === undefined) return undefined
++      const current = sessions.list.getSnapshot().current
++      if (current === undefined) return undefined
++      const actx = sessions.scope(current)
++      if (actx === undefined) return undefined
++      try {
++        const input = conversation.input.for(actx)
++        return {
++          // `setDraft` replaces the whole draft (the programmatic-write verb),
++          // so the legacy append is expressed as a read + write pair.
++          append: (text) => { input.setDraft(input.state.getSnapshot().draft + text) },
++        }
++      } catch {
++        // No resident input shell for this session: fall through to the legacy
++        // field rather than failing the click.
++        return undefined
++      }
++    }
++
++    function PasteButton(props) {
++      return React.createElement('button', {
++        type: 'button',
++        title: 'Paste the provider count into the draft',
++        onClick: () => { void props.pasteProviderCount() },
++        // The shell.overlay layer is click-through; its children opt back into
++        // pointer events, and this anchors the control to the frame corner.
++        style: { position: 'absolute', right: '16px', bottom: '16px' },
++      }, '📋')
++    }
++
++    return {
++      // Cordis service edges. `dsh.client.inject` is an informational
++      // package-row edge list in alpha.2 and does not belong here; the services
++      // this bundle actually reads are declared instead.
++      inject: ['remote', 'remote.llm', 'slots'],
++      apply(ctx) {
++        async function pasteProviderCount() {
++          // Alpha.2 unary Remotes resolve to RemoteResult; branch on `ok`
++          // before reading `value`.
++          const result = await ctx.remote.llm.listProviders()
++          if (!result.ok) {
++            console.error('[bench-paste] listProviders failed:', result.error.code, result.error.message)
++            return
++          }
++          const text = String(result.value.length)
++          const draft = residentDraft(ctx)
++          if (draft !== undefined) {
++            draft.append(text)
++            return
++          }
++          // Legacy composer field: pre-contenteditable hosts keep the old
++          // textarea write (card DSH-0.1.2-A1-28).
++          if (typeof document === 'undefined') return
++          const input = document.querySelector('textarea')
++          if (input) input.value += text
++        }
++
++        // Registrations are effects: `slots.inject` waits for the declaration
++        // and the contribution leaves with this fiber on unload or redeclare.
++        ctx.slots.inject('shell.overlay', () => ctx.slots.register(
++          {
++            name: 'shell.overlay',
++            id: 'bench-paste',
++            order: 100,
++            label: 'Paste provider count',
++            inject: () => ({ pasteProviderCount }),
++          },
++          PasteButton,
++        ))
++      },
++    }
++  },
++})
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..53ad285
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-paste",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-paste",
++      "version": "0.1.0"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index bdaaa10..444c3de 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -14,6 +14,9 @@
+     "inject": ["remote"]
+   },
+   "dsh": {
++    "client": {
++      "platform": "web"
++    },
+     "bundle": {
+       "patch": "./cordis.patch.yml"
+     }

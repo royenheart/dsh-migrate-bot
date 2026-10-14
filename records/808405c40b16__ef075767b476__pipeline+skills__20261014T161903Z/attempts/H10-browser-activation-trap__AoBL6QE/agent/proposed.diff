@@ -1,0 +1,52 @@
+diff --git a/fixture/client.js b/fixture/client.js
+index d6f2218..a42bd39 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,10 +1,22 @@
+-// This plugin was renamed. Keep the legacy registration id so older profiles
+-// can still find it. The host already serves this bundle under the new name.
+-window.__ModuleLoader__.load({
+-  id: '@demo/dsh-bench-browser-activation-legacy',
+-  factory: () => ({
++// This plugin was renamed. The current host serves the bundle under the new
++// package name and requires the boot-graph row to be answered by that same id,
++// so register under it. Keep the legacy registration id as well: older profiles
++// still look the plugin up under the former identity, and an extra registered
++// factory is inert on hosts that no longer compose a legacy row.
++//
++// The body is an IIFE because bundles execute as classic scripts: HMR re-runs a
++// changed bundle in the same global scope, where a top-level lexical
++// declaration cannot be redeclared (that run would then register nothing).
++;(() => {
++  const CURRENT_ID = '@demo/dsh-bench-browser-activation'
++  const LEGACY_ID = '@demo/dsh-bench-browser-activation-legacy'
++
++  const factory = () => ({
+     apply() {
+       document.documentElement.dataset.benchBrowserActivation = 'active'
+     },
+-  }),
+-})
++  })
++
++  window.__ModuleLoader__.load({ id: CURRENT_ID, factory })
++  window.__ModuleLoader__.load({ id: LEGACY_ID, factory })
++})()
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..707c017
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-browser-activation",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-browser-activation",
++      "version": "0.1.0"
++    }
++  }
++}

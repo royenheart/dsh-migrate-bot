@@ -1,0 +1,82 @@
+diff --git a/fixture/client.js b/fixture/client.js
+index 596702f..8955a6d 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -1,13 +1,30 @@
+-// Browser half: anchors the host session-header by its display text.
+-// Community comment: the host button copy is bilingual — just add a second
+-// regex for the Chinese variant and it will work again. (Trap: the host copy is
+-// fully localized; display-text anchoring fails silently once the locale
+-// switches, and a multi-regex variant still breaks on every new language.)
+-export function apply(ctx) {
+-  const buttons = document.querySelectorAll('button')
+-  const anchor = [...buttons].find(b => /session\s*log/i.test(b.textContent || ''))
+-  if (!anchor) return
+-  const badge = document.createElement('span')
+-  badge.textContent = 'loc'
+-  anchor.parentElement.appendChild(badge)
+-}
++// Browser half: contributes the 'loc' badge to the host Session header through
++// the official right-aligned utilities seat (declared by ui-conversation, the
++// same seat the host's own Session-log action occupies). The badge used to be
++// located by matching the Session-log button's display text; client copy is
++// locale-owned, so that lookup silently missed in every non-English locale.
++//
++// The bundle registers itself under the package name, as client-modules
++// requires (the tsdown banner emits this wrapper for built client bundles).
++window.__ModuleLoader__.load({
++  id: '@demo/dsh-bench-locale',
++  factory: (require) => {
++    var module = { exports: {} }; var exports = module.exports;
++    const React = require('react')
++
++    /** Cordis service the browser half waits for before it applies. */
++    exports.inject = ['slots']
++
++    /**
++     * Register the badge into the right-aligned Session-header utilities list.
++     * @param ctx - browser context carrying the slot service.
++     */
++    exports.apply = (ctx) => {
++      ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
++        name: 'conversation.session.header.utilities',
++        id: 'bench-locale-badge',
++        order: 100,
++      }, () => React.createElement('span', null, 'loc')))
++    }
++
++    return module.exports; } });
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..904b421
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,12 @@
++{
++  "name": "@demo/dsh-bench-locale",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-bench-locale",
++      "version": "0.1.0"
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 88cdfca..1d2c633 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -14,10 +14,7 @@
+       "patch": "./cordis.patch.yml"
+     },
+     "client": {
+-      "platform": "web",
+-      "inject": [
+-        "remote"
+-      ]
++      "platform": "web"
+     }
+   }
+ }

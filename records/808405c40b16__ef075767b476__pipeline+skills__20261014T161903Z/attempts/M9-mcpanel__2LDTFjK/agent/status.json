@@ -1,0 +1,142 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.2-alpha.2",
+      "target": {
+        "tag": "dsh-v0.1.2-alpha.2",
+        "version": "0.1.2-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.2-alpha.2",
+            "version": "0.1.2-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.0-rc.5",
+              "version": "0.1.0-rc.5"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "e2ePublish": false,
+            "checks": {
+              "cards": true,
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 1,
+        "lastFingerprint": "mechanical: npm error notarget No matching version found for @deepseek-ai/dsh-llm@^<n>.<n>-rc.<n> with a date before <n>/<n>/<n>, <n>:<n>:<n> PM. | npm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist. | npm error A complete log of this run can be found in: /root/.npm/_logs/<n>-<n>-14T20_07_50_618Z-debug-<n>.log",
+        "failure": {
+          "check": "mechanical",
+          "outcome": "fail",
+          "fingerprint": "mechanical: npm error notarget No matching version found for @deepseek-ai/dsh-llm@^<n>.<n>-rc.<n> with a date before <n>/<n>/<n>, <n>:<n>:<n> PM. | npm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist. | npm error A complete log of this run can be found in: /root/.npm/_logs/<n>-<n>-14T20_07_50_618Z-debug-<n>.log",
+          "detail": "npm error code ETARGET\nnpm error notarget No matching version found for @deepseek-ai/dsh-llm@^0.1.2-rc.1 with a date before 8/31/2026, 2:20:52 PM.\nnpm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-14T20_07_50_618Z-debug-0.log"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "could not install dsh 0.1.0-rc.5 for the checks: the npm registry did not say when @deepseek-ai/dsh@0.1.0-rc.5 was published"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [],
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-14T19-40-40-301Z",
+      "startedAt": "2026-10-14T19:40:41.516Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.2-alpha.2",
+    "target": {
+      "tag": "dsh-v0.1.2-alpha.2",
+      "version": "0.1.2-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.2-alpha.2",
+          "version": "0.1.2-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.0-rc.5",
+            "version": "0.1.0-rc.5"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "e2ePublish": false,
+          "checks": {
+            "cards": true,
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 1,
+      "lastFingerprint": "mechanical: npm error notarget No matching version found for @deepseek-ai/dsh-llm@^<n>.<n>-rc.<n> with a date before <n>/<n>/<n>, <n>:<n>:<n> PM. | npm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist. | npm error A complete log of this run can be found in: /root/.npm/_logs/<n>-<n>-14T20_07_50_618Z-debug-<n>.log",
+      "failure": {
+        "check": "mechanical",
+        "outcome": "fail",
+        "fingerprint": "mechanical: npm error notarget No matching version found for @deepseek-ai/dsh-llm@^<n>.<n>-rc.<n> with a date before <n>/<n>/<n>, <n>:<n>:<n> PM. | npm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist. | npm error A complete log of this run can be found in: /root/.npm/_logs/<n>-<n>-14T20_07_50_618Z-debug-<n>.log",
+        "detail": "npm error code ETARGET\nnpm error notarget No matching version found for @deepseek-ai/dsh-llm@^0.1.2-rc.1 with a date before 8/31/2026, 2:20:52 PM.\nnpm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-14T20_07_50_618Z-debug-0.log"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "could not install dsh 0.1.0-rc.5 for the checks: the npm registry did not say when @deepseek-ai/dsh@0.1.0-rc.5 was published"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [],
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-14T19-40-40-301Z",
+    "startedAt": "2026-10-14T19:40:41.516Z"
+  }
+}

@@ -1,0 +1,394 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index fd30dd7..4d42a17 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -4,7 +4,8 @@ An MCP-server management panel plugin: the host half writes the `mcp-client`
+ insert rows into the profile `cordis.patch.yml` (the loader's config HMR
+ mounts/unmounts/hot-swaps the official mcp-client instances), and the browser
+ half registers the settings-page "MCP" panel tab through the `settings.section`
+-slot. Written in the 0.1.2-era style; the host is moving to dsh 0.1.2-alpha.2.
++slot. Targets the dsh 0.1.2-alpha.2 cohort (client plane + peer cohort
++re-aligned); the host is the official profile/bundle path.
+ 
+ Release procedure (internal):
+ 
+diff --git a/fixture/client.js b/fixture/client.js
+index 500c522..3420ebe 100644
+--- a/fixture/client.js
++++ b/fixture/client.js
+@@ -3,51 +3,70 @@
+ // copy (following DSH's native zh/en).
+ //
+ // ────────────────────────────────────────────────────────────
+-// Migration memo (left in the repo during the 0.1.2 era):
+-//   "Keep @deepseek-ai/dsh-client-runtime in the client inject — the browser
+-//    half still imports its ClientContext type, and type imports need the
+-//    package present in the client graph."
++// Client-plane contract on the dsh 0.1.2-alpha.2 cohort:
++//   * The artifact is a hand-written `__ModuleLoader__` closure factory (no
++//     build step): the host serves this file as the package's `./client`
++//     bundle (`exports["./client"]` + `dsh.client.platform: "web"`) and the
++//     browser module system registers the factory under the package name.
++//   * `@deepseek-ai/dsh-client-runtime` was removed in the 0.1.2 corridor
++//     (DSH-0.1.2-A1-25). The plugin's Context is the Cordis `Context` from
++//     `@deepseek-ai/cordis`; `ctx.slots` is served by
++//     `@deepseek-ai/dsh-client-ui-renderer/client` and `ctx.locale` by
++//     `@deepseek-ai/dsh-client-locale/client` — the two services this plugin
++//     declares in `inject`. react, `dsh-client-ui-primitives` and
++//     `dsh-client-ui-slots` are platform seed modules answered by the
++//     injected `require`, so they need no graph row of their own.
+ // ────────────────────────────────────────────────────────────
+-//
+-// 0.1.2-era type surface: the client context type comes from the client
+-// runtime package; the ctx.slots merge and the locale runtime arrive with it.
+-
+-export const name = 'bench-mcpanel-client'
+-
+-// slots (settings.section tab) + locale (panel copy zh/en).
+-export const inject = ['slots', 'locale']
+-
+-// The panel component (server list + add/edit form + per-server tool browse)
+-// is elided; the slot renderer mounts it as a function component.
+-function mcpanelStub() {
+-  return null
+-}
+-
+-/**
+- * Register the settings-page "MCP" panel.
+- * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx
+- */
+-export function apply(ctx) {
+-  // Plugin-own copy namespace, following DSH's native zh/en.
+-  ctx.effect(
+-    () => ctx.locale.register('dsh-plugin-mcp-manager', {
+-      zh: { heading: 'MCP 服务器', add: '新增服务器' },
+-      en: { heading: 'MCP servers', add: 'Add server' },
+-    }),
+-    'bench-mcpanel-client: own copy namespace',
+-  )
+-
+-  // The settings.section tab registration (real call shape).
+-  ctx.slots.inject('settings.section', () =>
+-    ctx.slots.register({
+-      name: 'settings.section',
+-      id: 'bench-mcpanel',
+-      order: 61,
+-      label: () => 'MCP',
+-      locale: 'dsh-plugin-mcp-manager',
+-      inject: () => ({}),
+-    }, mcpanelStub))
+-
+-  // Elided: the better-locale override dicts registration (re-synced on every
+-  // locale revision bump; optional service, no runtime dependency).
+-}
++
++window.__ModuleLoader__.load({
++  id: '@bench/dsh-bench-mcpanel',
++  factory: (require) => {
++    var module = { exports: {} }
++    var exports = module.exports
++
++    exports.name = 'bench-mcpanel-client'
++
++    // slots (settings.section tab) + locale (panel copy zh/en).
++    exports.inject = ['slots', 'locale']
++
++    // The panel component (server list + add/edit form + per-server tool browse)
++    // is elided; the slot renderer mounts it as a function component.
++    function mcpanelStub() {
++      return null
++    }
++
++    /**
++     * Register the settings-page "MCP" panel.
++     * @param {import('@deepseek-ai/cordis').Context} ctx
++     */
++    exports.apply = (ctx) => {
++      // Plugin-own copy namespace, following DSH's native zh/en.
++      ctx.effect(
++        () => ctx.locale.register('dsh-plugin-mcp-manager', {
++          zh: { nav: 'MCP', heading: 'MCP 服务器', add: '新增服务器' },
++          en: { nav: 'MCP', heading: 'MCP servers', add: 'Add server' },
++        }),
++        'bench-mcpanel-client: own copy namespace',
++      )
++      const t = ctx.locale.bind('dsh-plugin-mcp-manager')
++
++      // The settings.section tab registration (real call shape).
++      ctx.slots.inject('settings.section', () =>
++        ctx.slots.register({
++          name: 'settings.section',
++          id: 'bench-mcpanel',
++          order: 61,
++          label: () => t('nav'),
++          locale: 'dsh-plugin-mcp-manager',
++          inject: () => ({}),
++        }, mcpanelStub))
++    }
++
++    // Elided: the better-locale override dicts registration. The service is
++    // optional, so it is probed weakly — `typeof ctx.get === 'function' ?
++    // ctx.get('betterLocale') : undefined` — and the registration re-syncs
++    // from `ctx.locale.subscribe` on every locale revision bump.
++
++    return module.exports
++  },
++})
+diff --git a/fixture/index.js b/fixture/index.js
+index 6b3a4fe..e94b027 100644
+--- a/fixture/index.js
++++ b/fixture/index.js
+@@ -1,9 +1,28 @@
+-// 0.1.2-era cohort (pre v0.1.2-alpha.1): the host half is the write-side of the
++// 0.1.2-alpha.2 cohort: the host half is the write-side of the
+ // MCP-server registry — it edits the mcp-client insert rows in the profile
+ // cordis.patch.yml and the loader's config HMR mounts/unmounts/hot-swaps the
+ // official mcp-client instances. The connection lifecycle is fully delegated
+ // to @deepseek-ai/dsh-mcp-client; this plugin only writes the patch rows.
+ //
++// Host-plane contract on the same cohort:
++//   * Resolve the profile layer from the runtime, never hardcode a directory
++//     (DSH-0.1.2-A1-04): `ctx.baseUrl` is anchored at the active profile
++//     directory and the harness home is the optional `dshHomePath` service.
++//   * Validate a candidate write with `loadOverlayPatches()` from
++//     @deepseek-ai/dsh-app-boot before it commits, so a bad edit cannot leave
++//     the profile unbootable; without that optional peer, degrade to a parse
++//     check.
++//   * The documented live mount/unmount/hot-swap needs a profile composed
++//     with `patchReload: "live"` (the shipped web profile). Other profiles
++//     apply the file at startup, which the panel must report instead of
++//     claiming a live reload.
++//   * The real body also injects 'webServer' for the /api/mcp-manager routes
++//     and 'connection', so every custom route handler first calls
++//     `ctx.connection.requestRejection(req)` (DSH-0.1.2-A1-08): routes
++//     registered through `ctx.webServer.register()` do not inherit the
++//     Connection auth gate. The stub below injects only 'tools' because the
++//     route body is elided.
++//
+ // The real host body (the yaml registry read/write layer, the
+ // /api/mcp-manager webServer routes for the browser panel, and the agent-side
+ // mcp_* tools registered through ctx.tools) is elided in this fixture — the
+@@ -17,10 +36,10 @@ export const name = 'bench-mcpanel'
+ export const inject = ['tools']
+ 
+ /**
+- * @param {import('cordis').Context} ctx
++ * @param {import('@deepseek-ai/cordis').Context} ctx
+  */
+ export function apply(ctx, config) {
+-  console.error('[bench-mcpanel] apply() on the 0.1.2-era cohort: bare cordis Context; client plane still on the client-runtime package')
++  console.error('[bench-mcpanel] apply() on the 0.1.2-alpha.2 cohort: Cordis Context from @deepseek-ai/cordis; client plane on the hand-written __ModuleLoader__ bundle')
+ 
+   ctx.effect(() => {
+     console.error('[bench-mcpanel] host half active: mcp-client insert rows in the profile cordis.patch.yml + /api/mcp-manager routes + mcp_* tools (real body elided)')
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..bbc071c
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,137 @@
++{
++  "name": "@bench/dsh-bench-mcpanel",
++  "version": "0.1.2",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@bench/dsh-bench-mcpanel",
++      "version": "0.1.2",
++      "dependencies": {
++        "yaml": "^2.4.0"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-app-boot": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
++        "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2",
++        "react": "^18.2.0"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/dsh-app-boot": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-locale": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-primitives": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-renderer": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-settings": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-client-ui-slots": {
++          "optional": true
++        },
++        "@deepseek-ai/dsh-tools": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cordis": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.4.tgz",
++      "integrity": "sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      },
++      "bin": {
++        "cordis": "bin.js"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis-plugin-include": {
++          "optional": true
++        },
++        "@deepseek-ai/cordis-plugin-loader": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/js-tokens": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/js-tokens/-/js-tokens-4.0.0.tgz",
++      "integrity": "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==",
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/loose-envify": {
++      "version": "1.4.0",
++      "resolved": "https://registry.npmjs.org/loose-envify/-/loose-envify-1.4.0.tgz",
++      "integrity": "sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "js-tokens": "^3.0.0 || ^4.0.0"
++      },
++      "bin": {
++        "loose-envify": "cli.js"
++      }
++    },
++    "node_modules/react": {
++      "version": "18.3.1",
++      "resolved": "https://registry.npmjs.org/react/-/react-18.3.1.tgz",
++      "integrity": "sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "loose-envify": "^1.1.0"
++      },
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
++    "node_modules/yaml": {
++      "version": "2.9.1",
++      "resolved": "https://registry.npmjs.org/yaml/-/yaml-2.9.1.tgz",
++      "integrity": "sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==",
++      "license": "ISC",
++      "bin": {
++        "yaml": "bin.mjs"
++      },
++      "engines": {
++        "node": ">= 14.6"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/eemeli"
++      }
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 8ac2d49..e4eff40 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@bench/dsh-bench-mcpanel",
+   "version": "0.1.2",
+-  "description": "MCP-server management panel plugin: the host half writes the mcp-client insert rows into the profile cordis.patch.yml (config HMR), the browser half registers the settings-page MCP tab (0.1.2-era cohort; exam material only)",
++  "description": "MCP-server management panel plugin: the host half writes the mcp-client insert rows into the profile cordis.patch.yml (config HMR), the browser half registers the settings-page MCP tab (migrated to the dsh 0.1.2-alpha.2 cohort; exam material only)",
+   "type": "module",
+   "main": "./index.js",
+   "exports": {
+@@ -15,9 +15,9 @@
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+         "@deepseek-ai/dsh-client-ui-primitives",
+-        "@deepseek-ai/dsh-client-ui-slots"
++        "@deepseek-ai/dsh-client-ui-slots",
++        "@deepseek-ai/dsh-client-locale"
+       ],
+       "platform": "web"
+     }
+@@ -26,16 +26,37 @@
+     "yaml": "^2.4.0"
+   },
+   "peerDependencies": {
+-    "cordis": "^4.0.0-rc.7",
++    "@deepseek-ai/cordis": "^4.0.2",
+     "react": "^18.2.0",
+-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.5",
+-    "@deepseek-ai/dsh-app-boot": "^0.1.0-rc.5",
+-    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.5",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.0-rc.5"
++    "@deepseek-ai/dsh-tools": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-app-boot": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-settings": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.2-alpha.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2"
+   },
+   "peerDependenciesMeta": {
+     "@deepseek-ai/dsh-app-boot": {
+       "optional": true
++    },
++    "@deepseek-ai/dsh-client-locale": {
++      "optional": true
++    },
++    "@deepseek-ai/dsh-client-ui-primitives": {
++      "optional": true
++    },
++    "@deepseek-ai/dsh-client-ui-renderer": {
++      "optional": true
++    },
++    "@deepseek-ai/dsh-client-ui-settings": {
++      "optional": true
++    },
++    "@deepseek-ai/dsh-client-ui-slots": {
++      "optional": true
++    },
++    "@deepseek-ai/dsh-tools": {
++      "optional": true
+     }
+   },
+   "private": true

@@ -1,0 +1,493 @@
+{
+  "cards": [
+    {
+      "id": "DSH-0.1.1-R1-01",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "package.json",
+        "cordis.patch.yml",
+        "README.md"
+      ],
+      "note": "Self-contained npm bundle: dsh.bundle.patch inserts the row, installed via `dsh plugin --profile web add`; no repository-plugins row and no dsh.plugin.json (README now documents the path)."
+    },
+    {
+      "id": "DSH-0.1.1-R1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json"
+      ],
+      "note": "The manifest already declares dsh.client (platform web + ./client); there is no legacy dshClient field or dsh.plugin.json to merge, and no prepare step rewrites the packed manifest."
+    },
+    {
+      "id": "DSH-0.1.1-R1-03",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "package.json",
+        "lib/client.js"
+      ],
+      "note": "The client half declares dsh.client and exports the built ./client bundle, so the alpha.2 scan admits it; the row was verified in the real __DSH_BOOT__ manifest."
+    },
+    {
+      "id": "DSH-0.1.1-R1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No ctx.get(...) or undeclared property access: the client half injects exactly the two services it uses (slots, locale) via export const inject."
+    },
+    {
+      "id": "DSH-0.1.1-R1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No optional host service is probed; slots and locale are guaranteed by the web profile scope, so hard inject entries are correct."
+    },
+    {
+      "id": "DSH-0.1.1-R1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "The plugin never subscribes to session/event and derives no session state from event fields."
+    },
+    {
+      "id": "DSH-0.1.1-R1-07",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No ctx.sessions or client-side session aggregation; the widget is purely decorative and session scoping comes from the dock slot."
+    },
+    {
+      "id": "DSH-0.1.1-R1-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No tasks.peek / job-output tailing anywhere in the plugin."
+    },
+    {
+      "id": "DSH-0.1.1-R1-09",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "index.js"
+      ],
+      "note": "The host half is a documented no-op; it injects/calls none of httpServer, tasks or onTaskDone."
+    },
+    {
+      "id": "DSH-0.1.1-R2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No ImageAttachmentRef, read_image or persisted image metadata in the plugin."
+    },
+    {
+      "id": "DSH-0.1.1-R2-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "The plugin neither registers nor parses read_image output."
+    },
+    {
+      "id": "DSH-0.1.1-R2-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No DeepSeek adapter, image request interceptor or attachment cache."
+    },
+    {
+      "id": "DSH-0.1.2-A1-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No APIProxy or ctx.remote usage; the client half only talks to ctx.slots and ctx.locale."
+    },
+    {
+      "id": "DSH-0.1.2-A1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "Target is alpha.2, not alpha.1; the plugin persists no third-party SessionEvents (net state per A2-01)."
+    },
+    {
+      "id": "DSH-0.1.2-A1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No host source patches and no internal session-view imports; the plugin is not in any patches/ directory."
+    },
+    {
+      "id": "DSH-0.1.2-A1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "index.js"
+      ],
+      "note": "No launcher wrapper, SDK/ACP integration or hardcoded profile path."
+    },
+    {
+      "id": "DSH-0.1.2-A1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "index.js"
+      ],
+      "note": "No headless wrapper or stdout/stderr parsing."
+    },
+    {
+      "id": "DSH-0.1.2-A1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No tool presentation mode, PTC preset or dispatch waterfall usage."
+    },
+    {
+      "id": "DSH-0.1.2-A1-07",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "index.js"
+      ],
+      "note": "The plugin ships no permission/approval/WebFetch policy and no tools."
+    },
+    {
+      "id": "DSH-0.1.2-A1-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "index.js"
+      ],
+      "note": "No custom loopback HTTP/WS/RPC routes, browser pages or /api handlers."
+    },
+    {
+      "id": "DSH-0.1.2-A1-09",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "index.js"
+      ],
+      "note": "The plugin is not a model provider and registers no settings page."
+    },
+    {
+      "id": "DSH-0.1.2-A1-10",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "Ships zh/en copy through the official ctx.locale.register dictionary RPC, not a third-party language pack; no custom i18n patch to retire (the typed LocaleNamespaceMap augmentation stays documented as elided)."
+    },
+    {
+      "id": "DSH-0.1.2-A1-11",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "index.js"
+      ],
+      "note": "No subagent orchestration or model selector."
+    },
+    {
+      "id": "DSH-0.1.2-A1-12",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json"
+      ],
+      "note": "Informational: no plugin code change; the official DeepSeek adapter attaching the package name/version is a deployment privacy decision, recorded in the report."
+    },
+    {
+      "id": "DSH-0.1.2-A1-13",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "index.js"
+      ],
+      "note": "No platform shell or directory-picker workarounds."
+    },
+    {
+      "id": "DSH-0.1.2-A1-14",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "index.js"
+      ],
+      "note": "No session-log-deepseek usage or LLM request path."
+    },
+    {
+      "id": "DSH-0.1.2-A1-19",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "lib/client.js",
+        "package.json"
+      ],
+      "note": "No browser acceptance script or wrapper in the tree; the migration still ran the boot-manifest acceptance on alpha.2 (row id == package name, advertised combo URL 200 and the bundle registers under the package name)."
+    },
+    {
+      "id": "DSH-0.1.2-A1-20",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "index.js"
+      ],
+      "note": "No userQuestions.registerProvider or structured-question answerer."
+    },
+    {
+      "id": "DSH-0.1.2-A1-21",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "index.js"
+      ],
+      "note": "No agent-preset inference or agent-presets roots."
+    },
+    {
+      "id": "DSH-0.1.2-A1-22",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No isTokenDelta / token-stream handling."
+    },
+    {
+      "id": "DSH-0.1.2-A1-23",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "cordis.patch.yml"
+      ],
+      "note": "The bundle layer inserts one row and reuses no dsh-base composition of its own; telemetry defaults stay the deployment profile's concern."
+    },
+    {
+      "id": "DSH-0.1.2-A1-24",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json"
+      ],
+      "note": "No direct @earendil-works/pi-ai dependency or provider/auth plugin surface."
+    },
+    {
+      "id": "DSH-0.1.2-A1-25",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "package.json",
+        "client.js",
+        "lib/client.js"
+      ],
+      "note": "dsh-client-runtime dropped from dsh.client.inject, peers and meta; ctx.slots re-homed to dsh-client-ui-renderer, ctx.locale to dsh-client-locale, ClientContext to @deepseek-ai/cordis; ui-slots/ui-primitives no longer listed as inject rows (platform seed words)."
+    },
+    {
+      "id": "DSH-0.1.2-A1-26",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "package.json",
+        "cordis.patch.yml",
+        "scripts/build.mjs",
+        "lib/client.js"
+      ],
+      "note": "All three ids agree with the package name: the row name and the generated __ModuleLoader__.load id are @bench/dsh-bench-sidebar-spur and package.json#name is the baseline."
+    },
+    {
+      "id": "DSH-0.1.2-A1-27",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "The plugin reads no session timeline or user-message content."
+    },
+    {
+      "id": "DSH-0.1.2-A1-28",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "The plugin does not touch the composer DOM; it only registers a dock entry."
+    },
+    {
+      "id": "DSH-0.1.2-A1-29",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No MarkdownText or fenced CodeBlock rendering (the braid is an elided SVG component)."
+    },
+    {
+      "id": "DSH-0.1.2-A1-30",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No ctx.connection.api usage; no history/transcript reads."
+    },
+    {
+      "id": "DSH-0.1.2-A1-31",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "index.js"
+      ],
+      "note": "No subagent descriptor construction or assertion."
+    },
+    {
+      "id": "DSH-0.1.2-A1-32",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No ctx.workspaces or ctx.uiWorkspace navigation calls."
+    },
+    {
+      "id": "DSH-0.1.2-A2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "The plugin produces no third-party persisted SessionEvents; the restored ignorable semantics have no producer here."
+    },
+    {
+      "id": "DSH-0.1.2-A2-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No ctx.remote calls or Remote failure handling."
+    },
+    {
+      "id": "DSH-0.1.2-A2-03",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "package.json"
+      ],
+      "note": "Peer graph rebuilt for the cohort: dsh-client-runtime removed, every DSH peer on ^0.1.2-alpha.2, dsh-client-ui-renderer added, and @deepseek-ai/cordis corrected to ^4.0.1."
+    },
+    {
+      "id": "DSH-0.1.2-A2-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "index.js"
+      ],
+      "note": "No Node-version workarounds or CI matrix in the plugin; the verification boot ran on Node 24.21 (outside the 24.0-24.11.1 failure window)."
+    },
+    {
+      "id": "DSH-0.1.2-A2-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "The plugin does not consume pluginInventory/list or validate PluginInventorySnapshot."
+    },
+    {
+      "id": "DSH-0.1.2-A2-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No ctx.remote.$host or host.describe usage."
+    },
+    {
+      "id": "DSH-0.1.2-A2-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json"
+      ],
+      "note": "The plugin neither composes profiles nor peers dsh-tool-todo/subagent/agent/terminal-bash, so sessionProjections does not enter its graph."
+    },
+    {
+      "id": "DSH-0.1.2-A2-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "client.js"
+      ],
+      "note": "No ctx.settings.register/update/get; the plugin registers no settings namespace."
+    }
+  ]
+}

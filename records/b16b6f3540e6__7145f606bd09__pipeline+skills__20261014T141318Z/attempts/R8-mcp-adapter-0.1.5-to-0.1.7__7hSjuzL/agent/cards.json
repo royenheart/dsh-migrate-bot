@@ -1,0 +1,1276 @@
+{
+  "cards": [
+    {
+      "id": "DSH-0.1.2-A1-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Ordinary Cordis plugin; no Host APIProxy call site. Client RPC uses ctx.connection.rpc."
+    },
+    {
+      "id": "DSH-0.1.2-A1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Writes no persisted SessionEvents."
+    },
+    {
+      "id": "DSH-0.1.2-A1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "No session-view internals imported; the only installed-source patch is the settings-shell nav glyph, tracked in patch-reports/settings-nav-icon."
+    },
+    {
+      "id": "DSH-0.1.2-A1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Resolves $DSH_HOME for its own skill/token files exactly as the harness does; reads no profile composition and hardcodes no user directory."
+    },
+    {
+      "id": "DSH-0.1.2-A1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Spawns no dsh process and parses no stdout/stderr."
+    },
+    {
+      "id": "DSH-0.1.2-A1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not use tool presentation modes or the PTC dispatch waterfall."
+    },
+    {
+      "id": "DSH-0.1.2-A1-07",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Ships no permission/approval policy or WebFetch preset; per-call MCP approval is the Adapter\u2019s own documented behavior."
+    },
+    {
+      "id": "DSH-0.1.2-A1-08",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers a custom loopback RPC channel and an OAuth redirect listener: the RPC handler rides the official Connection auth gate, and the listener is the RFC 8252 redirect endpoint (ephemeral 127.0.0.1 port, state-validated), not a DSH /api route."
+    },
+    {
+      "id": "DSH-0.1.2-A1-09",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Not a model-provider plugin."
+    },
+    {
+      "id": "DSH-0.1.2-A1-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Ships no localization resources."
+    },
+    {
+      "id": "DSH-0.1.2-A1-11",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Not a subagent orchestration plugin."
+    },
+    {
+      "id": "DSH-0.1.2-A1-12",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not use the official DeepSeek LLM adapter."
+    },
+    {
+      "id": "DSH-0.1.2-A1-13",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Carries no shell/directory-picker compatibility workaround."
+    },
+    {
+      "id": "DSH-0.1.2-A1-14",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "No session-log upload configuration."
+    },
+    {
+      "id": "DSH-0.1.2-A1-19",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "No browser acceptance script or wrapper in this repository; the runtime check is recorded in docs/verification and used the served boot roster."
+    },
+    {
+      "id": "DSH-0.1.2-A1-20",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers no structured-question answerer."
+    },
+    {
+      "id": "DSH-0.1.2-A1-21",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not infer agent presets from persisted sessions."
+    },
+    {
+      "id": "DSH-0.1.2-A1-22",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Never computes TPS from StreamChunks."
+    },
+    {
+      "id": "DSH-0.1.2-A1-23",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Ships a bundle patch, not a profile composition with telemetry rows."
+    },
+    {
+      "id": "DSH-0.1.2-A1-24",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not import @earendil-works/pi-ai."
+    },
+    {
+      "id": "DSH-0.1.2-A1-25",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "package.json",
+        "docs/adr/0010-profile-entry-config-on-017.md"
+      ],
+      "note": "Dropped @deepseek-ai/dsh-client-runtime from dsh.client.inject; the built bundle and the served roster carry no reference."
+    },
+    {
+      "id": "DSH-0.1.2-A1-26",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "build.mjs",
+        "docs/verification/v017-config-migration.md"
+      ],
+      "note": "Bundle id is emitted from package.json#name and the served boot row is keyed by the same name; the migration re-verified the roster after the inject change."
+    },
+    {
+      "id": "DSH-0.1.2-A1-27",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Reads no session timeline or user message content."
+    },
+    {
+      "id": "DSH-0.1.2-A1-28",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Never touches the composer DOM."
+    },
+    {
+      "id": "DSH-0.1.2-A1-29",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Renders no MarkdownText or fenced CodeBlock from ui-primitives."
+    },
+    {
+      "id": "DSH-0.1.2-A1-30",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "src/client/settings-api.js",
+        "src/client/index.jsx"
+      ],
+      "note": "0.1.7 path resolves configForms; connection.api.settings survives only inside the 0.1.1 legacy face."
+    },
+    {
+      "id": "DSH-0.1.2-A1-31",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Builds no subagent descriptors."
+    },
+    {
+      "id": "DSH-0.1.2-A1-32",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Calls no IWorkspaces navigation method."
+    },
+    {
+      "id": "DSH-0.1.2-A2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Produces no persisted SessionEvents (alpha.1 removal never hit this plugin)."
+    },
+    {
+      "id": "DSH-0.1.2-A2-02",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "note": "Legacy remote.settings branch already folds the flat { ok, error } result envelope and never relies on thrown Remote errors; the 0.1.7 path uses configForms."
+    },
+    {
+      "id": "DSH-0.1.2-A2-03",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "note": "Peer set is only @deepseek-ai/dsh-settings plus schemastery; the pnpm lockfile and an isolated install were validated."
+    },
+    {
+      "id": "DSH-0.1.2-A2-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "No Node-24 workaround was ever added."
+    },
+    {
+      "id": "DSH-0.1.2-A2-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not consume pluginInventory/list."
+    },
+    {
+      "id": "DSH-0.1.2-A2-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Reads no $host facts."
+    },
+    {
+      "id": "DSH-0.1.2-A2-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Mounts no session-projection-dependent tool package."
+    },
+    {
+      "id": "DSH-0.1.2-A2-10",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "src/host/settings.js",
+        "test/settings.test.js"
+      ],
+      "note": "Namespace is the literal \"mcp\"; the removed runtime settingsNamespace export is unused, the 0.1.7 path capability-probes instead of registering, and the legacy register path is covered by a generation double."
+    },
+    {
+      "id": "DSH-0.1.2-A3-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "settings.plugin.item is retired on 0.1.7-rc.2; the documented Settings > MCP page is a top-level settings.section entry, a different seat."
+    },
+    {
+      "id": "DSH-0.1.2-A3-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Mounts no SQLite persistence provider."
+    },
+    {
+      "id": "DSH-0.1.2-A4-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Lists no tool-subagent-report row or prompt."
+    },
+    {
+      "id": "DSH-0.1.2-A4-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not depend on the Python code runtime."
+    },
+    {
+      "id": "DSH-0.1.2-A4-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Reads no Session.events log."
+    },
+    {
+      "id": "DSH-0.1.2-A4-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Creates no seeded/forked sessions or projection definitions."
+    },
+    {
+      "id": "DSH-0.1.2-A4-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Ships no preset derived from ptc."
+    },
+    {
+      "id": "DSH-0.1.2-A4-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Is not a profile composition."
+    },
+    {
+      "id": "DSH-0.1.2-A5-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Persists no state through the storage-domain API."
+    },
+    {
+      "id": "DSH-0.1.2-A5-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Owns no storage domain."
+    },
+    {
+      "id": "DSH-0.1.2-A5-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Host upgrade fix; no plugin code change."
+    },
+    {
+      "id": "DSH-0.1.3-A1-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Host-plane session-log migrator; the Adapter reads no raw session logs."
+    },
+    {
+      "id": "DSH-0.1.3-A1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Host-plane resume behavior; not used."
+    },
+    {
+      "id": "DSH-0.1.3-A1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Builds no native addon and pins no fs-ext dependency."
+    },
+    {
+      "id": "DSH-0.1.3-A1-04",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "note": "Outbound MCP HTTP and OAuth token exchange use global fetch, so they inherit the profile\u2019s dsh-http-proxy policy; no plugin change."
+    },
+    {
+      "id": "DSH-0.1.3-A1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Never calls agentLoop.create or reads a SessionHandle."
+    },
+    {
+      "id": "DSH-0.1.3-A1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Reads no stored session logs."
+    },
+    {
+      "id": "DSH-0.1.3-A1-07",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Deployment/source-launch concern, not a plugin surface."
+    },
+    {
+      "id": "DSH-0.1.3-A1-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers no conversation.input.* surface or tool-card renderer."
+    },
+    {
+      "id": "DSH-0.1.3-A2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Configures no persona row."
+    },
+    {
+      "id": "DSH-0.1.3-A2-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Spawns stdio MCP servers through the MCP SDK, not ctx.subprocess; no pid use."
+    },
+    {
+      "id": "DSH-0.1.3-A2-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Assumes no particular editor tool set."
+    },
+    {
+      "id": "DSH-0.1.3-A2-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not wrap the dsh CLI."
+    },
+    {
+      "id": "DSH-0.1.3-A2-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not import pi-ai."
+    },
+    {
+      "id": "DSH-0.1.5-A1-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "No stored session-log reads or migration."
+    },
+    {
+      "id": "DSH-0.1.5-A1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Never reads ctx.agent; tool calls take the Agent from exec.agent."
+    },
+    {
+      "id": "DSH-0.1.5-A1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Uses no Inbox."
+    },
+    {
+      "id": "DSH-0.1.5-A1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Appends and seeds no session events."
+    },
+    {
+      "id": "DSH-0.1.5-A1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "No PTC/code-mode event filters."
+    },
+    {
+      "id": "DSH-0.1.5-A1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Uses no token-meter exports."
+    },
+    {
+      "id": "DSH-0.1.5-A1-07",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Contributes no system-prompt section and reads no header.system."
+    },
+    {
+      "id": "DSH-0.1.5-A1-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Forwards no scoped Remote events."
+    },
+    {
+      "id": "DSH-0.1.5-A1-09",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Passes no --profile desktop."
+    },
+    {
+      "id": "DSH-0.1.5-A1-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not create or template profiles."
+    },
+    {
+      "id": "DSH-0.1.5-A1-11",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Uses no workspaceFiles/readByteRange//api/file surface; workspace MCP config is its own file read."
+    },
+    {
+      "id": "DSH-0.1.5-A1-12",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Observes no goals."
+    },
+    {
+      "id": "DSH-0.1.5-A1-13",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "No native packaging or fs-ext pin."
+    },
+    {
+      "id": "DSH-0.1.5-A1-14",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers no details-panel slot."
+    },
+    {
+      "id": "DSH-0.1.5-A1-15",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Contributes no client slash-command UI or composer injection."
+    },
+    {
+      "id": "DSH-0.1.5-A1-16",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers only the settings.section seat; adds no right-sidebar tabs, client resources or dock-kit content."
+    },
+    {
+      "id": "DSH-0.1.5-A1-17",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not open files in the right sidebar."
+    },
+    {
+      "id": "DSH-0.1.5-A1-18",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not mount tool-subagent or modelSelectionSettings."
+    },
+    {
+      "id": "DSH-0.1.5-A1-19",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Calls no directory-picker or SSH fact seam."
+    },
+    {
+      "id": "DSH-0.1.5-A1-20",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "note": "Client-half artifact/roster issue on in-place npm-upgraded profiles; the README restart step and the boot-roster check cover it, with no possible plugin source change."
+    },
+    {
+      "id": "DSH-0.1.5-A2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Calls no workspaceFiles method."
+    },
+    {
+      "id": "DSH-0.1.5-A2-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Exposes no workspace file content through the harness."
+    },
+    {
+      "id": "DSH-0.1.5-A2-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers into no conversation slot."
+    },
+    {
+      "id": "DSH-0.1.5-A2-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Ships no preset or minimal-profile assumption."
+    },
+    {
+      "id": "DSH-0.1.5-A2-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Writes no session events."
+    },
+    {
+      "id": "DSH-0.1.5-A2-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not construct pi-ai provider profiles."
+    },
+    {
+      "id": "DSH-0.1.5-A2-07",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Contributes no tool guidance section; the agent skill is a separate documented surface."
+    },
+    {
+      "id": "DSH-0.1.5-A2-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Declares no turn deliverables; spill references and temp-file locators are documented Adapter behavior, not the present/turn-tail surface."
+    },
+    {
+      "id": "DSH-0.1.5-A2-09",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not depend on ui-sidebar-textpreview."
+    },
+    {
+      "id": "DSH-0.1.5-A2-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not depend on chunked-list or tool-present."
+    },
+    {
+      "id": "DSH-0.1.5-A2-11",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "note": "MCP tool discovery runs through the SDK listTools; the cursor fix lives in the harness mcp-client package and the Adapter inspects no harness-discovered tool set."
+    },
+    {
+      "id": "DSH-0.1.5-A2-12",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "No session-format reasoning."
+    },
+    {
+      "id": "DSH-0.1.5-A2-13",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Occupies no rightbar slot."
+    },
+    {
+      "id": "DSH-0.1.5-A2-14",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Implements no ResourceProvider."
+    },
+    {
+      "id": "DSH-0.1.5-A2-15",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Imports no icon/file-type helpers."
+    },
+    {
+      "id": "DSH-0.1.5-A2-16",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not embed ui-dockkit."
+    },
+    {
+      "id": "DSH-0.1.5-A2-17",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not use the message-feedback surface."
+    },
+    {
+      "id": "DSH-0.1.5-A2-18",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not inject uiWorkspace."
+    },
+    {
+      "id": "DSH-0.1.5-A2-19",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not use chatFileMentions."
+    },
+    {
+      "id": "DSH-0.1.5-A2-20",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "note": "No browser-only third-party value import: the client bundle imports only React (platform external) and the MCP SDK is a host-half dependency."
+    },
+    {
+      "id": "DSH-0.1.5-A2-21",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers no document preview."
+    },
+    {
+      "id": "DSH-0.1.5-A2-22",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers no command UI decoration."
+    },
+    {
+      "id": "DSH-0.1.5-A2-23",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not import command-feedback."
+    },
+    {
+      "id": "DSH-0.1.5-A2-24",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers no right-sidebar tab types."
+    },
+    {
+      "id": "DSH-0.1.5-RC1-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Not a profile composition; configures no agent model id."
+    },
+    {
+      "id": "DSH-0.1.5-RC1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not consume the model catalog."
+    },
+    {
+      "id": "DSH-0.1.5-RC1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers no document renderer."
+    },
+    {
+      "id": "DSH-0.1.5-RC1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers no sidebar guide entry."
+    },
+    {
+      "id": "DSH-0.1.5-RC1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Negative evidence; no plugin-facing surface moved."
+    },
+    {
+      "id": "DSH-0.1.5-RC2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not take over the feedback entry."
+    },
+    {
+      "id": "DSH-0.1.5-RC2-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not drive the feedback surface."
+    },
+    {
+      "id": "DSH-0.1.5-RC2-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Renders no FileTypeIcon."
+    },
+    {
+      "id": "DSH-0.1.5-RC2-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Contributes nothing to the turn tail."
+    },
+    {
+      "id": "DSH-0.1.5-RC2-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Surfaces no feedback category labels."
+    },
+    {
+      "id": "DSH-0.1.5-RC2-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Negative evidence; no Host-plane surface moved."
+    },
+    {
+      "id": "DSH-0.1.6-A1-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Listens for no agent/session lifecycle event."
+    },
+    {
+      "id": "DSH-0.1.6-A1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Boots and audits no config tree."
+    },
+    {
+      "id": "DSH-0.1.6-A1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Reads no session history."
+    },
+    {
+      "id": "DSH-0.1.6-A1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Owns no message-rewriting event."
+    },
+    {
+      "id": "DSH-0.1.6-A1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Uses no HMR config registration."
+    },
+    {
+      "id": "DSH-0.1.6-A1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "No profile or test composition here mounts session-log-deepseek."
+    },
+    {
+      "id": "DSH-0.1.6-A1-07",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers no program-execution provider and calls no ctx.ptcRuntime."
+    },
+    {
+      "id": "DSH-0.1.6-A1-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Implements no sandbox provider; calls no ctx.sandbox.confine."
+    },
+    {
+      "id": "DSH-0.1.6-A1-09",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Implements no ShellExecutor; stdio MCP servers are spawned by the SDK."
+    },
+    {
+      "id": "DSH-0.1.6-A1-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Implements no subprocess provider."
+    },
+    {
+      "id": "DSH-0.1.6-A1-11",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Mounts no workflow engine provider."
+    },
+    {
+      "id": "DSH-0.1.6-A1-12",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "note": "Pins its own @modelcontextprotocol/sdk 1.30.0 dependency rather than importing the host\u2019s transitive copy, so the harness 2.0 swap does not reach it; moving to @modelcontextprotocol/client@2.0.0 is an independent library upgrade, not a 0.1.7 compatibility need."
+    },
+    {
+      "id": "DSH-0.1.6-A1-13",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "note": "The Adapter is its own MCP bridge: its documented resources/read/prompts/prompt actions are the proxy-tool surface, and the shared resource tools are a different entry point whose adoption would replace documented UX."
+    },
+    {
+      "id": "DSH-0.1.6-A1-14",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Runs no remote SSH execution world."
+    },
+    {
+      "id": "DSH-0.1.6-A1-15",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Implements no LlmAdapter."
+    },
+    {
+      "id": "DSH-0.1.6-A1-16",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not configure the deepseek-official route."
+    },
+    {
+      "id": "DSH-0.1.6-A1-17",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Imports no DeepSeek image helpers."
+    },
+    {
+      "id": "DSH-0.1.6-A1-18",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Reads no token measurement or projection state."
+    },
+    {
+      "id": "DSH-0.1.6-A1-19",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not import the provenance type."
+    },
+    {
+      "id": "DSH-0.1.6-A1-20",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Imports no ui-conversation/ui-chat node types."
+    },
+    {
+      "id": "DSH-0.1.6-A1-21",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers no InputTriggerSource."
+    },
+    {
+      "id": "DSH-0.1.6-A1-22",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Renders no composer permission control."
+    },
+    {
+      "id": "DSH-0.1.6-A1-23",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers no sidebar-right tab type."
+    },
+    {
+      "id": "DSH-0.1.6-A1-24",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Renders no ConnectionIndicator and imports no ui-primitives value."
+    },
+    {
+      "id": "DSH-0.1.6-A1-25",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Renders no DiffBlock and computes no diff totals."
+    },
+    {
+      "id": "DSH-0.1.6-A1-26",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Never opens the ?fixture page; no CI lane uses it."
+    },
+    {
+      "id": "DSH-0.1.6-A1-27",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Names no workflow-worker-thread row."
+    },
+    {
+      "id": "DSH-0.1.6-A1-28",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Reads and replays no session log, so image/offload is not on its read path."
+    },
+    {
+      "id": "DSH-0.1.6-A1-29",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Assumes no tool-ralph row."
+    },
+    {
+      "id": "DSH-0.1.6-A1-30",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Consumes MCP resources through its own SDK connections, not the harness mcp-resources row; nothing to drop or adopt."
+    },
+    {
+      "id": "DSH-0.1.6-A1-31",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Names no code-runtime row in a Web overlay."
+    },
+    {
+      "id": "DSH-0.1.6-A1-32",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "note": "Depends only on dsh-settings, schemastery and the third-party MCP SDK; no retired package appears in its graph."
+    },
+    {
+      "id": "DSH-0.1.6-A1-33",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Drives no headless run."
+    },
+    {
+      "id": "DSH-0.1.6-A1-34",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "note": "Declares only dsh.bundle.patch (string form) and dsh.client; both stay valid under the redefined manifest, and the boot/roster checks confirmed the composition resolves."
+    },
+    {
+      "id": "DSH-0.1.6-A1-35",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Publishes no experimental package."
+    },
+    {
+      "id": "DSH-0.1.6-A1-36",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Does not depend on node-addon-require-builtin."
+    },
+    {
+      "id": "DSH-0.1.6-A1-37",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "README scopes support to the web profile; Desktop installability is not offered or claimed."
+    },
+    {
+      "id": "DSH-0.1.6-A1-38",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Negative evidence; no action."
+    },
+    {
+      "id": "DSH-0.1.6-A2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Resolves no current session through sessions.list."
+    },
+    {
+      "id": "DSH-0.1.6-A2-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "The settings page is root-scoped and consumes no session standard props."
+    },
+    {
+      "id": "DSH-0.1.6-A2-03",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "note": "Ships dsh.bundle.patch and installs through dsh plugin add / the Plugins page; the informational card needs no change."
+    },
+    {
+      "id": "DSH-0.1.6-A2-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Deployment-timing awareness; no plugin surface."
+    },
+    {
+      "id": "DSH-0.1.7-A1-01",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "scripts/patch-dsh-settings-nav-icon.mjs",
+        "patches/dsh-settings-section-icon.patch",
+        "README.md"
+      ],
+      "note": "Script derives the *Medium/*16 variant from the installed shell, verifies the export against the served bundle and was exercised on the 0.1.7-rc.2 shell (derive, refuse IconLinkOutline16, idempotent, stale replace, byte-identical revert)."
+    },
+    {
+      "id": "DSH-0.1.7-A1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Calls no workspaceFiles read."
+    },
+    {
+      "id": "DSH-0.1.7-A1-03",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "src/host/settings.js",
+        "src/client/settings-api.js",
+        "cordis.patch.yml",
+        "test/settings.test.js",
+        "docs/adr/0010-profile-entry-config-on-017.md"
+      ],
+      "note": "Exported volatile-root Config plus the configForms client face; the mcp row id makes the one-time settings.yaml import land in the Adapter entry, and the legacy provider generation is covered by the test double."
+    },
+    {
+      "id": "DSH-0.1.7-A1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Ships no agent presets."
+    },
+    {
+      "id": "DSH-0.1.7-A1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Parses no session log files."
+    },
+    {
+      "id": "DSH-0.1.7-A1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Configures no DeepSeek provider."
+    },
+    {
+      "id": "DSH-0.1.7-A1-07",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "note": "Single patch file (valid string form); the volatile root already uses the in-place no-reload update path instead of a remount."
+    },
+    {
+      "id": "DSH-0.1.7-A1-08",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "note": "Load-level tolerance only; installMcpSettings still fails loud with one guidance message on an unknown settings shape."
+    },
+    {
+      "id": "DSH-0.1.7-A1-09",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Optional Plugin Manager display fields; the Adapter ships none and carries no workaround they replace."
+    },
+    {
+      "id": "DSH-0.1.7-A1-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Stores no attachment payloads in custom session events."
+    },
+    {
+      "id": "DSH-0.1.7-A1-11",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers no settings launcher or models sign-in seat."
+    },
+    {
+      "id": "DSH-0.1.7-A2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Carries no spill-policy configuration; it only calls spillStore.saveText."
+    },
+    {
+      "id": "DSH-0.1.7-A2-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "No vendored-dependency resolution of its own."
+    },
+    {
+      "id": "DSH-0.1.7-A2-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Install-time host behavior; no plugin action."
+    },
+    {
+      "id": "DSH-0.1.7-A2-04",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "note": "The README already requires a host restart after a client-bundle change, and the verification pass restarted the served host before reading the roster."
+    },
+    {
+      "id": "DSH-0.1.7-RC1-01",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "package.json",
+        "pnpm-lock.yaml",
+        "docs/verification/v017-config-migration.md"
+      ],
+      "note": "The dsh-settings peer union keeps the ^0.1.7-rc.2 floor and the dev pin is ^0.1.7-rc.2, so no @deepseek-ai/dsh-* entry in any manifest block refuses the target; the peer was measured satisfiable against the host semver."
+    },
+    {
+      "id": "DSH-0.1.7-RC1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Registers no tool.call.toolview owner."
+    },
+    {
+      "id": "DSH-0.1.7-RC1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Implements no ConversationNodeDefinition."
+    },
+    {
+      "id": "DSH-0.1.7-RC1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Reads and writes no transcriptView setting."
+    },
+    {
+      "id": "DSH-0.1.7-RC1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "note": "Plugin Manager install behavior; no plugin action."
+    }
+  ]
+}

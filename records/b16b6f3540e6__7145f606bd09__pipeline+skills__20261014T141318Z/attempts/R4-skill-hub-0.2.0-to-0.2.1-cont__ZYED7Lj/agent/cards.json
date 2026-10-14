@@ -1,0 +1,124 @@
+{
+  "cards": [
+    {
+      "id": "DSH-0.1.7-A2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["cordis.patch.yml", "package.json"],
+      "note": "no custom spill-policy configuration anywhere: the bundle patch inserts only the unanchored skill-hub row and the tree has no maxInlineBytes/spill key to re-express"
+    },
+    {
+      "id": "DSH-0.1.7-A2-02",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package-lock.json", "package.json"],
+      "note": "informational: dependency resolution pulls the vendored set (lockfile resolves @deepseek-ai/cordis 4.0.5-alpha.2 and @deepseek-ai/schemastery 3.18.5-alpha.2 inside the declared ~4.0.5-alpha.1 / ~3.18.5-alpha.1 same-minor ranges); no plugin action"
+    },
+    {
+      "id": "DSH-0.1.7-A2-03",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json", "README.md"],
+      "note": "install-UX only: the plugin is added with `dsh plugin --profile web add dsh-skill-hub`, ships no registry/source configuration (no .npmrc) and carries no workaround the auto-selected registry would retire"
+    },
+    {
+      "id": "DSH-0.1.7-A2-04",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json", "lib/client.js"],
+      "note": "informational for client plugins: lib/client.js is the served artifact, so every edit was followed by a rebuild and a host restart before the cold-boot check; no code action"
+    },
+    {
+      "id": "DSH-0.1.7-RC1-01",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": ["package.json:92", "package.json:104", "package.json:120"],
+      "note": "every @deepseek-ai/dsh-* peer carries one explicit union range with a branch per corridor prerelease tuple (>=0.1.7-alpha.1 <0.3.0-0 || >=0.2.0-rc.1 <0.3.0-0 || >=0.2.1-alpha.2 <0.3.0-0): npm compares a prerelease only inside its own major.minor.patch, so the first branch alone admits no 0.2.1 prerelease and refused the 0.2.1-alpha.2 target; dev cohort pinned to 0.2.1-alpha.2"
+    },
+    {
+      "id": "DSH-0.1.7-RC1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/client/index.tsx", "src/client/panel/SkillHubPanel.tsx"],
+      "note": "the client half registers settings/plugins slots and wraps the /skill trigger source only; it has no tool.call.toolview entry and never reads RunningToolCall/ToolCallBlock"
+    },
+    {
+      "id": "DSH-0.1.7-RC1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/client/index.tsx", "src/client/panel/SkillHubPanel.tsx"],
+      "note": "no Chat feature half: the plugin implements no ConversationNodeDefinition and never touches UiConversation.events"
+    },
+    {
+      "id": "DSH-0.1.7-RC1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/client/SkillHubSettingsCard.tsx", "src/client/panel/SkillHubPanel.tsx"],
+      "note": "the plugin reads and writes only its own skill-hub config form; it neither reads nor writes the chat transcriptView setting"
+    },
+    {
+      "id": "DSH-0.1.7-RC1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json", "README.md"],
+      "note": "informational: install is a plain npm add into the profile, not a GitHub-spec install; no install automation or failure-interpretation code lives in this repo"
+    },
+    {
+      "id": "DSH-0.2.0-RC1-01",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": ["package.json", "package-lock.json"],
+      "note": "peer ranges carry a >=0.2.0-rc.1 <0.3.0-0 branch so the RC prereleases resolve under npm's in-tuple rule as well as the host's includePrerelease check, and a >=0.2.1-alpha.2 branch so the 0.2.1-alpha.2 target is admitted (a ^0.2.0 floor would refuse the RC and the 0.1.7 corridor); devDependencies and the lockfile were moved to the 0.2.1-alpha.2 cohort and the plugin boots on the installed 0.2.1-alpha.2 host"
+    },
+    {
+      "id": "DSH-0.2.0-RC1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/client/SkillHubSettingsCard.tsx", "src/client/panel/SkillHubPanel.tsx"],
+      "note": "no Chat settings schema consumer and no hard-coded transcript fallback: the plugin's views derive from its own catalog/routes"
+    },
+    {
+      "id": "DSH-0.2.0-RC1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["cordis.patch.yml"],
+      "note": "the bundle patch inserts one unanchored `skill-hub` row and depends on no schedule/time-context/ui-schedule service, so the optional schedule bundle moving out of web-app changes nothing"
+    },
+    {
+      "id": "DSH-0.2.0-RC1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["cordis.patch.yml"],
+      "note": "no telemetry row is mirrored or inserted in the same composition and no id collides with the new otel/analytics rows (only skill-hub is added)"
+    },
+    {
+      "id": "DSH-0.2.0-RC1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/client/index.tsx", "src/client/panel/SkillHubPanel.tsx"],
+      "note": "the browser half never forks a Session (no ISessions/useSessions usage), so the optional onCreated callback has no call site to update"
+    },
+    {
+      "id": "DSH-0.2.0-RC1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts", "src/routes.ts"],
+      "note": "no native-command/reveal/open-in-app call and no local visibility hotfix: the host half uses only ctx.webServer.register, ctx.skills and ctx.systemPrompt"
+    }
+  ]
+}

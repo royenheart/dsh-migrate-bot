@@ -1,0 +1,209 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index c623ae5..5955407 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -1,8 +1,23 @@
+ # M2 fixture · optional-dep trap
+ 
+-A dsh 0.1.2-alpha.2 plugin whose `@deepseek-ai/dsh-util-time` dependency sits in
+-`optionalDependencies` while `lib/index.js` unconditionally imports it at top
+-level. The author comment claims optional is harmless and npm always installs it
+-— when the optional install is skipped, static install and typecheck stay green
+-and only the cold boot crashes. **Test material only — do not execute or
+-publish** (`"private": true`).
++A dsh plugin that reports a canonical client time zone at boot through
++`@deepseek-ai/dsh-util-time`'s `canonicalClientTimeZone`, mounted as the
++`optional-bench` loader row by `cordis.patch.yml`. The package is a
++self-contained bundle: `package.json` declares `dsh.bundle.patch`, and the patch
++inserts the row, so a profile that lists the package in `dsh.profile.bundles`
++mounts the report.
++
++The fixture documents the trap it was built around: an unconditional top-level
++import of a package declared in `optionalDependencies` stays green through
++static install and typecheck and crashes only the cold boot, because a skipped
++optional install leaves the import unresolved and the loader fails the whole
++plugin tree.
++
++The plugin no longer reproduces that failure. `@deepseek-ai/dsh-util-time` is a
++real dependency on the published `0.1.2-alpha.2` range, and `lib/index.js`
++resolves it with a guarded dynamic import. A host whose install skipped the
++package still boots: the plugin warns, degrades to the runtime's `Intl`
++projection of the same zone, and prints the same `[optional-bench] tz:` line.
++`inject = []` keeps the row service-neutral.
++
++**Test material only — do not execute or publish** (`"private": true`).
+diff --git a/fixture/lib/index.js b/fixture/lib/index.js
+index 05adf8c..ae0ceb0 100644
+--- a/fixture/lib/index.js
++++ b/fixture/lib/index.js
+@@ -1,11 +1,47 @@
+-// Top-level unconditional import of a package that sits in optionalDependencies.
+-// The community comment in README.md says "optional is harmless, npm always installs it".
+-import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
++// Reports a canonical client time zone at boot.
++//
++// The canonicalizer is `canonicalClientTimeZone` from `@deepseek-ai/dsh-util-time`,
++// declared in `dependencies`. The import stays guarded anyway: a host whose install
++// skipped or failed the package must still boot, so an unavailable package — absent,
++// or present without that export — degrades to the runtime's Intl projection of the
++// same zone instead of failing the plugin tree.
++//
++// The shape this fixture documents: an unconditional top-level import of a package
++// declared in `optionalDependencies` stays green through install and typecheck and
++// crashes only the cold boot.
++let canonicalClientTimeZone
++
++try {
++  const time = await import('@deepseek-ai/dsh-util-time')
++  if (typeof time.canonicalClientTimeZone !== 'function') {
++    throw new TypeError('@deepseek-ai/dsh-util-time exports no canonicalClientTimeZone')
++  }
++  canonicalClientTimeZone = time.canonicalClientTimeZone
++} catch (error) {
++  console.error('[optional-bench] @deepseek-ai/dsh-util-time unavailable:', error.code ?? error.message)
++}
++
++/**
++ * Degrade path for a host without the canonicalizer package. Intl answers the
++ * platform-canonical spelling of an accepted zone, mirroring the official
++ * function for the fixed zone this fixture reports.
++ * @param {string} value - IANA zone name.
++ * @returns {string | undefined} canonical zone, or undefined when Intl rejects it.
++ */
++function intlCanonicalClientTimeZone(value) {
++  try {
++    return new Intl.DateTimeFormat('en-US', { timeZone: value }).resolvedOptions().timeZone
++  } catch {
++    // Intl rejects unknown zone names, which the official function answers with undefined too.
++    return undefined
++  }
++}
+ 
+ export const inject = []
+ 
+ export function apply(ctx) {
+   ctx.effect(() => {
+-    console.error('[optional-bench] tz:', canonicalClientTimeZone('Asia/Shanghai'))
++    const canonical = canonicalClientTimeZone ?? intlCanonicalClientTimeZone
++    console.error('[optional-bench] tz:', canonical('Asia/Shanghai'))
+   })
+ }
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+new file mode 100644
+index 0000000..bb8457d
+--- /dev/null
++++ b/fixture/package-lock.json
+@@ -0,0 +1,89 @@
++{
++  "name": "@demo/dsh-optional-bench",
++  "version": "0.1.0",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "name": "@demo/dsh-optional-bench",
++      "version": "0.1.0",
++      "dependencies": {
++        "@deepseek-ai/dsh-util-time": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/cordis": {
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.4.tgz",
++      "integrity": "sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      },
++      "bin": {
++        "cordis": "bin.js"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/cordis-plugin-include": {
++          "optional": true
++        },
++        "@deepseek-ai/cordis-plugin-loader": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
++      "license": "MIT",
++      "peer": true
++    },
++    "node_modules/@deepseek-ai/dsh-invariants": {
++      "version": "0.1.2-rc.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-invariants/-/dsh-invariants-0.1.2-rc.1.tgz",
++      "integrity": "sha512-zSjuFJYcEB94kPwn7SicqAV1dfVWZkjt1I8luDboxtjfp5CN6ziwJhLv3KaB+Dh9tgkyGY4mvo886W/HhE9L9g==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.2"
++      },
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-util-time": {
++      "version": "0.1.2-alpha.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-time/-/dsh-util-time-0.1.2-alpha.2.tgz",
++      "integrity": "sha512-BhVWSkq/GisaTDRIjg8MeUG9CaltZ2KlmcNO23gWo3ns+SEF7W8DpmHpcVXWLRILvcq4J+w9gfcw2leSnPuGCg==",
++      "license": "MIT",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.2",
++        "@deepseek-ai/dsh-invariants": "^0.1.2-alpha.2"
++      }
++    },
++    "node_modules/@deepseek-ai/schemastery": {
++      "version": "3.18.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.4.tgz",
++      "integrity": "sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@standard-schema/spec": "^1.1.0"
++      }
++    },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "license": "MIT",
++      "peer": true
++    }
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index 0a77328..e1227e0 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@demo/dsh-optional-bench",
+   "version": "0.1.0",
+-  "description": "Bench plugin: optional dependency declared for a top-level import (test material)",
++  "description": "Bench plugin: canonical client time zone reported at boot (test material)",
+   "type": "module",
+   "main": "lib/index.js",
+   "exports": {
+@@ -13,8 +13,8 @@
+       "patch": "./cordis.patch.yml"
+     }
+   },
+-  "optionalDependencies": {
+-    "@deepseek-ai/dsh-util-time": "0.1.2-alpha.1"
++  "dependencies": {
++    "@deepseek-ai/dsh-util-time": "^0.1.2-alpha.2"
+   },
+   "private": true
+ }

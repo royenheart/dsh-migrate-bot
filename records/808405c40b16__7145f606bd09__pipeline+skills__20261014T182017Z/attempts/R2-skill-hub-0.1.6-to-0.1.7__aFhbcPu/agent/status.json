@@ -1,0 +1,144 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.7-alpha.1",
+      "target": {
+        "tag": "dsh-v0.1.7-alpha.1",
+        "version": "0.1.7-alpha.1"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.7-alpha.1",
+            "version": "0.1.7-alpha.1"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.6-alpha.2",
+              "version": "0.1.6-alpha.2"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "e2ePublish": false,
+            "checks": {
+              "cards": true,
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 0,
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [
+          "config-effects.spec.ts \u203a the configured invocation dot colors reach the panel legend",
+          "diagnostics.spec.ts \u203a broken skill files surface as diagnostics with a Fix, and a workspace adds project skills",
+          "market.spec.ts \u203a the Market view offers the built-in sources, a custom source and the batch controls",
+          "panel.spec.ts \u203a Settings \u2192 Skills renders the Skill Hub panel and its browse chrome",
+          "scenes.spec.ts \u203a scenes can be created, renamed and deleted while the default scene stays",
+          "skill-lifecycle.spec.ts \u203a a skill can be scaffolded, inspected, disabled, restored and trashed",
+          "slash-menu-dots.spec.ts \u203a the chat / menu marks skill candidates with the plugin invocation dot"
+        ],
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-14T18-22-43-753Z",
+      "startedAt": "2026-10-14T18:22:44.525Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.7-alpha.1",
+    "target": {
+      "tag": "dsh-v0.1.7-alpha.1",
+      "version": "0.1.7-alpha.1"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.7-alpha.1",
+          "version": "0.1.7-alpha.1"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.6-alpha.2",
+            "version": "0.1.6-alpha.2"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "e2ePublish": false,
+          "checks": {
+            "cards": true,
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 0,
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [
+        "config-effects.spec.ts \u203a the configured invocation dot colors reach the panel legend",
+        "diagnostics.spec.ts \u203a broken skill files surface as diagnostics with a Fix, and a workspace adds project skills",
+        "market.spec.ts \u203a the Market view offers the built-in sources, a custom source and the batch controls",
+        "panel.spec.ts \u203a Settings \u2192 Skills renders the Skill Hub panel and its browse chrome",
+        "scenes.spec.ts \u203a scenes can be created, renamed and deleted while the default scene stays",
+        "skill-lifecycle.spec.ts \u203a a skill can be scaffolded, inspected, disabled, restored and trashed",
+        "slash-menu-dots.spec.ts \u203a the chat / menu marks skill candidates with the plugin invocation dot"
+      ],
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-14T18-22-43-753Z",
+    "startedAt": "2026-10-14T18:22:44.525Z"
+  }
+}

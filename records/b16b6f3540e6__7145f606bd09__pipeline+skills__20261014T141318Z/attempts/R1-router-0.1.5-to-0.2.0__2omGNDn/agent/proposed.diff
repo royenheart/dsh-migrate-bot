@@ -1,0 +1,608 @@
+diff --git a/fixture/README.md b/fixture/README.md
+index b71774f..fedb683 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -339,7 +339,8 @@ curl -X POST http://localhost:3080/v1/chat/completions \
+ 
+ ```
+ 浏览器(client 半)
+-  ├─ 设置 → 路由(settings.section 座位, order 10, 排在「模型」下面)
++  ├─ 设置 → 路由(settings.section 座位, order 11, 排在「模型」下面;0.1.x 用 10,
++  │             0.2.0 起同值 tie 会翻到「模型」上面,故取 11)
+   │    ├─ RouterSettingsSection  注册入口(settings-section.tsx)
+   │    ├─ RouterView        tab: 概览 / 供应商 / 组合 / 扩展 / 端点与密钥(tab 条:下划线指示器)
+   │    │    ├─ StatsTab          概览:用量看板(周期按钮组 + 汇总卡 + 折线趋势 + Top 榜 + 最近请求)
+diff --git a/fixture/package.json b/fixture/package.json
+index b2987f6..0e47986 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -100,11 +100,11 @@
+   },
+   "peerDependencies": {
+     "@deepseek-ai/cordis": "^4.0.2",
+-    "@deepseek-ai/dsh-client-locale": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-llm": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-settings": "^0.1.5-rc.2",
++    "@deepseek-ai/dsh-client-locale": "^0.1.5-rc.2 || ^0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.5-rc.2 || ^0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.2 || ^0.2.0-rc.1",
++    "@deepseek-ai/dsh-llm": "^0.1.5-rc.2 || ^0.2.0-rc.1",
++    "@deepseek-ai/dsh-settings": "^0.1.5-rc.2 || ^0.2.0-rc.1",
+     "cordis": "^4.0.0-rc.7",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+@@ -121,6 +121,9 @@
+     },
+     "@deepseek-ai/dsh-client-ui-primitives": {
+       "optional": true
++    },
++    "@deepseek-ai/dsh-settings": {
++      "optional": true
+     }
+   },
+   "devDependencies": {
+diff --git a/fixture/src/client/RouterModelCard.tsx b/fixture/src/client/RouterModelCard.tsx
+new file mode 100644
+index 0000000..a024c1e
+--- /dev/null
++++ b/fixture/src/client/RouterModelCard.tsx
+@@ -0,0 +1,21 @@
++/**
++ * 设置-模型 → Router 卡片里本插件自己的说明 —— 走官方
++ * `settings.models.provider-card` 座位（keyed，键 = 该提供方的设置命名空间）。
++ *
++ * 为什么用这个座位而不是认领 DOM：宿主对「未知命名空间」的提供方卡片只渲染一句
++ * 通用提示（「其余字段在 cordis.patch.yml 中，请直接编辑对应段。(<ns>)」），
++ * 插件没有可覆写字段；官方给的扩展位就是这张卡片内容区（渲染在编辑器之后）。
++ * 老写法是 MutationObserver 按文案指纹改写宿主那段文本 —— 只要座位存在，
++ * 就不该再去动宿主的 DOM（见 `.dsh-migrate/patch-reports/llm-provider-card-hint/`：
++ * 通用提示与插件说明并排仍会互相矛盾，那需要宿主给 ConfigurableProvider 一个
++ * 可覆写的 hint 字段才能彻底消掉）。
++ *
++ * 组件不收 props：这张卡片只说一句「组合即模型」，不读卡片的行数据。
++ */
++import type { JSX } from 'react'
++import { ROUTER_MODEL_HINT_COPY } from '../shared.ts'
++
++/** Router 提供方卡片的说明组件。 */
++export function RouterModelCard(): JSX.Element {
++  return <p className="dshr-modelCardHint">{ROUTER_MODEL_HINT_COPY}</p>
++}
+diff --git a/fixture/src/client/index.tsx b/fixture/src/client/index.tsx
+index 4c9aebb..ed973d3 100644
+--- a/fixture/src/client/index.tsx
++++ b/fixture/src/client/index.tsx
+@@ -15,7 +15,7 @@ import { ExtTestPanel } from './ExtTestPanel.tsx'
+ import { registerExtPanel } from './ext-panels.ts'
+ import { EXT_TEST_ID } from '../ext-test/plugin.ts'
+ import { registerSettingsNavIcon } from './settings-nav-icon.ts'
+-import { rewriteRouterModelHint } from './model-hint-copy.ts'
++import { RouterModelCard } from './RouterModelCard.tsx'
+ import { LastHitDock } from './LastHitDock.tsx'
+ import { ROUTER_API_BASE } from '../shared.ts'
+ import './router.css'
+@@ -83,16 +83,17 @@ async function fetchLastHitDockSupport(): Promise<boolean> {
+ function mountSettingsSection(ctx: Ctx): (() => void) | undefined {
+   const slots = ctx.slots
+   if (slots === undefined) return undefined
+-  // order 10 = 与「模型」「远程访问」同值，靠注册顺序定先后，实测排成
+-  //   模型 → 路由 → 远程访问（正是要的位置）。
+-  // 排序规则（宿主实现）：priority ?? 0 优先，再 order ?? 0，数值升序，
+-  //   同值保持注册顺序。所以想插在两个同 order 的条目中间是做不到的——
+-  //   试过 9.99（跑到模型上面）、10.001/10.05/11（都跑到远程访问后面）。
+-  //   只能取同值，让注册顺序决定。
++  // order 11 = 紧跟在「模型」(10) 后面。README 的席位是「排在模型下面」，而
++  //   0.1.x 曾用 order 10 与「模型」「远程访问」同值、靠注册顺序排成
++  //   模型 → 路由 → 远程访问；0.2.0 起本插件的 client bundle 先于
++  //   ui-settings-models 激活，同值 tie 翻成 路由 → 模型（浏览器实测），
++  //   文档席位就丢了。0.2.0 的官方席位是 general(0) / models(10) /
++  //   plugins(15) / agent-presets(20)，取 11 落在 models 与 plugins 之间，
++  //   不再和任何人同值。老宿主上仍是「模型下面」（远程访问同为 10，排在它前面）。
+   return slots.inject('settings.section', () => slots.register({
+     name: 'settings.section',
+     id: 'dsh-router',
+-    order: 10,
++    order: 11,
+     label: SECTION_LABEL,
+   }, RouterSettingsSection))
+ }
+@@ -129,6 +130,45 @@ function registerExtTestPanel(ctx: Ctx): void {
+   ctx.effect(() => dispose, 'dsh-router: ext test panel registry')
+ }
+ 
++/** Router 提供方的设置命名空间缺省值（= cordis.patch.yml 里本 bundle 的行 id）。 */
++const DEFAULT_SETTINGS_NS = 'dsh-router'
++
++/**
++ * 问核心：Router 提供方这一行的设置命名空间是什么。
++ *
++ * 客户端 bundle 拿不到 `ctx.fiber.entry.options.id`（那是宿主进程里的东西），
++ * 而 `settings.models.provider-card` 是**按命名空间键控**的座位 —— 键不对就
++ * 永远不派发。核心把这个值放进 `/router/api/health`，客户端读它来登记。
++ * 网络/解析失败回落 `dsh-router`（patch 里的行 id），不抛。
++ * @returns Router 提供方卡片的座位键
++ */
++async function fetchRouterSettingsNs(): Promise<string> {
++  try {
++    const res = await fetch(`${ROUTER_API_BASE}/health`)
++    if (!res.ok) return DEFAULT_SETTINGS_NS
++    const body = (await res.json()) as { settingsNs?: unknown }
++    return typeof body.settingsNs === 'string' && body.settingsNs !== '' ? body.settingsNs : DEFAULT_SETTINGS_NS
++  } catch {
++    return DEFAULT_SETTINGS_NS
++  }
++}
++
++/**
++ * 设置-模型 → Router 卡片里本插件自己的说明 —— 官方 `settings.models.provider-card`
++ * 座位（keyed，键 = Router 的设置命名空间）。宿主对未知命名空间只给一句通用提示，
++ * 插件要说的话（组合即模型）就放在这个官方扩展位里，不再改写宿主的 DOM。
++ * @param settingsNs - 核心报出的 Router 设置命名空间
++ * @returns 清理函数；宿主无 slots 时为空操作
++ */
++function mountRouterModelCard(ctx: Ctx, settingsNs: string): () => void {
++  const slots = ctx.slots
++  if (slots === undefined) return () => {}
++  return slots.inject('settings.models.provider-card', () => slots.register({
++    name: 'settings.models.provider-card',
++    key: settingsNs,
++  }, RouterModelCard))
++}
++
+ export function apply(ctx: Ctx): void {
+   // 「最近命中」徽章：走官方 conversation.composer.dock（scope: session → 组件
+   // props 注入 sessionId，按当前会话取命中）。**仅宿主 >= 0.1.7 才挂**——
+@@ -150,8 +190,11 @@ export function apply(ctx: Ctx): void {
+     ctx.effect(() => disposeComponents, 'dsh-router: plugin page components')
+   }
+   registerExtTestPanel(ctx)
++  // 设置-模型 里 Router 卡片的说明：走官方 settings.models.provider-card 座位
++  // （keyed，键从核心 /health 取）。查询是异步的，拿到键再登记。
++  void fetchRouterSettingsNs().then((settingsNs) => {
++    ctx.effect(() => mountRouterModelCard(ctx, settingsNs), 'dsh-router: models provider card')
++  })
+   // 换掉宿主的默认齿轮（契约没有 icon 字段，只能注册后认领自己的行）
+   ctx.effect(() => registerSettingsNavIcon(SECTION_LABEL), 'dsh-router: settings nav icon')
+-  // 设置-模型 里 Router 卡片的那句死路提示 → 正确说法（同样只能认领后就地改写）
+-  ctx.effect(() => rewriteRouterModelHint(), 'dsh-router: models provider hint copy')
+ }
+diff --git a/fixture/src/client/model-hint-copy.test.ts b/fixture/src/client/model-hint-copy.test.ts
+deleted file mode 100644
+index 77afa9c..0000000
+--- a/fixture/src/client/model-hint-copy.test.ts
++++ /dev/null
+@@ -1,36 +0,0 @@
+-/**
+- * 改写判据测试 —— 锁定「识别宿主提示」与「不自激」两条。
+- *
+- * 为什么要有：这个改写是按文案指纹认领宿主 DOM（见 model-hint-copy.ts）。
+- * 判据写错有两种坏法：漏认（提示原样留着）和自激（改完又被自己判定为需要改，
+- * 观察器反复触发）。两条都是纯函数可测的。
+- */
+-import test from 'node:test'
+-import assert from 'node:assert/strict'
+-import { routerHintRewrite, ROUTER_MODEL_HINT_COPY } from './model-hint-copy.ts'
+-
+-test('认出宿主提示（中/英两种文案 + 命名空间指纹）', () => {
+-  const zh = '其余字段在 settings.yaml 中，请直接编辑对应段。 (dsh-router)'
+-  const en = 'Other fields live in settings.yaml; edit that section directly. (dsh-router)'
+-  assert.equal(routerHintRewrite(zh), ROUTER_MODEL_HINT_COPY)
+-  assert.equal(routerHintRewrite(en), ROUTER_MODEL_HINT_COPY)
+-})
+-
+-test('别的 provider 的同类提示不动（指纹只属于 Router）', () => {
+-  const deepseek = '其余字段在 settings.yaml 中，请直接编辑对应段。 (llm-deepseek)'
+-  assert.equal(routerHintRewrite(deepseek), undefined)
+-})
+-
+-test('旧命名空间指纹不再认领 —— 0.1.7 起宿主渲染的是行 id', () => {
+-  const legacy = '其余字段在 settings.yaml 中，请直接编辑对应段。 (llm-dsh-router)'
+-  assert.equal(routerHintRewrite(legacy), undefined)
+-})
+-
+-test('已是目标文案时早退 —— 观察器不自激', () => {
+-  assert.equal(routerHintRewrite(ROUTER_MODEL_HINT_COPY), undefined)
+-})
+-
+-test('无关段落一律不动', () => {
+-  assert.equal(routerHintRewrite(''), undefined)
+-  assert.equal(routerHintRewrite('配置 DeepSeek 官方模型，即可开始使用。'), undefined)
+-})
+diff --git a/fixture/src/client/model-hint-copy.ts b/fixture/src/client/model-hint-copy.ts
+deleted file mode 100644
+index 39d46e5..0000000
+--- a/fixture/src/client/model-hint-copy.ts
++++ /dev/null
+@@ -1,55 +0,0 @@
+-/**
+- * 设置-模型 → Router 卡片：把宿主那句走不通的提示换成正确说法。
+- *
+- * 为什么不能直接改源头：Router 的卡片走宿主的 "unknown" 布局（宿主只认得
+- * llm-deepseek / llm-pi-ai 两套表单），那句
+- *   「其余字段在 settings.yaml 中，请直接编辑对应段。 (dsh-router)」
+- * 属于宿主 `settings.models` 的 locale 字典，而字典注册对同一个 (ns, locale)
+- * 只允许一个占位者（重复注册直接抛），插件覆写不了，契约也没给可覆写字段。
+- * 所以沿用本插件既有的认领手法（同 settings-nav-icon.ts）：按文案指纹认出宿主
+- * 渲染的那一段，就地改写。
+- *
+- * 只写 `nodeValue`、不增删节点（节点归 React，摘掉会让它的引用落空）。React 重渲染
+- * 覆盖回来时观察器会再改一次；已是目标文案就早退，不会自激。
+- *
+- * 升级路径：宿主若给该提示长出可覆写字段（或 Router 有了专属布局），删掉本文件。
+- */
+-
+-/** 指纹：语言无关（不受中英文切换影响），且只出现在 Router 卡片上。 */
+-const FINGERPRINT = '(dsh-router)'
+-
+-/** 正确说法：对齐 README「组合即模型」。 */
+-export const ROUTER_MODEL_HINT_COPY = '组合即模型 · 建好的组合会自动出现在 DSH 模型目录中，选中组合名即可直接使用。'
+-
+-/**
+- * 这段文本要不要改写。
+- * @param text 段落当前文本
+- * @returns 需要改写时给出目标文案，否则 undefined
+- */
+-export function routerHintRewrite(text: string): string | undefined {
+-  if (!text.includes(FINGERPRINT)) return undefined
+-  if (text === ROUTER_MODEL_HINT_COPY) return undefined // 已改过，早退防自激
+-  return ROUTER_MODEL_HINT_COPY
+-}
+-
+-/**
+- * 持续把 Router 卡片里的宿主提示改写成 {@link ROUTER_MODEL_HINT_COPY}。
+- * @returns 清理函数：断开观察
+- */
+-export function rewriteRouterModelHint(): () => void {
+-  const sync = (): void => {
+-    for (const el of document.querySelectorAll<HTMLElement>('p[class*="advancedHint"]')) {
+-      const next = routerHintRewrite(el.textContent ?? '')
+-      // 宿主把整句渲染成一个文本节点（单个模板串）——直接整段替换
+-      const node = el.firstChild
+-      if (next === undefined || node?.nodeType !== Node.TEXT_NODE) continue
+-      node.nodeValue = next
+-    }
+-  }
+-
+-  sync()
+-  // 设置面板按需挂载、React 重渲染都会覆盖回去，子树变动时重新认领
+-  const observer = new MutationObserver(sync)
+-  observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+-  return () => observer.disconnect()
+-}
+diff --git a/fixture/src/client/router.css b/fixture/src/client/router.css
+index 3786a2d..1683dcc 100644
+--- a/fixture/src/client/router.css
++++ b/fixture/src/client/router.css
+@@ -3774,3 +3774,14 @@ html[data-dsh-router-active]:not([data-dsh-taskboard-active]):not(
+ }
+ 
+ 
++/*
++ * 设置-模型 → Router 卡片里的插件说明（官方 settings.models.provider-card 座位）。
++ * 宿主卡片本身有自己的间距，这里只按标签层级给一行常规说明文字。
++ */
++.dshr-modelCardHint {
++    margin: 8px 0 0;
++    color: var(--dsw-alias-label-secondary);
++    font-size: 12px;
++    line-height: 18px;
++    overflow-wrap: anywhere;
++}
+diff --git a/fixture/src/index.ts b/fixture/src/index.ts
+index f64ea84..33f1cf9 100644
+--- a/fixture/src/index.ts
++++ b/fixture/src/index.ts
+@@ -33,7 +33,7 @@
+ import type { IncomingMessage, ServerResponse } from 'node:http'
+ import { join } from 'node:path'
+ import Schema from '@deepseek-ai/schemastery'
+-import { ROUTER_API_BASE, type RouterPeriod } from './shared.ts'
++import { ROUTER_API_BASE, ROUTER_MODEL_HINT_COPY, type RouterPeriod } from './shared.ts'
+ import { Router } from './router/index.ts'
+ import { RouterAdapter, type RouterAttachmentStore } from './llm/adapter.ts'
+ import { KeysStore } from './keys.ts'
+@@ -107,6 +107,15 @@ interface LlmConfigurableProvider {
+   displayName: string
+   settingsNs: string
+   settingsPath: readonly string[]
++  /**
++   * 卡片说明。宿主 ≥ 补丁版本会用它在设置-模型 的 Router 卡片里替掉那句
++   * 「其余字段在 cordis.patch.yml 中」的通用提示；**老宿主没有这个字段，
++   * 多传的键会被原样收下但不渲染**（`registerConfigurableProviders` 只校验
++   * provider/displayName/settingsNs/settingsPath），所以客户端那条
++   * `settings.models.provider-card` 座位是同一句话的兜底。
++   * 见 `.dsh-migrate/patch-reports/llm-provider-card-hint/`。
++   */
++  hint?: string
+ }
+ interface LlmModelDiscoveryRequest {
+   provider?: string
+@@ -210,6 +219,11 @@ export function apply(rawContext: unknown): void {
+   const hostVersion = detectHostVersion(ctx.baseUrl)
+   const host017Plus = isHost017Plus(ctx.baseUrl)
+   const lastHitDock = supportsLastHitDock(ctx.baseUrl)
++  // settings ns = 配置树行 id（cordis.patch.yml insert 的 id）—— 0.1.7 设置镜像按
++  // entry.options.id 收录；loader 未挂 entry 时回落到同一默认值，两版一个 ns。
++  // 放在这里而不是 /health 路由后面：客户端要读它去登记
++  // `settings.models.provider-card`（keyed 座位，键就是这个名字空间）。
++  const settingsNs = ctx.fiber?.entry?.options?.id ?? 'dsh-router'
+   log(`host version: ${hostVersion ?? '未知'} (>=0.1.7: ${host017Plus ? 'yes' : 'no'}, last-hit dock: ${lastHitDock ? 'on' : 'off'})`)
+   const store = new SupplierConfigStore(stateFile)
+   const credentials = new CredentialStore(join(dataDir, 'auths'))
+@@ -407,6 +421,9 @@ export function apply(rawContext: unknown): void {
+       // （composer.dock 在 0.1.5 渲染位置不对，只有 >= 0.1.7 才挂）。
+       hostVersion: hostVersion ?? '',
+       lastHitDock: lastHitDock,
++      // Router 提供方的设置命名空间：客户端据此登记官方
++      // `settings.models.provider-card` 座位（keyed by settingsNs）。
++      settingsNs: settingsNs,
+       suppliers: suppliers.map((s) => {
+         const loaded = loadedSuppliers.find((l) => l.supplier.id === s.id)
+         return {
+@@ -697,10 +714,6 @@ export function apply(rawContext: unknown): void {
+ 
+   // ---- 设置-模型：Router 提供方（固定卡片，插件注册，不可删）+ 模型目录（= 组合） ----
+ 
+-  // settings ns = 配置树行 id（cordis.patch.yml insert 的 id）—— 0.1.7 设置镜像按
+-  // entry.options.id 收录；loader 未挂 entry 时回落到同一默认值，两版一个 ns。
+-  const settingsNs = ctx.fiber?.entry?.options?.id ?? 'dsh-router'
+-
+   // llm 缺失时（如测试环境）跳过，不影响 /v1 核心。
+   if (ctx.llm !== undefined) {
+     try {
+@@ -710,6 +723,9 @@ export function apply(rawContext: unknown): void {
+           displayName: 'Router',
+           settingsNs,
+           settingsPath: [],
++          // 卡片说明：宿主支持该字段时替换未知命名空间那句通用提示；老宿主
++          // 忽略未知字段，由客户端 `settings.models.provider-card` 座位兜底。
++          hint: ROUTER_MODEL_HINT_COPY,
+         },
+       ])
+       disposers.push(providerReg)
+diff --git a/fixture/src/llm/adapter.test.ts b/fixture/src/llm/adapter.test.ts
+index 62d5bbf..fd9589a 100644
+--- a/fixture/src/llm/adapter.test.ts
++++ b/fixture/src/llm/adapter.test.ts
+@@ -857,6 +857,58 @@ test('wire：无 attachments 时图片回退占位文本，绝不静默丢图',
+   assert.ok(!text.includes('image_url'), '读不到字节时不能伪造图片 part')
+ })
+ 
++/* ---------------- 持久 offload 标记（0.1.6+ image/offload，DSH-0.1.6-A1-28） ---------------- */
++
++test('offload：被宿主标记 offloaded 的图渲染成占位文本，不读字节、不发 image_url', async () => {
++  let reads = 0
++  const spy = {
++    readImageRequest: async () => {
++      reads += 1
++      return { mediaType: 'image/png', data: new TextEncoder().encode('<png-bytes>') }
++    },
++  }
++  const body = await captureBodyWith({
++    messages: [{ role: 'user', content: [
++      { type: 'text', text: '这张还要吗' },
++      { type: 'image', offloaded: true, attachment: { attachmentId: 'sha256:off', mediaType: 'image/png', bytes: 11, width: 4, height: 2 } },
++    ] }],
++  }, spy)
++  const user = (body.messages as Array<{ role: string; content: unknown }>).find((m) => m.role === 'user')
++  const text = typeof user?.content === 'string' ? user.content : JSON.stringify(user?.content)
++  // 占位文案走官方 offloadedImageText（见 dsh-llm 的 content.ts）：带图片身份与
++  // 「为满足请求图片上限而省略」的语义，不能是读图失败的另一种说法。
++  assert.ok(text.includes('image omitted to fit request image limits'),
++    'offloaded 的图必须渲染成宿主的 offload 占位文本，而不是静默消失或改成读图失败文案')
++  assert.ok(text.includes('sha256:off'), '占位文本要带图片身份，模型才知道少了哪张')
++  assert.ok(!text.includes('image_url'), '已被 offload 的图绝不能再发字节')
++  assert.equal(reads, 0, 'offloaded 的图连字节都不该去读——持久决策是会话级事实，路由不能推翻')
++})
++
++test('offload：老形态 tool-result 里嵌套的 offloaded 图同样渲染占位文本（顶层投影不递归）', async () => {
++  let reads = 0
++  const spy = {
++    readImageRequest: async () => {
++      reads += 1
++      return { mediaType: 'image/png', data: new TextEncoder().encode('<png-bytes>') }
++    },
++  }
++  const body = await captureBodyWith({
++    messages: [
++      { role: 'assistant', content: [{ type: 'tool-call', id: 'c1', name: 'read_image', arguments: '{}' }] },
++      { role: 'user', content: [{ type: 'tool-result', toolCallId: 'c1', content: [
++        { type: 'text', text: 'tree.png' },
++        { type: 'image', offloaded: true, attachment: { attachmentId: 'sha256:nested', mediaType: 'image/png', bytes: 11, width: 4, height: 2 } },
++      ] }] },
++    ],
++  }, spy)
++  const messages = body.messages as Array<{ role: string; tool_call_id?: string; content: unknown }>
++  const tool = messages.find((m) => m.role === 'tool')
++  const text = typeof tool?.content === 'string' ? tool.content : JSON.stringify(tool?.content)
++  assert.ok(text.includes('image omitted to fit request image limits'), '嵌套在 tool-result 里的 offloaded 图也要投影成占位文本')
++  assert.ok(!text.includes('image_url'), '嵌套路径也不能把已 offload 的图发出去')
++  assert.equal(reads, 0, '嵌套路径同样不得读被 offload 的图字节')
++})
++
+ test('wire：一步两个 read_image（每条一个 user 消息，同现场）→ tool 消息紧跟 assistant，图片合并到末尾', async () => {
+   const ref = {
+     attachmentId: 'sha256:abcdef1234567890',
+diff --git a/fixture/src/llm/adapter.ts b/fixture/src/llm/adapter.ts
+index 166c6a4..69c60f6 100644
+--- a/fixture/src/llm/adapter.ts
++++ b/fixture/src/llm/adapter.ts
+@@ -26,6 +26,7 @@ import {
+   type ModelModality,
+   type StreamChunk,
+ } from '@deepseek-ai/dsh-llm'
++import * as dshLlm from '@deepseek-ai/dsh-llm'
+ import { mergeUsage, normalizeUsage, toTokenUsage, type UsageTokens } from '../router/usage-tokens.ts'
+ 
+ /**
+@@ -92,6 +93,36 @@ interface RouterImgLike {
+   bytes: number
+   width: number
+   height: number
++  /** 展示名；官方 offloadedImageText 会优先用它（缺省用 attachmentId）。 */
++  name?: string
++}
++
++/**
++ * 0.1.6 新增的 offload helper（`projectOffloadedImages` / `offloadedImageText`）
++ * **经命名空间取，不用顶层具名 import**。
++ *
++ * 为什么必须这样：README 的兼容下限是 0.1.5，而这两个导出在 0.1.5 的
++ * `@deepseek-ai/dsh-llm` 里不存在。ESM 的顶层具名 import 少一个导出是**整个
++ * 模块的 link error**（不是「那个函数变 undefined」）——插件在那个宿主上会直接
++ * 加载失败，连不是图片的功能一起挂掉。命名空间 + 形状检测把它降级成「老宿主
++ * 没有这套 helper」，而老宿主的消息里本来也不会有 `offloaded` 标记。
++ */
++type OffloadedProjection = (
++  messages: GenerateOptions['messages'],
++  placeholder: (ref: RouterImgLike) => string,
++) => GenerateOptions['messages']
++
++/** 有官方 `projectOffloadedImages` 就投影（0.1.6+）；没有就原样返回（0.1.5）。 */
++function projectOffloadedMessages(messages: GenerateOptions['messages']): GenerateOptions['messages'] {
++  const project = (dshLlm as unknown as { projectOffloadedImages?: OffloadedProjection }).projectOffloadedImages
++  if (typeof project !== 'function') return messages
++  return project(messages, (ref) => offloadedPlaceholder(ref))
++}
++
++/** 官方 offload 占位文案；老宿主没有这个 helper 时回落本地等价文案。 */
++function offloadedPlaceholder(ref: RouterImgLike): string {
++  const text = (dshLlm as unknown as { offloadedImageText?: (ref: RouterImgLike) => string }).offloadedImageText
++  return typeof text === 'function' ? text(ref) : imagePlaceholder(ref.attachmentId)
+ }
+ 
+ /** 模型目录来源：组合。 */
+@@ -130,6 +161,22 @@ export interface RouterAdapterSource {
+ /** tool-result 里图片挂到 user 消息时用的说明文字（与官方适配器一致）。 */
+ const TOOL_RESULT_IMAGE_TEXT = 'Tool result images'
+ 
++/**
++ * 老形态的 `'tool-result'` 块 —— 0.1.5/0.1.6 宿主（以及经 session-format
++ * 迁移/重放的老会话历史）里它挂在 user 消息的 content 上。0.2.0 契约的
++ * `ContentBlock` 已无这个成员，所以这里单独声明一个形状，供运行期窄化使用。
++ */
++interface LegacyToolResultBlock {
++  type: 'tool-result'
++  toolCallId: string
++  content: ReadonlyArray<{ type: string }>
++}
++
++/** 形状判据（不是版本判据）：同一宿主内两种形态都合法，见 {@link LegacyToolResultBlock}。 */
++function isLegacyToolResult(block: { type: string }): block is LegacyToolResultBlock {
++  return block.type === 'tool-result'
++}
++
+ /**
+  * 流空闲超时：上游连上后这么久没吐**任何**字节就判失败（抛 TIMEOUT，可重试）。
+  *
+@@ -143,6 +190,27 @@ const STREAM_IDLE_TIMEOUT_MS = 300_000
+ 
+ async function wireMessages(options: GenerateOptions, system: string | undefined, attachments: RouterAttachmentStore | undefined, log?: (msg: string) => void): Promise<Array<Record<string, unknown>>> {
+   const out: Array<Record<string, unknown>> = []
++  /**
++   * 宿主的持久 offload 决策必须先投影成占位文本，再序列化。
++   *
++   * 0.1.6 起 base 组合挂 `image-offload`：路由超出图片预算时**不能自己删图**，
++   * 而要抛 `IMAGE_OFFLOAD_REQUIRED`（带 offloadImages 数量）让宿主记一条
++   * `image/offload` 事件，重试时被选中的图带着 `ImageBlock.offloaded: true`
++   * 回来。这个标记是**会话级持久事实**——「同一条日志，每条路由送同一组图」——
++   * 所以 adapter 见到标记只能渲染占位文本，绝不能再读字节发图。
++   *
++   * 官方 `projectOffloadedImages` 就是这条投影（只动被标记的 occurrence，其余
++   * 原样）；`offloadedImageText` 给出与官方适配器同形的占位文案。两者都经
++   * {@link projectOffloadedMessages} / {@link offloadedPlaceholder} 取，0.1.5
++   * 宿主缺这两个导出时降级（见那两个函数的说明），不会让插件加载失败。
++   *
++   * 为什么这里没有 `requiredImageOffload` 的抛出分支：本 adapter 是异构组合的
++   * 网关，没有、也不该有「整条请求的图片字节预算」——预算由各上游决定，插件只
++   * 做每图一张的尺寸投影（`readImageRequest` 的 target，见 imageParts）。既然
++   * 从不靠丢掉最老的图来收缩请求，就没有要上报的 offload 数量；一旦宿主/组合
++   * 将来引入路由预算，抛 `IMAGE_OFFLOAD_REQUIRED_CODE` 的位置就在这行投影之前。
++   */
++  const messages = projectOffloadedMessages(options.messages)
+   /**
+    * 攒着「tool-result 里带出来的图片」，等这一串 tool 消息**发完**再合并成一条
+    * user 消息补在后面。
+@@ -163,7 +231,7 @@ async function wireMessages(options: GenerateOptions, system: string | undefined
+   if (typeof system === 'string' && system !== '') {
+     out.push({ role: 'system', content: system })
+   }
+-  for (const message of options.messages) {
++  for (const message of messages) {
+     if (message.role === 'system') {
+       // 手写调用也可能把 system 塞进 messages（one-shot 场景），照旧支持
+       flushToolImages()
+@@ -215,10 +283,15 @@ async function wireMessages(options: GenerateOptions, system: string | undefined
+       continue
+     }
+     // user / tool-result
+-    const toolResults = message.content.filter((b) => b.type === 'tool-result')
++    // 0.2.0 的 `ContentBlock` 已无 `'tool-result'` 成员（工具结果是独立
++    // role:'tool' 消息）；老宿主（0.1.5/0.1.6）与经 session-format 迁移/重放的
++    // 老会话历史仍会给出这个块形状。所以这一支按**形状**窄化，不按类型成员分派
++    // —— 编译期认当前宿主契约，运行期同时吃两版。
++    const blocks: ReadonlyArray<{ type: string }> = message.content
++    const toolResults = blocks.filter(isLegacyToolResult)
+     // 这条消息自己的（非 tool-result 的）user 部分：文本 + 图片。
+     const ownParts = await contentParts(
+-      message.content.filter((b) => b.type !== 'tool-result'),
++      blocks.filter((b) => b.type !== 'tool-result'),
+       attachments,
+       options.signal,
+       log,
+@@ -280,8 +353,16 @@ async function contentParts(
+       continue
+     }
+     if (block.type === 'image') {
+-      const ref = (block as unknown as { attachment: RouterImgLike }).attachment
+-      parts.push(...(await imageParts(ref, attachments, signal, log)))
++      const image = block as unknown as { attachment: RouterImgLike; offloaded?: true }
++      // 持久 offload 标记（见 wireMessages 的投影说明）。顶层消息已被
++      // `projectOffloadedImages` 投影掉，这里守的是**嵌套路径**——老形态
++      // `tool-result` 块里的 content（0.1.5/0.1.6 会话历史重放），官方投影只走
++      // 顶层 ContentBlock，不会递归进去。判据是块自己的形状，不是宿主版本。
++      if (image.offloaded === true) {
++        parts.push({ type: 'text', text: offloadedPlaceholder(image.attachment) })
++        continue
++      }
++      parts.push(...(await imageParts(image.attachment, attachments, signal, log)))
+       continue
+     }
+     if (block.type === 'tool-result') {
+diff --git a/fixture/src/shared.ts b/fixture/src/shared.ts
+index 33055b1..f3a776e 100644
+--- a/fixture/src/shared.ts
++++ b/fixture/src/shared.ts
+@@ -20,6 +20,17 @@ export const ROUTER_TITLE = '路由'
+ /** Same-origin API base the client panel fetches (host half serves it). */
+ export const ROUTER_API_BASE = '/router/api'
+ 
++/**
++ * 设置-模型 → Router 卡片的一句话说明（对齐 README「组合即模型」）。
++ *
++ * 两处用它，字面必须一致：
++ *   - 客户端经官方 `settings.models.provider-card` 座位渲染出来；
++ *   - 宿主把它作为 `registerConfigurableProviders` 的 `hint` 声明出去
++ *     （宿主支持该字段时会替换未知命名空间的那句通用提示；老宿主忽略未知字段，
++ *     由座位那份兜底——见 `.dsh-migrate/patch-reports/llm-provider-card-hint/`）。
++ */
++export const ROUTER_MODEL_HINT_COPY = '组合即模型 · 建好的组合会自动出现在 DSH 模型目录中，选中组合名即可直接使用。'
++
+ /** One account row from `/router/api/status`. */
+ export interface RouterAccount {
+   uid: string
+@@ -68,6 +79,12 @@ export interface RouterHealthResponse {
+   hostVersion?: string
+   /** 「最近命中」徽章是否受支持（宿主 >= 0.1.7 才有 composer.dock 正确位置）。 */
+   lastHitDock?: boolean
++  /**
++   * Router 提供方的设置命名空间（= 本 bundle 行 id）。客户端用它登记官方
++   * `settings.models.provider-card` 座位（keyed by settingsNs）；老核心没有这个
++   * 字段时客户端回落 `dsh-router`。
++   */
++  settingsNs?: string
+   suppliers?: Array<{
+     id: string
+     name: string

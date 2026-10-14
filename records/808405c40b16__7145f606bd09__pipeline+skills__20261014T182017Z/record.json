@@ -1,0 +1,233 @@
+{
+  "schema": 3,
+  "id": "808405c40b16__7145f606bd09__pipeline+skills__20261014T182017Z",
+  "createdAt": "2026-10-14T18:20:17Z",
+  "producer": {
+    "commit": "808405c40b1683da4cb20226bcd0f95720c3fd47",
+    "version": "0.3.4",
+    "dirty": false,
+    "message": "fix(bench): give an agent setup the time several setups at once take",
+    "snapshot": "8004c2c0bf2e362b"
+  },
+  "subject": {
+    "id": "pipeline+skills",
+    "agentRuntime": "0.2.0-rc.2",
+    "skills": {
+      "commit": "ef075767b476e8000c716a18f848028eebcd5aef",
+      "names": [
+        "plugin-upgrade"
+      ]
+    },
+    "attempts": 1,
+    "agentTimeoutMultiplier": 5
+  },
+  "suite": {
+    "repository": "royenheart/dsh-migrate-bot",
+    "commit": "7145f606bd090d44d327c2fa5b086e5ab5a843a5",
+    "tasks": [
+      {
+        "id": "R2-skill-hub-0.1.6-to-0.1.7",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R5-router-0.1.2-to-0.1.5",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      }
+    ]
+  },
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-v4-flash",
+    "before": {
+      "at": "2026-10-14T18:20:19.001Z",
+      "servedModel": "deepseek-flash",
+      "fingerprint": "aeb56401ca74e127821c4f9126dcb669"
+    },
+    "after": {
+      "at": "2026-10-14T19:51:48.941Z",
+      "servedModel": "deepseek-flash",
+      "fingerprint": "aeb56401ca74e127821c4f9126dcb669"
+    }
+  },
+  "environment": {
+    "harbor": "0.24.0",
+    "docker": "29.6.1",
+    "os": "Linux 6.12.101+deb13-cloud-amd64",
+    "concurrency": 2
+  },
+  "attempts": [
+    {
+      "task": "R2-skill-hub-0.1.6-to-0.1.7",
+      "attempt": 1,
+      "trial": "R2-skill-hub-0.1.6-to-0.1.7__aFhbcPu",
+      "outcome": "scored",
+      "reward": 0.7,
+      "rewards": {
+        "reward": 0.7
+      },
+      "agentExitCode": 0,
+      "durations": {
+        "agentSec": 5303.3,
+        "verifierSec": 19.4,
+        "totalSec": 5486.1
+      },
+      "usage": {
+        "inputTokens": 421962,
+        "cacheHitTokens": 116806272,
+        "outputTokens": 269828,
+        "usd": 0.5756099159999999
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__aFhbcPu/agent/proposed.diff",
+          "sha256": "985831243ddc375532bb4a7d12e45a972ed77904ee02e401d2923a429afd1e8b",
+          "bytes": 151110
+        },
+        "agent/agent.log": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__aFhbcPu/agent/agent.log",
+          "sha256": "c319116bcaf76195945d6962752f517b62e6c46bed41646ca595aa2b44a88c8c",
+          "bytes": 51751
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__aFhbcPu/agent/events.jsonl",
+          "sha256": "36cc519152952ff7985607f65a2ce8630d9ce65cede23a0ac872c63757e2956f",
+          "bytes": 6267
+        },
+        "agent/status.json": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__aFhbcPu/agent/status.json",
+          "sha256": "115815d0acf54f928f6dc44a51965f9609d741f12b41623b6781752fed047ccd",
+          "bytes": 5075
+        },
+        "agent/cards.json": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__aFhbcPu/agent/cards.json",
+          "sha256": "e9b4d373a8ee993dbecd9a73ad82e1493e4c87e24c31fbf97a13706f55aae14a",
+          "bytes": 4952
+        },
+        "verifier/judge.log": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__aFhbcPu/verifier/judge.log",
+          "sha256": "6a15f92c3d2732c32056223c5171f68a4eb32aa9fda0bf854031e22ad6df3cbf",
+          "bytes": 935
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__aFhbcPu/verifier/reward.txt",
+          "sha256": "3b1add489f8961560bc1562f10cabcf762bce961623cca362f0128522fe1ed29",
+          "bytes": 4
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__aFhbcPu/verifier/test-stdout.txt",
+          "sha256": "6a15f92c3d2732c32056223c5171f68a4eb32aa9fda0bf854031e22ad6df3cbf",
+          "bytes": 935
+        }
+      }
+    },
+    {
+      "task": "R5-router-0.1.2-to-0.1.5",
+      "attempt": 1,
+      "trial": "R5-router-0.1.2-to-0.1.5__2bbwa96",
+      "outcome": "scored",
+      "reward": 0.85,
+      "rewards": {
+        "reward": 0.85
+      },
+      "agentExitCode": 1,
+      "durations": {
+        "agentSec": 3576.3,
+        "verifierSec": 29.2,
+        "totalSec": 3767.9
+      },
+      "usage": {
+        "inputTokens": 373697,
+        "cacheHitTokens": 67330304,
+        "outputTokens": 268577,
+        "usd": 0.41919166199999996
+      },
+      "artifacts": {
+        "agent/proposed.diff": {
+          "path": "attempts/R5-router-0.1.2-to-0.1.5__2bbwa96/agent/proposed.diff",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "agent/agent.log": {
+          "path": "attempts/R5-router-0.1.2-to-0.1.5__2bbwa96/agent/agent.log",
+          "sha256": "d8ee114ed85285133dc67e37026d97cee8b969c4a59014d599fd2c225977eebc",
+          "bytes": 34744
+        },
+        "agent/events.jsonl": {
+          "path": "attempts/R5-router-0.1.2-to-0.1.5__2bbwa96/agent/events.jsonl",
+          "sha256": "313be109fca0be70bf7a1c6406175d7418696d30c7ab81b240d1f0045c6e0fa2",
+          "bytes": 3697
+        },
+        "agent/status.json": {
+          "path": "attempts/R5-router-0.1.2-to-0.1.5__2bbwa96/agent/status.json",
+          "sha256": "0a1cbbf3a1e17ee64a54b4598ce210c1a74c3e87180cb95a4971bc845d98365f",
+          "bytes": 3518
+        },
+        "agent/cards.json": {
+          "path": "attempts/R5-router-0.1.2-to-0.1.5__2bbwa96/agent/cards.json",
+          "sha256": "ada1329287b693c1d9a5764488209bd8658e67b860a997ba9ce9a7cf453ed64b",
+          "bytes": 17222
+        },
+        "verifier/judge.log": {
+          "path": "attempts/R5-router-0.1.2-to-0.1.5__2bbwa96/verifier/judge.log",
+          "sha256": "56e0ab0c43369e6b14fcbb07b977d14d0a29db7e784a482c219b69bac6834c5e",
+          "bytes": 400
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R5-router-0.1.2-to-0.1.5__2bbwa96/verifier/reward.txt",
+          "sha256": "b8713d4438c8855ac1ab83ca3baac5895bdddc9429b49b65d3804f95877e55ea",
+          "bytes": 5
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R5-router-0.1.2-to-0.1.5__2bbwa96/verifier/test-stdout.txt",
+          "sha256": "56e0ab0c43369e6b14fcbb07b977d14d0a29db7e784a482c219b69bac6834c5e",
+          "bytes": 400
+        }
+      }
+    }
+  ],
+  "metrics": {
+    "formula": "v1",
+    "values": {
+      "meanReward": 0.775,
+      "passRate@1.0": 0,
+      "passRate@0.7": 1,
+      "passAtK": 0,
+      "meanReward.S": null,
+      "meanReward.M": null,
+      "meanReward.H": null,
+      "passHatK": 0,
+      "fragility": 0,
+      "dispersion": null,
+      "unstableTaskShare": 0,
+      "inputTokens": 397829.5,
+      "outputTokens": 269202.5,
+      "cacheHitRatio": 0.995698,
+      "costPerAttempt": 0.497401,
+      "costPerSuccess": null,
+      "agentSecP50": 4439.8,
+      "agentSecP90": 5130.6,
+      "timeoutRate": 0,
+      "infrastructureRate": 0,
+      "eligibleTasks": 2,
+      "infeasibleTasks": 0
+    },
+    "intervals": {
+      "meanReward": [
+        0.7,
+        0.85
+      ],
+      "passRate@1.0": [
+        0,
+        0
+      ]
+    }
+  }
+}

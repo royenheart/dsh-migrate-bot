@@ -1,0 +1,3603 @@
+diff --git a/fixture/AGENTS.md b/fixture/AGENTS.md
+index d44f362..1a1338a 100644
+--- a/fixture/AGENTS.md
++++ b/fixture/AGENTS.md
+@@ -40,13 +40,13 @@ docs/
+ ## 关键约束与约定
+ 
+ 1. **单包双半边**：`package.json` 同时声明宿主侧 `dsh.bundle.patch` 与浏览器侧 `dsh.client`（`platform: "web"` + 导出 `./client`）。客户端 bundle 由 tsdown 生成，**禁止手写 `window.__ModuleLoader__.load(...)`**。
+-2. **工具必须挂进 agent preset**：`defineTool` 注册的工具只有在会话的 `agent.cordis.yml` 里挂上才对模型可见。安装体验必须自动化这一步（`init` 命令），不指望用户手工改 preset。**代价是同一个进程里会有两个插件实例**（profile 一份 + 每个会话的 preset 一份），而存储域按名字只允许 open 一次——所以**宿主半边必须是进程内单例**（现在走 `src/host/vault/lease.ts`，进程级引用计数），凡是 open 域/开端口/挂定时器这类进程级资源，都按"`apply` 会跑两遍"写；细节见 `docs/help/dsh-plugin-platform.md`。
++2. **工具的可见性来自 profile 组合，不再需要 agent preset**：`defineTool` 注册的宿主层工具由 dsh 的工具注册表给到该 profile 里的**每一个**会话（dsh 0.2.0：agent preset 是 bundle 里的声明式配置行，`~/.dsh/.agent-presets` 目录已经没有任何东西会读；`init` 只负责把包装进 profile）。**代价是同一个进程里仍可能有两个插件实例**（profile 一份 + 某个 preset 里再挂一份），而存储域按名字只允许 open 一次——所以**宿主半边必须是进程内单例**（现在走 `src/host/vault/lease.ts`，进程级引用计数），凡是 open 域/开端口/挂定时器这类进程级资源，都按"`apply` 会跑两遍"写；细节见 `docs/help/dsh-plugin-platform.md`。
+ 3. **密钥红线**：账密类资源**加密落盘（2026-09-20 已实现，域 v6）**——正文进 `secret`（AES-256-GCM，密钥由主密码 scrypt 派生），主密码与派生密钥**都不落盘**（只在进程内存里，重启即锁，界面显式解锁）；新捕获的账密在**没有密钥时直接拒绝入库**（绝不退回明文），老明文记录在首次设置/解锁时自动转密文。列表脱敏、明文**永不进模型上下文**、对话里**永不输出明文**，长期保留。任何发往模型的分类请求先过脱敏。列表里密钥/账密记录**只显示你起的名字**，没起名字时才用你的备注，**绝不显示正文**；取名规则只写在一处（`src/client/heading.ts`，列表与 dock 共用），「这是什么」由类目图标（钥匙）表达。**由此有一条不变式：`title` 只能由用户在面板里填**——规则、模型、抓来的页面标题等任何自动路径都不许往 `title` 写（那正是"列表把密文当标题"这条老漏洞的成因；抓来的标题进 `linkTitle`，`model.ts` 只 patch `category`/`categorySource`）。
+ 4. **图片与证件**：分类时**允许把图片发给模型判断**（2026-09-19 用户授权——手机拍的证件照比例就是普通照片，靠宽高判不出来）；对话里默认只回 `[attachment:<id>]` 标记，字节不进对话。**唯一的例外**（2026-09-20 用户授权）：`inbox_get` 显式带 `withImage: true` 时，把该记录的那张图作为 content part 发给模型——用于"帮我看这张图是什么"，**每次调用都要显式要**、默认永不发。类目结论里，只有**用户亲口说的**才算确定证件；模型判的标 `categorySource: model`，可以随时被用户改掉。模型调用受预算闸门约束（见 `docs/help/…` 与 `src/host/classify/model.ts`）。
+ 5. **上下文红线**：不自动把 inbox 摘要注入模型上下文；模型只有主动调工具时才看到仓库内容。
+ 6. **用户描述 = 权威分类**：用户给的描述/类目优先于任何模型判断，模型不得覆盖。
+ 7. **同步红线（2026-09-20 用户拍板改）**：**上云的密文只有账密正文**——账密的 `secret` 本来就是密文，别的字段（文本、链接、标题、备注、类目、标签、时间）和附件**字节**都按明文上云。因此 **远端必须有访问控制**（README 写明"别用公开桶"），并且：主密码与派生密钥永不上传、永不同步；冲突**直接按 `updatedAt` 覆盖**（不留冲突副本）；删除以墓碑同步，清空回收站连远端一起删；附件随同步走。**清空回收站还要在本机 `graves` 表留一条 `{id, purgedAt}`**（2026-09-21）：定向删除只覆盖本机那棵同步树，别的树里的副本靠这条墓碑挡住——merge 对本机没有的 id 只收"比 `purgedAt` 更新"的副本；机制与实测见 `docs/help/sync.md`。
+-8. **数据事实只认实测**：dsh 处于 rc 阶段（本机 0.1.5-rc.2），API 会变。写 dsh 相关代码前先查 `docs/help/dsh-plugin-platform.md`；该文档与代码冲突时以 `.research/` 里的官方源码为准，并回改文档。
++8. **数据事实只认实测**：dsh 处于 rc 阶段（本机 0.2.0-rc.2），API 会变。写 dsh 相关代码前先查 `docs/help/dsh-plugin-platform.md`；该文档与代码冲突时以官方源码/发行包为准（本轮迁移时是 `.dsh-migrate/harness` 的 `dsh-v0.2.0-rc.2`），并回改文档。
+ 9. **文档语言**：代码与标识符英文，代码注释中文；文档中英双份（`README.md` + `README.zh.md`），`AGENTS.md`/`docs/` 用中文。
+ 10. **持久化只走 `ctx.storageDomain`**：不自己开文件、SQLite 或别的存储；域 spec 的 schema 演进见 `docs/help/vault-data-model.md`。
+ 11. **客户端半边不许引入宿主依赖**：`src/client/**` 只能 import React、平台静态模块表里的包，以及 `src/shared/` 下的纯常量（不许 zod、不许 `node:*`、不许 `@deepseek-ai/dsh-*`），否则浏览器产物会在加载期炸。
+diff --git a/fixture/README.md b/fixture/README.md
+index 093173d..89c7ecd 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -72,11 +72,11 @@ dsh plugin --profile web add @chance722/dsh-inbox@latest
+ 
+ **Restart dsh** afterwards, then start it as usual. **Inbox** is in the left rail, and a new session's assistant can look things up ("what links in my inbox haven't I read yet?").
+ 
+-`init` also copies dsh's shipped `standard` preset to `~/.dsh/.agent-presets/inbox/` with this plugin added, and points your default preset at it — that is what lets the assistant see the inbox tools. It becomes a snapshot that will not follow later dsh upgrades; both it and the profile are reversible (see Uninstall).
++The assistant sees the inbox tools as soon as dsh restarts: the plugin registers them from the profile composition, and dsh's tool registry hands a host-plane tool to every session in that profile — there is no agent-preset step to perform. (Since dsh 0.2.0 an agent preset is a declarative row in a bundle, and the `~/.dsh/.agent-presets` directory is read by nothing; `init` no longer writes into it.)
+ 
+ To keep your daily dsh untouched, give the plugin its own profile and port: `npx @chance722/dsh-inbox init --create-profile`, then `dsh --profile inbox --no-open --port 3102`.
+ 
+-Other flags: `--profile <name>`, `--install-pnpm`, `--no-default`, `--help`.
++Other flags: `--profile <name>`, `--package <path>`, `--create-profile`, `--install-pnpm`, `--help`.
+ 
+ ### From a local checkout
+ 
+@@ -93,13 +93,13 @@ node lib/cli.js init --package <absolute path to this repo>
+ #    (also drops it from dsh.profile.bundles)
+ dsh plugin --profile <that profile> remove @chance722/dsh-inbox
+ 
+-# 2. delete what init created
+-rm -r ~/.dsh/.agent-presets/inbox      # the preset copy
+-# default preset: delete agent-presets.default in ~/.dsh/settings.yaml (falls back to the
+-# deployment default) or set it to standard; every init left a settings.yaml.bak-* backup
+-
+-# 3. and the profile itself, if you made one just for this
++# 2. and the profile itself, if you made one just for this
+ rm -r ~/.dsh/profiles/<that profile>
++
++# Installing no longer creates anything outside the profile: dsh 0.2.0 declares
++# agent presets as bundle rows, so there is no ~/.dsh/.agent-presets copy and no
++# settings.yaml edit to undo. (An install made with dsh 0.1.x can still have
++# them: delete ~/.dsh/.agent-presets/inbox and the agent-presets.default line.)
+ ```
+ 
+ **Uninstalling does not delete your vault.** To remove the records too: `rm -r ~/.dsh/storages/dsh_inbox`.
+@@ -114,7 +114,7 @@ Everything under `%DSH_HOME%` (`C:\Users\<you>\.dsh` on Windows):
+ | Attachment index (mime / size / original name) | `storages\dsh_inbox\attachments\*.json` |
+ | The **bytes** of images, videos and files | `attachments\` — dsh's own content-addressed store, never auto-deleted |
+ | Remote password / S3 AccessKey Secret | dsh's credential store, `.credentials.yaml` |
+-| Remote settings (URL, bucket, client identity…) | dsh's own settings |
++| Remote settings (URL, bucket, client identity…), list density | this plugin's row in the profile's `cordis.patch.yml` (dsh ≥ 0.2.0 keeps plugin configuration in the active profile; a 0.1.x install had them in `~/.dsh/settings.yaml`, and the first 0.2.0 boot adopts them) |
+ 
+ ### What the remote looks like
+ 
+diff --git a/fixture/README.zh.md b/fixture/README.zh.md
+index 8298a01..058ae78 100644
+--- a/fixture/README.zh.md
++++ b/fixture/README.zh.md
+@@ -71,11 +71,11 @@ dsh plugin --profile web add @chance722/dsh-inbox@latest
+ 
+ 装完**重启 dsh**，然后照旧启动。左栏出现 **Inbox**；新会话里问「我的收件箱里有哪些还没看的链接」，助手就会去查。
+ 
+-`init` 还会把 dsh 自带的 `standard` preset 复制到 `~/.dsh/.agent-presets/inbox/` 并加上本插件、把默认 preset 指向它——助手能看见收件箱工具就是靠这一步。那份快照不会跟着 dsh 以后升级 `standard` 一起变；它和 profile 都能退掉（见「卸载」）。
++重启 dsh 之后助手就能看见收件箱工具：工具由宿主组合注册，而 dsh 的工具注册表会把宿主层的工具给到这个 profile 里的**每一个**会话——没有 agent preset 这一步要做。（dsh 0.2.0 起 agent preset 是 bundle 里的声明式配置行，`~/.dsh/.agent-presets` 目录已经没有任何东西会读；`init` 不再往那里写。）
+ 
+ 想让日常 dsh 保持干净：`npx @chance722/dsh-inbox init --create-profile`，然后 `dsh --profile inbox --no-open --port 3102`。
+ 
+-其它选项：`--profile <名字>`、`--install-pnpm`、`--no-default`、`--help`。
++其它选项：`--profile <名字>`、`--package <路径>`、`--create-profile`、`--install-pnpm`、`--help`。
+ 
+ ### 从本地仓库装
+ 
+@@ -91,13 +91,13 @@ node lib/cli.js init --package <本仓库的绝对路径>
+ # 1. 从你装进去的那个 profile 里摘掉（同时会从 dsh.profile.bundles 移除）
+ dsh plugin --profile <你装的 profile> remove @chance722/dsh-inbox
+ 
+-# 2. 删掉 init 建的东西
+-rm -r ~/.dsh/.agent-presets/inbox      # 那个 preset 副本
+-# 默认 preset：把 ~/.dsh/settings.yaml 里 agent-presets.default 删掉（继承部署默认），
+-# 或改成 standard；init 每次都留了 settings.yaml.bak-* 备份，也可以直接还原
+-
+-# 3. 想连这个 profile 一起删（只为这个插件建过才需要）
++# 2. 想连这个 profile 一起删（只为这个插件建过才需要）
+ rm -r ~/.dsh/profiles/<你装的 profile>
++
++# 现在安装不会在 profile 之外留东西：dsh 0.2.0 的 agent preset 是 bundle 里的声明式
++# 配置行，所以没有 ~/.dsh/.agent-presets 副本、也没有 settings.yaml 要还原。
++# （用 dsh 0.1.x 装过的机器可能还留着：删掉 ~/.dsh/.agent-presets/inbox 与
++#   settings.yaml 里的 agent-presets.default 那一行。）
+ ```
+ 
+ **卸载不会删掉你的仓库。** 连记录一起删：`rm -r ~/.dsh/storages/dsh_inbox`。
+@@ -112,7 +112,7 @@ rm -r ~/.dsh/profiles/<你装的 profile>
+ | 附件索引（mime / 尺寸 / 原文件名） | `storages\dsh_inbox\attachments\*.json` |
+ | 图片 / 视频 / 文件的**字节** | `attachments\`（dsh 自己的附件仓库，按内容寻址，永不自动删） |
+ | 远端密码 / S3 AccessKey Secret | dsh 的凭证库 `.credentials.yaml` |
+-| 远端设置（地址、桶、客户端标识…） | dsh 的 settings |
++| 远端设置（地址、桶、客户端标识…）、列表密度 | 本插件在当前 profile 的 `cordis.patch.yml` 里那一行的 config（dsh ≥ 0.2.0 把插件配置放在当前 profile；0.1.x 装在 `~/.dsh/settings.yaml`，0.2.0 首次启动会接管过来） |
+ 
+ ### 云端长什么样
+ 
+diff --git a/fixture/docs/feature/dev-bus.md b/fixture/docs/feature/dev-bus.md
+index c6d8710..4903e19 100644
+--- a/fixture/docs/feature/dev-bus.md
++++ b/fixture/docs/feature/dev-bus.md
+@@ -1530,3 +1530,33 @@ AGENTS.md 那句过期的「当前版本」（还写着 `0.2.0`）一并更正
+ `'dsh-inbox' 不是内部或外部命令`；刚发布完几分钟内 pnpm 的 packument 缓存可能仍把 `latest` 当旧版，验证时要**写死版本号**。
+ 
+ **仍未验**：英文界面的视觉验收（沙箱里的 Chrome 画不出内容）、模型侧工具调用（需要工作区 + 用户自己的 API key）。
++
++### M10 — dsh 0.2.0-rc.2 兼容迁移（2026-10-14，未提交）
++
++**触发**：dsh 发行到 `0.2.0-rc.2`，插件的 peer 区间 `^0.1.5-rc.2` 会被新的兼容门禁拒（实测 `semver.satisfies('0.2.0-rc.2', '^0.1.5-rc.2')` 为 false），
++且 0.1.5 时代用的三处机制在 0.2.0 已经不存在：`settings.register(命名空间)`、用户级目录 preset、`tool.call.toolview` 的单相位 block。
++
++**做到了什么**
++
++- **设置搬到插件自己的 `Config`**：`src/host/config.ts` 新增 schema（远端参数 + 列表密度，逐字段 `.volatile()`），读走引用、写走
++  `ctx.configEditor.edit(ctx.fiber.entry, …)`（落进当前 profile 的 `cordis.patch.yml`，只改 volatile 字段时不重挂插件）。
++  旧 `settings.yaml` 的 `dsh-inbox-webdav` / `dsh-inbox-ui` 两个命名空间官方导入不认（映射表只有三条特例），
++  插件自己一次性接管：`adoptLegacySettings()` 只在 profile 覆盖与部署层都没给过该字段时采纳，且逐字段过 schema 校验。
++- **`init` 退役 preset 两步**：不再复制 `standard`、不再写 `settings.yaml`、`--preset` / `--no-default` 一并删除（留一个"看不懂的选项"比静默无效好）。
++  依据：0.2.0 的 preset 是 bundle 里的 `@deepseek-ai/dsh-agent-preset` 声明行、`.agent-presets` 目录不再被任何东西读；
++  而"助手看不看得见工具"这件事不再需要 preset——宿主层注册进工具注册表的 global 层，对每个 agent scope 可见
++  （工具注册表源码 + 官方 e2e 注释，见 `docs/help/dsh-plugin-platform.md` 新一节）。
++- **客户端两处契约**：`tool.call.toolview` 改成三相位并集后只在 `result` 相读 `block.content`；`sidebarRightTabs` 的 guide entry 补 `id`。
++- **依赖**：peers → `^0.2.0-rc.1`、cordis `~4.0.4`、schemastery `~3.18.4`（3.18.2 没有 `.volatile()`）、
++  devDependency 加 `@deepseek-ai/cordis-plugin-loader`（`Fiber.entry` 的类型 augmentation 在它身上）。
++
++**证据**：隔离 `DSH_HOME`（`/tmp/dsh-migrate-bench/rc2home`）上用发行副本 0.2.0-rc.2 实测——
++`dsh plugin --profile web add <仓库>` 落进 `dsh.profile.bundles`；`--dump-config` 里 `# == @chance722/dsh-inbox` 与
++被本包覆盖的 `web-fetch-http.userAgent` 都在；`verify-runtime.mjs` 冷启动归因 `pass-timeout-alive`；
++起 web 服务后首页启动清单里有本包、`/plugins/??@chance722/dsh-inbox/client.js` 200 且 `__ModuleLoader__.load` 的 id 正确；
++把 `lib/client.js` 在 Node 里用假 `window` + 真 react 执行 `apply`，记录到 `sidebar.panellist` / `main` /
++`tool.call.toolview`（inbox_search、inbox_get）/ `sidebarRightTabs`（guide `id: inbox-vault`）四个座位。
++本仓 `pnpm typecheck` + `pnpm build` + 323 条测试全绿（基线 309 条全绿，新增 14 条覆盖设置读写与旧值接管、相位读取、CLI 选项退役、locale 元数据）。
++
++**遗留**：浏览器里的视觉验收（沙箱无 Chrome 渲染）、模型侧真调工具、Windows 实机复验；`cordis.patch.yml` 的抓取身份补丁仍然必需
++（官方 `WebFetchRequest` 至今只有 `url`，报告在 `.dsh-migrate/patch-reports/web-fetch-caller-identity/report.md`）。
+diff --git a/fixture/docs/help/dev-setup.md b/fixture/docs/help/dev-setup.md
+index f29abc3..d28d486 100644
+--- a/fixture/docs/help/dev-setup.md
++++ b/fixture/docs/help/dev-setup.md
+@@ -62,35 +62,32 @@ dsh --profile inbox --no-open --port 3102
+ 
+ ## 验证模型能调到工具（headless 路线）
+ 
+-**2026-09-20 起用这个配方**（它复现的正是用户真实的组合：插件既是 profile bundle、又由会话 preset 带进来，也就是那个
+-"域被打开两次"的场景。少了 preset 那一半，`dsh_inbox` 只 open 一次，测试会假通过）：
++**2026-10-14 起用这个配方**（dsh 0.2.0：宿主层的工具注册对**每一个**会话可见，所以插件只需要在 profile 里，
++不再需要会话 preset 那一半）：
+ 
+ ```powershell
+ dsh --profile inbox-check --from-default-profile headless --dump-config   # 派生一个 headless profile
+-dsh plugin --profile inbox-check add <仓库路径>              # ① profile 那半边
+-# ② 会话那半边：用户级默认 preset 已经是收件箱 preset（init 写过 agent-presets.default），无需额外操作
++dsh plugin --profile inbox-check add <仓库路径>
+ dsh --profile inbox-check "调用 inbox_status 工具，把它的原始结果原样贴给我。"
+-# 期望：dsh-inbox v0.1.0: vault open, 7 record(s).
++# 期望：dsh-inbox v0.2.8: vault open, 7 record(s).
+ # 顺带验命中：dsh --profile inbox-check "我的个人仓库里有哪些还没看的链接？"（应调用 inbox_search）
+ ```
+ 
+ 跑完把临时 profile 删掉（`%DSH_HOME%\profiles\inbox-check`）。**注意** `pnpm build` 之后才会带上最新代码：headless 启动时装载 `lib/`。
+ 
+-早期（还没有 preset 的 M0 阶段）用过 `inbox-m0` 那种"只挂 profile、工具行直接可见"的写法，现在**不足以验证**上面那条双加载场景。
++`dsh --profile <name> --dump-config` 里出现 `# == @chance722/dsh-inbox` 只证明组合里有这一行；它**不**证明插件激活
++（0.1.6 起 `Loader.create()` 解析成功不再等于激活）。要证激活，冷启动一次真实 profile 并看它有没有卡在等待服务——
++`skills/plugin-upgrade/scripts/verify-runtime.mjs <仓库路径>` 就是干这个的（隔离 `DSH_HOME`、死模型端口，只按日志归因）。
+ 
+-## 在 web 里验证需要 agent preset
++## 在 web 里验证：不需要 agent preset（0.2.0 起）
+ 
+-用户级 preset 根：`%DSH_HOME%\.agent-presets\<preset-id>\`（**当前这台机器上这个目录还不存在**，要自己建），两个文件：
++`dsh plugin --profile <name> add <仓库路径>` 之后**重启 dsh**，任何新会话都能调用 `inbox_search` / `inbox_get`：
++工具注册在 profile 的宿主层，工具注册表的 global 层对每个 agent scope 都是"最远的那一层祖先"，preset 只能按**同名**遮蔽它。
+ 
+-- `preset.yml` —— `name` / `description` / `order`
+-- `agent.cordis.yml` —— 组合；把 `profiles\node_modules\@deepseek-ai\dsh-agent-presets\presets\standard\` 整个复制过来，再追加自己的行：
+-
+-```yaml
+-- id: dsh-inbox
+-  name: '@chance722/dsh-inbox'
+-```
+-
+-加完 preset 要**重启 dsh**（preset 在启动时扫描）。会话只有为空时才能切 preset。
++`%DSH_HOME%\.agent-presets\<id>\` 目录**已经没有任何东西会读**（0.2.0 的 preset 是 bundle 里的
++`@deepseek-ai/dsh-agent-preset` 声明行）；这台机器上遗留的那份可以直接删。
++preset 的默认值现在是 `agent-preset-registry` 那一行的 `default`（部署默认，web 包里是 `standard`）
++加它的 volatile 字段 `selectedDefault`（用户在 设置 → 通用 里选的），不再是 `settings.yaml` 的 `agent-presets.default`。
+ 
+ ## 环境上的坑
+ 
+diff --git a/fixture/docs/help/dsh-plugin-platform.md b/fixture/docs/help/dsh-plugin-platform.md
+index 5b79861..250690c 100644
+--- a/fixture/docs/help/dsh-plugin-platform.md
++++ b/fixture/docs/help/dsh-plugin-platform.md
+@@ -1,8 +1,10 @@
+ # dsh 插件平台实测事实
+ 
+-本机 dsh 版本：`@deepseek-ai/dsh@0.1.5-rc.2`（2026-09-19 实测）。
+-证据分两处：`%DSH_HOME%\profiles\` 下是**实际安装**的包；`.research/dsh-api/` 是从 npm 拉取的官方分发副本（已 gitignore，用完即删）。
+-**rc 阶段 API 会变**：与代码冲突时以 `.research/` 里的官方源码为准，并回改本文档。
++本机 dsh 版本：`@deepseek-ai/dsh@0.2.0-rc.2`（2026-10-14 迁移实测；下面标了「0.1.5 时代」的段落是旧版本的记录）。
++证据分三处：`%DSH_HOME%\profiles\` 下是**实际安装**的包；`.dsh-migrate/harness/` 是 `dsh-v0.2.0-rc.2` 的官方源码 checkout；
++`.dsh-migrate/dsh/dsh-0.2.0-rc.2/` 是同一版本的 npm 发行副本（迁移工作区，不进仓库）。
++**rc 阶段 API 会变**：与代码冲突时以官方源码/发行副本为准，并回改本文档。0.2.0 的逐条差异见文末
++[「0.2.0-rc.2 迁移实测」](#020-rc2-迁移实测2026-10-14)。
+ 
+ ## 命令与装配
+ 
+@@ -54,8 +56,14 @@ window.__ModuleLoader__.load({
+ ## 工具与 agent preset
+ 
+ - 注册工具：`defineTool({ name, description, parameters, output, execute })` + `ctx.tools.register(...)`；工具 schema 会自动进系统提示（证据：`profiles/.../dsh-tools/README.md`）。
+-- **工具只有在会话所属的 agent preset 的 `agent.cordis.yml` 里挂了才对模型可见**；web profile 里进程级工具行由 preset 接管（证据：`profiles/.../dsh-agent-presets/README.md`）。
+-- 用户级 preset 根：`$DSH_HOME/.agent-presets`（`includeUserRoot` 默认 true）。官方 UI 的 preset 创建是**复制现有 preset**、不接受直接写组合文本——自动装配因此是必需项，不是锦上添花。
++- **（0.1.5 时代的结论，0.2.0 已反转）**"工具只有在会话所属的 agent preset 里挂了才对模型可见"——0.2.0 起
++  宿主组合里的注册进工具注册表的 **global 层**，而 global 层是每个 agent scope 最远的祖先层，preset 只能按**同名**遮蔽它
++  （`packages/core/tools/src/index.ts:1186-1191`；官方自己的 e2e 注释：*"a tool in the global layer reaches EVERY agent
++  regardless of which preset composed it"*）。所以第三方插件把工具注册在 profile 里就够了，preset 那一步可以不做。
++  详见文末 [「0.2.0-rc.2 迁移实测」](#020-rc2-迁移实测2026-10-14)。
++- **（0.1.5 时代）**用户级 preset 根 `$DSH_HOME/.agent-presets` **0.2.0 起没有任何东西会读**：preset 是 bundle 里的
++  `@deepseek-ai/dsh-agent-preset` 声明行（`config: { id, name?, order?, plugins: [...] }`），默认值由
++  `agent-preset-registry` 那一行的 `default`（部署）+ volatile `selectedDefault`（用户）决定。
+ 
+ ### 同一个插件会被加载两次，宿主半边必须是进程内单例（2026-09-20 真机咬到）
+ 
+@@ -159,6 +167,9 @@ window.__ModuleLoader__.load({
+ 
+ 两条路，都成立：
+ 
++> **2026-10-14 注**：下面两条是 0.1.5 时代的记录，结论已被 0.2.0 反转（见文末「0.2.0-rc.2 迁移实测」）。
++> 现在**只有第 1 条需要做**，而且它对**所有**组合成立：宿主层的注册对每个会话都可见。
++
+ 1. **宿主组合直接挂**——`base`/`headless` 这类没有 agent-presets 的组合，工具行一挂就对模型可见（M0 用 headless 实测通过）。
+ 2. **挂进 agent preset**——web profile 的工具行由 preset 接管。用户级 preset 根是 `~/.dsh/.agent-presets/<id>/`，里面放 `preset.yml`（显示名/描述/顺序）+ `agent.cordis.yml`（组合）。把 shipped preset 整目录复制过来再追加自己的行即可。
+ 
+@@ -308,3 +319,59 @@ const rev  = info.tab.navigation.revision // 每次导航 +1，参数没变也
+ **接之前先做小 spike**（rc 期 API 会变）：我们的客户端 bundle 能否 require 到它（`package.json` 的
+ `dsh.client.inject` 要加这一条，和现有的 connection/ui-layout/ui-sidebar 并列）、`t` 席位在我们自己的
+ slot 注册里是否可用、以及 `ctx.effect` 的释放是否按官方样例走。
++
++## 0.2.0-rc.2 迁移实测（2026-10-14）
++
++本轮把 0.2.8 的插件从 dsh 0.1.5-rc.2 迁到 0.2.0-rc.2。下面每条都是读官方源码 + 在发行副本上跑出来的，不是推断。
++
++### 配置与设置：`settings.register` 没了
++
++- 旧写法 `ctx.settings.register(namespace, schema, { base })` + `settings.get(ns)` + `settings.update(ns, patch)` **整个删除**。
++  新写法：插件把自己的可配置值声明成 **Cordis `Config`**，能热改的字段加 `.volatile()`；消费者每次操作读引用
++  （`config.baseUrl.get()`）；写入走 `ctx.configEditor.edit(ctx.fiber.entry, (current, inherited) => next)`，
++  落进**当前 profile 的 `cordis.patch.yml`** 并立即生效（只改 volatile 字段时**不重挂插件**，所以仓库不会被关掉再打开）。
++- `.volatile()` 需要 **schemastery ≥ 3.18.4**：3.18.2 的原型上根本没有这个方法（`typeof s.volatile === 'function'` 为 false，
++  实测）。所以 peer 写 `~3.18.4`。
++- `ctx.fiber.entry` 的类型来自 `@deepseek-ai/cordis-plugin-loader` 的 **module augmentation**——只装 `@deepseek-ai/cordis`
++  的话 `Fiber` 上没有 `entry`（`tsc` 报 TS2339）。修法：devDependency 加上它 + 一句 `import type {} from '@deepseek-ai/cordis-plugin-loader'`。
++- **旧的 `settings.yaml` 只按「section id = entry id」导入一次**（`packages/settings/settings/src/index.ts:238-257`），
++  映射表里只有 `ui-developer-tools` / `ui-onboarding` / `shell` 三条特例。插件自己起的命名空间
++  （本插件的 `dsh-inbox-webdav` / `dsh-inbox-ui`）**不会**被导入——它们会被记一条 warn 并留在 `settings.yaml.imported` 里。
++  所以升级时要么让用户重填，要么插件自己读一次旧文档再写进 profile（本插件的做法：`src/host/config.ts` 的
++  `adoptLegacySettings()`，逐字段校验后才采纳，已经被 profile override 或部署层给过的字段不覆盖）。
++
++### agent preset：声明式，目录没了
++
++- 用户级目录 preset 机制**删除**（registry 既不扫目录也不收 preset 路径）。替代：bundle patch 里 `insert` 一行
++  `@deepseek-ai/dsh-agent-preset`，`config.plugins` 是完整的子行列表（**不是 `presets`**）。
++- `bundle.patch` 支持**字符串或有序数组**（`packages/util/package-manifest/src/types.ts:69-72`），web 包自己用了 5 个文件。
++- 一条对第三方插件重要的结论：**不需要为了"工具进会话"去声明 preset**——见上面 global 层那条。
++
++### Web 客户端契约的三处漂移
++
++- `tool.call.toolview` 的 owner props 变成 **`preparing` / `start` / `result` 三相位并集**：只有 `result` 相带
++  `block.content`（content blocks），`block.text` 已经不存在。卡片必须在 `phase === 'result'` 时才读结果，
++  否则渲染出一张空卡（本插件旧代码读 `block.text` 后靠 `content` 兜底，能显示但相位语义是错的）。
++- `ctx.sidebarRightTabs.register(definition)` 的 `guide[]` 每一项**必须有稳定 `id`**（同一 provider 内唯一，重复直接抛）；
++  需要多开页面的 kind 加 `multiple: true`；tab 自己持有进程/资源时用 `ctx.sidebarRight.registerCloseHandler(kind, handler)`
++  （每个 kind 只能一个）。`id` 同时是 `sidebar.right.pane.tab` 座位的 key，这一点没变。
++- `ConnectionIndicator` 去掉 `reconnectLabel`、`DiffBlock`/`diffTotals` 改成按上下文比较、`*16` 图标全部改名——
++  本插件不 import primitives，不受影响（客户端半边只 import React，见 AGENTS 第 11 条）。
++
++### 依赖与兼容门禁
++
++- 启动/安装时按 `semver.satisfies(runtime, range, { includePrerelease: true })` 检查 `@deepseek-ai/dsh*` peers
++  （`packages/boot/app-boot/src/plugin-compatibility.ts:77`）。实测：`^0.1.5-rc.2` **不**满足 `0.2.0-rc.2`
++  （caret 在 0.x 上封顶 `<0.2.0-0`），`^0.2.0` 也不满足 `0.2.0-rc.1/2`；要写 **`^0.2.0-rc.1`**。
++- `@deepseek-ai/cordis` 从 4.0.2 升到 **4.0.4**（`~4.0.4`，与官方包的 peer 一致）。
++
++### 怎么证明它真的起来了（这一轮用过的方法）
++
++- `--dump-config`：证明 bundle patch 组进来了、compat 门禁没拒行（出现 `# == @chance722/dsh-inbox`）。
++  **不证明激活**（0.1.6 起 `Loader.create()` 解析成功 ≠ 激活）。
++- `skills/plugin-upgrade/scripts/verify-runtime.mjs <仓库路径>`：隔离 `DSH_HOME` + 死模型端口冷启动，
++  按日志归因（本轮 `pass-timeout-alive`）。
++- **客户端半边**：`lib/client.js` 是 `window.__ModuleLoader__.load({id, factory})` 包裹的 CJS，可以在 Node 里
++  用假 `window` 捕获 factory、用真 `react` 当 require 表执行它，再拿一个记录型的假 ctx 调 `apply`——
++  能实测到 `sidebar.panellist` / `main` / `tool.call.toolview`（两个 key）/ `sidebarRightTabs`（含 guide 的 `id`）
++  真的注册了，而不是只过类型检查。这不能替代浏览器里的视觉验收。
+diff --git a/fixture/docs/help/index.md b/fixture/docs/help/index.md
+index 9ad763f..dba6731 100644
+--- a/fixture/docs/help/index.md
++++ b/fixture/docs/help/index.md
+@@ -1,33 +1,34 @@
+-# 知识文档索引
+-
+-> AGENTS.md 只记「主题 → 路径」，正文一律在本目录。新增/改名/归档必须同步更新本表。
+-
+-| 主题 | 路径 | 一句话 |
+-|---|---|---|
+-| dsh 插件平台实测事实 | `dsh-plugin-platform.md` | dsh 的扩展点、限制、安装机制，逐条带证据路径 |
+-| 已锁定的产品与架构决策 | `product-decisions.md` | 需求边界、隐私红线、分类与生命周期规则 |
+-| 本地开发与验收流程 | `dev-setup.md` | 建 profile、挂插件、起服务、headless 验证工具的命令 |
+-| 抓链接标题（外发请求） | `link-title-fetch.md` | 一次 GET 的自述身份、站点拒绝的两种长相（空壳页 / 假标题）、实测矩阵与复查命令 |
+-| 链接分类与平台标签 | `link-classification.md` | 平台表（62 个主机后缀）、路径优先 / 宿主习惯的判序、加一个新平台的步骤 |
+-| 仓库数据模型 | `vault-data-model.md` | 域 spec（到 v8）、词汇表、记录结构、查询语义、软删与 `graves`（清空回收站留下的本地墓碑） |
+-| 对象存储网关兼容性排查 | `remote-gateway-compat.md` | 401/403 的三种可能、客户端标识按凭证绑定、那句 500 `未知运行时异常` 的两种来源（SigV2 / GET 目录占位对象）、数据胶囊实测矩阵 |
+-| 远端目录布局 | `remote-sync-layout.md` | `inbox/` 里每个名字的含义、记录信封、附件命名理由、上云加密边界、还没做的两件事 |
+-| 同步机制（推/拉/合并） | `sync.md` | 三种触发、推什么、按 `id`+`updatedAt` 合并的规则、清空回收站的本地墓碑 `graves`（"清掉就是清掉"，不会被别的同步目录带回来）、**投放目录的占位对象不是投放文件**（`isFolder()` 按形状跳）、加密边界、排查表、还没做的三件事 |
+-| 面板 UI 的视觉/几何验证 | `ui-visual-check.md` | 真机 token 拿不到时，用 headless Chrome 量列宽与"能否放一行" |
+-| 面板主题（深色/浅色） | `panel-theme.md` | 怎么问出宿主的配色方案、三个反色坑、镜像页的五个场景 |
+-| 面板的中英双语 | `panel-i18n.md` | 接官方 `ctx.locale`（不是自造开关）、服务缺席时的 `<html lang>` 退路、哪一层文本归谁、为什么"句内碎片"要整句成 key |
+-| README 图片资产（封面与截图） | `readme-assets.md` | 封面没有源文件：量出来的字体/字距/几何，改名时怎么只改徽章那一小块 |
+-
+-## 维护记录
+-
+-| 时间 | 维护时 HEAD | 变更摘要 |
+-|---|---|---|
+-| 2026-09-21 | `f2912ff` | **M9.17 投放目录被当成投放文件**——用户报"点击刷新有 500 报错"，接口原话 `failed: 1`、`reason: inbox：取对象失败：HTTP 500 — {"msg":"未知运行时异常","code":500}`，`listed 39 / skippedSync 38`。定位：39 项里 **38 项是本机自己写的 `inbox/sync/…`**，第 39 项不在任何 `sync/` 树下、名字正是投放目录名 ⇒ 那就是**目录本身**（云盘的 key 以 `/` 结尾的占位对象）；GET 它本来就不是"读一个文件"，网关对不提供的东西一律回那句 500。因为**失败会钉住游标**，每次刷新重复同一句。修法：`remote/pull.ts` 新增 `isFolder()`，在"要不要读"之前按**形状**跳过（末尾 `/`，或路径等于被列举的投放目录），并计入新增的 `PullResult.skippedFolders`（面板不显示）；`…/sync/` 树的判定不动。两条新测试（WebDAV `inbox/sub/`、S3 `inbox/` + `inbox`）都断言"**根本没发出那次 GET**"，改前必红——复现出的那句与用户贴的逐字一致。`sync.md` 加「投放目录不是一个文件」一节 + 排查表一行，`remote-gateway-compat.md` 记下那句 500 的第二种来源。309 测试全绿 + tsc + build（本机 `lib/` 已重建，重启 dsh 即生效）|
+-| 2026-09-21 | `790b03d` | **M9.16 清空回收站又被拉回来**——用户报"清空后重启 dsh，13 条又躺在回收站里"。定位到 merge：定向删除只覆盖本机那棵同步树，开着「同时合并别的同步目录」时老树 `sync/` 里的墓碑副本每次启动都被重新导入（本机没有行可压）。域 **v7 → v8** 加 `graves`（`{id, purgedAt}`，`Vault.purge` 写、merge 读，只收"比清空时刻更新"的副本），`PullResult.purged` + tooltip 一句话；新增 3 条测试（含 v7 库能被 v8 打开）。`sync.md` 加「清空之后为什么不会再回来」一节与排查表一行，`vault-data-model.md` 加 v8 与表说明，AGENTS 同步红线补一句，README 中英各一句 |
+-| 2026-09-21 | `d7e88ec` | **M9.15 README 全书压缩**——用户："可以，都压缩一下，精简一点"。中英两份逐节收：开头两节并成「它是什么」；功能表 11 行每格收短；截图说明与重复句删掉；"东西存在哪 / 云端长什么样 / 同步怎么走" 表格保留、句子收短；隐私 7 条收到 ≤2 行但**事实一条不减**（加密边界、图片例外、云端明文、抓取身份外溢）；开发段收短。英文 **2104 → 1763 词（-16%）**，两份对称，无代码改动 |
+-| 2026-09-21 | `96eed94` | **M9.14 README 安装/更新压成命令块**——用户："README 太啰嗦，面向用户就直接写清楚安装命令和更新命令"。上一轮加的「更新」整节折进安装块（一条命令配一条注释：安装 / 全新机器 / 更新；"init 重复跑不会升级""刚发布时写确切版本"落成注释），平台说明与"init 做三件事"等段落合并，隐私里那条抓取身份收短。中英各 **-45/+21**、**-44/+21** 行，安装区 45 → 22 行，两份对称。只改 Markdown |
+-| 2026-09-21 | `75de827` | **M9.13 「更新」原来没有路径**——用户问"本地更新线上版本是不是跑 init 就行"，他只看到 `Already up to date`。答案：`init` 转发 `dsh plugin add <包名>`，profile 里的**版本范围**已被满足 ⇒ pnpm 什么都不做（同一个 pnpm 行为，这次撞在用户侧）。README 中英加「更新 / Update」一节（`@latest` 装、刚发布时要写确切版本、装完重启、**用 `inbox_status` 回显的 `dsh-inbox vX.Y.Z` 确认**），`init` 收尾提示加一行，dev-setup 第 5 条记下。顺带拉 registry 上 0.2.6 的 tarball 核对：平台表 / `refused-page` / 新 UA 都在 ⇒ **不需要 0.2.7**；用户 profile 依赖已是 `0.2.6` |
+-
+-> 表内哈希在 **2026-09-20** 因替换作者邮箱重写过一次历史（内容未变、tree 一致）后按新提交更新了最后一行；更早几行的短 id 是重写前的旧 id，只作历史记录，不再能直接 git show。dev-bus 正文里的旧短 id 同理。
+-
+-> 锚点必须是**已提交的 HEAD**；每次维护最多保留 5 条，**从上到下：新 → 旧**。
++# 知识文档索引
++
++> AGENTS.md 只记「主题 → 路径」，正文一律在本目录。新增/改名/归档必须同步更新本表。
++
++| 主题 | 路径 | 一句话 |
++|---|---|---|
++| 2026-10-14 | `a3a6ddf` + 未提交迁移 | **dsh 0.1.5-rc.2 → 0.2.0-rc.2 迁移**（`.dsh-migrate/`，未提交）：设置从 `settings.register(命名空间)` 搬到插件自己的 Cordis `Config`（`.volatile()` 字段 + `ctx.configEditor.edit(ctx.fiber.entry, …)` 落进当前 profile 的 `cordis.patch.yml`），旧 `settings.yaml` 的两个命名空间由插件自己一次性接管（harness 只按「section id = entry id」导入）；`init` 的 preset 复制/指默认两步**退役**（0.2.0 preset 是 bundle 声明行、`.agent-presets` 不再被读，而宿主层工具本来就对每个会话可见）；peer 区间 `^0.1.5-rc.2 → ^0.2.0-rc.1`（`^0.1.x` 被兼容门禁拒、`^0.2.0` 不认 prerelease）、cordis `~4.0.4`、schemastery `~3.18.4`；客户端两处契约漂移（toolview 三相位、sidebar guide entry 要 `id`）。`dsh-plugin-platform.md` 加「0.2.0-rc.2 迁移实测」一节并反转「工具必须挂 preset」的旧结论；README 中英的安装/卸载/存放位置同步；AGENTS 第 2/8 条同步。实测：`--dump-config` 组进 bundle、`verify-runtime.mjs` `pass-timeout-alive`、客户端 bundle 在 Node 里真跑 `apply` 注册到 4 个座位。323 测试全绿 + tsc + build |
++| dsh 插件平台实测事实 | `dsh-plugin-platform.md` | dsh 的扩展点、限制、安装机制，逐条带证据路径 |
++| 已锁定的产品与架构决策 | `product-decisions.md` | 需求边界、隐私红线、分类与生命周期规则 |
++| 本地开发与验收流程 | `dev-setup.md` | 建 profile、挂插件、起服务、headless 验证工具的命令 |
++| 抓链接标题（外发请求） | `link-title-fetch.md` | 一次 GET 的自述身份、站点拒绝的两种长相（空壳页 / 假标题）、实测矩阵与复查命令 |
++| 链接分类与平台标签 | `link-classification.md` | 平台表（62 个主机后缀）、路径优先 / 宿主习惯的判序、加一个新平台的步骤 |
++| 仓库数据模型 | `vault-data-model.md` | 域 spec（到 v8）、词汇表、记录结构、查询语义、软删与 `graves`（清空回收站留下的本地墓碑） |
++| 对象存储网关兼容性排查 | `remote-gateway-compat.md` | 401/403 的三种可能、客户端标识按凭证绑定、那句 500 `未知运行时异常` 的两种来源（SigV2 / GET 目录占位对象）、数据胶囊实测矩阵 |
++| 远端目录布局 | `remote-sync-layout.md` | `inbox/` 里每个名字的含义、记录信封、附件命名理由、上云加密边界、还没做的两件事 |
++| 同步机制（推/拉/合并） | `sync.md` | 三种触发、推什么、按 `id`+`updatedAt` 合并的规则、清空回收站的本地墓碑 `graves`（"清掉就是清掉"，不会被别的同步目录带回来）、**投放目录的占位对象不是投放文件**（`isFolder()` 按形状跳）、加密边界、排查表、还没做的三件事 |
++| 面板 UI 的视觉/几何验证 | `ui-visual-check.md` | 真机 token 拿不到时，用 headless Chrome 量列宽与"能否放一行" |
++| 面板主题（深色/浅色） | `panel-theme.md` | 怎么问出宿主的配色方案、三个反色坑、镜像页的五个场景 |
++| 面板的中英双语 | `panel-i18n.md` | 接官方 `ctx.locale`（不是自造开关）、服务缺席时的 `<html lang>` 退路、哪一层文本归谁、为什么"句内碎片"要整句成 key |
++| README 图片资产（封面与截图） | `readme-assets.md` | 封面没有源文件：量出来的字体/字距/几何，改名时怎么只改徽章那一小块 |
++
++## 维护记录
++
++| 时间 | 维护时 HEAD | 变更摘要 |
++|---|---|---|
++| 2026-09-21 | `f2912ff` | **M9.17 投放目录被当成投放文件**——用户报"点击刷新有 500 报错"，接口原话 `failed: 1`、`reason: inbox：取对象失败：HTTP 500 — {"msg":"未知运行时异常","code":500}`，`listed 39 / skippedSync 38`。定位：39 项里 **38 项是本机自己写的 `inbox/sync/…`**，第 39 项不在任何 `sync/` 树下、名字正是投放目录名 ⇒ 那就是**目录本身**（云盘的 key 以 `/` 结尾的占位对象）；GET 它本来就不是"读一个文件"，网关对不提供的东西一律回那句 500。因为**失败会钉住游标**，每次刷新重复同一句。修法：`remote/pull.ts` 新增 `isFolder()`，在"要不要读"之前按**形状**跳过（末尾 `/`，或路径等于被列举的投放目录），并计入新增的 `PullResult.skippedFolders`（面板不显示）；`…/sync/` 树的判定不动。两条新测试（WebDAV `inbox/sub/`、S3 `inbox/` + `inbox`）都断言"**根本没发出那次 GET**"，改前必红——复现出的那句与用户贴的逐字一致。`sync.md` 加「投放目录不是一个文件」一节 + 排查表一行，`remote-gateway-compat.md` 记下那句 500 的第二种来源。309 测试全绿 + tsc + build（本机 `lib/` 已重建，重启 dsh 即生效）|
++| 2026-09-21 | `790b03d` | **M9.16 清空回收站又被拉回来**——用户报"清空后重启 dsh，13 条又躺在回收站里"。定位到 merge：定向删除只覆盖本机那棵同步树，开着「同时合并别的同步目录」时老树 `sync/` 里的墓碑副本每次启动都被重新导入（本机没有行可压）。域 **v7 → v8** 加 `graves`（`{id, purgedAt}`，`Vault.purge` 写、merge 读，只收"比清空时刻更新"的副本），`PullResult.purged` + tooltip 一句话；新增 3 条测试（含 v7 库能被 v8 打开）。`sync.md` 加「清空之后为什么不会再回来」一节与排查表一行，`vault-data-model.md` 加 v8 与表说明，AGENTS 同步红线补一句，README 中英各一句 |
++| 2026-09-21 | `d7e88ec` | **M9.15 README 全书压缩**——用户："可以，都压缩一下，精简一点"。中英两份逐节收：开头两节并成「它是什么」；功能表 11 行每格收短；截图说明与重复句删掉；"东西存在哪 / 云端长什么样 / 同步怎么走" 表格保留、句子收短；隐私 7 条收到 ≤2 行但**事实一条不减**（加密边界、图片例外、云端明文、抓取身份外溢）；开发段收短。英文 **2104 → 1763 词（-16%）**，两份对称，无代码改动 |
++| 2026-09-21 | `96eed94` | **M9.14 README 安装/更新压成命令块**——用户："README 太啰嗦，面向用户就直接写清楚安装命令和更新命令"。上一轮加的「更新」整节折进安装块（一条命令配一条注释：安装 / 全新机器 / 更新；"init 重复跑不会升级""刚发布时写确切版本"落成注释），平台说明与"init 做三件事"等段落合并，隐私里那条抓取身份收短。中英各 **-45/+21**、**-44/+21** 行，安装区 45 → 22 行，两份对称。只改 Markdown |
++| 2026-09-21 | `75de827` | **M9.13 「更新」原来没有路径**——用户问"本地更新线上版本是不是跑 init 就行"，他只看到 `Already up to date`。答案：`init` 转发 `dsh plugin add <包名>`，profile 里的**版本范围**已被满足 ⇒ pnpm 什么都不做（同一个 pnpm 行为，这次撞在用户侧）。README 中英加「更新 / Update」一节（`@latest` 装、刚发布时要写确切版本、装完重启、**用 `inbox_status` 回显的 `dsh-inbox vX.Y.Z` 确认**），`init` 收尾提示加一行，dev-setup 第 5 条记下。顺带拉 registry 上 0.2.6 的 tarball 核对：平台表 / `refused-page` / 新 UA 都在 ⇒ **不需要 0.2.7**；用户 profile 依赖已是 `0.2.6` |
++
++> 表内哈希在 **2026-09-20** 因替换作者邮箱重写过一次历史（内容未变、tree 一致）后按新提交更新了最后一行；更早几行的短 id 是重写前的旧 id，只作历史记录，不再能直接 git show。dev-bus 正文里的旧短 id 同理。
++
++> 锚点必须是**已提交的 HEAD**；每次维护最多保留 5 条，**从上到下：新 → 旧**。
+diff --git a/fixture/docs/help/product-decisions.md b/fixture/docs/help/product-decisions.md
+index 1eae9bf..87008e3 100644
+--- a/fixture/docs/help/product-decisions.md
++++ b/fixture/docs/help/product-decisions.md
+@@ -9,10 +9,10 @@
+ 
+ ## 平台与装配
+ 
+-**安装形态（2026-08-… 起的目标，2026-09-20 落地一半）**：用户侧只该记住**一条命令**——`npx @chance722/dsh-inbox init`。它做三件事：把包装进他们的 profile、**复制** dsh 自带的 `standard` preset 到 `~/.dsh/.agent-presets/inbox/` 并把插件追加进组合（工具能进模型的唯一路径）、把**用户级默认 preset** 指过去。改用户的 `settings.yaml` 前必须**先备份**，值没变就不写。`init` 重复运行必须安全（不覆盖用户改过的 preset 文件，只补齐缺的）。
++**安装形态（2026-08-… 起的目标；2026-10-14 收敛成一件）**：用户侧只该记住**一条命令**——`npx @chance722/dsh-inbox init`。它做的事：把包装进他们的 profile。装完助手就能看见工具，因为宿主组合里的 `ctx.tools.register` 进的是工具注册表的 global 层，对每个会话可见（0.1.5 时代「必须挂进 agent preset」的结论在 0.2.0 被官方实现反转）。**不再需要**复制 `standard` preset、也不再改用户的 `settings.yaml`：0.2.0 的 preset 是 bundle 里的声明式配置行，`~/.dsh/.agent-presets` 目录已经没有任何东西会读。`init` 重复运行必须安全（pnpm 幂等，不重复装）。
+ 
+ - 代码跨平台；**v1 只在这台 Windows 验收**，README 明写 mac/Linux 未验证。
+-- 安装要自动化：装包 + 建 agent preset + 指默认，一条 `init` 完成。
++- 安装要自动化：装包一条 `init` 完成；工具的可见性由 profile 组合自己保证，不需要用户再做什么。
+ - 开发期 `dsh --profile inbox` 隔离，稳定后叠 patch 进 web profile。
+ 
+ ## 入口
+diff --git a/fixture/locale/en.json b/fixture/locale/en.json
+new file mode 100644
+index 0000000..b661ba0
+--- /dev/null
++++ b/fixture/locale/en.json
+@@ -0,0 +1,6 @@
++{
++  "meta": {
++    "title": "Inbox",
++    "description": "A local vault for whatever you copy — links, pictures, text, credentials: capture it, classify it, browse it from the sidebar, and ask your assistant to fetch it back in conversation."
++  }
++}
+diff --git a/fixture/locale/zh.json b/fixture/locale/zh.json
+new file mode 100644
+index 0000000..fe24d5e
+--- /dev/null
++++ b/fixture/locale/zh.json
+@@ -0,0 +1,6 @@
++{
++  "meta": {
++    "title": "收件箱",
++    "description": "把日常复制的链接、图片、文本、账密收进本地仓库：自动分类、侧栏浏览，还能在对话里让助手检索取回。"
++  }
++}
+diff --git a/fixture/package.json b/fixture/package.json
+index e6648b5..2df4731 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -35,13 +35,15 @@
+       "types": "./lib/types/client/index.d.ts",
+       "default": "./lib/client.js"
+     },
+-    "./package.json": "./package.json"
++    "./package.json": "./package.json",
++    "./locale/*.json": "./locale/*.json"
+   },
+   "files": [
+     "lib/index.js",
+     "lib/client.js",
+     "lib/cli.js",
+     "cordis.patch.yml",
++    "locale/*.json",
+     "lib/types/**/*.d.ts"
+   ],
+   "bin": {
+@@ -74,25 +76,27 @@
+     "zod": "^4.4.3"
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.2",
+-    "@deepseek-ai/dsh-attachment": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-client-connection": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-commands": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-storage-domain": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-tools": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-web": "^0.1.5-rc.2"
++    "@deepseek-ai/cordis": "~4.0.4",
++    "@deepseek-ai/dsh-attachment": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-connection": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-commands": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-storage-domain": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-tools": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-web": "^0.2.0-rc.1",
++    "@deepseek-ai/schemastery": "~3.18.4"
+   },
+   "devDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.2",
+-    "@deepseek-ai/dsh-attachment": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-client-connection": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-commands": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-storage": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-storage-domain": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-storage-json": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-tools": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-web": "0.1.5-rc.2",
+-    "@deepseek-ai/schemastery": "3.18.2",
++    "@deepseek-ai/cordis": "~4.0.4",
++    "@deepseek-ai/cordis-plugin-loader": "^1.0.5",
++    "@deepseek-ai/dsh-attachment": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-connection": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-commands": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-storage": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-storage-domain": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-storage-json": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-tools": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-web": "^0.2.0-rc.1",
++    "@deepseek-ai/schemastery": "3.18.4",
+     "@types/node": "^22.10.0",
+     "@types/react": "~18.3.1",
+     "esbuild": "^0.25.0",
+diff --git a/fixture/pnpm-lock.yaml b/fixture/pnpm-lock.yaml
+index 12018aa..7319093 100644
+--- a/fixture/pnpm-lock.yaml
++++ b/fixture/pnpm-lock.yaml
+@@ -16,35 +16,38 @@ importers:
+         version: 4.6.5
+     devDependencies:
+       '@deepseek-ai/cordis':
+-        specifier: ^4.0.2
+-        version: 4.0.2
++        specifier: ~4.0.4
++        version: 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/cordis-plugin-loader':
++        specifier: ^1.0.5
++        version: 1.0.5(@deepseek-ai/cordis@4.0.4)
+       '@deepseek-ai/dsh-attachment':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
++        specifier: ^0.2.0-rc.1
++        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
+       '@deepseek-ai/dsh-client-connection':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
++        specifier: ^0.2.0-rc.1
++        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
+       '@deepseek-ai/dsh-commands':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-agent@0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a))(@deepseek-ai/dsh-attachment@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/dsh-typert-protocol@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
++        specifier: ^0.2.0-rc.1
++        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-agent@0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977))(@deepseek-ai/dsh-attachment@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))(@deepseek-ai/dsh-typert-protocol@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
+       '@deepseek-ai/dsh-storage':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++        specifier: ^0.2.0-rc.1
++        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+       '@deepseek-ai/dsh-storage-domain':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-storage@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
++        specifier: ^0.2.0-rc.1
++        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-storage@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
+       '@deepseek-ai/dsh-storage-json':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-storage@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
++        specifier: ^0.2.0-rc.1
++        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-storage@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
+       '@deepseek-ai/dsh-tools':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(7f9e302786cf21e030eafe960666842c)
++        specifier: ^0.2.0-rc.1
++        version: 0.2.0-rc.2(c6e351a6a6cfd1c2a664558bffcd410d)
+       '@deepseek-ai/dsh-web':
+-        specifier: 0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
++        specifier: ^0.2.0-rc.1
++        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
+       '@deepseek-ai/schemastery':
+-        specifier: 3.18.2
+-        version: 3.18.2
++        specifier: 3.18.4
++        version: 3.18.4
+       '@types/node':
+         specifier: ^22.10.0
+         version: 22.20.3
+@@ -66,181 +69,216 @@ importers:
+ 
+ packages:
+ 
+-  '@deepseek-ai/cordis@4.0.2':
+-    resolution: {integrity: sha512-asOnXP1TzFSFQlHb1iegDZp0z/8WD1c7YNrwJR/Tx2bzNuMXfcekE/I67Iv6SQXeLB4csxqCngzQKANP7gdw0g==}
++  '@deepseek-ai/cordis-plugin-loader@1.0.5':
++    resolution: {integrity: sha512-200huL2ttWcjyeYllvPYn+qMR7I89qy8MhZasbHltPzB/KMrSfsyoCYKdCGc5KqPGj5iJugcmibQzjINMO9I+Q==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      node-addon-require-builtin: ^0.1.6
++    peerDependenciesMeta:
++      node-addon-require-builtin:
++        optional: true
++
++  '@deepseek-ai/cordis@4.0.4':
++    resolution: {integrity: sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==}
+     hasBin: true
+     peerDependencies:
+-      '@deepseek-ai/cordis-plugin-include': ^1.0.7
+-      '@deepseek-ai/cordis-plugin-loader': ^1.0.3
++      '@deepseek-ai/cordis-plugin-include': ~1.0.9
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
+     peerDependenciesMeta:
+       '@deepseek-ai/cordis-plugin-include':
+         optional: true
+       '@deepseek-ai/cordis-plugin-loader':
+         optional: true
+ 
+-  '@deepseek-ai/cosmokit@1.8.3':
+-    resolution: {integrity: sha512-qBo+ronVM6Eu2WNVJXi8JcMiqZ19T9BRIpV+5qJUFPXjGH/Z0QKcQMC/IZJ7L394YTOtJgcovbk9qP0w2GsBXQ==}
++  '@deepseek-ai/cosmokit@1.8.5':
++    resolution: {integrity: sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==}
+ 
+-  '@deepseek-ai/dsh-agent@0.1.5-rc.2':
+-    resolution: {integrity: sha512-SlUL1riZmVLwMUR3jo9CP/R1cxov9dHkCJDh6JQW3fSZJVCIdPygBRlAweCUDvHxAEmPpFHxE/U3NmSUbX+vQQ==}
++  '@deepseek-ai/dsh-agent@0.2.0-rc.2':
++    resolution: {integrity: sha512-CUkbU+c1G0ETXkpoLkpAFo5midz66FQGtlgQOP9pzvU9H3zJQVl4H5LrhhGVbEXKLFgdbtQiOynEW8hpWn3y0Q==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-llm': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-scope': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-session': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-session-projection': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-system-prompt': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-typert-protocol': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-util-values': ^0.1.5-rc.2
+-
+-  '@deepseek-ai/dsh-attachment@0.1.5-rc.2':
+-    resolution: {integrity: sha512-S6b8/WjqzGw+dMDLRXnq+tbijDGkQh38yE+zpQytX2/w/mPR3VzGj5r6McS01WwD76vXR8WFoheSCLyCAro8WQ==}
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session-projection': 0.2.0-rc.2
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2
++      '@deepseek-ai/dsh-typert-protocol': 0.2.0-rc.2
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.2
++      '@deepseek-ai/dsh-workspace': 0.2.0-rc.2
++    peerDependenciesMeta:
++      '@deepseek-ai/dsh-workspace':
++        optional: true
++
++  '@deepseek-ai/dsh-attachment@0.2.0-rc.2':
++    resolution: {integrity: sha512-asUDLv+mfb30vjjlQtMI9aBnC+kmPoUxS1ooadhwAd8wssIlLetq97nzC5W1qd0GQGwZtPG/gpljVAMcSwPr1g==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-brand': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-brand@0.1.5-rc.2':
+-    resolution: {integrity: sha512-/+3TzQRYT4M8NINZ9OrsL5VWNyQSXof8mFLx3txiosWA7Bt0H6UcxUdKGXVwj6gCXhsQ74mzEHm2ucsflG0mYA==}
++  '@deepseek-ai/dsh-brand@0.2.0-rc.2':
++    resolution: {integrity: sha512-A5XlN4tIgP0qObkYFhcZ7Oz/tM2oESEZqLwS0Qq+sM1ivGx6o4AMPgJdfKQlwLzqk0cMLNtAaVBHfiYoElt4lw==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-client-connection@0.1.5-rc.2':
+-    resolution: {integrity: sha512-W0GAZX01hAfrfjoZbtwEJ5ik3dG20Hy/0TFYJ6dnvwxtcacGYNIwi3f2oHpZgLcEw+PWwq1Y9IV1iKG+yDOytg==}
++  '@deepseek-ai/dsh-client-connection@0.2.0-rc.2':
++    resolution: {integrity: sha512-eL66YSZ0+HlWRzAPGU8jtCLd322WXBoMGN1g1OsM5T7Skqbbo9hSwV1FO3Lm0IcMZR3Y07sGPQBwZwf/l66T3w==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-code-runtime@0.1.5-rc.2':
+-    resolution: {integrity: sha512-qex3bvQNBkv1eapi8iTyNq+c52q1kxfdv5+8Nkswv4/kwrkvcDa4n4iiCbEgKS+K5U4DiVIprnyIv8Nx7il7Nw==}
++  '@deepseek-ai/dsh-commands@0.2.0-rc.2':
++    resolution: {integrity: sha512-pU5oUyOMPDN0yxEjE1wJRInNeC5hs5vJnbOG8MSSfkFov/7Q8hrfwETxZtcRnbrpzzeG19wsvtRz1twkEMKZBA==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2
++      '@deepseek-ai/dsh-attachment': 0.2.0-rc.2
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2
++      '@deepseek-ai/dsh-typert-protocol': 0.2.0-rc.2
++
++  '@deepseek-ai/dsh-credentials@0.2.0-rc.2':
++    resolution: {integrity: sha512-TQlvP0jxXYGy1ZNzh4nVsiCzb8FR9iGarD6BfIZ3LwJC8lDtjSxQHWE8//NYjpn10TIMxmaR4s6niHuJ3JkTOw==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-commands@0.1.5-rc.2':
+-    resolution: {integrity: sha512-ODc9h2Jig+Lo4XLdxqHpHjSXsBFeUCth6Y/rToor4KVRWQMedUARlq5otPyB1lYHyQh2DonNs2uf7g3mvag57A==}
++  '@deepseek-ai/dsh-invariants@0.2.0-rc.2':
++    resolution: {integrity: sha512-QOVc0HpRsS8ekvprb45FlxieDvgR/cAMaxW289HASjMoV/U/B54FpbkHuPBw4EnTw07/sPkjx2B/23+YqE0cbg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-agent': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-attachment': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-brand': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-llm': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-scope': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-session': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-typert-protocol': ^0.1.5-rc.2
+-
+-  '@deepseek-ai/dsh-credentials@0.1.5-rc.2':
+-    resolution: {integrity: sha512-TfX5MYLlyw0BFERj3dGxVfP9QGcKZUE5eXDSaY7ZfJbfQgK51VfxV5tP899OxIDRD3Bw94K5Rzx+dbUTSWJBtA==}
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-llm@0.2.0-rc.2':
++    resolution: {integrity: sha512-6QFrQn/h0iNqCfPpgQidnHtLSpA99A7ZND/uYKaGSd/4BGP8KBhuRd0w63e9s4u+hfW8jc3j29WKcNLIOeUfcA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-invariants@0.1.5-rc.2':
+-    resolution: {integrity: sha512-oUxttB2yjAgkk47AiXOCxk9GwnfGvIEGsQfnMD7fukwIdD3KLJObU7+nz63tbFN80rjwMI8rg+p9QBQ10KU5+g==}
++  '@deepseek-ai/dsh-ptc-runtime@0.2.0-rc.2':
++    resolution: {integrity: sha512-HR/3h1VFRcNlAAjCtCAxZ4V3F5pViYicXcLBuYLGjzXWpOhr4zKzeFKh9+UMLjsc9XWIarJMoSvxl662nDV/xQ==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-sandbox': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-llm@0.1.5-rc.2':
+-    resolution: {integrity: sha512-Z7BVsBkK24SE4EItQeow8PHms/9GP0DSTi337vTAa/RY7tNg2Snz3INcXUj6CPZfvntQr1in9op9wLI+rfNsqA==}
++  '@deepseek-ai/dsh-sandbox-policy@0.2.0-rc.2':
++    resolution: {integrity: sha512-0xXVqWw908/V6scohMyyU9SZSiQJYji+S1hMPulcUNLb3iew89d+WPWMIkWQBJRvcJzdQ2ghHwCESRkONXTJnQ==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
++      '@deepseek-ai/dsh-sandbox': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session-projection': 0.2.0-rc.2
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2
++
++  '@deepseek-ai/dsh-sandbox@0.2.0-rc.2':
++    resolution: {integrity: sha512-luKF7ey6HRZkGhImqLCB5Npt4f4omDRk1r+x5qQNqqdNOuN9LXciKDMNPfnSbHfKCcqSZbH3sK+APOmKzRAhVA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-scope@0.1.5-rc.2':
+-    resolution: {integrity: sha512-JwItISje52iVIjlGMNayRVMZrvZU/0i3Gr0s+coND5nBp5lS+pOj9Zf1RQzA5cWjHYCWKmDuQc+m6zGlwmtAeQ==}
++  '@deepseek-ai/dsh-scope@0.2.0-rc.2':
++    resolution: {integrity: sha512-066p7Wv74GNWt4xA5Cyvl+7c/i9KrNEDALYh2/hu0VsJPLb4T9He+TY7y1bld9OgungmqyTy1n/cB2ZrVskvxA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-session-projection@0.1.5-rc.2':
+-    resolution: {integrity: sha512-WMXGBdbxD1FO1Eu7Qs2FKDXq/kl+z+5b7zGLHdra66eEnShSnQmdF9bXSFQu1sJwba2yF7ueMcBJpWy76gtgQQ==}
++  '@deepseek-ai/dsh-session-projection@0.2.0-rc.2':
++    resolution: {integrity: sha512-caJ+XGjmR8ouws0LrvuXrabrzi21akB2l8CniUHdx4IpT6GkLapFYlWLbjZlDYqEWB3ktR+q32nxW2s+f27GSA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-session': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-session@0.1.5-rc.2':
+-    resolution: {integrity: sha512-y+klWiGAWR4m4cc4ylurA0cW63673B4N8cr2ANMimweDZAfxL4XVBC7WiD/5DT2DtIhYmVZhz/niyS/WbniUTA==}
++  '@deepseek-ai/dsh-session@0.2.0-rc.2':
++    resolution: {integrity: sha512-wj+6MeqCYbDcbEvKH3puHyEGdjyu51JwBoN6Ua2tz6griLufDgLM5HpSU40L5xgpbOfrYVhXZs4vRgOrMlFY2g==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-scope': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-storage-domain@0.1.5-rc.2':
+-    resolution: {integrity: sha512-NZ9U14kqcCnF4F+ynrTlBLb+S9FEOwSLkfdjDgdfrFdHh4c2WsRKWxyeYbL8AME1rB+XxLp4YQBx8LQ0Kiy62A==}
++  '@deepseek-ai/dsh-storage-domain@0.2.0-rc.2':
++    resolution: {integrity: sha512-GHHphcdLUNnFBPY1QOfE3dg6yKenIxB5wpgSNghZ7iG+Ifunwj4tyRUZ6YLKvni3HO9Kog1eIdXlUa9yEux39A==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-storage': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
++      '@deepseek-ai/dsh-storage': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-storage-json@0.1.5-rc.2':
+-    resolution: {integrity: sha512-vIdKeI6BUQpqneD/+oTZ2YNotNSGXZX0VbFbhdvgMSgamOrExIjl4cRsEJttcNr8zSvB8PjmuX2wPFvkMoeAlQ==}
++  '@deepseek-ai/dsh-storage-json@0.2.0-rc.2':
++    resolution: {integrity: sha512-h7pD397LA8JUD3QMz1IUV5kAg4WD6iVSZnMFrrCnN0wBF5B0PS0BDHT+x7zojLtq3MFfyx3JwpmX7uF12S0glg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-storage': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-storage': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-storage@0.1.5-rc.2':
+-    resolution: {integrity: sha512-mYt6+JSRxA5fSUcYnI3JFvYw9/TKUyykz5JWoZZ3MxWudItfhw+CV6T3kn3/bpTbWIQnGesSeY+0pJJVz0xBAA==}
++  '@deepseek-ai/dsh-storage@0.2.0-rc.2':
++    resolution: {integrity: sha512-tItvFJ1IAurwmZfBdrr8w+GuyLADZXZ01bos06Ma0QmD3+0NNyvo0E9qmYb54TfJ2h5yvRcFosHO1048gzuPPw==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-system-prompt@0.1.5-rc.2':
+-    resolution: {integrity: sha512-VtmZVKqBMJ7kzskHu0jY+Jth7jSuKMG8QB3MBPzJe9M0LL4YPMWsGKt9gGky9RXolk/ugAy4YZEv1gUqouVofA==}
++  '@deepseek-ai/dsh-system-prompt@0.2.0-rc.2':
++    resolution: {integrity: sha512-ZZNk2gkXFV8CIT0IOZXS+pFaxNVJaRknYyH2vc4ZgZAiHKT+RqUYNr8e1F5Kp0AaN0DNlcTkjOGP5MCxeXfDjg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-llm': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-scope': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/dsh-timeout@0.1.5-rc.2':
+-    resolution: {integrity: sha512-FgfaAw8Zt5X4Y6Ljh833B8Hy7h96FeR+yjNKI3iSyZSqREqOBgvDGXFfQlSu6V3Buvw/cbI/CJUQJvfRBKXOiA==}
++  '@deepseek-ai/dsh-timeout@0.2.0-rc.2':
++    resolution: {integrity: sha512-NDob8b8DJDB/sDPz3P7xhrkxOh1O9FbN1EZRKsxP4fuTfp4hrQU7aekYS5qZENFKoR8dBJMTh/zcEBw4m31glQ==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-tools@0.1.5-rc.2':
+-    resolution: {integrity: sha512-k2yZuJJtszaU9lzr2aBtdeFMINrkdlk4ellbtrMokA2oySVqJmAM8dv+u9RtzduD3aRRqyr2i2hWrTACz0qOrA==}
++  '@deepseek-ai/dsh-tools@0.2.0-rc.2':
++    resolution: {integrity: sha512-vquUz8PjHWE4zaS3wH70IpYjL441p2UlUcG8TN2yJZN1RhDkuiHum4bWCsjEPyWLS/aB1QJvzdXC2EK/PRkbsQ==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-agent': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-code-runtime': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-llm': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-scope': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-session': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-system-prompt': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-user-approval': ^0.1.5-rc.2
+-
+-  '@deepseek-ai/dsh-typert-protocol@0.1.5-rc.2':
+-    resolution: {integrity: sha512-zP8J20rBXa1AFjKL2i83JBeQcePZx8yal3pNojj4t7CCokMcoFMUbr50woa6fY1tRJ7qHxgypO3rH8Q6YWgmiA==}
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2
++      '@deepseek-ai/dsh-ptc-runtime': 0.2.0-rc.2
++      '@deepseek-ai/dsh-sandbox': 0.2.0-rc.2
++      '@deepseek-ai/dsh-sandbox-policy': 0.2.0-rc.2
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2
++      '@deepseek-ai/dsh-user-approval': 0.2.0-rc.2
++
++  '@deepseek-ai/dsh-typert-protocol@0.2.0-rc.2':
++    resolution: {integrity: sha512-95RvIDcVac2BWdv1IxN6yKlRV+8eEvkofqSxV+d0r8x1kx2EIWEsbdxz6C+coYIm+8e03MiN+rwOt8J7sLfe7Q==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-user-approval@0.1.5-rc.2':
+-    resolution: {integrity: sha512-8UpMEnEyMo6mYEVELBo0DC2iG7aJJfFMTNkU+DKD3c5Ut7ySRDzt1iRr1qni/CzqlTIpQBAkGaG77qk4q/v1bg==}
++  '@deepseek-ai/dsh-user-approval@0.2.0-rc.2':
++    resolution: {integrity: sha512-fZMfDp4IeWZMwAKEQkuAYCiGRrwoVWNObvAbpdmQNUavjfYCtwwduWqYQz+5lMQq8vENdczBj7cxnO/pOQ1oZQ==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-agent': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-brand': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-llm': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-scope': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-session': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-system-prompt': ^0.1.5-rc.2
+-
+-  '@deepseek-ai/dsh-util-crypto@0.1.5-rc.2':
+-    resolution: {integrity: sha512-JR0aJEUL35RE8FVT89wMZMbPwMrbkjNcy+gE9pq70d/m2Zxw3a0iNer+BAxPAKYPbmy0xDDXReTwXiecKVy4sQ==}
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2
++
++  '@deepseek-ai/dsh-util-crypto@0.2.0-rc.2':
++    resolution: {integrity: sha512-5OvvmepY69uXTagUMlnoHqg7euI4ZMifLgfdV8xZO20OslWGGiRCkJbZRyDtcJG9GsXWz9UimfWmUu52zKXJ5w==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-util-values@0.1.5-rc.2':
+-    resolution: {integrity: sha512-Cr0TkM6dFAD+Iy4sNXH/afJVMHwJXoOztivj+RflkYoACsOq+Ix0vdHn36hwW7mayU8OK3ZKIZUQ6BPo1fHvUg==}
++  '@deepseek-ai/dsh-util-values@0.2.0-rc.2':
++    resolution: {integrity: sha512-qgpsbgiZABuE9UvgNaVo9b2HiWwLeU93CTl9PFXqE0jN8ap1ALxzQsLGvr/q2MJuWDYqnFBg60XnqnY8ZxPWEg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-web@0.1.5-rc.2':
+-    resolution: {integrity: sha512-3qt/Fh+uCghOy2wZPjwQ6xIMU3t1NW4D5yRvTXOyvadwaDwosqXOzCteYUhnuWzWN66adrFLeRrymhSDS4PMeg==}
++  '@deepseek-ai/dsh-web@0.2.0-rc.2':
++    resolution: {integrity: sha512-d44eM9mMqGnQUGsjqUc6k1G9QrC0w+TWx6Cw6I1iXJkVw5LZ/hpVVzsuCqck8GGS8+GK20kqjGUJSyomfEgd1A==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-llm': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2
+ 
+-  '@deepseek-ai/schemastery@3.18.2':
+-    resolution: {integrity: sha512-njDtZsznjYxok7KLLlHOPyuv2efdWVbSflAHgztSfbMsg+CVraEoRe2DjOCgClYv3ZCSm7WXoaUkbB/+RY7tWQ==}
++  '@deepseek-ai/schemastery@3.18.4':
++    resolution: {integrity: sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==}
+ 
+   '@esbuild/aix-ppc64@0.25.12':
+     resolution: {integrity: sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA==}
+@@ -1003,180 +1041,212 @@ packages:
+ 
+ snapshots:
+ 
+-  '@deepseek-ai/cordis@4.0.2':
++  '@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cosmokit': 1.8.3
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/cosmokit': 1.8.5
++      '@deepseek-ai/schemastery': 3.18.4
++
++  '@deepseek-ai/cordis@4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)':
++    dependencies:
++      '@deepseek-ai/cosmokit': 1.8.5
+       '@standard-schema/spec': 1.1.0
++    optionalDependencies:
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/cosmokit@1.8.3': {}
++  '@deepseek-ai/cosmokit@1.8.5': {}
+ 
+-  '@deepseek-ai/dsh-agent@0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a)':
++  '@deepseek-ai/dsh-agent@0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-scope': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/dsh-session': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/dsh-session-projection': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))
+-      '@deepseek-ai/dsh-system-prompt': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/dsh-typert-protocol': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-
+-  '@deepseek-ai/dsh-attachment@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-session-projection': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-typert-protocol': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++
++  '@deepseek-ai/dsh-attachment@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
+ 
+-  '@deepseek-ai/dsh-client-connection@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-client-connection@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-credentials': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/schemastery': 3.18.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-credentials': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/schemastery': 3.18.4
+       zod: 4.6.5
+     transitivePeerDependencies:
+       - '@deepseek-ai/dsh-invariants'
+ 
+-  '@deepseek-ai/dsh-code-runtime@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-commands@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-agent@0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977))(@deepseek-ai/dsh-attachment@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))(@deepseek-ai/dsh-typert-protocol@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977)
++      '@deepseek-ai/dsh-attachment': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-typert-protocol': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-util-crypto': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      zod: 4.6.5
+ 
+-  '@deepseek-ai/dsh-commands@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-agent@0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a))(@deepseek-ai/dsh-attachment@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/dsh-typert-protocol@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-credentials@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-agent': 0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a)
+-      '@deepseek-ai/dsh-attachment': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-scope': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/dsh-session': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/dsh-typert-protocol': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-crypto': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      zod: 4.6.5
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/dsh-credentials@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/schemastery': 3.18.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-timeout': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-typert-protocol': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-util-crypto': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/schemastery': 3.18.4
++      zod: 4.6.5
++
++  '@deepseek-ai/dsh-ptc-runtime@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-sandbox@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-sandbox': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))
+ 
+-  '@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-sandbox-policy@0.2.0-rc.2(86f6fd7d6eb5d5ef0468bcbf88da8d4d)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-timeout': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-typert-protocol': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-crypto': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/schemastery': 3.18.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-sandbox': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-session-projection': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/schemastery': 3.18.4
+       zod: 4.6.5
+ 
+-  '@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-sandbox@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++
++  '@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/dsh-session-projection@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))':
++  '@deepseek-ai/dsh-session-projection@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-session': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
+       zod: 4.6.5
+ 
+-  '@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))':
++  '@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-scope': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/dsh-storage-domain@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-storage@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-storage-domain@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-storage@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-storage': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/schemastery': 3.18.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-storage': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/schemastery': 3.18.4
+       zod: 4.6.5
+ 
+-  '@deepseek-ai/dsh-storage-json@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-storage@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-storage-json@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-storage@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-storage': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/schemastery': 3.18.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-storage': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/dsh-storage@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-storage@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
+ 
+-  '@deepseek-ai/dsh-system-prompt@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))':
++  '@deepseek-ai/dsh-system-prompt@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-scope': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/schemastery': 3.18.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/dsh-timeout@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-timeout@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
+ 
+-  '@deepseek-ai/dsh-tools@0.1.5-rc.2(7f9e302786cf21e030eafe960666842c)':
++  '@deepseek-ai/dsh-tools@0.2.0-rc.2(c6e351a6a6cfd1c2a664558bffcd410d)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-agent': 0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a)
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-code-runtime': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-scope': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/dsh-session': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/dsh-system-prompt': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/dsh-user-approval': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-agent@0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a))(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/dsh-system-prompt@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/schemastery': 3.18.2
+-
+-  '@deepseek-ai/dsh-typert-protocol@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977)
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-ptc-runtime': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-sandbox@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))))
++      '@deepseek-ai/dsh-sandbox': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))
++      '@deepseek-ai/dsh-sandbox-policy': 0.2.0-rc.2(86f6fd7d6eb5d5ef0468bcbf88da8d4d)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-user-approval': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-agent@0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977))(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))(@deepseek-ai/dsh-system-prompt@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/schemastery': 3.18.4
++
++  '@deepseek-ai/dsh-typert-protocol@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/dsh-user-approval@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-agent@0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a))(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/dsh-system-prompt@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))':
++  '@deepseek-ai/dsh-user-approval@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-agent@0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977))(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))(@deepseek-ai/dsh-system-prompt@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-agent': 0.1.5-rc.2(6df6622855b87cb7fde1fe609a6d039a)
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-scope': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/dsh-session': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/dsh-system-prompt': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/schemastery': 3.18.2
+-
+-  '@deepseek-ai/dsh-util-crypto@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-agent': 0.2.0-rc.2(b872d4d836bb263e5b3a50782f98c977)
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-session': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/schemastery': 3.18.4
++
++  '@deepseek-ai/dsh-util-crypto@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
+ 
+-  '@deepseek-ai/dsh-util-values@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-util-values@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
+ 
+-  '@deepseek-ai/dsh-web@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-web@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/schemastery': 3.18.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/schemastery@3.18.2':
++  '@deepseek-ai/schemastery@3.18.4':
+     dependencies:
+-      '@deepseek-ai/cosmokit': 1.8.3
++      '@deepseek-ai/cosmokit': 1.8.5
+       '@standard-schema/spec': 1.1.0
+ 
+   '@esbuild/aix-ppc64@0.25.12':
+diff --git a/fixture/pnpm-workspace.yaml b/fixture/pnpm-workspace.yaml
+index 393dcb9..3b80a54 100644
+--- a/fixture/pnpm-workspace.yaml
++++ b/fixture/pnpm-workspace.yaml
+@@ -14,3 +14,10 @@ onlyBuiltDependencies:
+ # re-running the dependency check before every `pnpm run` (which exits non-zero
+ # on the "ignored builds" notice and would break `pnpm build` / `pnpm test`).
+ verifyDepsBeforeRun: false
++
++# Real directories instead of the isolated symlink farm. The compatibility
++# check pins the dsh cohort with `npm install --no-save …` in this tree, and
++# npm's arborist cannot load pnpm's `.pnpm` links: it crashes with
++# "Cannot read properties of null (reading 'matches')". Hoisted is also the
++# layout dsh's own profiles use (`docs/help/dev-setup.md`).
++nodeLinker: hoisted
+diff --git a/fixture/src/cli.ts b/fixture/src/cli.ts
+index d491abb..e689939 100644
+--- a/fixture/src/cli.ts
++++ b/fixture/src/cli.ts
+@@ -2,87 +2,36 @@
+ /**
+  * `dsh-inbox init` — the install that is not a paragraph of instructions.
+  *
+- * Installing this plugin by hand is three steps in three places, and the third
+- * is the one everybody forgets: the panel works as soon as the plugin is in the
+- * profile, but the *assistant* only sees `inbox_search` / `inbox_get` once the
+- * plugin is also in the session's **agent preset**. A README that says "now copy
+- * the standard preset into ~/.dsh/.agent-presets and append two lines" is a
+- * README that half its readers will skim past — so this does it.
+- *
+  * What it does, in order, and it is safe to run twice:
+  *   0. decide which profile to install into — `--profile` when it was named,
+  *      otherwise the one this machine already starts (`web`, or the only one);
+  *      with `--create-profile`, create a missing profile first (off by default:
+  *      a typo in a profile name should say so, not conjure a profile)
+  *   1. `dsh plugin --profile <profile> add <package>` (pnpm is idempotent)
+- *   2. copy the shipped `standard` preset into `<DSH_HOME>/.agent-presets/<id>`
+- *      and append this plugin's row to its composition
+- *   3. point the user-level default preset at it (backing the settings file up
+- *      first, because that file is the user's, not ours)
+  *
+- * The copy is the user's to edit afterwards: re-running adds the row when it is
+- * missing, and otherwise leaves the file alone — the one exception being that
+- * row's package name, which is ours to keep pointing at the real package (see
+- * `PRESET_ROW_PATTERN`).
++ * It used to do two more things: copy dsh's shipped `standard` preset into
++ * `<DSH_HOME>/.agent-presets/<id>` and point the user-level default preset at
++ * it, because the assistant only saw `inbox_search` / `inbox_get` when the
++ * plugin was also in the session's agent preset. Neither step exists any more.
++ * Agent presets are declarative rows in a bundle (a directory under
++ * `.agent-presets` is read by nothing), and the tools no longer need a preset
++ * at all: a host-plane `ctx.tools.register` from the profile composition lands
++ * in the tool registry's global layer, which every agent scope inherits. Install
++ * the package and a new session already has the tools.
+  */
+-
+-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
++import { existsSync, readdirSync, realpathSync } from 'node:fs'
+ import { homedir } from 'node:os'
+-import { dirname, join } from 'node:path'
+-import { createRequire } from 'node:module'
++import { join } from 'node:path'
+ import { spawnSync } from 'node:child_process'
+ import { fileURLToPath } from 'node:url'
+ 
+-/** What the plugin calls itself, and the row an agent preset needs. */
++/** What the package calls itself, in the messages the installer prints. */
+ const PACKAGE_NAME = '@chance722/dsh-inbox'
+-const PRESET_ROW = `
+-# dsh-inbox: the vault's conversation tools (inbox_search / inbox_get).
+-- id: dsh-inbox
+-  name: '${PACKAGE_NAME}'
+-`
+-
+-/**
+- * The plugin's row in a preset composition, matched **by id**.
+- *
+- * Matching by package name was wrong the day the package got renamed: the old
+- * name would still be sitting in the preset, `includes(PACKAGE_NAME)` would say
+- * "not there", and the installer would append a second row pointing at a
+- * package that no longer resolves — leaving the preset with one row that works
+- * and one that cannot load. The id is what stays put.
+- */
+-const PRESET_ROW_PATTERN = /(^[ \t]*-[ \t]*id:[ \t]*dsh-inbox[ \t]*\r?\n[ \t]*name:[ \t]*['"]?)([^'"\r\n]+)(['"]?[ \t]*$)/m
+-
+-/** What one pass over a preset composition had to do to our row. */
+-export interface PresetRowOutcome {
+-  /** The text to write back; identical to the input when nothing changed. */
+-  body: string
+-  change: 'added' | 'unchanged' | 'renamed'
+-  /** The package the row used to point at, when it was renamed. */
+-  from?: string
+-}
+-
+-/**
+- * Make sure the composition carries our row — once, pointing at the real package.
+- *
+- * @param body - the preset's `agent.cordis.yml` text.
+- * @returns the text to write, and what had to happen.
+- */
+-export function ensurePresetRow(body: string): PresetRowOutcome {
+-  const row = PRESET_ROW_PATTERN.exec(body)
+-  if (row === null) {
+-    return { body: `${body.replace(/\s*$/, '')}\n${PRESET_ROW}`, change: 'added' }
+-  }
+-  const from = (row[2] ?? '').trim()
+-  if (from === PACKAGE_NAME) return { body, change: 'unchanged' }
+-  return { body: body.replace(PRESET_ROW_PATTERN, `$1${PACKAGE_NAME}$3`), change: 'renamed', from }
+-}
+ 
+ export interface Options {
+   /** Profile named with `--profile`; undefined asks the installer to pick one. */
+   profile: string | undefined
+-  preset: string
+   source: string
+-  defaultPreset: boolean
+   /** Create the profile when it is missing, instead of refusing. */
+   createProfile: boolean
+   /** Install pnpm when it is missing, instead of stopping to explain it. */
+@@ -90,7 +39,7 @@ export interface Options {
+ }
+ 
+ function usage(): string {
+-  return `dsh-inbox init —— 把 inbox 装进一个 dsh profile，并让助手看得见它的工具
++  return `dsh-inbox init —— 把 inbox 装进一个 dsh profile
+ 
+ 用法：
+   dsh-inbox init [选项]
+@@ -99,23 +48,21 @@ function usage(): string {
+   --profile <名字>   装进哪个 dsh profile；不给就自己挑：优先你已有的 web，
+                      其次这台机器上唯一的那个（挑不出来会报错并告诉你怎么说）
+   --create-profile   profile 不存在时用 dsh 自带的 web 模板建一个（默认不开）
+-  --preset <id>      agent preset 的 id，默认 inbox
+   --package <来源>   插件来源，默认 ${PACKAGE_NAME}（本地开发传仓库路径）
+   --install-pnpm     PATH 上没有 pnpm 时替你装（先 npm i -g pnpm，不行再试 corepack）
+-  --no-default       不把默认 preset 指过去（只装，不改 dsh 的默认选择）
+   --help             这份说明
+ 
+-做三件事：① 把插件装进 profile；② 复制 standard preset 到
+-<DSH_HOME>/.agent-presets/<id> 并追加本插件；③ 把用户级默认 preset 指向它。
+-重复运行是安全的：已经做过的不会重复做。`
++做一件事：把插件装进 profile。装完助手就能看见收件箱的工具——工具的可见性
++来自宿主组合（dsh 的工具注册表把宿主层的工具给到每个会话），不再需要改
++agent preset；dsh 0.2.0 起 preset 是 bundle 里的声明式配置行，
++<DSH_HOME>/.agent-presets 目录已经没有任何东西会读。
++重复运行是安全的：已经装过的不会重复装。`
+ }
+ 
+ export function parse(argv: readonly string[]): Options | undefined {
+   const options: Options = {
+     profile: undefined,
+-    preset: '',
+     source: PACKAGE_NAME,
+-    defaultPreset: true,
+     createProfile: false,
+     installPnpm: false,
+   }
+@@ -134,25 +81,11 @@ export function parse(argv: readonly string[]): Options | undefined {
+     }
+     if (flag === '--help' || flag === '-h') return undefined
+     else if (flag === '--profile') options.profile = value()
+-    else if (flag === '--preset') options.preset = value()
+     else if (flag === '--package') options.source = value()
+-    else if (flag === '--no-default') options.defaultPreset = false
+     else if (flag === '--create-profile') options.createProfile = true
+     else if (flag === '--install-pnpm') options.installPnpm = true
+     else throw new Error(`看不懂的选项：${String(flag)}`)
+   }
+-  /*
+-    The preset id does *not* follow the profile name.
+-
+-    `~/.dsh/.agent-presets` is shared by every profile, so installing into a
+-    second profile would otherwise create a second, identically-composed preset
+-    ("web", say) that shadows nothing and confuses everyone. One plugin, one
+-    preset; the profile only decides where the panel and the host half run.
+-  */
+-  if (options.preset.length === 0) options.preset = 'inbox'
+-  if (!/^[a-z0-9][a-z0-9-]*$/.test(options.preset)) {
+-    throw new Error(`preset id 只能用小写字母、数字和连字符：${options.preset}`)
+-  }
+   return options
+ }
+ 
+@@ -259,124 +192,6 @@ function dshHome(): string {
+   return configured !== undefined && configured.length > 0 ? configured : join(homedir(), '.dsh')
+ }
+ 
+-/**
+- * Where the shipped `standard` preset lives.
+- *
+- * Resolved from the *profile's* perspective, because that is where dsh keeps the
+- * packages it runs: the plugin itself may be linked in from anywhere, but the
+- * preset it copies has to be the one this dsh installation ships.
+- *
+- * A profile made on a fresh machine is *thin* — it holds the plugin and its
+- * dependencies and nothing else — while the roster ships inside the **global dsh
+- * install** (`<prefix>\node_modules\@deepseek-ai\dsh\node_modules\...`). Measured
+- * 2026-09-20 on an empty `%DSH_HOME%`: every profile-local lookup missed and
+- * `init` stopped at step ② with "找不到随 dsh 附带的 standard preset" — the step
+- * that decides whether the assistant can see the tools at all. Hence the two
+- * extra places: the module root dsh links into `profiles/`, and whatever prefix
+- * the `dsh` on PATH came from.
+- *
+- * @param home - `<DSH_HOME>`.
+- * @param profileDir - the profile being installed into.
+- * @returns the shipped preset directory, or undefined when it cannot be found.
+- */
+-function shippedStandard(home: string, profileDir: string): string | undefined {
+-  const candidates: string[] = []
+-  /** `<module root>/@deepseek-ai/dsh-agent-presets`. */
+-  const roster = (moduleRoot: string): string =>
+-    join(moduleRoot, '@deepseek-ai', 'dsh-agent-presets')
+-  /** `<module root>/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-agent-presets`. */
+-  const nestedRoster = (moduleRoot: string): string =>
+-    join(moduleRoot, '@deepseek-ai', 'dsh', 'node_modules', '@deepseek-ai', 'dsh-agent-presets')
+-  try {
+-    const require = createRequire(join(profileDir, 'package.json'))
+-    candidates.push(dirname(require.resolve('@deepseek-ai/dsh-agent-presets/package.json')))
+-  } catch {
+-    // Fall through to the layouts below: resolution fails whenever the roster is
+-    // nested (the dsh package vendors its own dependencies) or hoisted
+-    // differently than expected.
+-  }
+-  candidates.push(
+-    roster(join(profileDir, 'node_modules')),
+-    nestedRoster(join(profileDir, 'node_modules')),
+-    roster(join(home, 'profiles', 'node_modules')),
+-    nestedRoster(join(home, 'profiles', 'node_modules')),
+-  )
+-  for (const prefix of dshPrefixes()) {
+-    candidates.push(nestedRoster(join(prefix, 'node_modules')), roster(join(prefix, 'node_modules')))
+-  }
+-  for (const candidate of candidates) {
+-    const standard = join(candidate, 'presets', 'standard')
+-    if (existsSync(join(standard, 'agent.cordis.yml'))) return standard
+-  }
+-  return undefined
+-}
+-
+-/**
+- * The npm prefixes the `dsh` on PATH may have been installed into.
+- *
+- * npm puts its shell shims next to `node_modules` (`<prefix>\dsh.cmd`), which is
+- * the one thing about the install `init` can discover without knowing anything
+- * about how dsh was installed.
+- *
+- * @returns candidate prefixes, most likely first.
+- */
+-function dshPrefixes(): string[] {
+-  const found = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['dsh'], {
+-    encoding: 'utf8',
+-    shell: process.platform === 'win32',
+-  })
+-  const prefixes: string[] = []
+-  for (const line of (found.stdout ?? '').split(/\r?\n/)) {
+-    const bin = line.trim()
+-    if (bin.length > 0) prefixes.push(dirname(bin))
+-  }
+-  return prefixes
+-}
+-
+-/**
+- * Point the user-level default preset at this one.
+- *
+- * A line-based merge, not a YAML library: the settings file is the user's, it is
+- * flat (one namespace per top-level key), and the alternative is dragging a YAML
+- * parser into a CLI that runs once. A backup is written first — this file holds
+- * settings for everything else the user has installed.
+- */
+-function setDefaultPreset(settingsPath: string, id: string): string {
+-  const original = existsSync(settingsPath) ? readFileSync(settingsPath, 'utf8') : ''
+-  /** Write, but only if this actually changes something — and back up first. */
+-  const commit = (next: string, note: string): string => {
+-    if (next === original) return '默认 preset 已经是它，没改'
+-    if (original.length > 0) writeFileSync(`${settingsPath}.bak-${String(Date.now())}`, original, 'utf8')
+-    writeFileSync(settingsPath, next, 'utf8')
+-    return note
+-  }
+-
+-  const lines = original.split(/\r?\n/)
+-  const head = lines.findIndex((line) => /^agent-presets:\s*$/.test(line))
+-  if (head === -1) {
+-    const block = `agent-presets:\n  default: ${id}\n`
+-    const body = original.length === 0 ? block : `${original.replace(/\s*$/, '')}\n${block}`
+-    mkdirSync(dirname(settingsPath), { recursive: true })
+-    return commit(body, original.length === 0 ? '新建了 settings.yaml' : `追加了 agent-presets.default: ${id}`)
+-  }
+-  // Inside the namespace: replace a `default:` line if there is one, else insert
+-  // one right after the header (the other keys stay exactly where they were).
+-  let end = lines.length
+-  for (let index = head + 1; index < lines.length; index += 1) {
+-    const line = lines[index] ?? ''
+-    if (line.length > 0 && !/^\s/.test(line)) {
+-      end = index
+-      break
+-    }
+-  }
+-  const before = lines.slice(0, end)
+-  const after = lines.slice(end)
+-  const defaultAt = before.findIndex((line, index) => index > head && /^\s+default:/.test(line))
+-  if (defaultAt !== -1) before[defaultAt] = `  default: ${id}`
+-  else before.push(`  default: ${id}`)
+-  return commit([...before, ...after].join('\n'), `把 agent-presets.default 改成 ${id}`)
+-}
+-
+ function main(argv: readonly string[]): number {
+   let options: Options
+   try {
+@@ -439,8 +254,8 @@ function main(argv: readonly string[]): number {
+     process.stdout.write(`⓪ profile 「${profile}」不存在，用 dsh 自带的模板建一个…\n`)
+     /*
+       Capture rather than inherit: `dsh --dump-config` prints the whole composed
+-      tree, which buries the three lines that matter. It is only interesting
+-      when the profile could not be created, so that is when it gets printed.
++      tree, which buries the one line that matters. It is only interesting when
++      the profile could not be created, so that is when it gets printed.
+     */
+     const created = createProfile(profile)
+     if (!created.ok || !existsSync(join(profileDir, 'package.json'))) {
+@@ -464,57 +279,13 @@ function main(argv: readonly string[]): number {
+     return 1
+   }
+ 
+-  const standard = shippedStandard(home, profileDir)
+-  if (standard === undefined) {
+-    process.stderr.write('找不到随 dsh 附带的 standard preset，无法创建 agent preset。\n')
+-    return 1
+-  }
+-  const presetDir = join(home, '.agent-presets', options.preset)
+-  if (existsSync(join(presetDir, 'agent.cordis.yml'))) {
+-    process.stdout.write(`② preset 「${options.preset}」已存在，只补上缺失的插件行\n`)
+-  } else {
+-    process.stdout.write(`② 从 standard 复制一份 preset 到 ${presetDir}\n`)
+-    mkdirSync(dirname(presetDir), { recursive: true })
+-    cpSync(standard, presetDir, { recursive: true })
+-    const manifest = join(presetDir, 'preset.yml')
+-    if (existsSync(manifest)) {
+-      const text = readFileSync(manifest, 'utf8')
+-      writeFileSync(
+-        manifest,
+-        text
+-          .replace(/^name:.*$/m, 'name: 收件箱（带 dsh-inbox）')
+-          .replace(
+-            /^description:.*$/m,
+-            'description: 标准模式 + dsh-inbox：助手可以直接查你的收件箱（叫它仓库 / inbox 也行）并把内容取回来。',
+-          ),
+-        'utf8',
+-      )
+-    }
+-  }
+-  const composition = join(presetDir, 'agent.cordis.yml')
+-  const body = readFileSync(composition, 'utf8')
+-  const outcome = ensurePresetRow(body)
+-  if (outcome.change === 'added') {
+-    writeFileSync(composition, outcome.body, 'utf8')
+-    process.stdout.write(`   已把 ${PACKAGE_NAME} 追加进 preset 的组合\n`)
+-  } else if (outcome.change === 'renamed') {
+-    writeFileSync(composition, outcome.body, 'utf8')
+-    process.stdout.write(`   preset 里那一行的来源从 ${String(outcome.from)} 改成 ${PACKAGE_NAME}\n`)
+-  } else {
+-    process.stdout.write('   preset 里已经有这个插件，跳过\n')
+-  }
+-
+-  if (options.defaultPreset) {
+-    const changed = setDefaultPreset(join(home, 'settings.yaml'), options.preset)
+-    process.stdout.write(`③ 默认 preset：${changed}\n`)
+-  }
+-
+   process.stdout.write(
+     `\n完成。接下来：\n` +
+-      `  · 重启 dsh（preset 在启动时扫描）\n` +
++      `  · 重启 dsh\n` +
+       `  · 用你平时那条命令启动它：${profile === 'web' ? 'dsh web' : `dsh --profile ${profile}`}\n` +
+-      `  · 新建一个会话，它就会带上收件箱工具；想让助手查仓库，直接问「我的收件箱里有哪些还没看的链接」\n` +
+-      `  · 面板（侧栏 Inbox）不需要 preset，装完就在\n` +
++      `  · 新建一个会话就能用收件箱工具（宿主组合注册的工具对每个会话可见），` +
++      `想让助手查仓库，直接问「我的收件箱里有哪些还没看的链接」\n` +
++      `  · 面板（侧栏 Inbox）装完就在\n` +
+       `  · 以后要更新到线上最新版：dsh plugin --profile ${profile} add ${PACKAGE_NAME}@latest` +
+       `（重复跑 init 只会重复检查，pnpm 回一句 "Already up to date"，不会升级）\n`,
+   )
+diff --git a/fixture/src/client/card.tsx b/fixture/src/client/card.tsx
+index 20ed572..9cd4bf7 100644
+--- a/fixture/src/client/card.tsx
++++ b/fixture/src/client/card.tsx
+@@ -45,11 +45,35 @@ interface CardBlock {
+ /** Owner props this card uses; the rest of the share is not needed here. */
+ export interface ToolCardProps {
+   toolName: string
++  /**
++   * Which stage of the call this render is for (0.2.0's three-phase view).
++   *
++   * The owner props are a union — `preparing` / `start` / `result` — and only
++   * the `result` arm carries the settled content. The card used to read the
++   * block at every stage; now the earlier stages render the pending line
++   * ({@link t} `card.pending`) instead of an empty result.
++   */
++  phase?: 'preparing' | 'start' | 'result'
+   block: CardBlock
+ }
+ 
+-/** Pull the result text out of whatever shape the settled block carries. */
+-function resultText(block: CardBlock): string | undefined {
++/**
++ * Pull the result text out of the settled block.
++ *
++ * Exported because the phase rule is the whole fix: a `preparing` or `start`
++ * block carries arguments, not a result, and rendering it as one showed an
++ * empty card until the call settled.
++ *
++ * A settled block carries `content` parts, not a `text` field; the `text`
++ * branch stays for a composition that hands the view a block without a phase
++ * (and for the tolerant path the tests pin).
++ *
++ * @param phase - the stage this render is for; only `result` has content.
++ * @param block - the block the Tool tree handed this view.
++ * @returns the text, or undefined while the call has not settled.
++ */
++export function resultText(phase: ToolCardProps['phase'], block: CardBlock): string | undefined {
++  if (phase !== undefined && phase !== 'result') return undefined
+   if (typeof block.text === 'string' && block.text.length > 0) return block.text
+   if (!Array.isArray(block.content)) return undefined
+   const parts: string[] = []
+@@ -186,15 +210,15 @@ function render(text: string): React.ReactNode[] {
+  * The card both tools share: a titled, monospace-ish rendering of the result
+  * with links and thumbnails.
+  *
+- * @param props - the tool call identity and its settled block.
++ * @param props - the tool call identity, its stage, and its current block.
+  * @returns the card element.
+  */
+-export function InboxToolCard({ toolName, block }: ToolCardProps): React.ReactElement {
++export function InboxToolCard({ toolName, phase, block }: ToolCardProps): React.ReactElement {
+   // A settled card stays on screen for the life of the conversation, so it has
+   // to follow a language switch like everything else.
+   useLocaleRevision()
+-  const text = resultText(block)
+-  const isError = block.isError === true
++  const text = resultText(phase, block)
++  const isError = phase === 'result' && block.isError === true
+ 
+   return (
+     <div
+@@ -219,15 +243,23 @@ export function InboxToolCard({ toolName, block }: ToolCardProps): React.ReactEl
+   )
+ }
+ 
+-/** Register both cards on the keyed tool view slot. */
++/**
++ * Register both cards on the keyed tool view slot.
++ *
++ * The key is the wire tool name and the whole of the dispatch (a keyed slot
++ * with no `key` throws at load), so each one is written out on its own
++ * registration instead of being looped over — the same form the shipped
++ * `dsh-client-ui-skill` card uses.
++ */
+ export function registerToolCards(
+   slots: { inject: (name: string, run: () => unknown) => unknown; register: (options: { name: string; key: string }, component: unknown) => unknown },
+ ): void {
+-  for (const key of ['inbox_search', 'inbox_get']) {
+-    slots.inject('tool.call.toolview', () =>
+-      slots.register({ name: 'tool.call.toolview', key }, InboxToolCard),
+-    )
+-  }
++  slots.inject('tool.call.toolview', () =>
++    slots.register({ name: 'tool.call.toolview', key: 'inbox_search' }, InboxToolCard),
++  )
++  slots.inject('tool.call.toolview', () =>
++    slots.register({ name: 'tool.call.toolview', key: 'inbox_get' }, InboxToolCard),
++  )
+ }
+ 
+ /** The panel answers with this envelope; kept here for the shared shape. */
+diff --git a/fixture/src/client/dock.tsx b/fixture/src/client/dock.tsx
+index ed64a6a..effc6d4 100644
+--- a/fixture/src/client/dock.tsx
++++ b/fixture/src/client/dock.tsx
+@@ -67,7 +67,15 @@ interface TabsLike {
+     // Copy is thunked and re-read on every use (so a language change needs no
+     // re-registration) — passing plain strings crashes the guide page with
+     // `entry.description is not a function`, measured.
+-    guide?: readonly { order: number; title: () => string; description: () => string }[]
++    //
++    // `id` is the entry's own stable identity (0.2.0): the guide page keys its
++    // capsules by it and refuses two entries with the same one.
++    guide?: readonly {
++      id: string
++      order: number
++      title: () => string
++      description: () => string
++    }[]
+   }): unknown
+ }
+ 
+@@ -146,7 +154,13 @@ export function registerInboxDock(ctx: Context): void {
+         kind: DOCK_KIND,
+         title: () => t('dock.title'),
+         guide: [
+-          { order: 20, title: () => t('dock.title'), description: () => t('dock.description') },
++          {
++            // Stable within this provider, and the same page the kind opens.
++            id: DOCK_KIND,
++            order: 20,
++            title: () => t('dock.title'),
++            description: () => t('dock.description'),
++          },
+         ],
+       })
+       slots.inject('sidebar.right.pane.tab', () =>
+diff --git a/fixture/src/client/messages.ts b/fixture/src/client/messages.ts
+index ffb0c0e..05180cc 100644
+--- a/fixture/src/client/messages.ts
++++ b/fixture/src/client/messages.ts
+@@ -315,7 +315,7 @@ export const zh = {
+     '账密永不回明文；图片默认只回一个标记，由界面在本机画出来。想让助手亲眼看图（比如「这张是什么码」）， 直接说「帮我看这张图」——那一次才会把这张图发给它。',
+   'manual.6.tools.label': '助手说不认识这个仓库',
+   'manual.6.tools.body':
+-    '说明这个会话没带上收件箱插件。新开一个会话再问一次即可——面板能用、助手看不到， 这两件事是分开的。',
++    '说明这个会话所在的 profile 里没有收件箱插件（面板和助手跑在同一个 profile 里）。 按 README 装好、重启 dsh，再新开一个会话问一次。',
+   'manual.7.title': '7. 出问题先看这里',
+   'manual.7.title.label': '链接没名字',
+   'manual.7.title.body': '正常：有些站点（如微信）对非浏览器请求只回空壳页，抓不到标题；点进详情自己起个名字即可。',
+@@ -594,7 +594,7 @@ export const en: Dictionary = {
+   'manual.6.refuse.body': 'a credential never comes back in clear text, and an image comes back as a marker the UI draws locally. To have the assistant look at a picture (say, “what is this code?”), ask it to — that one call sends that one image.',
+   'manual.6.tools.label': 'The assistant says it does not know this vault',
+   'manual.6.tools.body':
+-    'this session was not started with the inbox plugin. Open a new session and ask again — the panel working and the assistant seeing the tools are two different things.',
++    'the profile this session runs in has no inbox plugin (the panel and the assistant run in the same profile). Install it as the README says, restart dsh, then ask again in a new session.',
+   'manual.7.title': '7. When something looks wrong',
+   'manual.7.title.label': 'A link has no name',
+   'manual.7.title.body': 'normal: some sites (WeChat among them) serve non-browser requests an empty shell page with no title. Open the record and name it yourself.',
+diff --git a/fixture/src/host/config.ts b/fixture/src/host/config.ts
+new file mode 100644
+index 0000000..30df278
+--- /dev/null
++++ b/fixture/src/host/config.ts
+@@ -0,0 +1,365 @@
++/**
++ * The plugin's live configuration: remote-sync parameters and panel preferences.
++ *
++ * dsh 0.2.0 removed the settings service's namespace registration (`settings.register`),
++ * so a plugin's user-editable values now live on its own Cordis `Config`: fields
++ * that can change without remounting are declared `.volatile()`, consumers read
++ * the returned references on every operation, and writes go through
++ * `ctx.configEditor.edit(entry, …)`, which persists into the active profile's
++ * `cordis.patch.yml` and applies immediately (the volatile-only update keeps the
++ * plugin instance, so the vault is not re-opened by a settings change).
++ *
++ * The panel's own 「设置」 app stays where it was: it is a different entry point
++ * from 设置 → 插件, and the automatic form the harness derives from this schema
++ * is additive, not a replacement.
++ *
++ * The secrets are *not* here: the WebDAV password and the S3 secret stay in the
++ * credentials service, exactly as before.
++ */
++
++import { existsSync, readFileSync } from 'node:fs'
++import { join } from 'node:path'
++
++import type { Context } from '@deepseek-ai/cordis'
++// Type-only: this package owns the `Fiber.entry` augmentation a configuration
++// write needs, and the host supplies the runtime loader.
++import type {} from '@deepseek-ai/cordis-plugin-loader'
++import z from '@deepseek-ai/schemastery'
++
++import { UI_LIST_MODES, type UiListMode, type WebdavSettings } from '../shared/panel-wire.js'
++
++/** The legacy global settings namespace the remote parameters used to live in. */
++export const LEGACY_WEBDAV_SECTION = 'dsh-inbox-webdav'
++
++/** The legacy global settings namespace the panel preferences used to live in. */
++export const LEGACY_UI_SECTION = 'dsh-inbox-ui'
++
++/** What a fresh install looks like when nothing overrides it. */
++export const DEFAULT_REMOTE_SETTINGS: WebdavSettings = {
++  protocol: 'webdav',
++  baseUrl: '',
++  directory: '/inbox',
++  adoptForeignRoots: false,
++  username: '',
++  endpoint: '',
++  bucket: '',
++  region: 'us-east-1',
++  signatureVersion: 'v4',
++  accessKeyId: '',
++  userAgent: '',
++  webdavUserAgent: '',
++}
++
++/** The panel's default layout. */
++export const DEFAULT_LIST_MODE: UiListMode = 'grid'
++
++/**
++ * The plugin's configuration schema.
++ *
++ * Every field is volatile: changing one must not remount the plugin, because a
++ * remount disposes the vault lease and would close the store the panel is
++ * looking at. Names are flat and match the wire types the panel already speaks,
++ * so the automatic 设置 → 插件 form reads like the panel's own dialog.
++ */
++export const Config = z.object({
++  /** Which remote client the sync uses. */
++  protocol: z.union(['webdav', 's3']).default('webdav').volatile(),
++  /** WebDAV base URL, e.g. `https://data.cstcloud.cn/dav`. */
++  baseUrl: z.string().default('').volatile(),
++  /** Folder under the base URL; the shared 「目录」. */
++  directory: z.string().default('/inbox').volatile(),
++  /** Merge other sync trees found in the same bucket, not just this directory's. */
++  adoptForeignRoots: z.boolean().default(false).volatile(),
++  /** WebDAV user name. */
++  username: z.string().default('').volatile(),
++  /** S3 endpoint. */
++  endpoint: z.string().default('').volatile(),
++  /** S3 bucket. */
++  bucket: z.string().default('').volatile(),
++  /** S3 region. */
++  region: z.string().default('us-east-1').volatile(),
++  /** S3 signature version. */
++  signatureVersion: z.string().default('v4').volatile(),
++  /** S3 access key id; the secret stays in the credentials service. */
++  accessKeyId: z.string().default('').volatile(),
++  /** `User-Agent` for the S3 client; empty means the plugin's own identity. */
++  userAgent: z.string().default('').volatile(),
++  /** `User-Agent` for the WebDAV client; empty means the plugin's own identity. */
++  webdavUserAgent: z.string().default('').volatile(),
++  /** How the panel lays its record list out. */
++  listMode: z.union(['grid', 'compact']).default('grid').volatile(),
++})
++
++/** A `.volatile()` field's reference: the value may change between two operations. */
++export interface LiveRef<T> {
++  get(): T
++}
++
++/** The parsed `Config`, as Cordis hands it to `apply`. */
++export interface InboxConfig {
++  protocol: LiveRef<string>
++  baseUrl: LiveRef<string>
++  directory: LiveRef<string>
++  adoptForeignRoots: LiveRef<boolean>
++  username: LiveRef<string>
++  endpoint: LiveRef<string>
++  bucket: LiveRef<string>
++  region: LiveRef<string>
++  signatureVersion: LiveRef<string>
++  accessKeyId: LiveRef<string>
++  userAgent: LiveRef<string>
++  webdavUserAgent: LiveRef<string>
++  listMode: LiveRef<string>
++}
++
++/**
++ * A configuration whose references all answer the schema's defaults.
++ *
++ * Used when the plugin is mounted without configuration (a test, or a row that
++ * declares none) — the values are the schema's own, not a silent on/off switch.
++ *
++ * @returns references that never change.
++ */
++export function defaultConfig(): InboxConfig {
++  return Config({}) as unknown as InboxConfig
++}
++
++/** The slice of the config-editor service this file uses. */
++interface ConfigEditorLike {
++  edit(
++    entry: unknown,
++    change: (
++      current: Record<string, unknown>,
++      inherited: Record<string, unknown>,
++    ) => Record<string, unknown>,
++  ): Promise<void>
++}
++
++/** The slice of a Loader entry this file needs. */
++export interface EntryLike {
++  readonly options?: { readonly id?: string; readonly config?: unknown }
++}
++
++/** The slice of `profileContext` this file needs. */
++interface ProfileContextLike {
++  readonly home: string
++}
++
++/**
++ * The active configuration, and the entry a write belongs to.
++ *
++ * Cordis hands the parsed `Config` to `apply`; the rest of the host half reads it
++ * through {@link readWebdavSettings} / {@link readListMode} rather than threading
++ * references through every remote call.
++ *
++ * One slot, because a profile loads this plugin once: the tools reach every agent
++ * from the profile composition, so there is no preset row to load a second
++ * instance (see `docs/help/dsh-plugin-platform.md`). If a deployment composes a
++ * second row anyway — the way 0.1.x installs did — the last activation wins this
++ * slot and the two instances read their own entry's configuration; the vault
++ * lease is the part that already handles that case, and the settings do not.
++ */
++let live: { readonly refs: InboxConfig; readonly entry: EntryLike | undefined } | undefined
++
++/**
++ * Publish the configuration read by the rest of the host half.
++ *
++ * @param refs - the parsed `Config` references.
++ * @param entry - this plugin's Loader entry, the write target for the profile patch.
++ */
++export function installConfig(refs: InboxConfig, entry: EntryLike | undefined): void {
++  live = { refs, entry }
++}
++
++/** Whether a settings write can persist: it needs both a config editor and our entry. */
++export function canPersist(ctx: Context): boolean {
++  return ctx.get('configEditor') !== undefined && live?.entry !== undefined
++}
++
++/**
++ * The remote parameters as they are right now.
++ *
++ * A stored value this version no longer understands falls back to its default,
++ * the same way the old namespace reader treated an unknown layout mode.
++ *
++ * @returns a detached snapshot of the remote settings.
++ */
++export function readWebdavSettings(): WebdavSettings {
++  const refs = live?.refs
++  if (refs === undefined) return DEFAULT_REMOTE_SETTINGS
++  const protocol = refs.protocol.get()
++  const signatureVersion = refs.signatureVersion.get()
++  return {
++    protocol: protocol === 's3' ? 's3' : 'webdav',
++    baseUrl: refs.baseUrl.get(),
++    directory: refs.directory.get(),
++    adoptForeignRoots: refs.adoptForeignRoots.get() === true,
++    username: refs.username.get(),
++    endpoint: refs.endpoint.get(),
++    bucket: refs.bucket.get(),
++    region: refs.region.get(),
++    signatureVersion: signatureVersion === 'v2' ? 'v2' : 'v4',
++    accessKeyId: refs.accessKeyId.get(),
++    userAgent: refs.userAgent.get(),
++    webdavUserAgent: refs.webdavUserAgent.get(),
++  }
++}
++
++/**
++ * The panel layout as it is right now.
++ *
++ * @returns the stored mode, or the default when the stored one is unknown.
++ */
++export function readListMode(): UiListMode {
++  const stored = live?.refs.listMode.get()
++  return UI_LIST_MODES.includes(stored as UiListMode) ? (stored as UiListMode) : DEFAULT_LIST_MODE
++}
++
++/** What one settings write may change: remote fields and the panel's list mode. */
++export type ConfigPatch = Partial<WebdavSettings> & { listMode?: UiListMode }
++
++/**
++ * Persist a configuration change into the active profile.
++ *
++ * The change callback receives the raw profile override and the inherited
++ * layers; returning a spread of `current` keeps every field this write does not
++ * name — including values a deployment shipped in a bundle layer, which stay
++ * inherited because they are not in `current`.
++ *
++ * @param ctx - host context; the config editor arrives through it.
++ * @param patch - the fields to write.
++ * @returns whether the write went through, and why not when it did not.
++ */
++export async function writeConfig(
++  ctx: Context,
++  patch: ConfigPatch,
++): Promise<{ ok: boolean; reason?: string }> {
++  const editor = ctx.get('configEditor') as ConfigEditorLike | undefined
++  if (editor === undefined) return { ok: false, reason: '这个组合里没有配置编辑器，改不了设置' }
++  const entry = live?.entry
++  if (entry === undefined) return { ok: false, reason: '这个插件不是由 profile 装配的，改不了设置' }
++  await editor.edit(entry, (current) => ({ ...current, ...patch }))
++  return { ok: true }
++}
++
++/** One scalar read out of the legacy YAML document. */
++function scalarOf(text: string): string | boolean | undefined {
++  let value = text
++  // A trailing comment is YAML's, not the value's — but a `#` inside a URL is not.
++  const comment = /\s#/.exec(value)
++  if (comment !== null) value = value.slice(0, comment.index)
++  value = value.trim()
++  if (value.length >= 2) {
++    const first = value[0]
++    const last = value[value.length - 1]
++    if ((first === '"' && last === '"') || (first === "'" && last === "'")) value = value.slice(1, -1)
++  }
++  if (value === 'true') return true
++  if (value === 'false') return false
++  // Block scalars, anchors, tags (`!!js`) and explicit nulls are not ours to guess.
++  if (value === 'null' || value === '~' || /^[|>&*!]/.test(value)) return undefined
++  return value
++}
++
++/**
++ * The two sections this plugin used to own, read from a legacy settings document.
++ *
++ * A deliberately narrow reader: the old settings service wrote one flat namespace
++ * per plugin with scalar values, which is exactly what these two sections are.
++ * Anything that does not look like a plain scalar is skipped rather than guessed
++ * at, and the caller validates the result against the schema before writing.
++ *
++ * @param text - the `settings.yaml` (or `settings.yaml.imported`) body.
++ * @returns the sections that were found, each a plain field map.
++ */
++export function parseLegacySettings(text: string): Record<string, Record<string, unknown>> {
++  const found: Record<string, Record<string, unknown>> = {}
++  let section: string | undefined
++  for (const raw of text.split(/\r?\n/)) {
++    if (raw.trim().length === 0 || /^\s*#/.test(raw)) continue
++    if (!/^\s/.test(raw)) {
++      const header = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(raw)
++      const name = header?.[1]
++      // A section with inline content (`ui: {}`) is not one of ours.
++      section =
++        name !== undefined && (header?.[2] ?? '') === '' && (name === LEGACY_WEBDAV_SECTION || name === LEGACY_UI_SECTION)
++          ? name
++          : undefined
++      if (section !== undefined) found[section] = {}
++      continue
++    }
++    if (section === undefined) continue
++    const field = /^\s+([A-Za-z][A-Za-z0-9_]*):\s*(.*)$/.exec(raw)
++    if (field === null) continue
++    const value = scalarOf(field[2] ?? '')
++    if (value !== undefined) (found[section] as Record<string, unknown>)[field[1] as string] = value
++  }
++  return found
++}
++
++/**
++ * Adopt what an earlier release stored in `$DSH_HOME/settings.yaml`.
++ *
++ * The harness imports that document once, mapping each section id to an entry of
++ * the same id. This plugin's sections (`dsh-inbox-webdav`, `dsh-inbox-ui`) name
++ * no entry, so the harness rejects them and leaves them in
++ * `settings.yaml.imported` — meaning the upgrade would otherwise lose the
++ * remote address, the 「目录」 and the layout the user chose. This runs once per
++ * profile: after the write, the profile override carries the fields and the next
++ * boot finds nothing left to adopt.
++ *
++ * A field a deployment already composed (in `inherited`) is never overwritten,
++ * and neither is one the profile already overrides.
++ *
++ * @param ctx - host context carrying `configEditor` and `profileContext`.
++ * @returns whether anything was adopted.
++ */
++export async function adoptLegacySettings(ctx: Context): Promise<boolean> {
++  const editor = ctx.get('configEditor') as ConfigEditorLike | undefined
++  const home = (ctx.get('profileContext') as ProfileContextLike | undefined)?.home
++  const entry = live?.entry
++  if (editor === undefined || home === undefined || entry === undefined) return false
++
++  const document = firstExisting([join(home, 'settings.yaml'), join(home, 'settings.yaml.imported')])
++  if (document === undefined) return false
++  const sections = parseLegacySettings(readFileSync(document, 'utf8'))
++  const legacy = { ...sections[LEGACY_WEBDAV_SECTION], ...sections[LEGACY_UI_SECTION] }
++  if (Object.keys(legacy).length === 0) return false
++
++  let adopted = false
++  await editor.edit(entry, (current, inherited) => {
++    const next = { ...current }
++    for (const [key, value] of Object.entries(legacy)) {
++      if (key in next || key in inherited) continue
++      // Only fields this schema knows, and only values it accepts: the editor
++      // would refuse the whole write otherwise, and a legacy string that
++      // disagrees with the schema is not worth failing a boot over.
++      try {
++        const candidate = Config({ ...inherited, ...next, [key]: value }) as unknown as Record<
++          string,
++          LiveRef<unknown>
++        >
++        candidate[key]?.get()
++      } catch {
++        continue
++      }
++      next[key] = value
++      adopted = true
++    }
++    return next
++  })
++  return adopted
++}
++
++/**
++ * The first path that exists.
++ *
++ * @param candidates - paths to try, in order.
++ * @returns the first one present on disk.
++ */
++function firstExisting(candidates: readonly string[]): string | undefined {
++  for (const candidate of candidates) {
++    if (existsSync(candidate)) return candidate
++  }
++  return undefined
++}
+diff --git a/fixture/src/host/index.ts b/fixture/src/host/index.ts
+index 941e800..cf6a296 100644
+--- a/fixture/src/host/index.ts
++++ b/fixture/src/host/index.ts
+@@ -3,13 +3,12 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
+ 
+ import { PACKAGE_NAME, VERSION } from '../shared/constants.js'
+ import { registerInboxCommand } from './command.js'
++import { type InboxConfig, adoptLegacySettings, defaultConfig, installConfig } from './config.js'
+ import { registerInboxRpc } from './rpc.js'
+ import { registerInboxTools } from './tools.js'
+-import { installUiSettings } from './ui/config.js'
+ import { leaseVault } from './vault/lease.js'
+ import { Vault } from './vault/vault.js'
+ import { runPull } from './webdav/run.js'
+-import { installWebdavSettings } from './webdav/config.js'
+ 
+ /** Stable Cordis plugin name for the host half. */
+ export const name = 'dsh-inbox'
+@@ -17,6 +16,9 @@ export const name = 'dsh-inbox'
+ /** Tool registry, command surface, and the storage domain form we persist through. */
+ export const inject = ['tools', 'commands', 'storageDomain']
+ 
++/** The plugin's own settings schema; the panel and the remote read it live. */
++export { Config } from './config.js'
++
+ /**
+  * Claim the vault and publish the tools.
+  *
+@@ -24,23 +26,32 @@ export const inject = ['tools', 'commands', 'storageDomain']
+  * every caller reads whatever is open at call time, and reports the failure
+  * instead of pretending the vault is empty when it is not.
+  *
+- * The claim goes through `./vault/lease.js` because dsh loads this plugin twice
+- * in one process (profile bundle + agent preset) while the storage domain
+- * allows a single open per name — the second instance used to fail with
++ * The claim goes through `./vault/lease.js` because a session that composes this
++ * plugin a second time (a profile row plus a preset row) would otherwise hit the
++ * storage domain's single-open rule — the second instance used to fail with
+  * `domain 'dsh_inbox' is already open` and every tool it published answered
+- * 「仓库没有打开」. The first instance owns the vault; the rest borrow it.
++ * 「仓库没有打开」. The first instance owns the vault; the rest borrow it. Since
++ * 0.2.0 the shipped install wires the plugin into the profile only — the tools
++ * reach every agent from there — but the lease stays as the safety net.
+  *
+  * @param ctx - host plugin context carrying the tool registry and storage.
++ * @param config - this entry's live configuration (see `./config.js`).
+  */
+-export function apply(ctx: Context): void {
+-  // Declare the configuration namespace before anything reads it — and *after*
+-  // the settings service exists. Registering eagerly at load looked right and
+-  // silently did nothing: the service is not live yet, `ctx.get('settings')`
+-  // answered undefined, and every read afterwards saw the defaults instead of
+-  // the user's stored values.
+-  ctx.inject(['settings'], (withSettings) => {
+-    installWebdavSettings(withSettings)
+-    installUiSettings(withSettings)
++export function apply(ctx: Context, config: InboxConfig = defaultConfig()): void {
++  // Publish the configuration references before anything reads them: the panel,
++  // the tools and the remote all read through `./config.js`.
++  installConfig(config, ctx.fiber.entry)
++  /*
++    Adopt what an older release left in `$DSH_HOME/settings.yaml`.
++
++    The harness imports that document once, by section id → entry id; this
++    plugin's sections name no entry, so without this step the user's remote
++    address and 「目录」 would be stranded in `settings.yaml.imported`.
++    Deliberately fire-and-forget: a failed adoption must never hold up a boot,
++    and the panel can still write the values again.
++  */
++  ctx.inject(['configEditor', 'profileContext'], (scoped) => {
++    void adoptLegacySettings(scoped).catch(() => undefined)
+   })
+   const lease = leaseVault(ctx, (opened) => {
+     // One pull per start, in the background: whatever the phone dropped should
+diff --git a/fixture/src/host/remote/merge.ts b/fixture/src/host/remote/merge.ts
+index 8f11283..082a62c 100644
+--- a/fixture/src/host/remote/merge.ts
++++ b/fixture/src/host/remote/merge.ts
+@@ -338,7 +338,7 @@ export async function mergeRemote(
+    */
+   extraRoots: readonly string[] = [],
+ ): Promise<MergeOutcome> {
+-  const settings = readSettings(ctx)
++  const settings = readSettings()
+   const prefix = syncRoot(settings)
+   try {
+     const tree =
+diff --git a/fixture/src/host/remote/writer.ts b/fixture/src/host/remote/writer.ts
+index 90d5e51..87a5927 100644
+--- a/fixture/src/host/remote/writer.ts
++++ b/fixture/src/host/remote/writer.ts
+@@ -57,7 +57,7 @@ export function syncRoot(settings: WebdavSettings): string {
+  * @returns the writer and the sync root, or why there is none.
+  */
+ export async function remoteWriter(ctx: Context): Promise<RemoteWriterResult> {
+-  const settings = readSettings(ctx)
++  const settings = readSettings()
+   try {
+     if (settings.protocol === 's3') {
+       if (settings.endpoint.trim().length === 0 || settings.bucket.trim().length === 0) {
+diff --git a/fixture/src/host/rpc.ts b/fixture/src/host/rpc.ts
+index 9f7ce0d..9a8c20b 100644
+--- a/fixture/src/host/rpc.ts
++++ b/fixture/src/host/rpc.ts
+@@ -591,7 +591,7 @@ async function handleWebdav(
+       patch.accessKeySecret = request.accessKeySecret
+     }
+     if (typeof request.userAgent === 'string') patch.userAgent = request.userAgent
+-    const saved = await saveWebdav(ctx, vault, readSettings(ctx), patch)
++    const saved = await saveWebdav(ctx, vault, patch)
+     if (!saved.ok) return failure('inbox/webdav-unsaved', saved.reason ?? '存不进去')
+   }
+ 
+@@ -608,7 +608,6 @@ async function handlePull(
+   if (vault === undefined) {
+     return failure('inbox/vault-closed', 'inbox 仓库还没打开（或打开失败），稍后再试')
+   }
+-  const settings = readSettings(ctx)
+   const result: PullResult = await runPull(ctx, vault, attachments)
+   return { ok: true, value: result }
+ }
+@@ -630,7 +629,7 @@ async function handlePush(
+ 
+ /** Run the connection self-test for whichever protocol is configured. */
+ async function handleProbe(ctx: Context): Promise<InboxRpcResult<unknown>> {
+-  const settings = readSettings(ctx)
++  const settings = readSettings()
+   if (settings.protocol === 's3') {
+     if (settings.endpoint.trim().length === 0 || settings.bucket.trim().length === 0) {
+       return failure('inbox/unconfigured', '还没配置 S3 的 endpoint 或 bucket，先填上再自检')
+@@ -742,7 +741,7 @@ async function handleUi(ctx: Context, payload: unknown): Promise<InboxRpcResult<
+   if (!parsed.success) return failure('inbox/bad-ui-request', parsed.error.message)
+ 
+   if (parsed.data.action === 'save' && parsed.data.listMode !== undefined) {
+-    const saved = saveUiPrefs(ctx, { listMode: parsed.data.listMode })
++    const saved = await saveUiPrefs(ctx, { listMode: parsed.data.listMode })
+     if (!saved.ok) return failure('inbox/ui-unsaved', saved.reason ?? '存不进去')
+   }
+   return { ok: true, value: readUiPrefs(ctx) }
+diff --git a/fixture/src/host/ui/config.ts b/fixture/src/host/ui/config.ts
+index 070e196..79e19b3 100644
+--- a/fixture/src/host/ui/config.ts
++++ b/fixture/src/host/ui/config.ts
+@@ -1,74 +1,37 @@
+ /**
+  * The panel's own preferences — how it looks, not what it holds.
+  *
+- * Deliberately a namespace of its own rather than more fields on the remote
+- * namespace: "which WebDAV server do I pull from" and "how dense should the
+- * list be" are different questions that happen to share a storage service, and
+- * merging them would make the remote config the home of unrelated UI state.
++ * Since dsh 0.2.0 these are ordinary fields of the plugin's `Config`
++ * (`src/host/config.ts`): the value is live (changing it does not remount the
++ * plugin, so the panel keeps its vault), and a write persists into the active
++ * profile's `cordis.patch.yml` through the config editor — which is what the
++ * removed `settings.register(namespace, schema, { base })` seam used to do.
+  *
+- * It lives in dsh's settings (not `localStorage`) for the same reason the
+- * theme's font size does: a preference is user state, and the user should find
+- * it where they find their other settings.
++ * The panel's 「设置」 app still owns the *entry point*: 设置 → 插件 now also
++ * lists these fields, but that is a different menu and does not replace the
++ * in-panel dialog.
+  */
+ 
+ import type { Context } from '@deepseek-ai/cordis'
+-import z from '@deepseek-ai/schemastery'
+ 
+ import { UI_LIST_MODES, type UiListMode, type UiPrefs } from '../../shared/panel-wire.js'
+-
+-/** Namespace this plugin owns for panel preferences. */
+-export const UI_SETTINGS_NAMESPACE = 'dsh-inbox-ui'
++import { DEFAULT_LIST_MODE, canPersist, readListMode, writeConfig } from '../config.js'
+ 
+ /** What a fresh install looks like: two columns of cards, the roomier of the two. */
+-export const DEFAULT_UI_PREFS: UiPrefs = { listMode: 'grid' }
+-
+-/** The namespace's schema; every field optional so a partial layer is valid. */
+-export const UiPrefsSchema = z.object({
+-  listMode: z.union(['grid', 'compact']).default('grid'),
+-})
+-
+-/** The slice of the settings service this file uses. */
+-interface SettingsScope {
+-  get(): UiPrefs
+-  update(patch: Partial<UiPrefs>): void
+-}
+-
+-interface SettingsLike {
+-  register(namespace: string, schema: unknown, options: { base: UiPrefs }): SettingsScope
+-  get(namespace: string): UiPrefs | undefined
+-  update(namespace: string, patch: Partial<UiPrefs>): void
+-}
++export const DEFAULT_UI_PREFS: UiPrefs = { listMode: DEFAULT_LIST_MODE }
+ 
+ /**
+- * Declare the namespace. Registering more than once in a process throws, so a
+- * second activation of the plugin simply keeps the first declaration.
++ * Read the panel preferences.
+  *
+- * @param ctx - host context.
+- */
+-export function installUiSettings(ctx: Context): void {
+-  const settings = ctx.get('settings') as SettingsLike | undefined
+-  if (settings === undefined) return
+-  try {
+-    settings.register(UI_SETTINGS_NAMESPACE, UiPrefsSchema, { base: DEFAULT_UI_PREFS })
+-  } catch {
+-    // Already declared by an earlier activation in this process.
+-  }
+-}
+-
+-/**
+- * Read the panel preferences, falling back to the defaults.
++ * A stored mode this version no longer offers reads as the default — `rows` was
++ * a real choice until the list went to two densities, and a profile that still
++ * remembers it must land on a usable list, not on a blank one.
+  *
+- * @param ctx - host context.
+- * @returns the preferences, plus whether a settings service was there at all.
++ * @param ctx - host context; the answer also says whether a write could ever persist.
++ * @returns the preferences, plus whether a config editor is there to save them.
+  */
+ export function readUiPrefs(ctx: Context): UiPrefs & { settingsAvailable: boolean } {
+-  const settings = ctx.get('settings') as SettingsLike | undefined
+-  if (settings === undefined) return { ...DEFAULT_UI_PREFS, settingsAvailable: false }
+-  const stored = settings.get(UI_SETTINGS_NAMESPACE)?.listMode
+-  const listMode = UI_LIST_MODES.includes(stored as UiListMode)
+-    ? (stored as UiListMode)
+-    : DEFAULT_UI_PREFS.listMode
+-  return { listMode, settingsAvailable: true }
++  return { listMode: readListMode(), settingsAvailable: canPersist(ctx) }
+ }
+ 
+ /**
+@@ -78,10 +41,10 @@ export function readUiPrefs(ctx: Context): UiPrefs & { settingsAvailable: boolea
+  * @param patch - what to change; an absent field changes nothing.
+  * @returns whether the write went through, and why not when it did not.
+  */
+-export function saveUiPrefs(
++export async function saveUiPrefs(
+   ctx: Context,
+   patch: { listMode?: string },
+-): { ok: boolean; reason?: string } {
++): Promise<{ ok: boolean; reason?: string }> {
+   if (patch.listMode === undefined) return { ok: true }
+   if (!UI_LIST_MODES.includes(patch.listMode as UiListMode)) {
+     return {
+@@ -89,9 +52,5 @@ export function saveUiPrefs(
+       reason: `列表模式只支持 ${UI_LIST_MODES.join(' / ')}，收到的是 ${patch.listMode}`,
+     }
+   }
+-  const settings = ctx.get('settings') as SettingsLike | undefined
+-  if (settings === undefined) return { ok: false, reason: '这个组合里没有设置服务，记不住列表模式' }
+-  installUiSettings(ctx)
+-  settings.update(UI_SETTINGS_NAMESPACE, { listMode: patch.listMode as UiListMode })
+-  return { ok: true }
++  return writeConfig(ctx, { listMode: patch.listMode as UiListMode })
+ }
+diff --git a/fixture/src/host/webdav/config.ts b/fixture/src/host/webdav/config.ts
+index f5e0594..777ed1a 100644
+--- a/fixture/src/host/webdav/config.ts
++++ b/fixture/src/host/webdav/config.ts
+@@ -1,28 +1,26 @@
+ /**
+  * Where the WebDAV settings live, and why they live there.
+  *
+- * URL, folder and username are *configuration*: they belong in dsh's settings
+- * service, so a deployment can ship defaults and a user can change them from a
+- * configuration surface. The password is a *secret*: it goes through the
+- * credentials service, which keeps values out of configuration files entirely.
++ * URL, folder and username are *configuration*: they belong on the plugin's own
++ * Cordis `Config` (declared in `../config.ts`), so a deployment can ship
++ * defaults and a user can change them from a configuration surface. The password
++ * is a *secret*: it goes through the credentials service, which keeps values out
++ * of configuration files entirely.
+  *
+- * Both services are optional. Without them the plugin keeps working from its own
+- * composed values — a headless profile has no settings provider and must not
+- * break — and the panel simply says what is missing.
++ * Both services are optional. Without a config editor the plugin keeps working
++ * from the composed defaults — a headless profile has none and must not break —
++ * and the panel simply says what is missing.
+  */
+ 
+ import type { Context } from '@deepseek-ai/cordis'
+-import z from '@deepseek-ai/schemastery'
+ 
+ import type { WebdavSettings, WebdavStatus } from '../../shared/panel-wire.js'
+ import { DEFAULT_USER_AGENT } from '../../shared/constants.js'
++import { canPersist, readWebdavSettings, writeConfig } from '../config.js'
+ import type { Vault } from '../vault/vault.js'
+ 
+ export type { WebdavSettings, WebdavStatus } from '../../shared/panel-wire.js'
+ 
+-/** Namespace this plugin owns in the settings service. */
+-export const SETTINGS_NAMESPACE = 'dsh-inbox-webdav'
+-
+ /** The credential key holding the password. */
+ export const PASSWORD_KEY = 'DSH_INBOX_WEBDAV_PASSWORD'
+ 
+@@ -30,53 +28,7 @@ export const PASSWORD_KEY = 'DSH_INBOX_WEBDAV_PASSWORD'
+ export const S3_SECRET_KEY = 'DSH_INBOX_S3_SECRET'
+ 
+ /** The composed defaults, so a fresh install has a sane shape. */
+-export const DEFAULT_SETTINGS: WebdavSettings = {
+-  protocol: 'webdav',
+-  baseUrl: '',
+-  directory: '/inbox',
+-  adoptForeignRoots: false,
+-  username: '',
+-  endpoint: '',
+-  bucket: '',
+-  region: 'us-east-1',
+-  signatureVersion: 'v4',
+-  accessKeyId: '',
+-  userAgent: '',
+-  webdavUserAgent: '',
+-}
+-
+-/** The namespace's schema: every field optional, so a partial user layer is valid. */
+-export const WebdavSettingsSchema = z.object({
+-  protocol: z.union(['webdav', 's3']).default('webdav'),
+-  baseUrl: z.string().default(''),
+-  directory: z.string().default('/inbox'),
+-  adoptForeignRoots: z.boolean().default(false),
+-  username: z.string().default(''),
+-  endpoint: z.string().default(''),
+-  bucket: z.string().default(''),
+-  region: z.string().default('us-east-1'),
+-  signatureVersion: z.string().default('v4'),
+-  accessKeyId: z.string().default(''),
+-  userAgent: z.string().default(''),
+-  webdavUserAgent: z.string().default(''),
+-})
+-
+-/** The slice of the settings service this file uses. */
+-interface SettingsScope {
+-  get(): WebdavSettings
+-  update(patch: Partial<WebdavSettings>): void
+-}
+-
+-interface SettingsLike {
+-  register(
+-    namespace: string,
+-    schema: unknown,
+-    options: { base: WebdavSettings },
+-  ): SettingsScope
+-  get(namespace: string): WebdavSettings | undefined
+-  /** Namespace-addressed write: no scope object required. */
+-  update(namespace: string, patch: Partial<WebdavSettings>): void
+-}
++export { DEFAULT_REMOTE_SETTINGS as DEFAULT_SETTINGS } from '../config.js'
+ 
+ /** The slice of the credentials service this file uses. */
+ interface CredentialsLike {
+@@ -85,33 +37,16 @@ interface CredentialsLike {
+   unset(ref: string): Promise<void>
+ }
+ 
+-/** Resolve the current settings, falling back to the composed defaults. */
+-export function readSettings(ctx: Context): WebdavSettings {
+-  const settings = ctx.get('settings') as SettingsLike | undefined
+-  if (settings === undefined) return DEFAULT_SETTINGS
+-  return settings.get(SETTINGS_NAMESPACE) ?? DEFAULT_SETTINGS
+-}
+-
+ /**
+- * Declare the namespace once, at plugin load.
++ * Resolve the current settings.
+  *
+- * Registering lazily on the first save looked harmless and was not: before that
+- * first save, `get()` answers undefined for an unregistered namespace, so the
+- * panel loaded *defaults* instead of the stored overrides — and the next save
+- * wrote those defaults back over the user's real values. Declaring up front is
+- * the whole point of a settings namespace.
++ * Reads the live `Config` references, so a change the user just saved reaches
++ * the very next pull without remounting the plugin.
+  *
+- * @param ctx - host context.
+- * @param base - composed defaults for this deployment.
++ * @returns a detached snapshot of the remote settings.
+  */
+-export function installWebdavSettings(ctx: Context, base: WebdavSettings = DEFAULT_SETTINGS): void {
+-  const settings = ctx.get('settings') as SettingsLike | undefined
+-  if (settings === undefined) return
+-  try {
+-    settings.register(SETTINGS_NAMESPACE, WebdavSettingsSchema, { base })
+-  } catch {
+-    // Another activation of this plugin already declared it in this process.
+-  }
++export function readSettings(): WebdavSettings {
++  return readWebdavSettings()
+ }
+ 
+ /** Read the password, or undefined when none is stored. */
+@@ -142,10 +77,10 @@ export async function describeWebdav(ctx: Context): Promise<WebdavStatus> {
+   const password = await readPassword(ctx)
+   const secret = await readS3Secret(ctx)
+   return {
+-    settings: readSettings(ctx),
++    settings: readSettings(),
+     passwordSet: password !== undefined,
+     secretSet: secret !== undefined,
+-    settingsAvailable: ctx.get('settings') !== undefined,
++    settingsAvailable: canPersist(ctx),
+     credentialsAvailable: credentials !== undefined,
+   }
+ }
+@@ -205,23 +140,20 @@ export function normalizeUrl(value: string): string {
+ /**
+  * Persist a configuration change.
+  *
+- * The password never lands in settings: it is written (or cleared) through the
+- * credentials service, and a composition without one refuses the write instead
+- * of quietly storing a secret somewhere else.
++ * The password never lands in configuration: it is written (or cleared) through
++ * the credentials service, and a composition without one refuses the write
++ * instead of quietly storing a secret somewhere else.
+  *
+  * @param ctx - host context.
+  * @param vault - the open vault, used for the "settings unavailable" fallback.
+- * @param base - composed defaults for the settings base layer.
+  * @param patch - what to change.
+  * @returns whether the write went through, and why not when it did not.
+  */
+ export async function saveWebdav(
+   ctx: Context,
+   vault: Vault | undefined,
+-  base: WebdavSettings,
+   patch: WebdavPatch,
+ ): Promise<{ ok: boolean; reason?: string }> {
+-  const settings = ctx.get('settings') as SettingsLike | undefined
+   const credentials = ctx.get('credentials') as CredentialsLike | undefined
+ 
+   const config: Partial<WebdavSettings> = {}
+@@ -251,20 +183,20 @@ export async function saveWebdav(
+     const protocol =
+       patch.protocol === 'webdav' || patch.protocol === 's3'
+         ? patch.protocol
+-        : readSettings(ctx).protocol
++        : readSettings().protocol
+     if (protocol === 'webdav') config.webdavUserAgent = patch.userAgent.trim()
+     else config.userAgent = patch.userAgent.trim()
+   }
+ 
+   if (Object.keys(config).length > 0) {
+-    if (settings === undefined) {
+-      return { ok: false, reason: '这个组合里没有设置服务，改不了地址' }
++    if (!canPersist(ctx)) {
++      return { ok: false, reason: '这个组合里没有配置编辑器，改不了地址' }
+     }
+-    // The namespace is declared at load time; here we only write. `update()`
+-    // merges into the *user* layer and persists, leaving the composed base the
+-    // deployment's — which is what makes a shipped default work.
+-    installWebdavSettings(ctx, base)
+-    settings.update(SETTINGS_NAMESPACE, config)
++    // The write goes into the profile's cordis.patch.yml through the config
++    // editor, so a composed default a deployment shipped stays inherited and
++    // only the fields named here are overridden.
++    const saved = await writeConfig(ctx, config)
++    if (!saved.ok) return saved
+   }
+ 
+   if (patch.password !== undefined) {
+diff --git a/fixture/src/host/webdav/run.ts b/fixture/src/host/webdav/run.ts
+index bc82676..afe727f 100644
+--- a/fixture/src/host/webdav/run.ts
++++ b/fixture/src/host/webdav/run.ts
+@@ -106,7 +106,7 @@ async function withMerge(
+     trees the pull found elsewhere are merged too — same per-record rule, so an
+     older tree cannot overwrite a newer copy.
+   */
+-  const settings = readSettings(ctx)
++  const settings = readSettings()
+   const extraRoots = settings.adoptForeignRoots ? (pulled.foreignSyncRoots ?? []) : []
+   const outcome = await mergeRemote(ctx, vault, attachments, extraRoots)
+   const troubles = [...(pulled.failed > 0 && pulled.reason !== undefined ? [pulled.reason] : []), ...outcome.failures]
+@@ -129,7 +129,7 @@ async function pullDropFolder(
+   vault: Vault,
+   attachments: AttachmentStore | undefined,
+ ): Promise<PullResult> {
+-  const settings = readSettings(ctx)
++  const settings = readSettings()
+   if (attachments === undefined) {
+     return {
+       status: 'failed',
+diff --git a/fixture/test/card.test.ts b/fixture/test/card.test.ts
+index c3198de..27b6070 100644
+--- a/fixture/test/card.test.ts
++++ b/fixture/test/card.test.ts
+@@ -10,7 +10,7 @@
+ 
+ import { describe, expect, it } from 'vitest'
+ 
+-import { recordIdsIn } from '../src/client/card.js'
++import { recordIdsIn, resultText } from '../src/client/card.js'
+ 
+ const ID = '5b1f7c9e-2f4a-4c3b-9f1e-8a7d6c5b4a39'
+ 
+@@ -38,3 +38,33 @@ describe('recordIdsIn', () => {
+     expect(recordIdsIn('我帮你找到了 3 条记录，id 我就没贴出来了。')).toEqual([])
+   })
+ })
++
++describe('resultText', () => {
++  it('reads text parts out of a settled result block', () => {
++    // 0.2.0's settled block carries `content` blocks rather than a `text` field.
++    expect(
++      resultText('result', {
++        content: [
++          { type: 'text', text: '找到了 2 条' },
++          { type: 'image', attachmentId: 'sha256:x' },
++          { type: 'text', text: 'id: ' + ID },
++        ],
++      }),
++    ).toBe(`找到了 2 条\nid: ${ID}`)
++  })
++
++  it('says nothing while the call is still preparing or started', () => {
++    // The three-phase union: only `result` has content. Reading the block at
++    // every stage is what this replaced, and it rendered an empty card.
++    expect(resultText('preparing', {})).toBeUndefined()
++    expect(resultText('start', {})).toBeUndefined()
++    // A composition that passes no phase keeps the old tolerant behaviour.
++    expect(resultText(undefined, { text: 'ok' })).toBe('ok')
++  })
++
++  it('ignores blocks that carry no usable text', () => {
++    expect(resultText('result', {})).toBeUndefined()
++    expect(resultText('result', { content: [] })).toBeUndefined()
++    expect(resultText('result', { content: [{ type: 'image' }, 'nope', null] })).toBeUndefined()
++  })
++})
+diff --git a/fixture/test/cli.test.ts b/fixture/test/cli.test.ts
+index 1e63e52..1a159f0 100644
+--- a/fixture/test/cli.test.ts
++++ b/fixture/test/cli.test.ts
+@@ -3,10 +3,12 @@
+  *
+  * The installer itself writes into someone's `~/.dsh`, so the tests stay on the
+  * parser: defaults, the flags the README documents, and the refusals (unknown
+- * flag, missing value, a preset id that would not be a directory-safe name).
+- * `--create-profile` is here because it is the difference between "one command
+- * installs it" being true and being true only for people who already have the
+- * profile.
++ * flag, missing value). `--create-profile` is here because it is the difference
++ * between "one command installs it" being true and being true only for people
++ * who already have the profile.
++ *
++ * The preset half is gone: 0.2.0 declares presets as bundle rows, so there is
++ * nothing left for the installer to copy or point at.
+  */
+ 
+ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+@@ -18,7 +20,6 @@ import { describe, expect, it } from 'vitest'
+ 
+ import {
+   chooseProfile,
+-  ensurePresetRow,
+   isEntryPoint,
+   listProfiles,
+   missingPnpmMessage,
+@@ -27,27 +28,11 @@ import {
+   profileCreationAttempts,
+ } from '../src/cli.js'
+ 
+-/** A composition that already speaks for a couple of other plugins. */
+-const COMPOSITION = [
+-  '- id: tool-web',
+-  "  name: '@deepseek-ai/dsh-tool-web'",
+-  '',
+-  '# dsh-inbox: the vault tools',
+-  '- id: dsh-inbox',
+-  "  name: '@oldscope/dsh-inbox'",
+-  '',
+-].join('\n')
+-
+-/** How many times our row appears; two would mean two loads of one plugin. */
+-const rows = (body: string): number => (body.match(/- id: dsh-inbox/g) ?? []).length
+-
+ describe('dsh-inbox init arguments', () => {
+   it('leaves the profile to be detected when one was not named', () => {
+     expect(parse(['init'])).toEqual({
+       profile: undefined,
+-      preset: 'inbox',
+       source: '@chance722/dsh-inbox',
+-      defaultPreset: true,
+       createProfile: false,
+       installPnpm: false,
+     })
+@@ -61,19 +46,14 @@ describe('dsh-inbox init arguments', () => {
+         'init',
+         '--profile',
+         'web',
+-        '--preset',
+-        'mine',
+         '--package',
+         'C:\\repo\\dsh-inbox',
+-        '--no-default',
+         '--create-profile',
+         '--install-pnpm',
+       ]),
+     ).toEqual({
+       profile: 'web',
+-      preset: 'mine',
+       source: 'C:\\repo\\dsh-inbox',
+-      defaultPreset: false,
+       createProfile: true,
+       installPnpm: true,
+     })
+@@ -94,10 +74,12 @@ describe('dsh-inbox init arguments', () => {
+   it('refuses what it cannot act on', () => {
+     expect(() => parse(['--mystery'])).toThrow(/看不懂的选项/)
+     expect(() => parse(['--profile'])).toThrow(/需要一个值/)
+-    expect(() => parse(['--preset'])).toThrow(/需要一个值/)
+-    // A preset id becomes a directory name under `~/.dsh/.agent-presets`.
+-    expect(() => parse(['--preset', 'Inbox 2'])).toThrow(/preset id/)
+-    expect(() => parse(['--preset', '../evil'])).toThrow(/preset id/)
++    expect(() => parse(['--package'])).toThrow(/需要一个值/)
++    // The preset flags configured a directory `~/.dsh/.agent-presets` that
++    // nothing reads any more; accepting them silently would be worse than
++    // saying they are gone.
++    expect(() => parse(['--preset', 'mine'])).toThrow(/看不懂的选项/)
++    expect(() => parse(['--no-default'])).toThrow(/看不懂的选项/)
+   })
+ })
+ 
+@@ -231,41 +213,3 @@ describe('running as a program', () => {
+     }
+   })
+ })
+-
+-describe('the preset row', () => {
+-  it('adds the row when the preset has never heard of us', () => {
+-    const outcome = ensurePresetRow('- id: tool-web\n')
+-    expect(outcome.change).toBe('added')
+-    expect(outcome.body).toContain("- id: dsh-inbox\n  name: '@chance722/dsh-inbox'")
+-    expect(rows(outcome.body)).toBe(1)
+-  })
+-
+-  it('leaves the file alone when the row already points at the package', () => {
+-    const body = COMPOSITION.replace('@oldscope/dsh-inbox', '@chance722/dsh-inbox')
+-    const outcome = ensurePresetRow(body)
+-    expect(outcome.change).toBe('unchanged')
+-    expect(outcome.body).toBe(body)
+-  })
+-
+-  it('renames a row left over from an older package name instead of adding a second one', () => {
+-    // The trap: the package was renamed, so matching by name would say "not
+-    // there" and append a row pointing at a package that no longer resolves.
+-    const outcome = ensurePresetRow(COMPOSITION)
+-    expect(outcome.change).toBe('renamed')
+-    expect(outcome.from).toBe('@oldscope/dsh-inbox')
+-    expect(outcome.body).toContain("name: '@chance722/dsh-inbox'")
+-    expect(outcome.body).not.toContain('@oldscope/dsh-inbox')
+-    expect(rows(outcome.body)).toBe(1)
+-    // Everything else in the file is untouched.
+-    expect(outcome.body).toContain("name: '@deepseek-ai/dsh-tool-web'")
+-  })
+-
+-  it('copes with the quoting styles YAML allows', () => {
+-    for (const line of ['  name: @oldscope/dsh-inbox', '  name: "@oldscope/dsh-inbox"']) {
+-      const outcome = ensurePresetRow(`- id: dsh-inbox\n${line}\n`)
+-      expect(outcome.change).toBe('renamed')
+-      expect(outcome.body).toContain('@chance722/dsh-inbox')
+-      expect(outcome.body).not.toContain('@oldscope/dsh-inbox')
+-    }
+-  })
+-})
+diff --git a/fixture/test/config.test.ts b/fixture/test/config.test.ts
+new file mode 100644
+index 0000000..ef140a7
+--- /dev/null
++++ b/fixture/test/config.test.ts
+@@ -0,0 +1,230 @@
++/**
++ * The plugin's live configuration: the schema, the write path, and the one-time
++ * adoption of what an older release left in `$DSH_HOME/settings.yaml`.
++ *
++ * The adoption is the part with a deadline — the harness renames the global
++ * settings document at first boot, so anything not read out of it is stranded —
++ * and the part where guessing would be worse than skipping.
++ */
++
++import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++
++import type { Context } from '@deepseek-ai/cordis'
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
++
++import {
++  Config,
++  DEFAULT_REMOTE_SETTINGS,
++  type InboxConfig,
++  adoptLegacySettings,
++  installConfig,
++  parseLegacySettings,
++  readWebdavSettings,
++  writeConfig,
++} from '../src/host/config.js'
++
++/**
++ * A config editor that keeps the profile override in memory.
++ *
++ * @param initial - the profile override the document starts from.
++ * @param inherited - the composed layers beneath the profile override.
++ */
++function fakeConfig(initial?: Record<string, unknown>, inherited: Record<string, unknown> = {}) {
++  let current: Record<string, unknown> = { ...initial }
++  const entry = { options: { id: 'dsh-inbox' } }
++  const publish = (): void => {
++    installConfig(Config(current) as unknown as InboxConfig, entry)
++  }
++  publish()
++  return {
++    current: () => current,
++    entry,
++    edit: vi.fn(
++      async (
++        _entry: unknown,
++        change: (
++          current: Record<string, unknown>,
++          inherited: Record<string, unknown>,
++        ) => Record<string, unknown>,
++      ) => {
++        current = change(current, inherited)
++        publish()
++      },
++    ),
++  }
++}
++
++/** What an older release wrote for this plugin, plus a neighbour's section. */
++const LEGACY = `# dsh settings, written by 0.1.5
++ui-settings:
++  theme: dark
++dsh-inbox-webdav:
++  protocol: s3
++  baseUrl: https://data.cstcloud.cn/dav
++  directory: vault
++  adoptForeignRoots: true
++  username: "me"
++  endpoint: 's3.cstcloud.cn'
++  region: cn-north-1   # a trailing comment
++  note: !!js process.env.SECRET
++dsh-inbox-ui:
++  listMode: compact
++`
++
++let home: string
++
++beforeEach(() => {
++  home = mkdtempSync(join(tmpdir(), 'dsh-inbox-config-'))
++})
++
++afterEach(() => {
++  rmSync(home, { recursive: true, force: true })
++})
++
++/** A host context with only the two services the adoption needs. */
++function context(parts: { configEditor?: unknown; home?: string }): Context {
++  return {
++    get: (name: string) => {
++      if (name === 'configEditor') return parts.configEditor
++      if (name === 'profileContext') return parts.home === undefined ? undefined : { home: parts.home }
++      return undefined
++    },
++  } as unknown as Context
++}
++
++describe('the legacy settings document', () => {
++  it('reads this plugin two sections and leaves the neighbours alone', () => {
++    expect(parseLegacySettings(LEGACY)).toEqual({
++      'dsh-inbox-webdav': {
++        protocol: 's3',
++        baseUrl: 'https://data.cstcloud.cn/dav',
++        directory: 'vault',
++        adoptForeignRoots: true,
++        username: 'me',
++        endpoint: 's3.cstcloud.cn',
++        region: 'cn-north-1',
++      },
++      'dsh-inbox-ui': { listMode: 'compact' },
++    })
++  })
++
++  it('skips a tag or anchor it would have to evaluate', () => {
++    // `!!js` is a live expression; adopting it as the literal string would be
++    // worse than leaving the field at its default.
++    const parsed = parseLegacySettings('dsh-inbox-webdav:\n  baseUrl: !!js process.env.URL\n')
++    expect(parsed['dsh-inbox-webdav']).toEqual({})
++  })
++
++  it('keeps a hash that is part of a value, and drops one that is a comment', () => {
++    const parsed = parseLegacySettings(
++      'dsh-inbox-webdav:\n  baseUrl: https://host/dav#/root\n  username: me # me\n',
++    )
++    expect(parsed['dsh-inbox-webdav']).toEqual({
++      baseUrl: 'https://host/dav#/root',
++      username: 'me',
++    })
++  })
++
++  it('finds nothing in a document that has neither section', () => {
++    expect(parseLegacySettings('ui-settings:\n  theme: dark\n')).toEqual({})
++  })
++})
++
++describe('adopting the legacy values', () => {
++  it('writes them into the profile once, and not again', async () => {
++    writeFileSync(join(home, 'settings.yaml'), LEGACY, 'utf8')
++    const editor = fakeConfig()
++    const ctx = context({ configEditor: editor, home })
++
++    expect(await adoptLegacySettings(ctx)).toBe(true)
++    expect(editor.current()).toMatchObject({
++      protocol: 's3',
++      baseUrl: 'https://data.cstcloud.cn/dav',
++      directory: 'vault',
++      adoptForeignRoots: true,
++      username: 'me',
++      endpoint: 's3.cstcloud.cn',
++      region: 'cn-north-1',
++      listMode: 'compact',
++    })
++    // The adopted values are live: the very next read answers them.
++    expect(readWebdavSettings().baseUrl).toBe('https://data.cstcloud.cn/dav')
++    expect(readWebdavSettings().protocol).toBe('s3')
++
++    // Second boot: every field is already in the profile override.
++    expect(await adoptLegacySettings(ctx)).toBe(false)
++  })
++
++  it('reads the renamed document the harness leaves behind', async () => {
++    // The settings service renames `settings.yaml` to `settings.yaml.imported`
++    // before it writes anything; an install that boots before the plugin is
++    // present finds only the renamed file.
++    writeFileSync(join(home, 'settings.yaml.imported'), LEGACY, 'utf8')
++    const editor = fakeConfig()
++    expect(await adoptLegacySettings(context({ configEditor: editor, home }))).toBe(true)
++    expect(editor.current().username).toBe('me')
++  })
++
++  it('never overwrites a value the profile or a deployment already set', async () => {
++    writeFileSync(join(home, 'settings.yaml'), LEGACY, 'utf8')
++    // `inherited` is the composed layer under the profile override: a bundle
++    // that ships a username keeps it, and a profile override wins too.
++    const editor = fakeConfig({ baseUrl: 'https://mine.example/dav' }, { username: 'shipped' })
++    await adoptLegacySettings(context({ configEditor: editor, home }))
++    expect(editor.current()).toMatchObject({
++      baseUrl: 'https://mine.example/dav',
++      region: 'cn-north-1',
++      directory: 'vault',
++    })
++    // The inherited value is not copied into the profile override, so a later
++    // change to the deployment layer still reaches this install.
++    expect(editor.current()).not.toHaveProperty('username')
++  })
++
++  it('does nothing when there is no document to read', async () => {
++    expect(await adoptLegacySettings(context({ configEditor: fakeConfig(), home }))).toBe(false)
++  })
++
++  it('does nothing without an editor', async () => {
++    writeFileSync(join(home, 'settings.yaml'), LEGACY, 'utf8')
++    expect(await adoptLegacySettings(context({ home }))).toBe(false)
++  })
++
++  it('does nothing without a profile home', async () => {
++    writeFileSync(join(home, 'settings.yaml'), LEGACY, 'utf8')
++    expect(await adoptLegacySettings(context({ configEditor: fakeConfig() }))).toBe(false)
++  })
++
++  it('does nothing when the plugin has no Loader entry to write to', async () => {
++    writeFileSync(join(home, 'settings.yaml'), LEGACY, 'utf8')
++    const editor = fakeConfig()
++    installConfig(Config({}) as unknown as InboxConfig, undefined)
++    expect(await adoptLegacySettings(context({ configEditor: editor, home }))).toBe(false)
++    expect(editor.edit).not.toHaveBeenCalled()
++  })
++})
++
++describe('writing the configuration', () => {
++  it('refuses when there is no editor, and reports the reason', async () => {
++    fakeConfig()
++    const result = await writeConfig(context({}), { baseUrl: 'https://x' })
++    expect(result.ok).toBe(false)
++    expect(result.reason).toContain('配置编辑器')
++  })
++
++  it('keeps every field the patch does not name', async () => {
++    const editor = fakeConfig({ bucket: 'vault' })
++    const result = await writeConfig(context({ configEditor: editor }), { baseUrl: 'https://x' })
++    expect(result.ok).toBe(true)
++    expect(editor.current()).toEqual({ bucket: 'vault', baseUrl: 'https://x' })
++  })
++})
++
++describe('the schema', () => {
++  it('answers every documented default', () => {
++    fakeConfig()
++    expect(readWebdavSettings()).toEqual(DEFAULT_REMOTE_SETTINGS)
++  })
++})
+diff --git a/fixture/test/host.test.ts b/fixture/test/host.test.ts
+index e5b0659..42ac3bf 100644
+--- a/fixture/test/host.test.ts
++++ b/fixture/test/host.test.ts
+@@ -21,6 +21,9 @@ function fakeContext() {
+     inject,
+     ctx: {
+       get: () => undefined,
++      // The configuration is published through `ctx.fiber.entry`, which is
++      // where a settings write lands.
++      fiber: { entry: { options: { id: 'dsh-inbox' } } },
+       tools: { register },
+       commands: { register: registerCommand },
+       effect,
+diff --git a/fixture/test/manual.test.ts b/fixture/test/manual.test.ts
+index d644397..a0e63d1 100644
+--- a/fixture/test/manual.test.ts
++++ b/fixture/test/manual.test.ts
+@@ -34,10 +34,11 @@ describe('the panel manual', () => {
+   })
+ 
+   it('says how the conversation tools actually become visible', () => {
+-    // The rule that bites: the panel works as soon as the plugin is installed,
+-    // but the *assistant* only sees the tools in a session that carries the
+-    // plugin — and that has to be said in the user's words, not in preset jargon.
+-    expect(MESSAGES.zh['manual.6.tools.body']).toContain('没带上收件箱插件')
++    // The rule that bites: the tools come from the profile composition every
++    // session in that profile inherits, so a session that cannot see them means
++    // the *profile* has no plugin — and that has to be said in the user's words,
++    // not in preset jargon.
++    expect(MESSAGES.zh['manual.6.tools.body']).toContain('profile 里没有收件箱插件')
+     expect(MESSAGES.zh['manual.6.tools.body']).toContain('新开一个会话')
+     expect(MESSAGES.en['manual.6.tools.body']).toContain('new session')
+     // No internal milestones or tool names the reader never typed: the manual
+diff --git a/fixture/test/ui-config.test.ts b/fixture/test/ui-config.test.ts
+index 8373e1d..359699d 100644
+--- a/fixture/test/ui-config.test.ts
++++ b/fixture/test/ui-config.test.ts
+@@ -1,93 +1,95 @@
+ /**
+- * The panel's own preferences: a namespace of their own, a bad value refused,
+- * and a composition without a settings service degrading to defaults instead of
+- * throwing.
++ * The panel's own preferences, now a field of the plugin's `Config`.
++ *
++ * The seam these tests pin down: the value is read from the live configuration
++ * references, a write goes through the config editor into the profile, and a
++ * composition without an editor refuses the write instead of pretending it
++ * remembered something.
+  */
+ 
+ import type { Context } from '@deepseek-ai/cordis'
+ import { describe, expect, it, vi } from 'vitest'
+ 
+-import {
+-  DEFAULT_UI_PREFS,
+-  UI_SETTINGS_NAMESPACE,
+-  installUiSettings,
+-  readUiPrefs,
+-  saveUiPrefs,
+-} from '../src/host/ui/config.js'
++import { Config, type InboxConfig, installConfig } from '../src/host/config.js'
++import { DEFAULT_UI_PREFS, readUiPrefs, saveUiPrefs } from '../src/host/ui/config.js'
+ 
+ /**
+- * A settings service that keeps one namespace value in memory.
++ * A config editor that keeps the profile override in memory.
+  *
+- * `listMode` is typed as a bare string on purpose: a profile written by an older
+- * version can hold a mode this version no longer offers, and the reader has to
+- * cope with exactly that.
++ * It mirrors the real one's contract in the one way that matters here: a
++ * successful write re-parses the configuration, so the references every reader
++ * holds answer the new values (the real loader commits volatile references the
++ * same way). A refused write leaves both the document and the references alone.
+  */
+-function fakeSettings(initial?: { listMode?: string }) {
+-  let current = { ...DEFAULT_UI_PREFS, ...initial }
+-  let registered = false
++function fakeConfig(initial?: Record<string, unknown>) {
++  let current: Record<string, unknown> = { ...initial }
++  const entry = { options: { id: 'dsh-inbox' } }
++  const publish = (): void => {
++    installConfig(Config(current) as unknown as InboxConfig, entry)
++  }
++  publish()
+   return {
+     current: () => current,
+-    register: vi.fn((namespace: string, _schema: unknown, options: { base: typeof DEFAULT_UI_PREFS }) => {
+-      if (registered) throw new Error(`namespace "${namespace}" is already registered`)
+-      registered = true
+-      current = { ...options.base, ...current }
+-      return { get: () => current, update: () => undefined }
+-    }),
+-    get: (namespace: string) => (namespace === UI_SETTINGS_NAMESPACE ? current : undefined),
+-    update: (namespace: string, patch: Partial<typeof DEFAULT_UI_PREFS>) => {
+-      if (namespace !== UI_SETTINGS_NAMESPACE) throw new Error('unknown namespace')
+-      current = { ...current, ...patch }
+-    },
++    entry,
++    edit: vi.fn(
++      async (
++        _entry: unknown,
++        change: (
++          current: Record<string, unknown>,
++          inherited: Record<string, unknown>,
++        ) => Record<string, unknown>,
++      ) => {
++        current = change(current, {})
++        publish()
++      },
++    ),
+   }
+ }
+ 
+-const context = (settings?: unknown): Context =>
+-  ({ get: (name: string) => (name === 'settings' ? settings : undefined) }) as unknown as Context
++const context = (parts: { configEditor?: unknown }): Context =>
++  ({ get: (name: string) => (name === 'configEditor' ? parts.configEditor : undefined) }) as unknown as Context
+ 
+ describe('panel preferences', () => {
+-  it('falls back to the default layout with no settings service', () => {
+-    expect(readUiPrefs(context())).toEqual({ ...DEFAULT_UI_PREFS, settingsAvailable: false })
+-    expect(readUiPrefs(context(fakeSettings())).listMode).toBe('grid')
++  it('reads the composed default when nothing overrides it', () => {
++    fakeConfig()
++    expect(readUiPrefs(context({}))).toEqual({ ...DEFAULT_UI_PREFS, settingsAvailable: false })
+   })
+ 
+-  it('remembers the chosen layout', () => {
+-    const settings = fakeSettings()
+-    const ctx = context(settings)
++  it('remembers the chosen layout in the profile configuration', async () => {
++    const editor = fakeConfig()
++    const ctx = context({ configEditor: editor })
+ 
+-    expect(saveUiPrefs(ctx, { listMode: 'grid' }).ok).toBe(true)
+-    expect(settings.current().listMode).toBe('grid')
++    expect((await saveUiPrefs(ctx, { listMode: 'grid' })).ok).toBe(true)
++    expect(editor.current().listMode).toBe('grid')
+     expect(readUiPrefs(ctx).listMode).toBe('grid')
+ 
+-    expect(saveUiPrefs(ctx, { listMode: 'compact' }).ok).toBe(true)
++    expect((await saveUiPrefs(ctx, { listMode: 'compact' })).ok).toBe(true)
+     expect(readUiPrefs(ctx).listMode).toBe('compact')
++    expect(readUiPrefs(ctx).settingsAvailable).toBe(true)
+   })
+ 
+-  it('refuses a layout it does not have, and says which ones it does', () => {
+-    const result = saveUiPrefs(context(fakeSettings()), { listMode: 'masonry' })
++  it('refuses a layout it does not have, and says which ones it does', async () => {
++    const editor = fakeConfig()
++    const result = await saveUiPrefs(context({ configEditor: editor }), { listMode: 'masonry' })
+     expect(result.ok).toBe(false)
+     expect(result.reason).toContain('grid')
+     expect(result.reason).toContain('masonry')
++    // A refused value never reaches the profile document.
++    expect(editor.edit).not.toHaveBeenCalled()
+   })
+ 
+-  it('treats a stored mode that no longer exists as unset', () => {
+-    // `rows` was a real choice until the list went to two densities; a profile
+-    // that still remembers it must land on the default, not on a blank list.
+-    const settings = fakeSettings({ listMode: 'rows' })
+-    expect(readUiPrefs(context(settings)).listMode).toBe(DEFAULT_UI_PREFS.listMode)
++  it('refuses a mode a profile hand-edited into the schema', () => {
++    // `rows` was a real choice until the list went to two densities. It can no
++    // longer arrive through a write (the check above rejects it) or through the
++    // legacy adoption (which validates before writing), and a hand-edit that
++    // names it fails loud at load rather than silently blanking the list.
++    expect(() => Config({ listMode: 'rows' } as never)).toThrow(/grid/)
+   })
+ 
+-  it('refuses to remember anything when there is nowhere to remember it', () => {
+-    const result = saveUiPrefs(context(), { listMode: 'grid' })
++  it('refuses to remember anything when there is nowhere to remember it', async () => {
++    fakeConfig()
++    const result = await saveUiPrefs(context({}), { listMode: 'grid' })
+     expect(result.ok).toBe(false)
+-    expect(result.reason).toContain('设置服务')
+-  })
+-
+-  it('declares its namespace once, even if activated twice', () => {
+-    const settings = fakeSettings()
+-    installUiSettings(context(settings))
+-    installUiSettings(context(settings))
+-    expect(settings.register).toHaveBeenCalledTimes(2)
+-    // The second call threw inside and was swallowed — the panel keeps working.
+-    expect(readUiPrefs(context(settings)).settingsAvailable).toBe(true)
++    expect(result.reason).toContain('配置编辑器')
+   })
+ })
+diff --git a/fixture/test/webdav-config.test.ts b/fixture/test/webdav-config.test.ts
+index 46e21ff..c1d64df 100644
+--- a/fixture/test/webdav-config.test.ts
++++ b/fixture/test/webdav-config.test.ts
+@@ -3,48 +3,52 @@
+  * them are not mounted.
+  *
+  * The point of these tests is the seam, not the storage: the password must go
+- * through credentials and nothing else, and a composition without settings must
+- * degrade to its composed defaults rather than breaking.
++ * through credentials and nothing else, an address write must go through the
++ * profile's config editor, and a composition without one must degrade to the
++ * composed defaults rather than breaking.
+  */
+ 
+ import type { Context } from '@deepseek-ai/cordis'
+ import { describe, expect, it, vi } from 'vitest'
+ 
++import { Config, type InboxConfig, installConfig } from '../src/host/config.js'
+ import {
+   activeUserAgent,
+   DEFAULT_SETTINGS,
+   PASSWORD_KEY,
+-  SETTINGS_NAMESPACE,
+   describeWebdav,
+   readPassword,
+   readSettings,
+   saveWebdav,
+ } from '../src/host/webdav/config.js'
+ 
+-/** A settings service that keeps one namespace value in memory. */
+-function fakeSettings(initial?: Partial<typeof DEFAULT_SETTINGS>) {
+-  let current = { ...DEFAULT_SETTINGS, ...initial }
+-  let registered = false
++/**
++ * A config editor that keeps the profile override in memory, re-publishing the
++ * configuration references after every accepted write — the same commit the
++ * Loader performs for a volatile-only update.
++ */
++function fakeConfig(initial?: Partial<typeof DEFAULT_SETTINGS>) {
++  let current: Record<string, unknown> = { ...initial }
++  const entry = { options: { id: 'dsh-inbox' } }
++  const publish = (): void => {
++    installConfig(Config(current) as unknown as InboxConfig, entry)
++  }
++  publish()
+   return {
+     current: () => current,
+-    register: vi.fn((namespace: string, _schema: unknown, options: { base: typeof DEFAULT_SETTINGS }) => {
+-      // The real service refuses a second registration; the fake has to refuse
+-      // it too, or this test would have missed the bug it exists for.
+-      if (registered) throw new Error(`settings namespace "${namespace}" is already registered`)
+-      registered = true
+-      current = { ...options.base, ...current }
+-      return {
+-        get: () => current,
+-        update: (patch: Partial<typeof DEFAULT_SETTINGS>) => {
+-          current = { ...current, ...patch }
+-        },
+-      }
+-    }),
+-    get: (namespace: string) => (namespace === SETTINGS_NAMESPACE ? current : undefined),
+-    update: (namespace: string, patch: Partial<typeof DEFAULT_SETTINGS>) => {
+-      if (namespace !== SETTINGS_NAMESPACE) throw new Error('unknown namespace')
+-      current = { ...current, ...patch }
+-    },
++    entry,
++    edit: vi.fn(
++      async (
++        _entry: unknown,
++        change: (
++          current: Record<string, unknown>,
++          inherited: Record<string, unknown>,
++        ) => Record<string, unknown>,
++      ) => {
++        current = change(current, {})
++        publish()
++      },
++    ),
+   }
+ }
+ 
+@@ -63,20 +67,27 @@ function fakeCredentials(initial?: string) {
+   }
+ }
+ 
+-function context(parts: { settings?: unknown; credentials?: unknown }): Context {
++function context(parts: { configEditor?: unknown; credentials?: unknown }): Context {
+   return {
+     get: (name: string) => (parts as Record<string, unknown>)[name],
+   } as unknown as Context
+ }
+ 
+ describe('reading the configuration', () => {
+-  it('falls back to the composed defaults when no settings service is mounted', () => {
+-    expect(readSettings(context({}))).toEqual(DEFAULT_SETTINGS)
++  it('falls back to the composed defaults when nothing is installed', () => {
++    // No `installConfig` call: the module answers the schema defaults.
++    expect(readSettings()).toEqual(DEFAULT_SETTINGS)
+   })
+ 
+-  it('reads the resolved namespace when one is mounted', () => {
+-    const settings = fakeSettings({ baseUrl: 'https://data.cstcloud.cn/dav', username: 'me' })
+-    expect(readSettings(context({ settings }))).toMatchObject({
++  it('reads the live configuration references when they are installed', () => {
++    installConfig(
++      Config({
++        baseUrl: 'https://data.cstcloud.cn/dav',
++        username: 'me',
++      }) as unknown as InboxConfig,
++      { options: {} },
++    )
++    expect(readSettings()).toMatchObject({
+       baseUrl: 'https://data.cstcloud.cn/dav',
+       username: 'me',
+       directory: '/inbox',
+@@ -84,11 +95,12 @@ describe('reading the configuration', () => {
+   })
+ 
+   it('reports whether a password is stored, without reading it out', async () => {
++    installConfig(Config({}) as unknown as InboxConfig, { options: {} })
+     const credentials = fakeCredentials('hunter2')
+     expect(await readPassword(context({ credentials }))).toBe('hunter2')
+     expect(await readPassword(context({}))).toBeUndefined()
+ 
+-    const status = await describeWebdav(context({ credentials, settings: fakeSettings() }))
++    const status = await describeWebdav(context({ credentials, configEditor: fakeConfig() }))
+     expect(status).toMatchObject({
+       passwordSet: true,
+       credentialsAvailable: true,
+@@ -96,15 +108,21 @@ describe('reading the configuration', () => {
+     })
+     expect(JSON.stringify(status)).not.toContain('hunter2')
+   })
++
++  it('says settings are unavailable when there is no config editor', async () => {
++    installConfig(Config({}) as unknown as InboxConfig, { options: {} })
++    const status = await describeWebdav(context({}))
++    expect(status.settingsAvailable).toBe(false)
++  })
+ })
+ 
+ describe('saving the configuration', () => {
+-  it('writes the address through settings and the password through credentials', async () => {
+-    const settings = fakeSettings()
++  it('writes the address through the profile config and the password through credentials', async () => {
++    const editor = fakeConfig()
+     const credentials = fakeCredentials()
+-    const ctx = context({ settings, credentials })
++    const ctx = context({ configEditor: editor, credentials })
+ 
+-    const result = await saveWebdav(ctx, undefined, DEFAULT_SETTINGS, {
++    const result = await saveWebdav(ctx, undefined, {
+       baseUrl: ' https://data.cstcloud.cn/dav ',
+       directory: 'inbox',
+       username: ' me ',
+@@ -112,59 +130,72 @@ describe('saving the configuration', () => {
+     })
+ 
+     expect(result.ok).toBe(true)
+-    expect(settings.current()).toMatchObject({
++    expect(editor.current()).toMatchObject({
+       baseUrl: 'https://data.cstcloud.cn/dav',
+       directory: '/inbox',
+       username: 'me',
+     })
+     expect(credentials.value()).toBe('hunter2')
+     expect(credentials.set).toHaveBeenCalledWith(PASSWORD_KEY, 'hunter2')
+-    // The secret must not be anywhere in the settings layer.
+-    expect(JSON.stringify(settings.current())).not.toContain('hunter2')
++    // The secret must not be anywhere in the configuration layer.
++    expect(JSON.stringify(editor.current())).not.toContain('hunter2')
+   })
+ 
+   it('saves more than once in one process', async () => {
+-    // Regression: registering on every save threw "already registered" on the
+-    // second one, and the panel could only report an empty body.
+-    const settings = fakeSettings()
+-    const ctx = context({ settings, credentials: fakeCredentials() })
+-
+-    expect((await saveWebdav(ctx, undefined, DEFAULT_SETTINGS, { baseUrl: 'https://a' })).ok).toBe(true)
+-    expect((await saveWebdav(ctx, undefined, DEFAULT_SETTINGS, { baseUrl: 'https://b' })).ok).toBe(true)
+-    expect(settings.current().baseUrl).toBe('https://b')
++    // Regression: registering a namespace on every save threw "already
++    // registered" on the second one, and the panel could only report an empty
++    // body. A config write has no such one-shot declaration.
++    const editor = fakeConfig()
++    const ctx = context({ configEditor: editor, credentials: fakeCredentials() })
++
++    expect((await saveWebdav(ctx, undefined, { baseUrl: 'https://a' })).ok).toBe(true)
++    expect((await saveWebdav(ctx, undefined, { baseUrl: 'https://b' })).ok).toBe(true)
++    expect(editor.current().baseUrl).toBe('https://b')
++  })
++
++  it('keeps fields the write does not name', async () => {
++    // The profile override is replaced whole, so a write that forgot `region`
++    // would silently drop it back to the schema default.
++    const editor = fakeConfig({ region: 'cn-north-1', bucket: 'vault' })
++    await saveWebdav(context({ configEditor: editor }), undefined, { baseUrl: 'https://a' })
++    expect(editor.current()).toMatchObject({
++      region: 'cn-north-1',
++      bucket: 'vault',
++      baseUrl: 'https://a',
++    })
+   })
+ 
+   it('accepts v4 and v2, and refuses anything else', async () => {
+-    const settings = fakeSettings()
+-    const ctx = context({ settings })
++    const editor = fakeConfig()
++    const ctx = context({ configEditor: editor })
+ 
+-    expect((await saveWebdav(ctx, undefined, DEFAULT_SETTINGS, { signatureVersion: 'V2' })).ok).toBe(true)
+-    expect(settings.current().signatureVersion).toBe('v2')
+-    expect((await saveWebdav(ctx, undefined, DEFAULT_SETTINGS, { signatureVersion: 'v4' })).ok).toBe(true)
++    expect((await saveWebdav(ctx, undefined, { signatureVersion: 'V2' })).ok).toBe(true)
++    expect(editor.current().signatureVersion).toBe('v2')
++    expect((await saveWebdav(ctx, undefined, { signatureVersion: 'v4' })).ok).toBe(true)
+ 
+-    const nonsense = await saveWebdav(ctx, undefined, DEFAULT_SETTINGS, { signatureVersion: 'v9' })
++    const nonsense = await saveWebdav(ctx, undefined, { signatureVersion: 'v9' })
+     expect(nonsense.ok).toBe(false)
+     expect(nonsense.reason).toContain('v4 或 v2')
+   })
+ 
+   it('adds https to a bare host, and keeps an explicit scheme', async () => {
+-    const settings = fakeSettings()
+-    const ctx = context({ settings })
++    const editor = fakeConfig()
++    const ctx = context({ configEditor: editor })
+ 
+-    await saveWebdav(ctx, undefined, DEFAULT_SETTINGS, {
++    await saveWebdav(ctx, undefined, {
+       endpoint: '  s3.cstcloud.cn  ',
+       baseUrl: 'data.cstcloud.cn/dav',
+     })
+-    expect(settings.current()).toMatchObject({
++    expect(editor.current()).toMatchObject({
+       endpoint: 'https://s3.cstcloud.cn',
+       baseUrl: 'https://data.cstcloud.cn/dav',
+     })
+ 
+-    await saveWebdav(ctx, undefined, DEFAULT_SETTINGS, { endpoint: 'http://192.168.1.9:9000' })
+-    expect(settings.current().endpoint).toBe('http://192.168.1.9:9000')
++    await saveWebdav(ctx, undefined, { endpoint: 'http://192.168.1.9:9000' })
++    expect(editor.current().endpoint).toBe('http://192.168.1.9:9000')
+ 
+-    await saveWebdav(ctx, undefined, DEFAULT_SETTINGS, { endpoint: '' })
+-    expect(settings.current().endpoint).toBe('')
++    await saveWebdav(ctx, undefined, { endpoint: '' })
++    expect(editor.current().endpoint).toBe('')
+   })
+ 
+   it('keeps one client identity per protocol', async () => {
+@@ -174,65 +205,62 @@ describe('saving the configuration', () => {
+     expect(DEFAULT_SETTINGS.userAgent).toBe('')
+     expect(DEFAULT_SETTINGS.webdavUserAgent).toBe('')
+ 
+-    const settings = fakeSettings()
+-    const ctx = context({ settings })
++    const editor = fakeConfig()
++    const ctx = context({ configEditor: editor })
+ 
+-    await saveWebdav(ctx, undefined, DEFAULT_SETTINGS, {
+-      protocol: 's3',
+-      userAgent: '  Obsidian/1.8.7 ',
+-    })
+-    expect(settings.current().userAgent).toBe('Obsidian/1.8.7')
+-    expect(settings.current().webdavUserAgent).toBe('')
++    await saveWebdav(ctx, undefined, { protocol: 's3', userAgent: '  Obsidian/1.8.7 ' })
++    expect(editor.current().userAgent).toBe('Obsidian/1.8.7')
++    // Only the named field is written; the other door's slot stays inherited.
++    expect(editor.current()).not.toHaveProperty('webdavUserAgent')
++    expect(readSettings().webdavUserAgent).toBe('')
+ 
+-    await saveWebdav(ctx, undefined, DEFAULT_SETTINGS, { protocol: 'webdav', userAgent: 'Zotero' })
+-    expect(settings.current().webdavUserAgent).toBe('Zotero')
++    await saveWebdav(ctx, undefined, { protocol: 'webdav', userAgent: 'Zotero' })
++    expect(readSettings().webdavUserAgent).toBe('Zotero')
+     // Switching doors must not overwrite the other door's identity.
+-    expect(settings.current().userAgent).toBe('Obsidian/1.8.7')
++    expect(readSettings().userAgent).toBe('Obsidian/1.8.7')
+ 
+     const both = { ...DEFAULT_SETTINGS, userAgent: 'Obsidian', webdavUserAgent: 'Zotero' }
+     expect(activeUserAgent({ ...both, protocol: 's3' })).toBe('Obsidian')
+     expect(activeUserAgent({ ...both, protocol: 'webdav' })).toBe('Zotero')
+ 
+-    await saveWebdav(ctx, undefined, DEFAULT_SETTINGS, { protocol: 'webdav', userAgent: '' })
+-    expect(settings.current().webdavUserAgent).toBe('')
+-    expect(settings.current().userAgent).toBe('Obsidian/1.8.7')
++    await saveWebdav(ctx, undefined, { protocol: 'webdav', userAgent: '' })
++    expect(editor.current().webdavUserAgent).toBe('')
++    expect(editor.current().userAgent).toBe('Obsidian/1.8.7')
+   })
+ 
+   it('files the identity under the protocol already in effect when the patch omits it', async () => {
+-    const settings = fakeSettings({ protocol: 's3' })
+-    await saveWebdav(context({ settings }), undefined, DEFAULT_SETTINGS, { userAgent: 'Obsidian' })
+-    expect(settings.current().userAgent).toBe('Obsidian')
+-    expect(settings.current().webdavUserAgent).toBe('')
++    const editor = fakeConfig({ protocol: 's3' })
++    await saveWebdav(context({ configEditor: editor }), undefined, { userAgent: 'Obsidian' })
++    expect(editor.current().userAgent).toBe('Obsidian')
++    expect(readSettings().webdavUserAgent).toBe('')
+   })
+ 
+   it('clears a stored password on an empty string, and leaves it alone when omitted', async () => {
+-    const settings = fakeSettings()
++    const editor = fakeConfig()
+     const credentials = fakeCredentials('existing')
+-    const ctx = context({ settings, credentials })
++    const ctx = context({ configEditor: editor, credentials })
+ 
+-    await saveWebdav(ctx, undefined, DEFAULT_SETTINGS, { username: 'me' })
++    await saveWebdav(ctx, undefined, { username: 'me' })
+     expect(credentials.value()).toBe('existing')
+ 
+-    await saveWebdav(ctx, undefined, DEFAULT_SETTINGS, { password: '' })
++    await saveWebdav(ctx, undefined, { password: '' })
+     expect(credentials.value()).toBeUndefined()
+   })
+ 
+   it('refuses to store a password when there is no credential service', async () => {
+-    const result = await saveWebdav(
+-      context({ settings: fakeSettings() }),
+-      undefined,
+-      DEFAULT_SETTINGS,
+-      { password: 'hunter2' },
+-    )
++    const editor = fakeConfig()
++    const result = await saveWebdav(context({ configEditor: editor }), undefined, {
++      password: 'hunter2',
++    })
+     expect(result.ok).toBe(false)
+     expect(result.reason).toContain('凭证服务')
+   })
+ 
+-  it('refuses an address change when there is no settings service', async () => {
+-    const result = await saveWebdav(context({}), undefined, DEFAULT_SETTINGS, {
++  it('refuses an address change when there is no config editor', async () => {
++    const result = await saveWebdav(context({}), undefined, {
+       baseUrl: 'https://data.cstcloud.cn/dav',
+     })
+     expect(result.ok).toBe(false)
+-    expect(result.reason).toContain('设置服务')
++    expect(result.reason).toContain('配置编辑器')
+   })
+ })
+diff --git a/fixture/vitest.config.ts b/fixture/vitest.config.ts
+new file mode 100644
+index 0000000..44d059a
+--- /dev/null
++++ b/fixture/vitest.config.ts
+@@ -0,0 +1,21 @@
++// The package's own suite, and only it.
++//
++// A bare `vitest run` globs the whole working tree, which includes the ignored
++// reference checkouts kept beside the source while developing against dsh
++// (`.research/`, and the harness checkout a migration session reads). Those are
++// not this package's tests, and their specs need a monorepo install this
++// package does not carry — so the scope is pinned here. Every test of this
++// package lives under `test/`.
++import { defineConfig } from 'vitest/config'
++
++export default defineConfig({
++  test: {
++    include: ['test/**/*.test.ts'],
++    // The suite's slow tests (scrypt key derivation, node:sqlite, HTTP fakes)
++    // sit close to the 5s default when the machine is loaded. A container
++    // capped at two CPUs still reports every core to vitest, which then
++    // starves its own workers and turns ordinary tests into timeouts.
++    testTimeout: 30_000,
++    hookTimeout: 30_000,
++  },
++})

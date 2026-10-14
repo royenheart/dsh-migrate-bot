@@ -1,0 +1,87 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.5-rc.1",
+      "target": {
+        "tag": "dsh-v0.1.5-rc.1",
+        "version": "0.1.5-rc.1"
+      },
+      "state": "error",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.5-rc.1",
+            "version": "0.1.5-rc.1"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.2-rc.1",
+              "version": "0.1.2-rc.1"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "e2ePublish": false,
+            "checks": {
+              "cards": true,
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [
+          "mechanical",
+          "boot",
+          "web",
+          "e2e"
+        ],
+        "reviewed": true,
+        "attempts": 0,
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [
+          "api.spec.ts \u203a the plugin answers its panel API and the OpenAI-compatible model list",
+          "combos.spec.ts \u203a the combos section offers creation and explains the fallback strategies",
+          "combos.spec.ts \u203a a combo can be created, becomes a router model, and can be deleted",
+          "endpoint.spec.ts \u203a the endpoint card shows the OpenAI-compatible base URL and copies it",
+          "endpoint.spec.ts \u203a requiring an API key gates the OpenAI endpoint until it is switched off again",
+          "endpoint.spec.ts \u203a an API key can be created, revealed, paused, resumed and deleted",
+          "extensions.spec.ts \u203a the extensions section reports that no extension plugin is installed",
+          "overview.spec.ts \u203a the overview dashboard shows its usage cards, trend, rankings and recent list",
+          "overview.spec.ts \u203a the overview period switch re-reads the dashboard",
+          "overview.spec.ts \u203a the overview keeps the panel mounted when its section is left and re-entered",
+          "panel.spec.ts \u203a the routing section is offered in the host settings and renders its panel",
+          "suppliers.spec.ts \u203a the supplier list groups the built-in suppliers and counts them",
+          "suppliers.spec.ts \u203a a supplier detail shows its link pool and model catalogue",
+          "suppliers.spec.ts \u203a a supplier model can be disabled, restored and bulk-switched",
+          "suppliers.spec.ts \u203a the supplier dialogs offer adding a key, editing the prefix and adding a model",
+          "suppliers.spec.ts \u203a a custom model can be added to a supplier and removed again"
+        ],
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "comments": []
+      },
+      "run": "local-2026-10-14T18-22-43-757Z",
+      "startedAt": "2026-10-14T18:22:44.548Z"
+    }
+  ]
+}

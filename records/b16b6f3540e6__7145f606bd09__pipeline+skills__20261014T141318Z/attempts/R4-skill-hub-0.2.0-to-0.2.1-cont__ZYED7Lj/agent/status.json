@@ -1,0 +1,142 @@
+{
+  "migrations": [
+    {
+      "id": "0.2.1-alpha.2",
+      "target": {
+        "tag": "dsh-v0.2.1-alpha.2",
+        "version": "0.2.1-alpha.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.2.1-alpha.2",
+            "version": "0.2.1-alpha.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.7-alpha.1",
+              "version": "0.1.7-alpha.1"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "e2ePublish": false,
+            "checks": {
+              "cards": true,
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 1,
+        "lastFingerprint": "mechanical: error: peerDependencies: @deepseek-ai/dsh-client-connection is \">=<n>.<n>-alpha.<n> <<n>.<n>-<n>\", which does not admit <n>.<n>-alpha.<n> | error: peerDependencies: @deepseek-ai/dsh-client-locale is \">=<n>.<n>-alpha.<n> <<n>.<n>-<n>\", which does not admit <n>.<n>-alpha.<n> | error: peerDependencies: @deepseek-ai/dsh-client-store is \">=<n>.<n>-alpha.<n> <<n>.<n>-<n>\", which does not admit <n>.<n>-a",
+        "failure": {
+          "check": "mechanical",
+          "outcome": "fail",
+          "fingerprint": "mechanical: error: peerDependencies: @deepseek-ai/dsh-client-connection is \">=<n>.<n>-alpha.<n> <<n>.<n>-<n>\", which does not admit <n>.<n>-alpha.<n> | error: peerDependencies: @deepseek-ai/dsh-client-locale is \">=<n>.<n>-alpha.<n> <<n>.<n>-<n>\", which does not admit <n>.<n>-alpha.<n> | error: peerDependencies: @deepseek-ai/dsh-client-store is \">=<n>.<n>-alpha.<n> <<n>.<n>-<n>\", which does not admit <n>.<n>-a",
+          "detail": "error: peerDependencies: @deepseek-ai/dsh-client-connection is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-client-locale is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-client-store is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-client-ui-input-trigger is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-client-ui-settings is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-client-ui-slots is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-host-webserver is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-session is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-session-query is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-settings is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-skill is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-system-prompt is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "could not install dsh 0.1.7-alpha.1 for the checks: npm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: @deepseek-ai/dsh-host-directory-picker-auto@0.1.7-alpha.2\nnpm warn Found: @deepseek-ai/dsh-host-directory-picker-native@undefined\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-host-directory-picker-native\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-host-directory-picker-native@\"0.1.7-alpha.2\" from @deepseek-ai/dsh-host-directory-picker-auto@0.1.7-alpha.2\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-host-directory-picker-auto\nnpm warn   @deepseek-ai/dsh-host-directory-picker-auto@\"0.1.7-alpha.2\" from @deepseek-ai/dsh-web-app@0.1.7-alpha.2\nnpm warn   node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-web-app\nnpm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: @deepseek-ai/dsh-webhook-github@0.1.7-alpha.2\nnpm warn Found: peer @deepseek-ai/dsh-webhook@\"0.1.7-alpha.2\" from the root project\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-webhook@\"0.1.7-alpha.2\" from the root project\nnpm error code ETARGET\nnpm error notarget No matching version found for @deepseek-ai/dsh-client-ui-open-in-app@0.1.7-alpha.2 with a date before 9/22/2026, 4:08:54 PM.\nnpm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-14T14_21_22_086Z-debug-0.log"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [],
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-14T14-21-19-861Z",
+      "startedAt": "2026-10-14T14:21:21.766Z"
+    }
+  ],
+  "processed": {
+    "id": "0.2.1-alpha.2",
+    "target": {
+      "tag": "dsh-v0.2.1-alpha.2",
+      "version": "0.2.1-alpha.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.2.1-alpha.2",
+          "version": "0.2.1-alpha.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.7-alpha.1",
+            "version": "0.1.7-alpha.1"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "e2ePublish": false,
+          "checks": {
+            "cards": true,
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 1,
+      "lastFingerprint": "mechanical: error: peerDependencies: @deepseek-ai/dsh-client-connection is \">=<n>.<n>-alpha.<n> <<n>.<n>-<n>\", which does not admit <n>.<n>-alpha.<n> | error: peerDependencies: @deepseek-ai/dsh-client-locale is \">=<n>.<n>-alpha.<n> <<n>.<n>-<n>\", which does not admit <n>.<n>-alpha.<n> | error: peerDependencies: @deepseek-ai/dsh-client-store is \">=<n>.<n>-alpha.<n> <<n>.<n>-<n>\", which does not admit <n>.<n>-a",
+      "failure": {
+        "check": "mechanical",
+        "outcome": "fail",
+        "fingerprint": "mechanical: error: peerDependencies: @deepseek-ai/dsh-client-connection is \">=<n>.<n>-alpha.<n> <<n>.<n>-<n>\", which does not admit <n>.<n>-alpha.<n> | error: peerDependencies: @deepseek-ai/dsh-client-locale is \">=<n>.<n>-alpha.<n> <<n>.<n>-<n>\", which does not admit <n>.<n>-alpha.<n> | error: peerDependencies: @deepseek-ai/dsh-client-store is \">=<n>.<n>-alpha.<n> <<n>.<n>-<n>\", which does not admit <n>.<n>-a",
+        "detail": "error: peerDependencies: @deepseek-ai/dsh-client-connection is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-client-locale is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-client-store is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-client-ui-input-trigger is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-client-ui-settings is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-client-ui-slots is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-host-webserver is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-session is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-session-query is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-settings is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-skill is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2\nerror: peerDependencies: @deepseek-ai/dsh-system-prompt is \">=0.1.7-alpha.1 <0.3.0-0\", which does not admit 0.2.1-alpha.2"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "could not install dsh 0.1.7-alpha.1 for the checks: npm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: @deepseek-ai/dsh-host-directory-picker-auto@0.1.7-alpha.2\nnpm warn Found: @deepseek-ai/dsh-host-directory-picker-native@undefined\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-host-directory-picker-native\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-host-directory-picker-native@\"0.1.7-alpha.2\" from @deepseek-ai/dsh-host-directory-picker-auto@0.1.7-alpha.2\nnpm warn node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-host-directory-picker-auto\nnpm warn   @deepseek-ai/dsh-host-directory-picker-auto@\"0.1.7-alpha.2\" from @deepseek-ai/dsh-web-app@0.1.7-alpha.2\nnpm warn   node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-web-app\nnpm warn ERESOLVE overriding peer dependency\nnpm warn While resolving: @deepseek-ai/dsh-webhook-github@0.1.7-alpha.2\nnpm warn Found: peer @deepseek-ai/dsh-webhook@\"0.1.7-alpha.2\" from the root project\nnpm warn\nnpm warn Could not resolve dependency:\nnpm warn peer @deepseek-ai/dsh-webhook@\"0.1.7-alpha.2\" from the root project\nnpm error code ETARGET\nnpm error notarget No matching version found for @deepseek-ai/dsh-client-ui-open-in-app@0.1.7-alpha.2 with a date before 9/22/2026, 4:08:54 PM.\nnpm error notarget In most cases you or one of your dependencies are requesting a package version that doesn't exist.\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-14T14_21_22_086Z-debug-0.log"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [],
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-14T14-21-19-861Z",
+    "startedAt": "2026-10-14T14:21:21.766Z"
+  }
+}

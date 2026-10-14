@@ -1,0 +1,130 @@
+{
+  "cards": [
+    {
+      "id": "DSH-0.1.7-A1-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/icons.tsx",
+        "src/client/settings-form.ts"
+      ],
+      "note": "no primitives icon imports anywhere: the card's *16 names in src/client/icons.tsx are local vendored components, and the only @deepseek-ai/dsh-client-ui-primitives import is the non-icon SettingsFormModel/spec types"
+    },
+    {
+      "id": "DSH-0.1.7-A1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "package.json"
+      ],
+      "note": "the plugin never reads workspace file content through the workspaceFiles Remote; its file access is the host fs SDK plus its own GitHub fetch layer"
+    },
+    {
+      "id": "DSH-0.1.7-A1-03",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "src/index.ts",
+        "src/client/index.tsx",
+        "src/client/settings-form.ts",
+        "src/client/SkillHubSettingsCard.tsx",
+        "src/settings-migrate.ts"
+      ],
+      "note": "host registers no settings namespace: every card field is a volatile field on the plugin's own profile entry Config (ctx.settings.mutate/describe, configure({auto:false}) for the self-owned page); the browser card and slash dots read ctx.configForms.get('skill-hub'); the one-time legacy settings.yaml section and sidecar config are adopted at startup"
+    },
+    {
+      "id": "DSH-0.1.7-A1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "cordis.patch.yml",
+        "package.json"
+      ],
+      "note": "the plugin ships no agent presets: its bundle patch inserts one plugin row and dsh.bundle declares no preset source"
+    },
+    {
+      "id": "DSH-0.1.7-A1-05",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/stats.ts",
+        "src/stats/persistence.ts",
+        "src/stats/scan.ts"
+      ],
+      "note": "the stats reader never parses raw session logs: reads go through sessionQuery and the sessionPersistence seam whose list()/open()/read() shapes were re-checked unchanged at 0.1.7 (the V4 log stays the host's implementation detail), and event matching is by type only"
+    },
+    {
+      "id": "DSH-0.1.7-A1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "cordis.patch.yml",
+        "package.json"
+      ],
+      "note": "the plugin configures no model provider: neither its bundle patch nor its package manifest touches the official DeepSeek adapter or any llm row"
+    },
+    {
+      "id": "DSH-0.1.7-A1-07",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": [
+        "src/index.ts",
+        "src/settings-migrate.ts",
+        "package.json",
+        "cordis.patch.yml"
+      ],
+      "note": "every configurable field is declared .volatile() so a settings edit commits into the running instance via loader/volatile-update (no reload); dsh.bundle.patch stays a single file because the 12-line patch needs no ordered split, which the 0.1.7 contract still accepts"
+    },
+    {
+      "id": "DSH-0.1.7-A1-08",
+      "applies": true,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/index.ts",
+        "src/client/index.tsx"
+      ],
+      "note": "informational only: the host half activates from its profile row and the browser half registers both slots with a log-never-throw failure policy, so the Plugin Manager roster and Settings stay the visibility path after a host upgrade"
+    },
+    {
+      "id": "DSH-0.1.7-A1-09",
+      "applies": true,
+      "required": false,
+      "status": "done",
+      "evidence": [
+        "locale/en.json",
+        "locale/zh.json",
+        "icon.svg",
+        "package.json"
+      ],
+      "note": "optional capability adopted (no workaround replaced): locale meta.title/meta.description exported at ./locale/*.json and a top-level package icon, so the Plugins manager renders the plugin's own localized card instead of the package description"
+    },
+    {
+      "id": "DSH-0.1.7-A1-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/stats/scan.ts"
+      ],
+      "note": "the plugin stores no attachments and writes no custom session events: it only reads user/message and tool/call events that the host delivers"
+    },
+    {
+      "id": "DSH-0.1.7-A1-11",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": [
+        "src/client/index.tsx"
+      ],
+      "note": "the plugin registers a settings.section page and a plugins.bundle.config card; it does not extend the sidebar launcher seat (settings.launcher) or the Models credential flow (settings.models.sign-in)"
+    }
+  ]
+}

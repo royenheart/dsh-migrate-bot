@@ -1,0 +1,292 @@
+{
+  "cards": [
+    {
+      "id": "DSH-0.1.2-A1-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts:22", "package.json"],
+      "note": "Host-plane settings plugin: the only extension point it calls is ctx.inject(['settings']) -> settings.register; no APIProxy and no ctx.remote call site."
+    },
+    {
+      "id": "DSH-0.1.2-A1-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts", "package.json"],
+      "note": "Target is alpha.2 (not alpha.1) and the plugin produces no third-party persisted SessionEvents; corridor net state read together with A2-01."
+    },
+    {
+      "id": "DSH-0.1.2-A1-03",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts", "cordis.patch.yml"],
+      "note": "No host-source patch, no internal session-view import, no client half; the tree touches no harness internals."
+    },
+    {
+      "id": "DSH-0.1.2-A1-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["cordis.patch.yml", "package.json"],
+      "note": "No launcher wrapper, SDK/ACP integration or hardcoded profile path; the bundle layer is consumed by the official launcher via dsh.bundle.patch."
+    },
+    {
+      "id": "DSH-0.1.2-A1-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json"],
+      "note": "No headless wrapper or stdout/stderr parser; package scripts are tsc and node --test only."
+    },
+    {
+      "id": "DSH-0.1.2-A1-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts"],
+      "note": "No tool presentation mode, PTC preset, dispatch waterfall or tool-related types in the plugin."
+    },
+    {
+      "id": "DSH-0.1.2-A1-07",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts", "cordis.patch.yml"],
+      "note": "No tool policy, permission/approval plugin or web_fetch configuration; the layer only inserts the plugin row."
+    },
+    {
+      "id": "DSH-0.1.2-A1-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json", "src/index.ts"],
+      "note": "No custom loopback HTTP/WS/RPC route, no browser page, no /api route; no web client half."
+    },
+    {
+      "id": "DSH-0.1.2-A1-09",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts"],
+      "note": "Optional model-provider capability; this plugin is not a model provider and carries no settings-page patch or shim."
+    },
+    {
+      "id": "DSH-0.1.2-A1-10",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts", "package.json"],
+      "note": "Optional localization capability; no i18n resources, no client half and no custom i18n patch."
+    },
+    {
+      "id": "DSH-0.1.2-A1-11",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts"],
+      "note": "Optional subagent selection capability; the plugin runs no subagents and carries no selector workaround."
+    },
+    {
+      "id": "DSH-0.1.2-A1-12",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["README.md", "package.json"],
+      "note": "Informational deployment/privacy card; the fixture issues no model requests and ships no adapter config, so no plugin code change."
+    },
+    {
+      "id": "DSH-0.1.2-A1-13",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts", "package.json"],
+      "note": "No PowerShell/Bash persistence or Windows directory-picker compatibility workaround in the tree."
+    },
+    {
+      "id": "DSH-0.1.2-A1-14",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts"],
+      "note": "No official-LLM session-log egress configuration and no session persistence/watermark code."
+    },
+    {
+      "id": "DSH-0.1.2-A1-19",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json"],
+      "note": "No browser acceptance script and no boot-manifest consumer; acceptance here is profile boot plus the host-side activation check."
+    },
+    {
+      "id": "DSH-0.1.2-A1-20",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts"],
+      "note": "Registers no structured-question answerer; userQuestions is never referenced."
+    },
+    {
+      "id": "DSH-0.1.2-A1-21",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts", "package.json"],
+      "note": "No resolveSessionPreset use and no agent-presets roots configuration."
+    },
+    {
+      "id": "DSH-0.1.2-A1-22",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts", "package.json"],
+      "note": "No host UI/stream-timing code; isTokenDelta is not imported."
+    },
+    {
+      "id": "DSH-0.1.2-A1-23",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["cordis.patch.yml"],
+      "note": "The fixture layer is insert-only and never restates dsh-base rows; telemetry/inventory defaults stay deployment-owned."
+    },
+    {
+      "id": "DSH-0.1.2-A1-24",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json"],
+      "note": "No direct @earendil-works/pi-ai dependency or import; only cordis/schemastery/dsh-settings are consumed."
+    },
+    {
+      "id": "DSH-0.1.2-A1-25",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json"],
+      "note": "No dsh.client half, no dsh-client-runtime import and no client inject list to clean up."
+    },
+    {
+      "id": "DSH-0.1.2-A1-26",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["cordis.patch.yml:3", "package.json"],
+      "note": "No client bundle to register; the host-side row already uses the bare package name ('h5-runtime-drift-fixture') as its name."
+    },
+    {
+      "id": "DSH-0.1.2-A1-27",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts"],
+      "note": "No session-timeline or user-message reads; the plugin only registers a namespace schema."
+    },
+    {
+      "id": "DSH-0.1.2-A1-28",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json"],
+      "note": "No composer/DOM manipulation; the plugin has no browser-side code."
+    },
+    {
+      "id": "DSH-0.1.2-A1-29",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json"],
+      "note": "Does not render MarkdownText or import ui-primitives."
+    },
+    {
+      "id": "DSH-0.1.2-A1-30",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json", "src/index.ts"],
+      "note": "No ctx.connection usage and no history/transcript read."
+    },
+    {
+      "id": "DSH-0.1.2-A1-31",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts"],
+      "note": "No subagent seed/persisted descriptors and no SUBAGENT_DESCRIPTOR_VERSION assertions."
+    },
+    {
+      "id": "DSH-0.1.2-A1-32",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json"],
+      "note": "No workspace navigation or directory-picker calls."
+    },
+    {
+      "id": "DSH-0.1.2-A2-01",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts"],
+      "note": "Persists no third-party SessionEvents, so the restored ignorable retention semantics have no producer seam here."
+    },
+    {
+      "id": "DSH-0.1.2-A2-02",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts"],
+      "note": "No ctx.remote/unary Remote call and no RemoteResult error handling; settings are read through the host service."
+    },
+    {
+      "id": "DSH-0.1.2-A2-03",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": ["package.json:28", "pnpm-lock.yaml"],
+      "note": "devDependencies aligned to the alpha.2 cohort, incl. dsh-brand as the declaration owner for SettingsNamespace; the plugin-local pnpm install tree was removed (generated artifact, not part of the shipped files) so the host's cohort-install check resolves the declared cohort from the release-date registry; typecheck/build/test and a skipLibCheck:false diagnostic typecheck pass on that cohort."
+    },
+    {
+      "id": "DSH-0.1.2-A2-04",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json"],
+      "note": "No startup wrapper or CI-matrix Node workaround in the repository; verification ran on Node 24.21.0, outside the 24.0-24.11.1 failure window."
+    },
+    {
+      "id": "DSH-0.1.2-A2-05",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["src/index.ts"],
+      "note": "Does not consume pluginInventory/list or validate PluginInventorySnapshot."
+    },
+    {
+      "id": "DSH-0.1.2-A2-06",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["package.json", "src/index.ts"],
+      "note": "No client Remote usage; $host.home/isLoopback has no call site."
+    },
+    {
+      "id": "DSH-0.1.2-A2-08",
+      "applies": false,
+      "required": false,
+      "status": "not-needed",
+      "evidence": ["cordis.patch.yml", "package.json"],
+      "note": "The fixture mounts no tool/agent packages and adds no peers; its layer rides dsh-base, which already mounts session-projection."
+    },
+    {
+      "id": "DSH-0.1.2-A2-10",
+      "applies": true,
+      "required": true,
+      "status": "done",
+      "evidence": ["src/index.ts:19", "src/test/settings.test.ts:10", "package.json:29"],
+      "note": "Namespace literal passed straight to ctx.settings.register (compile-time SettingsNamespaceInput), test double uses 'as SettingsNamespace', and settingsNamespace() no longer appears in any import."
+    }
+  ]
+}

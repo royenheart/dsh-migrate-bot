@@ -1,0 +1,2904 @@
+diff --git a/fixture/.npmrc b/fixture/.npmrc
+new file mode 100644
+index 0000000..5461e1a
+--- /dev/null
++++ b/fixture/.npmrc
+@@ -0,0 +1,7 @@
++# The DSH packages this plugin develops against are prereleases whose own
++# peer ranges (for example `^0.1.7-alpha.1`) resolve to LATER 0.1.7 prereleases
++# of the same cohort, so npm's automatic peer installation walks into a mixed
++# 0.1.7-alpha.1 / 0.1.7-rc.x tree and refuses the install. Every DSH package
++# this repository needs is declared explicitly in devDependencies at the exact
++# target version; the runtime cohort is the one the dsh profile tree ships.
++legacy-peer-deps=true
+diff --git a/fixture/CONTRIBUTING.md b/fixture/CONTRIBUTING.md
+index edf7348..b28ec0e 100644
+--- a/fixture/CONTRIBUTING.md
++++ b/fixture/CONTRIBUTING.md
+@@ -12,7 +12,8 @@ Please keep both halves on official APIs — no dsh source patches.
+ ## Layout
+ 
+ ```
+-src/index.ts            cordis plugin entry (config schema, settings namespace, stats wiring)
++src/index.ts            cordis plugin entry (volatile config schema, profile-entry
++                        settings writes, stats wiring)
+ src/routes.ts           route-family aggregator (wraps every domain handler in the shared fences)
+ src/routes/             one file per domain + shared layers:
+                         http.ts (fences/JSON/error mapping), deps.ts (route deps + writable-skill
+@@ -39,10 +40,17 @@ src/client/locales/     dictionaries by view (common/skills/market/sources/detai
+ ```bash
+ npm install
+ npm run typecheck   # tsc --noEmit
+-npm test            # vitest (253 tests across 14 suites)
++npm test            # vitest (261 tests across 15 suites)
+ npm run build       # tsc declarations + tsdown bundles (lib/index.js + lib/client.js)
+ ```
+ 
++The DSH packages are pinned exactly (prerelease cohort) in `devDependencies`, and
++`.npmrc` sets `legacy-peer-deps=true` because those prereleases' own peer ranges
++resolve to later prereleases of the same cohort. Runtime packages come from the
++`dsh` profile tree; the browser bundle externalises exactly the shell's shared
++module table (`PLATFORM_MODULES` in `tsdown.config.ts`) and must be re-checked
++against `@deepseek-ai/dsh-client-web/src/platform.ts` on every DSH upgrade.
++
+ ## Before opening a pull request
+ 
+ 1. **Typecheck** — `npm run typecheck` must pass.
+diff --git a/fixture/README.md b/fixture/README.md
+index bfff686..3de9340 100644
+--- a/fixture/README.md
++++ b/fixture/README.md
+@@ -24,9 +24,9 @@ dsh plugin --profile web add dsh-skill-hub
+ # restart dsh web → Settings → 技能 → Market → scan → import
+ ```
+ 
+-Requires `Node ^22.19 || >=24` + dsh web `>=0.1.6-alpha.2 <0.2`.
++Requires `Node ^22.19 || >=24` + dsh web `>=0.1.7-alpha.1 <0.2`.
+ 
+-Two surfaces — the hub panel lives at **Settings → 技能**, and the plugin's settings card lives on the plugin's own page in the **Plugins manager** (sidebar → 插件 → dsh-skill-hub). The card moved there in dsh `0.1.6-alpha.2`, when the Plugins manager replaced the old Settings → 插件 list; this plugin registers into the new location only.
++Two surfaces — the hub panel lives at **Settings → 技能**, and the plugin's settings card lives on the plugin's own page in the **Plugins manager** (sidebar → 插件 → dsh-skill-hub). The card moved there in dsh `0.1.6-alpha.2`, when the Plugins manager replaced the old Settings → 插件 list; since dsh `0.1.7-alpha.1` the card edits the plugin's own profile entry configuration (volatile `Config` fields, live without a restart), which is the only settings store this build reads and writes.
+ 
+ ## Features
+ 
+@@ -40,7 +40,7 @@ Two surfaces — the hub panel lives at **Settings → 技能**, and the plugin'
+ - **Market** — built-in curated repos plus custom `owner/repo` sources. Any top-level directory containing `SKILL.md` scans as a root (no allowlist), and a `SKILL.md` at the repo root itself scans as a single skill named after the repo (minus repo tooling such as `.github/`). Async import with byte-level progress and cancel. Each source pins a version — click the ref badge to switch between releases, branches, or a custom ref.
+ - **Track updates** — imported skills record a repo + commit snapshot. Check all / update-all, per-source badges (installed / updatable / deleted upstream / new release). Sync overwrites local edits (with confirm); upstream deletions move into a restorable trash that keeps source and scene membership.
+ - **Stats** — per-skill call counts + last-used times from session logs (incremental cache), group summaries; window and scan interval live-configurable from the settings card.
+-- **Settings card** — on the plugin's own page in the **Plugins manager** (sidebar → 插件 → dsh-skill-hub): master switch, announce-to-agent, invocation dot colors, usage display toggles, stats window/interval; plus a self-update check against GitHub releases.
++- **Settings card** — on the plugin's own page in the **Plugins manager** (sidebar → 插件 → dsh-skill-hub): master switch, announce-to-agent, invocation dot colors, usage display toggles, stats window/interval; plus a self-update check against GitHub releases. The values are the plugin's own profile entry configuration, so a save is live and survives with the profile.
+ 
+ ## Why not just the read-only browser?
+ 
+@@ -77,7 +77,7 @@ GitHub repo ──scan/import──▶ ~/.dsh/skills
+                     /api/skill-hub/* ──▶ Panel (Settings → 技能)
+ ```
+ 
+-Host uses only `ctx.skills.snapshot/get`, `ctx.webServer.register`, `ctx.systemPrompt.section`. Loopback-only routes (`127.0.0.1`/`localhost`), JSON.
++Host uses only `ctx.skills.snapshot/get`, `ctx.webServer.register`, `ctx.systemPrompt.section`, and `ctx.settings` (the plugin's own profile entry configuration). Loopback-only routes (`127.0.0.1`/`localhost`), JSON.
+ 
+ ## HTTP API
+ 
+@@ -108,7 +108,7 @@ Host uses only `ctx.skills.snapshot/get`, `ctx.webServer.register`, `ctx.systemP
+ 
+ ```bash
+ npm run typecheck  # tsc --noEmit
+-npm test           # 253 tests, 14 suites
++npm test           # 261 tests, 15 suites
+ npm run build      # tsc + tsdown → lib/index.js + lib/client.js
+ ```
+ 
+@@ -120,7 +120,7 @@ npm run build      # tsc + tsdown → lib/index.js + lib/client.js
+ - Skill missing — check the diagnostics section (frontmatter / name mismatch / short description).
+ - Empty source group — its skills were deleted, or their disabled records were lost (sidecar restored/hand-edited). Startup reconciles `.disabled` files on disk; source groups with no visible member are no longer rendered.
+ - Dots missing in `/` menu — dsh internals changed; catalog still works.
+-- Settings card missing — it lives in the Plugins manager (sidebar → 插件 → dsh-skill-hub), not under Settings. On dsh older than `0.1.6-alpha.2` this plugin contributes no config surface at all.
++- Settings card missing — it lives in the Plugins manager (sidebar → 插件 → dsh-skill-hub), not under Settings. On dsh older than `0.1.7-alpha.1` this plugin contributes no config surface at all.
+ 
+ ## Community
+ 
+diff --git a/fixture/README.zh.md b/fixture/README.zh.md
+index 80b5151..a24f449 100644
+--- a/fixture/README.zh.md
++++ b/fixture/README.zh.md
+@@ -24,9 +24,9 @@ dsh plugin --profile web add dsh-skill-hub
+ # 重启 dsh web → 设置 → 技能 → 市场 → 扫描 → 导入
+ ```
+ 
+-要求 `Node ^22.19 || >=24` + dsh web `>=0.1.6-alpha.2 <0.2`。
++要求 `Node ^22.19 || >=24` + dsh web `>=0.1.7-alpha.1 <0.2`。
+ 
+-两个界面 —— 管理面板在 **设置 → 技能**；本插件的设置卡片在 **插件管理页** 的插件自有页面上（侧边栏「插件」→ dsh-skill-hub）。该卡片于 dsh `0.1.6-alpha.2` 迁到此处 —— 插件管理页取代了旧的「设置 → 插件」列表，本插件只注册到新位置。
++两个界面 —— 管理面板在 **设置 → 技能**；本插件的设置卡片在 **插件管理页** 的插件自有页面上（侧边栏「插件」→ dsh-skill-hub）。该卡片于 dsh `0.1.6-alpha.2` 迁到此处 —— 插件管理页取代了旧的「设置 → 插件」列表；自 dsh `0.1.7-alpha.1` 起，卡片编辑的是插件自身 profile 条目的配置（volatile `Config` 字段，保存即生效、无需重启），这也是本版本唯一读写的设置存储。
+ 
+ ## 功能
+ 
+@@ -40,7 +40,7 @@ dsh plugin --profile web add dsh-skill-hub
+ - **市场** — 内置精选仓库 + 自定义 `owner/repo`。任何含 `SKILL.md` 的顶层目录都可扫描（无白名单）；`SKILL.md` 直接放在仓库根时，整个仓库算一个技能，技能名取仓库名（`.github/` 等仓库基建不计入）。异步导入，字节级进度+取消。每个源钉一个版本 —— 点 ref 徽标可在发布版/分支/手输之间切换。
+ - **跟踪更新** — 导入的技能记录 repo+commit 快照。检查全部/一键全更；每源徽章（已装/可更新/上游已删/新版本）。同步覆盖本地修改（先确认）；上游删除跟进移入回收站，恢复保留来源与场景归属。
+ - **统计** — 会话日志的调用次数+最近使用，分组头汇总；窗口与扫描间隔在设置卡片实时可调。
+-- **设置卡片** — 位于 **插件管理页** 的插件自有页面（侧边栏「插件」→ dsh-skill-hub）：总开关、向 Agent 公告、调用圆点颜色、用量显示开关、统计窗口/间隔；附带插件自更新检查（对 GitHub releases）。
++- **设置卡片** — 位于 **插件管理页** 的插件自有页面（侧边栏「插件」→ dsh-skill-hub）：总开关、向 Agent 公告、调用圆点颜色、用量显示开关、统计窗口/间隔；附带插件自更新检查（对 GitHub releases）。这些值就是插件自身 profile 条目的配置，保存即生效并随 profile 持久化。
+ 
+ ## 为什么还需要一个管理器？
+ 
+@@ -77,7 +77,7 @@ GitHub 仓库 ──扫描/导入──▶ ~/.dsh/skills
+                   /api/skill-hub/* ──▶ 面板（设置 → 技能）
+ ```
+ 
+-宿主仅用 `ctx.skills.snapshot/get`、`ctx.webServer.register`、`ctx.systemPrompt.section`。路由仅回环（`127.0.0.1`/`localhost`），JSON。
++宿主仅用 `ctx.skills.snapshot/get`、`ctx.webServer.register`、`ctx.systemPrompt.section` 以及 `ctx.settings`（插件自身 profile 条目配置）。路由仅回环（`127.0.0.1`/`localhost`），JSON。
+ 
+ ## HTTP API
+ 
+@@ -108,7 +108,7 @@ GitHub 仓库 ──扫描/导入──▶ ~/.dsh/skills
+ 
+ ```bash
+ npm run typecheck  # tsc --noEmit
+-npm test           # 253 tests, 14 suites
++npm test           # 261 tests, 15 suites
+ npm run build      # tsc + tsdown → lib/index.js + lib/client.js
+ ```
+ 
+@@ -120,7 +120,7 @@ npm run build      # tsc + tsdown → lib/index.js + lib/client.js
+ - 技能不出现 — 看诊断区（缺 frontmatter / 名称不一致 / 描述过短）。
+ - 来源组空壳 — 组内技能已被删除、或禁用记录丢失（状态文件被恢复/手改）。启动时自动对账磁盘上的 `.disabled` 文件补记录；无可见成员的来源组不再渲染。
+ - `/` 菜单圆点消失 — dsh 内部触发源变更，目录功能不受影响。
+-- 找不到设置卡片 — 它在插件管理页（侧边栏「插件」→ dsh-skill-hub），不在「设置」里；dsh 低于 `0.1.6-alpha.2` 时本插件不提供任何配置入口。
++- 找不到设置卡片 — 它在插件管理页（侧边栏「插件」→ dsh-skill-hub），不在「设置」里；dsh 低于 `0.1.7-alpha.1` 时本插件不提供任何配置入口。
+ 
+ ## 社区
+ 
+diff --git a/fixture/icon.svg b/fixture/icon.svg
+new file mode 100644
+index 0000000..4088dae
+--- /dev/null
++++ b/fixture/icon.svg
+@@ -0,0 +1,6 @@
++<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
++  <g transform="scale(2.25)" fill="#4D6BFE">
++    <path d="M12.5113 15.4067C12.4395 15.6249 12.1308 15.6249 12.059 15.4067L11.643 14.1416C11.454 13.567 11.0033 13.1164 10.4288 12.9274L9.16369 12.5113C8.94544 12.4395 8.94544 12.1308 9.16369 12.059L10.4288 11.643C11.0033 11.454 11.454 11.0033 11.643 10.4288L12.059 9.16369C12.1308 8.94544 12.4395 8.94544 12.5113 9.16369L12.9274 10.4288C13.1164 11.0033 13.567 11.454 14.1416 11.643L15.4067 12.059C15.6249 12.1308 15.6249 12.4395 15.4067 12.5113L14.1416 12.9274C13.567 13.1164 13.1164 13.567 12.9274 14.1416L12.5113 15.4067Z" />
++    <path d="M9.02246 0.546878C9.9822 0.546878 10.7564 0.545403 11.374 0.612307C12.0042 0.680586 12.5515 0.826244 13.0273 1.17188C13.3052 1.37376 13.5501 1.61868 13.752 1.89649C14.0975 2.37225 14.2432 2.91984 14.3115 3.54981C14.3784 4.16727 14.377 4.94206 14.377 5.90137V8.51367C13.9611 8.29533 13.5071 8.13985 13.0273 8.06055V5.90137C13.0273 4.9121 13.0259 4.22322 12.9688 3.69532C12.9129 3.18044 12.8098 2.89782 12.6592 2.69043C12.5406 2.52724 12.3966 2.38326 12.2334 2.26465C12.026 2.11404 11.7437 2.0109 11.2285 1.95508C10.7005 1.89789 10.0122 1.89649 9.02246 1.89649H6.55371C5.56395 1.89649 4.87569 1.89787 4.34766 1.95508C3.83242 2.01092 3.55022 2.11398 3.34278 2.26465C3.17953 2.38329 3.03564 2.52719 2.91699 2.69043C2.76642 2.89782 2.66325 3.18042 2.60742 3.69532C2.55027 4.22322 2.54883 4.9121 2.54883 5.90137V10.0986C2.54883 11.0878 2.55031 11.7768 2.60742 12.3047C2.66326 12.8196 2.76642 13.1032 2.91699 13.3105C3.03558 13.4736 3.17966 13.6178 3.34278 13.7363C3.5502 13.8869 3.83265 13.9901 4.34766 14.0459C4.87568 14.1031 5.56398 14.1035 6.55371 14.1035H8.08399C8.27443 14.6025 8.55077 15.0585 8.89551 15.4541H6.55371C5.59402 15.4541 4.81976 15.4546 4.20215 15.3877C3.57204 15.3194 3.02468 15.1738 2.54883 14.8281C2.27111 14.6263 2.02606 14.3813 1.82422 14.1035C1.47883 13.6278 1.33293 13.08 1.26465 12.4502C1.19783 11.8327 1.19922 11.0579 1.19922 10.0986V5.90137C1.19922 4.94206 1.1978 4.16727 1.26465 3.54981C1.33295 2.91984 1.47867 2.37225 1.82422 1.89649C2.02613 1.61864 2.27098 1.37379 2.54883 1.17188C3.02472 0.826181 3.57197 0.6806 4.20215 0.612307C4.81976 0.545393 5.594 0.546877 6.55371 0.546878H9.02246ZM9.19629 9.14649H4.5459V7.84571H9.19629V9.14649ZM11.0303 6.10645H4.5459V4.80567H11.0303V6.10645Z" />
++  </g>
++</svg>
+diff --git a/fixture/locale/en.json b/fixture/locale/en.json
+new file mode 100644
+index 0000000..41b0289
+--- /dev/null
++++ b/fixture/locale/en.json
+@@ -0,0 +1,6 @@
++{
++  "meta": {
++    "title": "Skill Hub",
++    "description": "Browse, toggle, organize, and install Agent Skills from a dedicated Settings page, with a skill market and upstream source tracking."
++  }
++}
+diff --git a/fixture/locale/zh.json b/fixture/locale/zh.json
+new file mode 100644
+index 0000000..1dfd16e
+--- /dev/null
++++ b/fixture/locale/zh.json
+@@ -0,0 +1,6 @@
++{
++  "meta": {
++    "title": "技能中枢",
++    "description": "在设置页中浏览、开关、整理与安装 Agent Skills，并带技能市场与上游来源跟踪。"
++  }
++}
+diff --git a/fixture/package-lock.json b/fixture/package-lock.json
+index 77fff15..1d50ab8 100644
+--- a/fixture/package-lock.json
++++ b/fixture/package-lock.json
+@@ -1,33 +1,38 @@
+ {
+   "name": "dsh-skill-hub",
+-  "version": "0.3.14",
++  "version": "0.3.15",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "dsh-skill-hub",
+-      "version": "0.3.14",
++      "version": "0.3.15",
+       "license": "MIT",
+       "dependencies": {
+-        "js-yaml": "^4.1.0",
+-        "schemastery": "^3.18.0"
++        "@deepseek-ai/schemastery": "^3.18.3",
++        "js-yaml": "^4.1.0"
+       },
+       "devDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-client-connection": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-client-locale": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-client-store": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-client-ui-input-trigger": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-client-ui-plugin-manager": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-client-ui-settings": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-client-ui-slots": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-host-webserver": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-query": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-settings": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-skill": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2",
++        "@deepseek-ai/cordis": "^4.0.3",
++        "@deepseek-ai/cordis-plugin-loader": "^1.0.5",
++        "@deepseek-ai/dsh-client-connection": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-client-locale": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-client-store": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-client-ui-input-trigger": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-client-ui-plugin-manager": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-client-ui-primitives": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-client-ui-settings": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-client-ui-settings-plugins": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-client-ui-slots": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-host-webserver": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-scope": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-session": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-session-query": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-settings": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-skill": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-system-prompt": "0.1.7-alpha.1",
++        "@deepseek-ai/dsh-util-values": "0.1.7-alpha.1",
++        "@deepseek-ai/schemastery": "^3.18.3",
+         "@types/js-yaml": "^4.0.9",
+         "@types/node": "^22.20.0",
+         "@types/react": "~18.3.1",
+@@ -36,7 +41,6 @@
+         "lightningcss": "1.32.0",
+         "react": "^18.3.1",
+         "react-dom": "^18.3.1",
+-        "schemastery": "^3.18.0",
+         "tsdown": "0.22.2",
+         "typescript": "~5.7.2",
+         "vitest": "^3.0.0",
+@@ -46,27 +50,23 @@
+         "node": "^22.19.0 || >=24.0.0"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.1 || ^4.0.2",
+-        "@deepseek-ai/dsh-client-connection": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-locale": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-runtime": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-store": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-ui-settings": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-client-ui-slots": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-host-webserver": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-session": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-session-query": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-settings": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-skill": ">=0.1.6-alpha.2 <0.2.0-0",
+-        "@deepseek-ai/dsh-system-prompt": ">=0.1.6-alpha.2 <0.2.0-0",
++        "@deepseek-ai/cordis": "^4.0.3",
++        "@deepseek-ai/dsh-client-connection": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-client-locale": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-client-store": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-client-ui-settings": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-client-ui-slots": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-host-webserver": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-session": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-session-query": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-settings": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-skill": ">=0.1.7-alpha.1 <0.2.0-0",
++        "@deepseek-ai/dsh-system-prompt": ">=0.1.7-alpha.1 <0.2.0-0",
+         "react": "^18.2.0",
+         "react-dom": "^18.2.0"
+       },
+       "peerDependenciesMeta": {
+-        "@deepseek-ai/dsh-client-runtime": {
+-          "optional": true
+-        },
+         "@deepseek-ai/dsh-client-store": {
+           "optional": true
+         }
+@@ -151,21 +151,21 @@
+       }
+     },
+     "node_modules/@deepseek-ai/cordis": {
+-      "version": "4.0.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.2.tgz",
+-      "integrity": "sha512-asOnXP1TzFSFQlHb1iegDZp0z/8WD1c7YNrwJR/Tx2bzNuMXfcekE/I67Iv6SQXeLB4csxqCngzQKANP7gdw0g==",
++      "version": "4.0.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis/-/cordis-4.0.4.tgz",
++      "integrity": "sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/cosmokit": "^1.8.3",
++        "@deepseek-ai/cosmokit": "~1.8.5",
+         "@standard-schema/spec": "^1.1.0"
+       },
+       "bin": {
+         "cordis": "bin.js"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis-plugin-include": "^1.0.7",
+-        "@deepseek-ai/cordis-plugin-loader": "^1.0.3"
++        "@deepseek-ai/cordis-plugin-include": "~1.0.9",
++        "@deepseek-ai/cordis-plugin-loader": "~1.0.5"
+       },
+       "peerDependenciesMeta": {
+         "@deepseek-ai/cordis-plugin-include": {
+@@ -176,447 +176,451 @@
+         }
+       }
+     },
+-    "node_modules/@deepseek-ai/cosmokit": {
+-      "version": "1.8.3",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.3.tgz",
+-      "integrity": "sha512-qBo+ronVM6Eu2WNVJXi8JcMiqZ19T9BRIpV+5qJUFPXjGH/Z0QKcQMC/IZJ7L394YTOtJgcovbk9qP0w2GsBXQ==",
+-      "dev": true,
+-      "license": "MIT"
+-    },
+-    "node_modules/@deepseek-ai/dsh-agent": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-agent/-/dsh-agent-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-XEOytfXmJG6dyHld3Np0IYRrVPJnuoKKx2yQ+o74a7cN89k+J61c33D7zIcDG5rLkF7sMNM608ZkhfCWJuTcjg==",
++    "node_modules/@deepseek-ai/cordis-plugin-loader": {
++      "version": "1.0.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cordis-plugin-loader/-/cordis-plugin-loader-1.0.5.tgz",
++      "integrity": "sha512-200huL2ttWcjyeYllvPYn+qMR7I89qy8MhZasbHltPzB/KMrSfsyoCYKdCGc5KqPGj5iJugcmibQzjINMO9I+Q==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
++      "dependencies": {
++        "@deepseek-ai/cosmokit": "~1.8.5",
++        "@deepseek-ai/schemastery": "~3.18.4"
++      },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-typert-protocol": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "node-addon-require-builtin": "^0.1.6"
++      },
++      "peerDependenciesMeta": {
++        "node-addon-require-builtin": {
++          "optional": true
++        }
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-attachment": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-attachment/-/dsh-attachment-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-dv3s/FrFuZwmcBfWzWozj9khlb8LrFSCgz/spGsEg6l9zka1Wu3ZkHDcE+CRsM+fyCD/z/jTClMOkQ2DIMw5wQ==",
++    "node_modules/@deepseek-ai/cosmokit": {
++      "version": "1.8.5",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/cosmokit/-/cosmokit-1.8.5.tgz",
++      "integrity": "sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==",
+       "dev": true,
+-      "license": "MIT",
+-      "peer": true,
+-      "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2"
+-      }
++      "license": "MIT"
+     },
+-    "node_modules/@deepseek-ai/dsh-brand": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-brand/-/dsh-brand-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-Fx+GKwkTjTVf6drn888j7vF5ak0/6mxHDF1bYH4FBsRI+h/8UmPAgIV5fAfT63GqBSXdgmVe/hdzdmXS2nq6Eg==",
++    "node_modules/@deepseek-ai/dsh-atomic-write": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-atomic-write/-/dsh-atomic-write-0.1.7-rc.2.tgz",
++      "integrity": "sha512-gdUVkVv5DXBgnEDB1Dh/lL+HV/8mKR3AGUqNjLhQJSEqE9MIYyiHC+3zwzaWjeWhiTdLXd5rkA4HVCiS3KIcUg==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-connection": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-connection/-/dsh-client-connection-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-M/5WNKgxrPm+Y5C2tDTQDGMmFRpk7jMdlKD2Hkg4HmzdTXr/O2VzCXdCiBHvB/AZEkvZa2FSNPa3fqcLkPdvyg==",
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-connection/-/dsh-client-connection-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-kvxYm6jiMcB2kTPQz60TKa4Xsl4OmjGTGRdr1vGKhC4VAqBA5lN+NcR/m7KIvAgRFiDn7hQXFS+Na0Pow4/smw==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-credentials": "^0.1.6-alpha.2",
+-        "@deepseek-ai/schemastery": "^3.18.2",
++        "@deepseek-ai/dsh-credentials": "^0.1.7-alpha.1",
++        "@deepseek-ai/schemastery": "^3.18.3",
+         "zod": "^4.4.3"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "^4.0.3",
++        "@deepseek-ai/dsh-scope": "^0.1.7-alpha.1"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-locale": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-locale/-/dsh-client-locale-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-n22prMdNVl+d7Bx/E16zhtTEXZqk9fUBRY7DScNem0kXftIwxuQCXQkOmDraNrbLUtA3WHPe6/4+8UpQ+1xIuA==",
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-locale/-/dsh-client-locale-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-2S1Ji9bBwU133HGyRPNNbsyiG2Jg5GR/NMY6FD46cYhZryUyYxz6irxHlqwI/t8Qk6cfDoIXj6i72ID49KPG0Q==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/schemastery": "^3.18.2"
++        "@deepseek-ai/schemastery": "^3.18.3"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "^4.0.3"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-store": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-store/-/dsh-client-store-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-TUAfEQkptbd41uDXlmrjqA4e4lQ/AFRZYXHSNSwkOZApfPUk4drJOGFlHBseWGwrjcS6kWknia28ubUM9WZdEw==",
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-store/-/dsh-client-store-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-HJZBXhP1bw05MS7RSLc+98bOIj8CNXiiOzsPJVX+3Pz7OBFDum4/B6nv1VyeLv9JSb2r511iLD/0i/xYq/Fmsg==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "^4.0.3"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-ui-input-trigger": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-input-trigger/-/dsh-client-ui-input-trigger-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-vC1/xY8/abiZG/F/6ikGamqSiF/fQ/fbKy0SPPiHhqG3SSLQmYUs+Hk00fgufwUZnRkLOclR9w09afO08+gKdA==",
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-input-trigger/-/dsh-client-ui-input-trigger-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-p9IrZhHAsrGdOU5brHiKSs5Z/phgWeacBsmKiUPu3MMj2JocmEob+QmPdf1JyoRAk0QBo2xa2vzd9TFX3z06qw==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "^4.0.3"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-ui-plugin-manager": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-plugin-manager/-/dsh-client-ui-plugin-manager-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-DJuN13Jo5UN9LKjZLsOTAGMEQsRM7NSPW9/mBS8oCJUvbPSwqi1N1mNn1bHzNmiOCjPNBlNcH2XnZiT+BTRseg==",
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-plugin-manager/-/dsh-client-ui-plugin-manager-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-FfuZRifJEY1cCKlN2PWnXwNMYWhEzTE4vIoo17o+IkJLy2SY+skJxxGIkEzv3/nF3rJ1D1tanJOnoLo08B59Iw==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "^4.0.3"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-client-ui-primitives": {
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-primitives/-/dsh-client-ui-primitives-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-H7iRoqlqY/tS4bj37w428FvmW6xN5+aUj18PkMqqL/V5M4rasdindN5jmxUbc172Wnv4RPaL2lvkdM3f2P9vrg==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "^4.0.3"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-ui-settings": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings/-/dsh-client-ui-settings-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-90hotMS5Cdk2pYuOC/E4K9Giffze/UTGekXyB9yzsV2DSEaFAD0s0/Ie/NnVe8xmdTrLgFd2fxKTi6xDQIwooQ==",
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings/-/dsh-client-ui-settings-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-bFUKeO5KsxNteVwMhB8LOayPKXXkATUqPZMH2c9LJKnxCw9MliC3hmiMfHw3QjL7cFaoNA7/T9f49zmtIwvlFQ==",
+       "dev": true,
+       "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/schemastery": "^3.18.3"
++      },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "^4.0.3"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-ui-settings-plugins": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings-plugins/-/dsh-client-ui-settings-plugins-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-fQKzLhjdfRsN6kulAOdFF1wliyAPT1J19dgT1tMFRlO5RMZCpXHgh+O1cVh3o5hl3K/xGTHlWsQL3XtNB1hjmQ==",
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-settings-plugins/-/dsh-client-ui-settings-plugins-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-hpOkasH/qB4tun5S5pup0hW8x9M5GaQqyn3Xk2dY9xwGHw+ToYzgpMKUls2akoEOiTzwiDx8FhGRN5tt6iNVHA==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "^4.0.3"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-client-ui-slots": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-slots/-/dsh-client-ui-slots-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-yvmMjjwcVgy+PuOPljdYcMuqrhL0fNzwjT7Ar0pPZ5Jv8WcRFJGeo7s8vrW6/V1dcQyhgvPGvz+ozSu8MUmwUw==",
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-client-ui-slots/-/dsh-client-ui-slots-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-lN4WVTzDb/t01KGmwjtZxjoqCIMKvi5kyY9/XPVkFjI+6q5RmorbCIyZiq84YJ2I36Cj2nYUQLB8KSRXjGMQbw==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "^4.0.3"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-commands": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-commands/-/dsh-commands-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-u90h9UUy5maUzmNZJn3jRjqFXKzvWMIX6RtD4YDy0sJsEFBkZTupBO4cITNd8w4s3tYBKSUAltZqxgxSE4Ngaw==",
++    "node_modules/@deepseek-ai/dsh-compaction-image-offload": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-compaction-image-offload/-/dsh-compaction-image-offload-0.1.7-rc.2.tgz",
++      "integrity": "sha512-IraXZq6uR88RbJcxkK7vfDViIB4WCxm8Kf9s43VWoias9Tr//w0s8oHZWTfNuy8kVgpw4cBze6DeExZooMALrw==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-crypto": "^0.1.6-alpha.2",
+-        "zod": "^4.4.3"
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-attachment": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-typert-protocol": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-agent": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-compaction": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-compaction": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-compaction/-/dsh-compaction-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-jS580ZgaBOX9XjcEXetcSowuUeNK249HUuxJMpNL7JjPz2q+IwQYE4UDRNjAyBaArMp24rc2RhGJYdfse8k1ZA==",
++    "node_modules/@deepseek-ai/dsh-compaction-image-offload/node_modules/@deepseek-ai/dsh-util-values": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.7-rc.2.tgz",
++      "integrity": "sha512-UX8nh5SbtZcPVVEvjd+9PCPcbybA6OpVzJGgFxYn59ao/7QQGyYbByS8KXr+THU5JtqmDDVb9xGUSJaF2IYmeQ==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-commands": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-compaction-image-offload": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-compaction-image-offload/-/dsh-compaction-image-offload-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-mYJjxjbq48nHeExbvdsDuXlxG9FnA8wtS4zqH2TP/d6AiMYIZOVkEpVA6Fk94Vcr310XcALPwv4pl5PU0GHE3w==",
++    "node_modules/@deepseek-ai/dsh-config-editor": {
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-config-editor/-/dsh-config-editor-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-smttBp9Mc+DIQbZmYNb6ypvWbLB1dtJ0HC+4IO+NshtqPD4YwuA7tbRm14nEFlvZe+fxa8bcZuSs9h3ObuzjRA==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-atomic-write": "^0.1.7-alpha.1",
++        "js-yaml": "^4.1.0",
++        "yaml": "^2.8.1"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-compaction": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "^4.0.3",
++        "@deepseek-ai/cordis-plugin-include": "^1.0.8",
++        "@deepseek-ai/cordis-plugin-loader": "^1.0.4",
++        "@deepseek-ai/dsh-app-boot": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-hmr": "^0.1.7-alpha.1"
++      },
++      "peerDependenciesMeta": {
++        "@deepseek-ai/dsh-hmr": {
++          "optional": true
++        }
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-credentials": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-credentials/-/dsh-credentials-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-xfUX30VlsXCLX+5/99AXIKQXEUXaW1pe1wJXKohj+OnMZWYBZGXpSlEpquiUaINgifs129lHCCFGbLWhr3wmWA==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-credentials/-/dsh-credentials-0.1.7-rc.2.tgz",
++      "integrity": "sha512-Zi5MCL+o2bphuvWcfFsaRmg6eIafkjCa758+DVB2ac2tt5hzXLoKhwSku4YVhvhZYJan8TP87abIzyGr5z1X5g==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-brand": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-invariants": "0.1.7-rc.2"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-host-webserver": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-host-webserver/-/dsh-host-webserver-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-lq4BAR25yg3N6niq3kujWvxrYrcAqvZF/Xz3AuHbJPUiZkYQ5P3lWPl5LxmWpnPh8FJwW4yHNXg93gvV7l99iQ==",
++    "node_modules/@deepseek-ai/dsh-credentials/node_modules/@deepseek-ai/dsh-brand": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-brand/-/dsh-brand-0.1.7-rc.2.tgz",
++      "integrity": "sha512-cvcvlNRuiFqZNNqyxdu7wcpiBjd9xa/0MpuhRvee43zBp9uED2p5JolZr5/2EKJf57gYx9k9bedb+Zbyiqnpkw==",
+       "dev": true,
+       "license": "MIT",
+-      "dependencies": {
+-        "@deepseek-ai/schemastery": "^3.18.2",
+-        "compression": "^1.8.1",
+-        "negotiator": "^1.0.0"
+-      },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-invariants": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-invariants/-/dsh-invariants-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-YS4DysoPqwFx02istRp2FHN8XmJPRoPDc+pu56b/UtHovqIFzcX4QepQ4yRESDQ4SOO44KZBg72RxXma/9ziVw==",
++    "node_modules/@deepseek-ai/dsh-host-webserver": {
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-host-webserver/-/dsh-host-webserver-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-bFVnH3lzlksSrmTpf6ZdhexcSHTym/Xh7+mpqFH+lnqZmTQsoot38IpTnhblciWp+3wviIFBRle1dz6uc0JjjQ==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/schemastery": "^3.18.2"
++        "@deepseek-ai/schemastery": "^3.18.3",
++        "compression": "^1.8.1",
++        "negotiator": "^1.0.0"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "^4.0.3"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-llm": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-llm/-/dsh-llm-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-kIQoqnD6jN3Z2qQ+gd0TrIwkEDfUZAPC3kkTUUv2yQm1GeDjB7JULwT1vGAKTbEqOhOpVfKhdp4wItpG5PclfA==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-llm/-/dsh-llm-0.1.7-rc.2.tgz",
++      "integrity": "sha512-hNT3ovFnbNDQ8g544bh2Q9ORX40aI6Y+jhjer1lETeHS4g0jTjqUUVfARCTA7uAFvHucSBg2rFgbisIktmJCxw==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-timeout": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-typert-protocol": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-util-crypto": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2",
+-        "@deepseek-ai/schemastery": "^3.18.2",
++        "@deepseek-ai/dsh-brand": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-timeout": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-typert-protocol": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-util-crypto": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2",
++        "@deepseek-ai/schemastery": "~3.18.4",
+         "zod": "^4.4.3"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-ptc-runtime": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-ptc-runtime/-/dsh-ptc-runtime-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-A5WjgPaEGqjzbe3Qq6Q4Dxh7FMmiki6beFEDmR9M64n6+g97eHPWF7jA7HRTEJ3rYD0kOno6bRWd84tngA5NWQ==",
++    "node_modules/@deepseek-ai/dsh-llm/node_modules/@deepseek-ai/dsh-brand": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-brand/-/dsh-brand-0.1.7-rc.2.tgz",
++      "integrity": "sha512-cvcvlNRuiFqZNNqyxdu7wcpiBjd9xa/0MpuhRvee43zBp9uED2p5JolZr5/2EKJf57gYx9k9bedb+Zbyiqnpkw==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-sandbox": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-sandbox": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-sandbox/-/dsh-sandbox-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-WQ718npnJI1htC++wGxBll7iFlaOfgS1PpN+SoVzL39BcYuqp6zGP5CuLlxIIjz4uMs8bMbeQkk3MSl/mBV72g==",
++    "node_modules/@deepseek-ai/dsh-llm/node_modules/@deepseek-ai/dsh-util-crypto": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-crypto/-/dsh-util-crypto-0.1.7-rc.2.tgz",
++      "integrity": "sha512-BGc55/bSj/1LcDTQ5fpok4U24X9SFyN+TB23/hBlbe2TBUKVuwO8+X5FFKKje2MLO8PWYEDkXv/LrV6jRVKZEg==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+-      "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
+-      },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-sandbox-policy": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-sandbox-policy/-/dsh-sandbox-policy-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-yeLbgxCuCl5xUA1/eAzduBl82/WQuBNmNqYddMMNgSp79Vpb6YcvDY8Q0DC00Uaviz8rpPgQ91K60biU4p4FAQ==",
++    "node_modules/@deepseek-ai/dsh-llm/node_modules/@deepseek-ai/dsh-util-values": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.7-rc.2.tgz",
++      "integrity": "sha512-UX8nh5SbtZcPVVEvjd+9PCPcbybA6OpVzJGgFxYn59ao/7QQGyYbByS8KXr+THU5JtqmDDVb9xGUSJaF2IYmeQ==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+-      "dependencies": {
+-        "@deepseek-ai/schemastery": "^3.18.2",
+-        "zod": "^4.4.3"
+-      },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-sandbox": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-scope": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-scope/-/dsh-scope-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-nbh9kxekeiZPYVG2Up3ufJsDZRHrXaBqOGutERMBw1IfFjE8EXZReDQV9F8qP1hQKIF1xkxFcGaPcFPbxJwDAw==",
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-scope/-/dsh-scope-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-k5NRzlFKnAddKOSwOpS3H9KAR9iugn6qmfwqzo1PIHGjjpGJOl8ywSoRct20ZbIcUBIusnfr7r79prRWFu4i5Q==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "^4.0.3",
++        "@deepseek-ai/dsh-invariants": "^0.1.7-alpha.1"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session/-/dsh-session-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-WQNriZEQb0ykg+SDvqvNbp/AmG/DnydY5YdkTm5u3ST+PNXSQDLkaFzlY2YFU6hEuzs1h0yGCw6qPVpVGDAm1g==",
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session/-/dsh-session-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-dUd/fUj8wign5ZuniGfr5VqMWZqFPwhc0IImapToE2NDZB/Hl0JVXtg/lS5aYoFfgxwEeIWEDjVO3UJBClQa9A==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-brand": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-llm": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.7-alpha.1"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "^4.0.3",
++        "@deepseek-ai/dsh-scope": "^0.1.7-alpha.1"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-format": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format/-/dsh-session-format-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-KM1VvrasXgi3Hs5Y1d2NhIVetUnP9wzaecghsXTsGH1NfZ12bYvMB5nmtVgqp2vYrnqZVn8IuOJHSR8AlBa7yQ==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format/-/dsh-session-format-0.1.7-rc.2.tgz",
++      "integrity": "sha512-ayk2VoX3r7m8U9rVc+F70qx76Eq3Mi3ToLySi29hDZPFLy8ujjSOO5LVCC1xmon8uukfcnScvElNPoP/mKTkBg==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-format-catalog": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-catalog/-/dsh-session-format-catalog-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-+++F17ZVq1FaH/vMlAUfs2P0eQHvBpntrCbfTcjkUd6wt6bmgXwtLS3rJhtyOeZ/+9yaBg5kJF7nn2Rm3PdNDA==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-catalog/-/dsh-session-format-catalog-0.1.7-rc.2.tgz",
++      "integrity": "sha512-PMwm6M713ZWMqV0NVRFGeP0eYoBBCe0n4l5k8g1sRI+e2wD5xVoTEn8ZduG0vxnrVrGneJRDPQjZ4TiMi/fgDw==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-compaction-image-offload": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format-v0-to-v1": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format-v1-to-v2": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format-v2-to-v3": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-compaction-image-offload": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v0-to-v1": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v1-to-v2": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v2-to-v3": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v3-to-v4": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4",
++        "@deepseek-ai/dsh-session": "0.1.7-rc.2"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-format-v0-to-v1": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v0-to-v1/-/dsh-session-format-v0-to-v1-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-ICKbie7Db+FgjYkdUTx8gD0M4UjDMXdrvxIyIEbxggfG9s92bMEG9m6l9vd+yCeKWiguJNsL21fZfAAU8aeRcw==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v0-to-v1/-/dsh-session-format-v0-to-v1-0.1.7-rc.2.tgz",
++      "integrity": "sha512-2JjUnl5+00N8/eda1s47VXP8wEl0HFqLRKk3MgEcRb6PEH3NH3Mvxb6jmkF6EeH0mMLLvzYHbpfDazOhECkXRg==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-session-format": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session-format-v0-to-v1/node_modules/@deepseek-ai/dsh-util-values": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.7-rc.2.tgz",
++      "integrity": "sha512-UX8nh5SbtZcPVVEvjd+9PCPcbybA6OpVzJGgFxYn59ao/7QQGyYbByS8KXr+THU5JtqmDDVb9xGUSJaF2IYmeQ==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-format-v1-to-v2": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v1-to-v2/-/dsh-session-format-v1-to-v2-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-Gx4ucbohIyFsdtXvKofN8hBe1Wp7nL2L7BeUH9JA4U6k417MhFTCu7fx3cTEbGl7keVLz2vjnshjNqhhotpLbg==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v1-to-v2/-/dsh-session-format-v1-to-v2-0.1.7-rc.2.tgz",
++      "integrity": "sha512-a7Rsv7z2zeIyWpwRWkdtbi1T8r9zBGvbcoQVQEPpmpMFH9qu5hZmzYUGNFS1qRW5KW2cZoOU+qRxHwRoKI0dcQ==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format-v0-to-v1": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v0-to-v1": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-util-values": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session-format-v1-to-v2/node_modules/@deepseek-ai/dsh-util-values": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.7-rc.2.tgz",
++      "integrity": "sha512-UX8nh5SbtZcPVVEvjd+9PCPcbybA6OpVzJGgFxYn59ao/7QQGyYbByS8KXr+THU5JtqmDDVb9xGUSJaF2IYmeQ==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-format-v2-to-v3": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v2-to-v3/-/dsh-session-format-v2-to-v3-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-eLpl5/mBOBsF6iIUQgegr5wLx50BdST31fDPlf1FwelqTVcIPybQftsjrz2Ezb0JSVRscVwvh2gqI6Pn3Qb2IA==",
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v2-to-v3/-/dsh-session-format-v2-to-v3-0.1.7-rc.2.tgz",
++      "integrity": "sha512-che+x4X57f4MPWYWjj3UkcDs4qU0sQspUvy0Ie8w+iMFPkH0C7f/629l6ubZXRFrGF/k6djbyLR/NYH7nArZaA==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-session-format": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format-v0-to-v1": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-format-v1-to-v2": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-session-format": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v0-to-v1": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v1-to-v2": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-session-projection": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-projection/-/dsh-session-projection-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-ig+XpRxv5N+gSpfy3IajvG5AlFm2UKfTKqqtem4DXwxCHIPoRbZnYWgwd/qFIl1bNNJHL6z1zjnOGGNeO640GA==",
++    "node_modules/@deepseek-ai/dsh-session-format-v3-to-v4": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-format-v3-to-v4/-/dsh-session-format-v3-to-v4-0.1.7-rc.2.tgz",
++      "integrity": "sha512-PpGsFntVbc6HEnIlTRMluk55YPAFGmbz7SSyYMXDaz7N+jzWTa54AuMg9gUthHxPwZyj7KF2QtJAJnSQ2+GPGw==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+-        "zod": "^4.4.3"
++        "@deepseek-ai/dsh-session-format": "0.1.7-rc.2",
++        "@deepseek-ai/dsh-session-format-v2-to-v3": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4"
++      }
++    },
++    "node_modules/@deepseek-ai/dsh-session-format/node_modules/@deepseek-ai/dsh-util-values": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.7-rc.2.tgz",
++      "integrity": "sha512-UX8nh5SbtZcPVVEvjd+9PCPcbybA6OpVzJGgFxYn59ao/7QQGyYbByS8KXr+THU5JtqmDDVb9xGUSJaF2IYmeQ==",
++      "dev": true,
++      "license": "MIT",
++      "peerDependencies": {
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-session-query": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-query/-/dsh-session-query-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-rB/Kss4VtN4H+MZx1n/nToppl95+0lihrnJw3cJqN8mRz9ytqcpHPhoQh7P6LQlM6R9nI5ou6XUr79hsDPkqog==",
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-query/-/dsh-session-query-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-XZJMmyLj31soYhjUWnIwdh5WsQkYDiUGXXWmme8vnxnmusoZaLQWcyUPuKJOZxK+lkrLpJZuiXXVdmDM0HLjhg==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-session-format-catalog": "^0.1.6-alpha.2"
++        "@deepseek-ai/dsh-session-format-catalog": "^0.1.7-alpha.1"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-persistence": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-projection-cache": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-title": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-tool-todo": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "^4.0.3",
++        "@deepseek-ai/dsh-brand": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-llm": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-session": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-session-persistence": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-session-projection": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-session-projection-cache": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-session-title": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-tool-todo": "^0.1.7-alpha.1"
+       },
+       "peerDependenciesMeta": {
+         "@deepseek-ai/dsh-session-persistence": {
+@@ -630,192 +634,150 @@
+         }
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-session-title": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-session-title/-/dsh-session-title-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-NZnEDIAUBEn8CFYFtZ+vB7SruoCAaLrZ9Xhqpbl8e/6/glx3jm7ZOlwdwVh9FhM/69yfOgfscuT4a+mV4dqG7g==",
++    "node_modules/@deepseek-ai/dsh-session/node_modules/@deepseek-ai/dsh-brand": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-brand/-/dsh-brand-0.1.7-rc.2.tgz",
++      "integrity": "sha512-cvcvlNRuiFqZNNqyxdu7wcpiBjd9xa/0MpuhRvee43zBp9uED2p5JolZr5/2EKJf57gYx9k9bedb+Zbyiqnpkw==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+-      "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2",
+-        "@deepseek-ai/schemastery": "^3.18.2",
+-        "zod": "^4.4.3"
+-      },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-settings": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-settings/-/dsh-settings-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-ty9zaulN2ceHJHahQ+D42fIpFCOxluY+AFVWJbkMJukdFcZEiWGucRxDwmgsoUt8ob/pkRnk0BBCTG0TI/FdIQ==",
++    "node_modules/@deepseek-ai/dsh-session/node_modules/@deepseek-ai/dsh-util-values": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.7-rc.2.tgz",
++      "integrity": "sha512-UX8nh5SbtZcPVVEvjd+9PCPcbybA6OpVzJGgFxYn59ao/7QQGyYbByS8KXr+THU5JtqmDDVb9xGUSJaF2IYmeQ==",
+       "dev": true,
+       "license": "MIT",
+-      "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2"
+-      },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/schemastery": "^3.18.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-skill": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-skill/-/dsh-skill-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-Ycq+5JrKDd1gU3KErnra6s6mL5qaXGdJX66+A9085M6JxSCBMqsb/Fhgh2nnk/D5vV6p7XSE8CEYPISMtXo/TA==",
++    "node_modules/@deepseek-ai/dsh-settings": {
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-settings/-/dsh-settings-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-I7xEso742PC9lmpu9F+011mVRsvvemVxrFrf3+MgQpSOl2PM1iNjD6I4/+tMYQsV+i/N6yDVC5RB8U/anM/MFA==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2",
+-        "@deepseek-ai/schemastery": "^3.18.2"
++        "@deepseek-ai/cordis-plugin-loader": "^1.0.4",
++        "@deepseek-ai/cosmokit": "^1.8.4",
++        "@deepseek-ai/dsh-config-editor": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-util-values": "^0.1.7-alpha.1",
++        "yaml": "^2.8.1"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "^4.0.3",
++        "@deepseek-ai/dsh-brand": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-invariants": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-session": "^0.1.7-alpha.1",
++        "@deepseek-ai/schemastery": "^3.18.3"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-system-prompt": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-system-prompt/-/dsh-system-prompt-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-nP+gpLPy4S1c8Rv3uZpmYB6J7gnMBwmehYWd/3oqPTWtcezj0L5opFkdfzrCrwEQLPgnTRgmr99OnBaJy2vZSQ==",
++    "node_modules/@deepseek-ai/dsh-settings/node_modules/@deepseek-ai/dsh-util-values": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.7-rc.2.tgz",
++      "integrity": "sha512-UX8nh5SbtZcPVVEvjd+9PCPcbybA6OpVzJGgFxYn59ao/7QQGyYbByS8KXr+THU5JtqmDDVb9xGUSJaF2IYmeQ==",
+       "dev": true,
+       "license": "MIT",
+-      "dependencies": {
+-        "@deepseek-ai/schemastery": "^3.18.2"
+-      },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-timeout": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-timeout/-/dsh-timeout-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-Hdcv+GMyfJVENm7CFEjztwbpDfsND10HZ+Q/9Nnw5UqlCkyQd8alhW+I2xIDTZQVvlDnRcu6l8ix1k2OOmiFSA==",
++    "node_modules/@deepseek-ai/dsh-skill": {
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-skill/-/dsh-skill-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-X6rd5Ss3O2Zsytoz+85lKAdRIAY/fD3LlTp9c/lAVeUYjqhqEb16sE4ikr/rA354b+qvGihMo+/BAUsyNcag/w==",
+       "dev": true,
+       "license": "MIT",
++      "dependencies": {
++        "@deepseek-ai/dsh-util-values": "^0.1.7-alpha.1",
++        "@deepseek-ai/schemastery": "^3.18.3"
++      },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "^4.0.3",
++        "@deepseek-ai/dsh-llm": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-scope": "^0.1.7-alpha.1"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-tool-todo": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tool-todo/-/dsh-tool-todo-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-iPQW6ahvKzDKwTrPUNb0qqZ2Gxzp2hfT9yErIdTPVMyh/njBeT0Zv/PML0Iul5uieYhr8lFqksNlvphXMfyMzQ==",
++    "node_modules/@deepseek-ai/dsh-skill/node_modules/@deepseek-ai/dsh-util-values": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.7-rc.2.tgz",
++      "integrity": "sha512-UX8nh5SbtZcPVVEvjd+9PCPcbybA6OpVzJGgFxYn59ao/7QQGyYbByS8KXr+THU5JtqmDDVb9xGUSJaF2IYmeQ==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+-      "dependencies": {
+-        "@deepseek-ai/schemastery": "^3.18.2",
+-        "zod": "^4.4.3"
+-      },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session-projection": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-tools": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-tools": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-tools/-/dsh-tools-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-twRy/AffES124neGEpDLHjOTgcmWi8HtisTdTIm1b144LdEUBfU604A5N65muE+GfECDzyDKK/jJeLGuosMx2w==",
++    "node_modules/@deepseek-ai/dsh-system-prompt": {
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-system-prompt/-/dsh-system-prompt-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-eDRfgbDtLV0pEgCKzElaHV6c9P+OJAwBPJK3n+RzrU9ibEtD4WyfxcrzvS9Kw3Q4wRsYULYDZNEWVw8ZGQeazw==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-util-values": "^0.1.6-alpha.2",
+-        "@deepseek-ai/schemastery": "^3.18.2"
++        "@deepseek-ai/schemastery": "^3.18.3"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-ptc-runtime": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-sandbox": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-sandbox-policy": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-user-approval": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "^4.0.3",
++        "@deepseek-ai/dsh-invariants": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-llm": "^0.1.7-alpha.1",
++        "@deepseek-ai/dsh-scope": "^0.1.7-alpha.1"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-typert-protocol": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-typert-protocol/-/dsh-typert-protocol-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-rC0XtllnwXXr+956y5r9E1CQIe/BA7AoNVZVW3+4srF7i4BoH90j64g4c3U+KsNLFC4dCOufNJ15kXKrMLMauQ==",
++    "node_modules/@deepseek-ai/dsh-timeout": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-timeout/-/dsh-timeout-0.1.7-rc.2.tgz",
++      "integrity": "sha512-YunLoLZSF8Ld9eYwyvKoBnxgy3GZrIQpw98HfFS15ZfZlqcFiZcchFhYmStLtUbtX+gjhoeXc8Xz913YbVifNA==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-user-approval": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-user-approval/-/dsh-user-approval-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-PMV8LOBoO3xwXpxDHBhh7PHHSqxHCn8YmzTMeGA2VNCSsL4e4KHLuVMUKyhpsny6KdP8Y2GjBHaKg2ZxLuEbnA==",
++    "node_modules/@deepseek-ai/dsh-typert-protocol": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-typert-protocol/-/dsh-typert-protocol-0.1.7-rc.2.tgz",
++      "integrity": "sha512-oJm03zqMQlvt16Ejw7VWy3/gqlJGrBCZj3Z4KL8ydLJeeTToKIR49WVCxMbJTlH0F9QFljruLtHguA5B99AeUQ==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+-        "@deepseek-ai/schemastery": "^3.18.2"
++        "@deepseek-ai/dsh-brand": "0.1.7-rc.2"
+       },
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2",
+-        "@deepseek-ai/dsh-agent": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-brand": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-invariants": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-llm": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-scope": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-        "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+-    "node_modules/@deepseek-ai/dsh-util-crypto": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-crypto/-/dsh-util-crypto-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-Jn+3w5pp+rBOSFekvtNWQAx2+M08ZxJmlVYn7OI6l5Gd9ISq4/T0v4yE07O9s7uU5zr7yZ9nq5CTUpcXCrBrxw==",
++    "node_modules/@deepseek-ai/dsh-typert-protocol/node_modules/@deepseek-ai/dsh-brand": {
++      "version": "0.1.7-rc.2",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-brand/-/dsh-brand-0.1.7-rc.2.tgz",
++      "integrity": "sha512-cvcvlNRuiFqZNNqyxdu7wcpiBjd9xa/0MpuhRvee43zBp9uED2p5JolZr5/2EKJf57gYx9k9bedb+Zbyiqnpkw==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "~4.0.4"
+       }
+     },
+     "node_modules/@deepseek-ai/dsh-util-values": {
+-      "version": "0.1.6-alpha.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.6-alpha.2.tgz",
+-      "integrity": "sha512-9p+4ffFjq7OIeYqvHlIhKs85MZrirdu9QYi+vknOwkgszZXAgoRbPnX0ZzhsTneFSqQgLEfBXtUHUtOI1iiB/Q==",
++      "version": "0.1.7-alpha.1",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/dsh-util-values/-/dsh-util-values-0.1.7-alpha.1.tgz",
++      "integrity": "sha512-/jTTlIEgqt2SG2yX3vXDBXN5eJ36XMaGiFTeXjkwmFRdqxnjh0IOHS2DCTtHmxPL+8VhgvNNmfnNzU84K4lNeQ==",
+       "dev": true,
+       "license": "MIT",
+       "peerDependencies": {
+-        "@deepseek-ai/cordis": "^4.0.2"
++        "@deepseek-ai/cordis": "^4.0.3"
+       }
+     },
+     "node_modules/@deepseek-ai/schemastery": {
+-      "version": "3.18.2",
+-      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.2.tgz",
+-      "integrity": "sha512-njDtZsznjYxok7KLLlHOPyuv2efdWVbSflAHgztSfbMsg+CVraEoRe2DjOCgClYv3ZCSm7WXoaUkbB/+RY7tWQ==",
++      "version": "3.18.4",
++      "resolved": "https://registry.npmjs.org/@deepseek-ai/schemastery/-/schemastery-3.18.4.tgz",
++      "integrity": "sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@deepseek-ai/cosmokit": "^1.8.3",
++        "@deepseek-ai/cosmokit": "~1.8.5",
+         "@standard-schema/spec": "^1.1.0"
+       }
+     },
+@@ -2398,13 +2360,6 @@
+         "url": "https://opencollective.com/express"
+       }
+     },
+-    "node_modules/cosmokit": {
+-      "version": "1.8.1",
+-      "resolved": "https://registry.npmjs.org/cosmokit/-/cosmokit-1.8.1.tgz",
+-      "integrity": "sha512-PDBv4l90xZKrUsZ0vtoycgZpO/j4iFsqJXrAxsyBDsnQRI7ZMJXIjgDJsKNjd5L8jnVnnlrDCdhkFbTncgCVjQ==",
+-      "dev": true,
+-      "license": "MIT"
+-    },
+     "node_modules/csstype": {
+       "version": "3.2.3",
+       "resolved": "https://registry.npmjs.org/csstype/-/csstype-3.2.3.tgz",
+@@ -3325,17 +3280,6 @@
+         "loose-envify": "^1.1.0"
+       }
+     },
+-    "node_modules/schemastery": {
+-      "version": "3.18.0",
+-      "resolved": "https://registry.npmjs.org/schemastery/-/schemastery-3.18.0.tgz",
+-      "integrity": "sha512-Jw2uxjoyyqc/yeurmChUEc/jbi8GsrdXV/KmqRUDZXJAXAmrJiPsz8vKa17l/VckyzljHZ9oGaul443CQiXxtA==",
+-      "dev": true,
+-      "license": "MIT",
+-      "dependencies": {
+-        "@standard-schema/spec": "^1.1.0",
+-        "cosmokit": "^1.8.1"
+-      }
+-    },
+     "node_modules/semver": {
+       "version": "7.8.5",
+       "resolved": "https://registry.npmjs.org/semver/-/semver-7.8.5.tgz",
+@@ -3865,6 +3809,22 @@
+         "node": ">=8"
+       }
+     },
++    "node_modules/yaml": {
++      "version": "2.9.1",
++      "resolved": "https://registry.npmjs.org/yaml/-/yaml-2.9.1.tgz",
++      "integrity": "sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==",
++      "dev": true,
++      "license": "ISC",
++      "bin": {
++        "yaml": "bin.mjs"
++      },
++      "engines": {
++        "node": ">= 14.6"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/eemeli"
++      }
++    },
+     "node_modules/zod": {
+       "version": "4.6.5",
+       "resolved": "https://registry.npmjs.org/zod/-/zod-4.6.5.tgz",
+diff --git a/fixture/package.json b/fixture/package.json
+index 08bee0a..5cad5ca 100644
+--- a/fixture/package.json
++++ b/fixture/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "dsh-skill-hub",
+-  "version": "0.3.14",
+-  "description": "In-GUI skill hub for DeepSeek Harness (dsh): browse the full local skill catalog from the official ctx.skills registry (every root + third-party providers), toggle skills on/off, inspect bodies, surface frontmatter diagnostics, and scaffold new skills — plus a codex-style skill market (built-in catalog, upstream update checks, one-click update-all) with tracked source sync. The full manager beyond the read-only dsh-skill-manager browser.",
++  "version": "0.3.15",
++  "description": "In-GUI skill hub for DeepSeek Harness (dsh): browse the full local skill catalog from the official ctx.skills registry (every root + third-party providers), toggle skills on/off, inspect bodies, surface frontmatter diagnostics, and scaffold new skills \u2014 plus a codex-style skill market (built-in catalog, upstream update checks, one-click update-all) with tracked source sync. The full manager beyond the read-only dsh-skill-manager browser.",
+   "type": "module",
+   "engines": {
+     "node": "^22.19.0 || >=24.0.0"
+@@ -21,9 +21,12 @@
+       "types": "./lib/types/client/index.d.ts",
+       "default": "./lib/client.js"
+     },
++    "./cordis.patch.yml": "./cordis.patch.yml",
++    "./locale/*.json": "./locale/*.json",
+     "./src/*": "./src/*",
+     "./package.json": "./package.json"
+   },
++  "icon": "./icon.svg",
+   "dsh": {
+     "bundle": {
+       "patch": "./cordis.patch.yml"
+@@ -61,13 +64,13 @@
+     ],
+     "compatibility": {
+       "dshVersions": [
+-        "0.1.6-alpha.2"
++        "0.1.7-alpha.1"
+       ]
+     },
+     "capability": {
+       "id": "skill-hub-settings-panel",
+       "kind": "ui",
+-      "invocation": "Open Settings → Skills panel; GET /api/skill-hub/catalog",
++      "invocation": "Open Settings \u2192 Skills panel; GET /api/skill-hub/catalog",
+       "expected": "The full local skill catalog (all roots) renders as groups and toggles persist an enabled/disabled row without a restart."
+     },
+     "evidence": {
+@@ -78,51 +81,52 @@
+     }
+   },
+   "dependencies": {
+-    "js-yaml": "^4.1.0",
+-    "schemastery": "^3.18.0"
++    "@deepseek-ai/schemastery": "^3.18.3",
++    "js-yaml": "^4.1.0"
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.1 || ^4.0.2",
+-    "@deepseek-ai/dsh-client-connection": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-locale": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-runtime": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-store": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-ui-settings": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-client-ui-slots": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-host-webserver": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-session": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-session-query": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-settings": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-skill": ">=0.1.6-alpha.2 <0.2.0-0",
+-    "@deepseek-ai/dsh-system-prompt": ">=0.1.6-alpha.2 <0.2.0-0",
++    "@deepseek-ai/cordis": "^4.0.3",
++    "@deepseek-ai/dsh-client-connection": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-client-locale": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-client-store": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-client-ui-settings": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-client-ui-slots": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-host-webserver": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-session": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-session-query": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-settings": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-skill": ">=0.1.7-alpha.1 <0.2.0-0",
++    "@deepseek-ai/dsh-system-prompt": ">=0.1.7-alpha.1 <0.2.0-0",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+   },
+   "peerDependenciesMeta": {
+-    "@deepseek-ai/dsh-client-runtime": {
+-      "optional": true
+-    },
+     "@deepseek-ai/dsh-client-store": {
+       "optional": true
+     }
+   },
+   "devDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.2",
+-    "@deepseek-ai/dsh-client-connection": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-client-locale": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-client-store": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-client-ui-input-trigger": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-client-ui-plugin-manager": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-client-ui-settings": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-host-webserver": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-session": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-session-query": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-settings": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-skill": "^0.1.6-alpha.2",
+-    "@deepseek-ai/dsh-system-prompt": "^0.1.6-alpha.2",
++    "@deepseek-ai/cordis": "^4.0.3",
++    "@deepseek-ai/cordis-plugin-loader": "^1.0.5",
++    "@deepseek-ai/dsh-client-connection": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-client-locale": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-client-store": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-client-ui-input-trigger": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-client-ui-plugin-manager": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-client-ui-primitives": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-client-ui-settings": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-client-ui-settings-plugins": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-client-ui-slots": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-host-webserver": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-scope": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-session": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-session-query": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-settings": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-skill": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-system-prompt": "0.1.7-alpha.1",
++    "@deepseek-ai/dsh-util-values": "0.1.7-alpha.1",
++    "@deepseek-ai/schemastery": "^3.18.3",
+     "@types/js-yaml": "^4.0.9",
+     "@types/node": "^22.20.0",
+     "@types/react": "~18.3.1",
+@@ -131,7 +135,6 @@
+     "lightningcss": "1.32.0",
+     "react": "^18.3.1",
+     "react-dom": "^18.3.1",
+-    "schemastery": "^3.18.0",
+     "tsdown": "0.22.2",
+     "typescript": "~5.7.2",
+     "vitest": "^3.0.0",
+@@ -144,6 +147,8 @@
+     "lib/**/*.d.ts.map",
+     "src",
+     "cordis.patch.yml",
++    "icon.svg",
++    "locale/*.json",
+     "README.md",
+     "README.zh.md",
+     "LICENSE",
+diff --git a/fixture/src/client/SkillHubSettingsCard.tsx b/fixture/src/client/SkillHubSettingsCard.tsx
+index e915c68..831c8dd 100644
+--- a/fixture/src/client/SkillHubSettingsCard.tsx
++++ b/fixture/src/client/SkillHubSettingsCard.tsx
+@@ -1,20 +1,22 @@
+ /**
+- * The dsh-skill-hub plugin settings card: bridges the hub's settings
+- * namespace (bound through the official settings transport) onto the
+- * family-style staged card form (enabled master switch + agent announcement).
+- * Registered into `plugins.bundle.config` under the bundle's package name, so
+- * the Plugins manager renders it on dsh-skill-hub's own page. That slot is
+- * dispatched with `view: 'page'` only, so the card always renders its full
+- * form (no `summary` one-liner variant).
++ * The dsh-skill-hub plugin settings card: bridges the hub's profile entry
++ * config (the shared configuration form every browser surface writes through)
++ * onto the family-style staged card form (enabled master switch + agent
++ * announcement). Registered into `plugins.bundle.config` under the bundle's
++ * package name, so the Plugins manager renders it on dsh-skill-hub's own page.
++ * That slot is dispatched with `view: 'page'` only, so the card always renders
++ * its full form (no `summary` one-liner variant).
+  */
+ 
+ import { useEffect, useState, type ReactElement } from 'react'
+ import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
++import { SettingsFormModel, type SettingsFormScope } from '@deepseek-ai/dsh-client-ui-primitives'
+ import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+ import { SkillHubApi } from './api.ts'
+ import type { HubKey } from './locales.ts'
+ import { ColorField, NumberField, PluginSettingsCard, SecretField, SwitchField } from './settings-card.tsx'
+-import { booleanField, CardForm, colorField, numberField, secretField, type CardShell, type FieldState, type FormScope } from './settings-form.ts'
++import { booleanField, colorField, numberField, secretField, type CardShell, type FieldState } from './settings-form.ts'
++import type { HubSettingsValue } from '../protocol.ts'
+ // Single source for the TS-side dot defaults (the panel CSS mirrors these).
+ import { DEFAULT_DOT_MODEL_COLOR, DEFAULT_DOT_USER_COLOR } from './panel/format.ts'
+ 
+@@ -58,20 +60,28 @@ export interface SkillHubSettingsCardFace {
+ export type SkillHubSettingsCardProps =
+   PropsRuntime<'plugins.bundle.config'> & PropsLocale<'dsh-skill-hub'> & InjectFace<SkillHubSettingsCardFace>
+ 
+-/** Bridges the hub's config scope onto the card's staged form. */
++/** Bridges the hub's profile entry config onto the card's staged form. */
+ export class SkillHubSettingsCardController {
+-  private readonly form: CardForm
++  private readonly form: SettingsFormModel<HubSettingsValue>
++  private readonly scope: SettingsFormScope<HubSettingsValue>
+   private readonly store: SnapshotStore<SkillHubSettingsState>
+ 
+-  /** @param scope - the hub settings scope the card edits (FormScope-compatible). */
+-  constructor(scope: FormScope) {
+-    this.form = new CardForm(scope, [booleanField('enabled'), booleanField('announceToAgent'), colorField('dotModelColor'), colorField('dotUserColor'), booleanField('showUseCount'), booleanField('showUseTime'), booleanField('showGroupSummary'), numberField('statsWindowDays', { min: 0, max: 3650 }), numberField('statsScanMinutes', { min: 1, max: 1440 }), secretField('githubToken')])
++  /** @param scope - the shared configuration form for the hub's profile entry. */
++  constructor(scope: SettingsFormScope<HubSettingsValue>) {
++    this.scope = scope
++    this.form = new SettingsFormModel(scope, [booleanField('enabled'), booleanField('announceToAgent'), colorField('dotModelColor'), colorField('dotUserColor'), booleanField('showUseCount'), booleanField('showUseTime'), booleanField('showGroupSummary'), numberField('statsWindowDays', { min: 0, max: 3650 }), numberField('statsScanMinutes', { min: 1, max: 1440 }), secretField('githubToken')])
+     this.store = this.form.bind(() => this.projection())
+   }
+ 
+   private projection(): SkillHubSettingsState {
++    const snapshot = this.scope.getSnapshot()
+     return {
+       ...this.form.shell(),
++      // The shared shell folds `loading` and `unavailable` into "not
++      // available"; the card keeps the two apart so an unserved entry names
++      // its state instead of silently rendering nothing.
++      available: snapshot.status !== 'loading',
++      exposed: snapshot.status === 'ready',
+       enabled: this.form.field('enabled'),
+       announceToAgent: this.form.field('announceToAgent'),
+       dotModelColor: this.form.field('dotModelColor'),
+@@ -95,6 +105,11 @@ export class SkillHubSettingsCardController {
+       ...this.form.actions(),
+     }
+   }
++
++  /** Release the form's subscription to the shared configuration entry. */
++  dispose(): void {
++    this.form.dispose()
++  }
+ }
+ 
+ /** The card's field rows in render order; the rendered DOM order follows it. */
+diff --git a/fixture/src/client/index.tsx b/fixture/src/client/index.tsx
+index 45232e2..1c7feef 100644
+--- a/fixture/src/client/index.tsx
++++ b/fixture/src/client/index.tsx
+@@ -6,11 +6,11 @@
+  * surfaces, both through official slots (no DOM injection):
+  *  - a plugin-management card in the `plugins.bundle.config` slot, keyed by the
+  *    bundle package name, rendered on the plugin's own page in the Plugins
+- *    manager (sidebar → 插件 → dsh-skill-hub), bound through the official
+- *    settings transport (the Host serves every registered namespace to the web
+- *    client, and the manager dispatches that key with `view: 'page'`) — the
+- *    family-bucket card pattern (PluginSettingsCard + CardForm vendored from
+- *    dsh-task-board);
++ *    manager (sidebar → 插件 → dsh-skill-hub) and bound to the hub's profile
++ *    entry through the shared configuration form (`ctx.configForms.get`), the
++ *    same service every official plugin card edits through — the
++ *    family-bucket card pattern (PluginSettingsCard + the shared
++ *    SettingsFormModel);
+  *  - a top-level Settings section (Settings → 技能) hosting the skill hub
+  *    panel: catalog, search, enable/disable, diagnostics, new-skill form.
+  *
+@@ -26,7 +26,7 @@
+ import type { Context as ClientContext } from '@deepseek-ai/cordis'
+ // Type-only: pulls the locale plugin's Context merge (ctx.locale).
+ import type {} from '@deepseek-ai/dsh-client-locale/client'
+-// Type-only: pulls the settings-scope service merge and the settings.section slot.
++// Type-only: pulls the ctx.configForms service merge and the settings.section slot.
+ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+ // Type-only: pulls the LocaleNamespaceMap merge table.
+ import type {} from '@deepseek-ai/dsh-client-ui-slots'
+@@ -44,7 +44,7 @@ declare module '@deepseek-ai/cordis' {
+     slots: any
+   }
+ }
+-import type { HubSettingsValue } from '../protocol.ts'
++import { CONFIG_ENTRY_ID, type HubSettingsValue } from '../protocol.ts'
+ import { SkillHubApi } from './api.ts'
+ import { en, zh, type HubKey } from './locales.ts'
+ import { applySettingsNavIcon } from './settings-nav-icon.ts'
+@@ -64,12 +64,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
+ 
+ /**
+  * Required services (fiber inject waiting — the runtime must be up first).
+- * `connection`/`remote` are the settings transport's own prerequisites
+- * (`ctx.settingsScope.bind` resolves them on the caller's fiber), and
+- * `settingsScope` is the namespace-scope binder itself; mirror the official
+- * settings-plugins inject list.
++ * `configForms` is the shared per-entry configuration form service (ui-settings
++ * provides it; the form itself owns the remote writes), and `inputTriggers`
++ * gates the slash-dot wiring on a registered trigger service.
+  */
+-export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope', 'inputTriggers']
++export const inject = ['slots', 'locale', 'connection', 'remote', 'configForms', 'inputTriggers']
+ 
+ /** Type-only surface (export discipline: no value exports beyond the plugin contract). */
+ export type { SkillHubPanelProps } from './panel/SkillHubPanel.tsx'
+@@ -78,25 +77,24 @@ export type { HubKey } from './locales.ts'
+ 
+ /**
+  * Mount the settings card and the skill hub section.
+- * @param ctx - client root context (slots, locale).
++ * @param ctx - client root context (slots, locale, configForms).
+  */
+ export function apply(ctx: ClientContext): void {
+   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-skill-hub: dictionaries')
+   const t = ctx.locale.bind(NS)
+   const api = new SkillHubApi()
+ 
+-  // The card edits the hub's settings namespace through the official settings
+-  // transport: the Plugins manager dispatches the card by the bundle package
+-  // name, and the Host serves every registered namespace — that pairing is
+-  // what makes the card appear (and stay in sync).
+-  // Single scope instance reused for both the card and slash-dots to avoid
+-  // duplicate subscriptions (review #3).
+-  const scope = ctx.settingsScope.bind<HubSettingsValue>({ namespace: NS })
+-  const settingsCard = new SkillHubSettingsCardController(scope)
++  // The card and the slash dots edit the hub's own profile entry through the
++  // shared configuration form the Plugins page owner also serves: the entry id
++  // is the bundle patch's row id, and the Host serves it because this plugin
++  // declares volatile Config fields. One form instance keeps one subscription.
++  const form = ctx.configForms.get<HubSettingsValue>(CONFIG_ENTRY_ID)
++  const settingsCard = new SkillHubSettingsCardController(form)
++  ctx.effect(() => () => { settingsCard.dispose() }, 'dsh-skill-hub: settings card form')
+ 
+   // Chat `/` 菜单技能圆点：为每个候选行加可调用性圆点（蓝=模型可调，绿=仅用户），颜色与面板图例同步；仅装饰，不自动预填 "/"
+   // inject 含 inputTriggers 保证 fiber 就绪后再 wrap，slash-dots 内的 undefined 防御仅用于单元测试 mock
+-  ctx.effect(() => setupSkillSlashDots(ctx, api, scope), 'dsh-skill-hub: slash dots')
++  ctx.effect(() => setupSkillSlashDots(ctx, api, form), 'dsh-skill-hub: slash dots')
+ 
+   // Plugin configuration: the hub renders its own form on the bundle's page in
+   // the Plugins manager (sidebar → 插件 → dsh-skill-hub), keyed by the bundle's
+diff --git a/fixture/src/client/settings-form.ts b/fixture/src/client/settings-form.ts
+index 34c95a5..6424038 100644
+--- a/fixture/src/client/settings-form.ts
++++ b/fixture/src/client/settings-form.ts
+@@ -1,32 +1,42 @@
+ /**
+- * Settings-card form machinery, vendored from the dsh-web-ui family bucket
+- * (packages/dsh-task-board/src/client/settings-form.ts) and re-typed. Stages
+- * one card's edits over one settings namespace and writes them on save.
++ * The hub card's staged form: the shared form model from the official
++ * primitives package, specialised with this card's field conversions.
+  *
+- * The Host is the only authority on whether a value was accepted — its
+- * validators own the constraints no schema can express — so the outcome is
+- * read back from the section rather than predicted here. A save that did not
+- * land keeps its drafts, so the user can correct them instead of retyping.
++ * `SettingsFormModel` owns the staging, revision-fenced save, and
++ * discard/reset behavior over the card's `ctx.configForms` entry; the specs
++ * below only say how one control's draft text converts to the value the
++ * profile entry stores. The Host is the only authority on whether a value was
++ * accepted — its validators own the constraints no schema can express — so the
++ * outcome is read back from the section rather than predicted here.
+  */
+ 
+-import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
++import type { SettingsFieldSpec, SettingsFieldState } from '@deepseek-ai/dsh-client-ui-primitives'
++import { GITHUB_TOKEN_RE } from '../protocol.ts'
+ 
+-/** One staged field: its draft text plus the clear/reset marker. */
+-interface StagedEdit {
+-  text: string
+-  clear: boolean
+-}
++/** One field's state from the effective section and its staged draft. */
++export type FieldState = SettingsFieldState
+ 
+-/** One editable field spec: formatting plus text parsing. */
+-export interface FieldSpec {
+-  field: string
+-  format: (value: unknown) => string
+-  parse: (text: string) => { kind: 'set'; value: unknown } | { kind: 'clear' } | undefined
++/** Card-level state the chrome renders (the shared shell plus exposure). */
++export interface CardShell {
++  /** False while the entry is still loading; the card renders nothing. */
++  available: boolean
++  /** True while the Host serves this entry to the client; false shows the not-exposed notice. */
++  exposed: boolean
++  writable: boolean
++  dirty: boolean
++  invalid: boolean
++  saving: boolean
++  failed: boolean
+ }
+ 
+-/** A boolean field, edited through true/false draft text. */
+-export function booleanField(field: string): FieldSpec {
++/**
++ * A boolean field, edited through true/false draft text. An empty draft means
++ * the field inherits its default; the switch still reflects the effective
++ * default and becomes an explicit override on click.
++ * @param field - field name inside the profile entry config.
++ * @returns the field's conversion spec.
++ */
++export function booleanField(field: string): SettingsFieldSpec {
+   return {
+     field,
+     format: (value) => (typeof value === 'boolean' ? String(value) : ''),
+@@ -38,41 +48,29 @@ export function booleanField(field: string): FieldSpec {
+   }
+ }
+ 
+-/** A #rrggbb color field, edited through hex draft text. */
+-export function colorField(field: string): FieldSpec {
+-  return {
+-    field,
+-    format: (value) => (typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : ''),
+-    parse: (text) => {
+-      if (/^#[0-9a-f]{6}$/i.test(text)) return { kind: 'set', value: text }
+-      return undefined
+-    },
+-  }
+-}
+-
+ /**
+- * A secret field (API token): the stored value is never echoed back into the
+- * draft (format always yields ''), so typing is always a fresh set and Reset
+- * always unsets. An empty draft stages nothing.
++ * A #rrggbb color field, edited through hex draft text. An empty or non-hex
++ * draft is not a value the profile entry accepts, which blocks the save; the
++ * control's Reset sends the clear.
++ * @param field - field name inside the profile entry config.
++ * @returns the field's conversion spec.
+  */
+-export function secretField(field: string): FieldSpec {
++export function colorField(field: string): SettingsFieldSpec {
+   return {
+     field,
+-    format: () => '',
+-    parse: (text) => {
+-      const trimmed = text.trim()
+-      if (trimmed === '') return undefined
+-      if (!/^[A-Za-z0-9_-]{8,255}$/.test(trimmed)) return undefined
+-      return { kind: 'set', value: trimmed }
+-    },
++    format: (value) => (typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : ''),
++    parse: (text) => (/^#[0-9a-f]{6}$/i.test(text) ? { kind: 'set', value: text } : undefined),
+   }
+ }
+ 
+ /**
+  * A numeric field with range clamping. Integer by default: a fractional draft
+  * is truncated so "5.5 分钟" cannot sneak past an integer-only schema.
++ * @param field - field name inside the profile entry config.
++ * @param options - accepted range and whether the value must be integral.
++ * @returns the field's conversion spec.
+  */
+-export function numberField(field: string, options: { min?: number; max?: number; integer?: boolean } = {}): FieldSpec {
++export function numberField(field: string, options: { min?: number; max?: number; integer?: boolean } = {}): SettingsFieldSpec {
+   const min = options.min ?? Number.NEGATIVE_INFINITY
+   const max = options.max ?? Number.POSITIVE_INFINITY
+   const integer = options.integer ?? true
+@@ -89,175 +87,22 @@ export function numberField(field: string, options: { min?: number; max?: number
+   }
+ }
+ 
+-/** Card-level state the chrome renders. */
+-export interface CardShell {
+-  available: boolean
+-  exposed: boolean
+-  writable: boolean
+-  dirty: boolean
+-  invalid: boolean
+-  saving: boolean
+-  failed: boolean
+-}
+-
+-/** One field's state from the effective section and its staged draft. */
+-export interface FieldState {
+-  text: string
+-  overridden: boolean
+-  invalid: boolean
+-}
+-
+-/** The settings scope face the form consumes (subset of SettingsScope<T>). */
+-export interface FormScope {
+-  subscribe(listener: () => void): () => void
+-  getSnapshot(): { status: string; writable: boolean; value?: Record<string, unknown>; base?: unknown; user?: unknown }
+-  set(field: string, value: unknown): Promise<void>
+-  unset(field: string): Promise<void>
+-}
+-
+-/** Stages one card's edits and writes them through the settings transport. */
+-export class CardForm {
+-  private readonly scope: FormScope
+-  private readonly specs = new Map<string, FieldSpec>()
+-  private readonly staged = new Map<string, StagedEdit>()
+-  private readonly listeners = new Set<() => void>()
+-  private saving = false
+-  private failed = false
+-
+-  /** @param scope - the bound settings scope for this card's namespace. */
+-  constructor(scope: FormScope, specs: FieldSpec[]) {
+-    this.scope = scope
+-    for (const spec of specs) this.specs.set(spec.field, spec)
+-    scope.subscribe(() => { this.publish() })
+-  }
+-
+-  /** Publish a projection of this form, rebuilt whenever the scope or a draft changes. */
+-  bind<T>(project: () => T) {
+-    const store = createSnapshotStore(project())
+-    this.listeners.add(() => { store.set(project()) })
+-    return store
+-  }
+-
+-  /** Read the card-level state: what the Host serves, and what a save would do. */
+-  shell(): CardShell {
+-    const snapshot = this.scope.getSnapshot()
+-    const plan = this.plan()
+-    return {
+-      available: snapshot.status !== 'loading',
+-      exposed: snapshot.status === 'ready',
+-      writable: snapshot.writable,
+-      dirty: plan.length > 0,
+-      invalid: plan.some((item) => item.run === undefined),
+-      saving: this.saving,
+-      failed: this.failed,
+-    }
+-  }
+-
+-  /** Read one field's state from the effective section and its staged draft. */
+-  field(field: string): FieldState {
+-    const spec = this.specOf(field)
+-    const staged = this.staged.get(field)
+-    if (staged === undefined) {
+-      return { text: spec.format(this.sectionValue(field)), overridden: this.stored(field), invalid: false }
+-    }
+-    const write = staged.clear ? { kind: 'clear' as const } : spec.parse(staged.text)
+-    return { text: staged.text, overridden: write?.kind === 'set', invalid: write === undefined }
+-  }
+-
+-  /** The actions the card's slot registration injects. */
+-  actions() {
+-    return {
+-      edit: (field: string, text: string) => { this.stage(field, { text, clear: false }) },
+-      resetField: (field: string) => {
+-        this.stage(field, { text: this.specOf(field).format(this.baseValue(field)), clear: true })
+-      },
+-      save: () => { void this.save() },
+-      discard: () => {
+-        if (this.staged.size === 0 && !this.failed) return
+-        this.staged.clear()
+-        this.failed = false
+-        this.publish()
+-      },
+-    }
+-  }
+-
+-  /** Write every staged edit, then re-seed from what the Host accepted. */
+-  async save(): Promise<void> {
+-    const plan = this.plan()
+-    const writes = plan.flatMap((item) => (item.run === undefined ? [] : [item.run]))
+-    if (plan.length === 0 || this.saving || writes.length !== plan.length) return
+-    this.saving = true
+-    this.failed = false
+-    this.publish()
+-    let landed = true
+-    for (const write of writes) landed = (await write()) && landed
+-    if (landed) this.staged.clear()
+-    this.saving = false
+-    this.failed = !landed
+-    this.publish()
+-  }
+-
+-  /** Every staged edit a save would write, in staging order. */
+-  plan(): Array<{ field: string; run: (() => Promise<boolean>) | undefined }> {
+-    const plan: Array<{ field: string; run: (() => Promise<boolean>) | undefined }> = []
+-    for (const [field, staged] of this.staged) {
+-      const spec = this.specOf(field)
+-      if (staged.clear) {
+-        if (this.stored(field)) plan.push({ field, run: () => this.clear(field) })
+-        continue
+-      }
+-      if (staged.text === spec.format(this.sectionValue(field))) continue
+-      const write = spec.parse(staged.text)
+-      if (write === undefined) plan.push({ field, run: undefined })
+-      else if (write.kind === 'clear') plan.push({ field, run: () => this.clear(field) })
+-      else plan.push({ field, run: () => this.store(field, write.value) })
+-    }
+-    return plan
+-  }
+-
+-  private async clear(field: string): Promise<boolean> {
+-    await this.scope.unset(field)
+-    return !this.stored(field)
+-  }
+-
+-  private async store(field: string, value: unknown): Promise<boolean> {
+-    await this.scope.set(field, value)
+-    return this.userRecord()?.[field] === value
+-  }
+-
+-  private userRecord(): Record<string, unknown> | undefined {
+-    const user = this.scope.getSnapshot().user
+-    return typeof user === 'object' && user !== null ? user as Record<string, unknown> : undefined
+-  }
+-
+-  private stage(field: string, edit: StagedEdit): void {
+-    this.staged.set(field, edit)
+-    this.failed = false
+-    this.publish()
+-  }
+-
+-  private specOf(field: string): FieldSpec {
+-    const spec = this.specs.get(field)
+-    if (spec === undefined) throw new Error('settings card has no field ' + field)
+-    return spec
+-  }
+-
+-  private sectionValue(field: string): unknown {
+-    return this.scope.getSnapshot().value?.[field]
+-  }
+-
+-  private baseValue(field: string): unknown {
+-    const base = this.scope.getSnapshot().base
+-    return typeof base === 'object' && base !== null ? (base as Record<string, unknown>)[field] : undefined
+-  }
+-
+-  private stored(field: string): boolean {
+-    const user = this.userRecord()
+-    return user !== undefined && Object.hasOwn(user, field)
+-  }
+-
+-  private publish(): void {
+-    for (const listener of this.listeners) listener()
++/**
++ * The GitHub token: the stored value is never echoed back into the draft
++ * (format always yields ''), so typing is always a fresh set and Reset always
++ * unsets. An empty draft stages no write at all; a non-empty draft that is not
++ * a plausible token blocks the save.
++ * @param field - field name inside the profile entry config.
++ * @returns the field's conversion spec.
++ */
++export function secretField(field: string): SettingsFieldSpec {
++  return {
++    field,
++    format: () => '',
++    parse: (text) => {
++      const trimmed = text.trim()
++      if (trimmed === '') return { kind: 'clear' }
++      return GITHUB_TOKEN_RE.test(trimmed) ? { kind: 'set', value: trimmed } : undefined
++    },
+   }
+ }
+-
+diff --git a/fixture/src/client/slash-dots.test.ts b/fixture/src/client/slash-dots.test.ts
+index f6431ea..14919c5 100644
+--- a/fixture/src/client/slash-dots.test.ts
++++ b/fixture/src/client/slash-dots.test.ts
+@@ -1,18 +1,26 @@
+ /**
+  * Slash-menu skill dots: source lookup + candidates wrapping. The wrapper's
+  * contract is pure and injectable — fake api (catalog) and fake settings scope
+- * (getSnapshot) — so it tests cleanly in the node vitest environment. The dot
+- * itself is injected into the rendered DOM, which does not exist here, so these
+- * tests assert that candidate rows pass through untouched. The module caches
+- * the catalog map; resetModelCache keeps tests independent.
++ * (getSnapshot) — so it tests cleanly in the node vitest environment. Rows
++ * carry the dot through the official candidate `icon`; the icon component is
++ * rendered here with react-dom/server to assert the marker and the colors.
++ * The module caches the catalog map; resetModelCache keeps tests independent.
+  */
+ 
++import { createElement } from 'react'
++import type { ComponentType } from 'react'
++import { renderToStaticMarkup } from 'react-dom/server'
+ import { beforeEach, describe, expect, it } from 'vitest'
+-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
++import type { SettingsFormScope } from '@deepseek-ai/dsh-client-ui-primitives'
+ import type { InputTriggerCandidate, InputTriggerServiceContract, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+ import type { HubSettingsValue } from '../protocol.ts'
+ import type { SkillHubApi } from './api.ts'
+-import { findSkillSource, resetModelCache, wrapSkillSource } from './slash-dots.tsx'
++import { findSkillSource, resetModelCache, skillDotIcon, wrapSkillSource } from './slash-dots.tsx'
++
++/** Render one candidate's icon to static HTML (the menu renders it at the row head). */
++function renderIcon(icon: InputTriggerCandidate['icon']): string {
++  return renderToStaticMarkup(createElement(icon as ComponentType<{ size?: number }>, { size: 14 }))
++}
+ 
+ beforeEach(() => {
+   resetModelCache()
+@@ -34,15 +42,13 @@ function registry(...sources: InputTriggerSource[]): InputTriggerServiceContract
+   return { live: { sources }, registerSource: () => () => {}, sessionOf: () => { throw new Error('not used in tests') } } as unknown as InputTriggerServiceContract
+ }
+ 
+-/** Fake settings scope snapshotting a fixed HubSettingsValue. */
+-function scopeWith(value: HubSettingsValue): SettingsScope<HubSettingsValue> {
++/** Fake configuration form snapshotting a fixed HubSettingsValue. */
++function scopeWith(value: HubSettingsValue): SettingsFormScope<HubSettingsValue> {
+   return {
+-    getSnapshot: () => ({ status: 'ready', value, base: undefined, user: undefined, revision: 1, writable: true, mode: 'host' }),
++    getSnapshot: () => ({ status: 'ready', value, base: undefined, user: undefined, revision: 1, writable: true }),
+     subscribe: () => () => {},
+-    set: async () => {},
+-    unset: async () => {},
+-    mutate: async () => {},
+-  } as unknown as SettingsScope<HubSettingsValue>
++    mutate: async () => true,
++  }
+ }
+ 
+ /** Fake hub api whose catalog lists the given skills. */
+@@ -87,10 +93,11 @@ describe('findSkillSource', () => {
+ })
+ 
+ describe('wrapSkillSource', () => {
+-  it('leaves candidate rows untouched — the dot goes to the DOM, not the icon slot', async () => {
++  it('marks catalog skills with the official candidate icon and leaves other rows untouched', async () => {
+     const source = skillSource(async () => [
+       { name: 'code-review', description: 'review code' },
+       { name: 'personal-note', description: 'only me' },
++      { name: 'deploy', description: 'a command, not a hub skill' },
+     ])
+     const api = apiWith([
+       { name: 'code-review', modelInvocable: true },
+@@ -102,11 +109,16 @@ describe('wrapSkillSource', () => {
+     try {
+       const rows = await source.candidates({ sessionId: 's1' as never }, { query: '', position: 'leading', drilled: false, signal: new AbortController().signal })
+ 
+-      expect(rows).toHaveLength(2)
+-      // MenuView renders `icon` through ReferenceIcon (enum-narrowed), so a
+-      // custom element would never show — rows must carry no icon at all.
+-      expect(rows[0].icon).toBeUndefined()
+-      expect(rows[1].icon).toBeUndefined()
++      expect(rows).toHaveLength(3)
++      // Non-catalog candidates (here a command) keep whatever icon they had.
++      expect(rows[2].icon).toBeUndefined()
++      // Catalog skills carry the dot through the menu's own leading-glyph seat.
++      const modelHtml = renderIcon(rows[0].icon)
++      expect(modelHtml).toContain('data-skill-dot')
++      expect(modelHtml).toContain('#112233')
++      const userHtml = renderIcon(rows[1].icon)
++      expect(userHtml).toContain('data-skill-dot')
++      expect(userHtml).toContain('#445566')
+       // Original fields pass through untouched.
+       expect(rows[0].name).toBe('code-review')
+       expect(rows[0].description).toBe('review code')
+@@ -115,6 +127,11 @@ describe('wrapSkillSource', () => {
+     }
+   })
+ 
++  it('keeps one stable icon identity per color', () => {
++    expect(skillDotIcon('#112233')).toBe(skillDotIcon('#112233'))
++    expect(skillDotIcon('#112233')).not.toBe(skillDotIcon('#445566'))
++  })
++
+   it('still returns the rows when the catalog route is down', async () => {
+     const source = skillSource(async () => [{ name: 'lonely', description: '' }])
+     const api = { catalog: async () => { throw new Error('route down') } } as unknown as SkillHubApi
+@@ -127,6 +144,7 @@ describe('wrapSkillSource', () => {
+       // menu itself must keep working.
+       expect(rows).toHaveLength(1)
+       expect(rows[0].name).toBe('lonely')
++      expect(rows[0].icon).toBeUndefined()
+     } finally {
+       restore()
+     }
+diff --git a/fixture/src/client/slash-dots.tsx b/fixture/src/client/slash-dots.tsx
+index ad04642..fb0cafb 100644
+--- a/fixture/src/client/slash-dots.tsx
++++ b/fixture/src/client/slash-dots.tsx
+@@ -4,10 +4,10 @@
+  *
+  * Mechanism: hooks the `/skill` source's `candidates` so the hub learns which
+  * rows are skill candidates and how each one classifies for model invocation,
+- * then injects the dot straight into the rendered option rows. The menu's
+- * `icon` slot is unusable for this — `MenuView` narrowed `icon` to an enum
+- * ('file' | 'folder' | 'session') and renders it through `ReferenceIcon`, so a
+- * custom element never reaches the DOM. Colors come from the same settings
++ * then returns each row with the official candidate `icon` — the menu's own
++ * leading-glyph seat (`InputTriggerCandidate.icon` accepts a component, which
++ * `MenuView` renders at the row head). No DOM injection and no dependence on
++ * the menu's hashed class names. Colors come from the same settings
+  * (dotModelColor / dotUserColor) and the same `modelInvocable` classification
+  * the panel legend uses — so the chat menu and the Settings → 技能 panel stay
+  * in sync, and editing the color updates both.
+@@ -19,8 +19,9 @@
+  * / `sessionOf` — the lookup below is defensive: it never throws).
+  */
+ 
++import type { ComponentType, JSX } from 'react'
+ import type { Context as ClientContext } from '@deepseek-ai/cordis'
+-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
++import type { SettingsFormScope } from '@deepseek-ai/dsh-client-ui-primitives'
+ // Type-only: pulls the Context merge for ctx.inputTriggers.
+ import type {} from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+ // Type-only: pulls the connection/reset event.
+@@ -68,8 +69,8 @@ export function resetModelCache(): void {
+ /**
+  * Resolve name → modelInvocable from the hub's catalog, cached for
+  * MODEL_TTL_MS. A failed load caches the failure briefly so a downed route
+- * doesn't hammer the host on every keystroke; the returned map is empty then
+- * (callers fall back to the model dot for unknown names).
++ * doesn't hammer the host on every keystroke; the returned map is empty then,
++ * so no row is marked as a hub skill until the next successful load.
+  * @param api - the hub browser API.
+  * @returns name → whether the model may call the skill.
+  */
+@@ -91,57 +92,56 @@ async function modelInvocableMap(api: SkillHubApi): Promise<Map<string, boolean>
+   }
+ }
+ 
++/** Props the menu hands a candidate icon component (the dsh icon family shape). */
++export interface SkillDotProps {
++  /** Rendered box size; the menu passes the row glyph size (14). */
++  size?: number
++}
++
+ /**
+- * 通过直接操作已渲染的 `[role="option"]` 列表注入彩色点，
+- * 绕过 MenuView 对 `icon` 的枚举限制。
+- * @param modelByName - 技能名 → 模型可调用性；不在表内的候选不注点。
+- * @param modelColor - 模型可调用技能的点色。
+- * @param userColor - 仅用户可调用技能的点色。
++ * One component identity per dot color, kept stable across renders so the menu
++ * does not remount the glyph on every keystroke; the value is tiny and bounded
++ * by the number of configured colors.
+  */
+-function injectDotsViaDOM(modelByName: Map<string, boolean>, modelColor: string, userColor: string): void {
+-  if (typeof document === 'undefined' || typeof requestAnimationFrame === 'undefined') return
+-  const run = (): void => {
+-    // 仅处理斜杠菜单：优先用哈希类 `_3e4SsG_menu` 严格隔离面板内其它 listbox，
+-    // 哈希为 dsh 构建产物（review #4 已知脆弱点），已提供 `[role="listbox"]` 回退；
+-    // 后续 dsh 若暴露 `data-*` 锚点应迁移至此
+-    const menu = document.querySelector('[class*="_3e4SsG_menu"]') as HTMLElement | null
+-    const listbox = menu?.querySelector('[role="listbox"]') ?? document.querySelector('[role="listbox"]')
+-    // 若菜单未打开则不注入
+-    if (listbox === null) return
+-    const scope: ParentNode = listbox
+-    const options = scope.querySelectorAll('[role="option"]')
+-    for (const opt of options) {
+-      if (opt.querySelector('[data-skill-dot]') !== null) continue
+-      const nameEl = opt.querySelector('[class*="itemName"]') as HTMLElement | null
+-      if (nameEl === null) continue
+-      const name = (nameEl.textContent ?? '').trim()
+-      if (name.length === 0) continue
+-      // 仅对技能生效：非技能候选（/command、@file 等）不在 catalog，不注点
+-      if (!modelByName.has(name)) continue
+-      const color = (modelByName.get(name) ?? true) ? modelColor : userColor
+-      // 布局对齐菜单行原有的 icon 槽：16×16 容器居中 6px 点
+-      const wrapper = document.createElement('span')
+-      wrapper.setAttribute('data-skill-dot', '')
+-      wrapper.setAttribute('aria-hidden', 'true')
+-      wrapper.style.width = '16px'
+-      wrapper.style.height = '16px'
+-      wrapper.style.display = 'inline-flex'
+-      wrapper.style.justifyContent = 'center'
+-      wrapper.style.alignItems = 'center'
+-      wrapper.style.flex = 'none'
+-      const dot = document.createElement('span')
+-      dot.style.display = 'inline-block'
+-      dot.style.width = '6px'
+-      dot.style.height = '6px'
+-      dot.style.borderRadius = '3px'
+-      dot.style.background = color
+-      dot.style.flex = 'none'
+-      wrapper.appendChild(dot)
+-      // 直接插在名称前，与菜单行原有 icon 槽的位置一致
+-      nameEl.parentElement?.insertBefore(wrapper, nameEl)
+-    }
+-  }
+-  requestAnimationFrame(() => setTimeout(run, 0))
++const dotIcons = new Map<string, ComponentType<SkillDotProps>>()
++
++/**
++ * The invocation-status dot as a candidate-icon component: a 6px colored dot
++ * centered in the menu's leading-glyph box, carrying `data-skill-dot` so
++ * styling and tests can find it.
++ * @param color - CSS color for the dot (model or user dot setting).
++ * @returns a stable component rendering that dot.
++ */
++export function skillDotIcon(color: string): ComponentType<SkillDotProps> {
++  const cached = dotIcons.get(color)
++  if (cached !== undefined) return cached
++  const SkillDot = ({ size = 16 }: SkillDotProps): JSX.Element => (
++    <span
++      data-skill-dot=''
++      aria-hidden='true'
++      style={{
++        width: `${String(size)}px`,
++        height: `${String(size)}px`,
++        display: 'inline-flex',
++        justifyContent: 'center',
++        alignItems: 'center',
++        flex: 'none',
++      }}
++    >
++      <span
++        style={{
++          display: 'inline-block',
++          width: '6px',
++          height: '6px',
++          borderRadius: '3px',
++          background: color,
++          flex: 'none',
++        }}
++      />
++    </span>
++  )
++  dotIcons.set(color, SkillDot)
++  return SkillDot
+ }
+ 
+ /**
+@@ -149,10 +149,10 @@ function injectDotsViaDOM(modelByName: Map<string, boolean>, modelColor: string,
+  * Exported for unit tests; production wiring goes through setupSkillSlashDots.
+  * @param source - the registered `/skill` source.
+  * @param api - hub browser API for the modelInvocable lookup.
+- * @param scope - hub settings scope for the dot colors.
++ * @param scope - the hub's shared configuration form (dot colors).
+  * @returns a disposer restoring the original candidates.
+  */
+-export function wrapSkillSource(source: InputTriggerSource, api: SkillHubApi, scope: SettingsScope<HubSettingsValue>): () => void {
++export function wrapSkillSource(source: InputTriggerSource, api: SkillHubApi, scope: SettingsFormScope<HubSettingsValue>): () => void {
+   const original = source.candidates
+   source.candidates = async (session, req) => {
+     const items = await original(session, req)
+@@ -162,8 +162,13 @@ export function wrapSkillSource(source: InputTriggerSource, api: SkillHubApi, sc
+     const snapshot = scope.getSnapshot()
+     const modelColor = snapshot.value?.dotModelColor ?? DEFAULT_DOT_MODEL_COLOR
+     const userColor = snapshot.value?.dotUserColor ?? DEFAULT_DOT_USER_COLOR
+-    injectDotsViaDOM(modelByName, modelColor, userColor)
+-    return items
++    // Unknown names are not skills this hub manages (commands, files): their
++    // rows pass through with whatever icon the owning source set.
++    return items.map((item) => {
++      const modelInvocable = modelByName.get(item.name)
++      if (modelInvocable === undefined) return item
++      return { ...item, icon: skillDotIcon(modelInvocable ? modelColor : userColor) }
++    })
+   }
+   return () => {
+     source.candidates = original
+@@ -178,13 +183,13 @@ export function wrapSkillSource(source: InputTriggerSource, api: SkillHubApi, sc
+  * original candidates and clears the model cache.
+  * @param ctx - the client root context (inputTriggers + events).
+  * @param api - hub browser API.
+- * @param scope - hub settings scope for dot colors.
++ * @param scope - the hub's shared configuration form (dot colors).
+  * @returns a cleanup function for `ctx.effect`.
+  */
+ export function setupSkillSlashDots(
+   ctx: ClientContext,
+   api: SkillHubApi,
+-  scope: SettingsScope<HubSettingsValue>,
++  scope: SettingsFormScope<HubSettingsValue>,
+ ): () => void {
+   const inputTriggers = ctx.get('inputTriggers')
+   if (inputTriggers === undefined) return () => {}
+diff --git a/fixture/src/index.ts b/fixture/src/index.ts
+index b991eb9..6fb2f0b 100644
+--- a/fixture/src/index.ts
++++ b/fixture/src/index.ts
+@@ -5,18 +5,27 @@
+  * announcement. The browser half (./client) renders the sidebar entry and
+  * the skill hub panel. Everything rides official NPM SDK packages — no dsh
+  * source changes.
++ *
++ * The hub's runtime configuration lives in this plugin's own profile entry
++ * Config (the bundle row declared by cordis.patch.yml). Every field is
++ * declared `.volatile()`, so a settings write is committed into this running
++ * instance without a remount; the browser card edits the same entry through
++ * `ctx.configForms`. One schema, one owner, one value.
+  */
+ 
+-import type { Context } from '@deepseek-ai/cordis'
++import type { Context, Volatile } from '@deepseek-ai/cordis'
+ import type { SkillProviderControl } from '@deepseek-ai/dsh-skill'
+-import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
+-import z from 'schemastery'
++import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
++import z from '@deepseek-ai/schemastery'
++// Type-only: declares the Loader's `loader/volatile-update` event this plugin
++// consumes when a live config edit commits into the running instance.
++import type {} from '@deepseek-ai/cordis-plugin-loader'
+ import type {} from '@deepseek-ai/dsh-host-webserver'
+ import type {} from '@deepseek-ai/dsh-skill'
+ import type {} from '@deepseek-ai/dsh-system-prompt'
+ import type {} from '@deepseek-ai/dsh-session-query'
+ import type {} from '@deepseek-ai/dsh-settings'
+-import { HUB_CONFIG_DEFAULTS, HEX_COLOR_RE, type HubConfig, type HubSettingsValue } from './protocol.ts'
++import { CONFIG_ENTRY_ID, HUB_CONFIG_DEFAULTS, HEX_COLOR_RE, type HubConfig } from './protocol.ts'
+ import { SkillHubProvider } from './provider.ts'
+ import { makeRoutes } from './routes.ts'
+ import { createSkillStatsReader, asPersistenceSeam, type SessionPersistenceLike, type SessionQueryLike, type SkillStatsReader } from './stats.ts'
+@@ -24,63 +33,64 @@ import { SkillHubStore } from './store.ts'
+ import { reconcileDisabledSkills } from './reconcile.ts'
+ import { cleanupLeftoverImportDirs, setGithubToken } from './repo.ts'
+ import { dshHome } from './store.ts'
++import { LEGACY_SETTINGS_SECTION, readLegacySettingsSection, sanitizeLegacyConfig } from './settings-migrate.ts'
+ import { join } from 'node:path'
+ import { homedir } from 'node:os'
+ 
+ /** Stable cordis plugin name (matches cordis.patch.yml insert id). */
+ export const name = 'skill-hub'
+ 
++/**
++ * Profile entry id whose Config carries the hub's runtime configuration. The
++ * bundle patch inserts exactly this id (`cordis.patch.yml`) and the browser
++ * half addresses the same entry through `ctx.configForms.get(...)`.
++ */
++export const ENTRY_ID = CONFIG_ENTRY_ID
++
++export { LEGACY_SETTINGS_SECTION, readLegacySettingsSection, sanitizeLegacyConfig } from './settings-migrate.ts'
++
+ /** Services required before the skill-hub surfaces can mount. */
+ export const inject = ['webServer', 'skills', 'systemPrompt', 'settings']
+ 
+-/** Plugin config, validated by the same-named schemastery schema. */
++/**
++ * Plugin config, validated by the same-named schemastery schema. Every field
++ * is volatile: the settings form edits it live and the surfaces below re-read
++ * the references on `loader/volatile-update`.
++ */
+ export interface Config {
+   /** When true (default), a system-prompt section announces the hub to every agent. */
+-  announceToAgent?: boolean
++  announceToAgent: Volatile<boolean>
+   /** Master switch for the plugin (routes, prompt section). */
+-  enabled?: boolean
++  enabled: Volatile<boolean>
+   /** Show per-skill invocation count chip. Default true. */
+-  showUseCount?: boolean
++  showUseCount: Volatile<boolean>
+   /** Show per-skill last-used relative time. Default true. */
+-  showUseTime?: boolean
++  showUseTime: Volatile<boolean>
+   /** Show group-header usage summaries (count + last used). Default true. */
+-  showGroupSummary?: boolean
++  showGroupSummary: Volatile<boolean>
++  /** Model-invocable dot color (#rrggbb); absent means the panel default. */
++  dotModelColor: Volatile<string | undefined>
++  /** User-invocable dot color (#rrggbb); absent means the panel default. */
++  dotUserColor: Volatile<string | undefined>
++  /** GitHub token for market/source API calls; absent means anonymous. */
++  githubToken: Volatile<string | undefined>
+   /** 统计滚动窗口天数：只统计最近 N 天的使用；0 = 全部历史。默认 0。 */
+-  statsWindowDays?: number
++  statsWindowDays: Volatile<number>
+   /** 自动统计扫描间隔（分钟，最小 1）。默认 5。 */
+-  statsScanMinutes?: number
++  statsScanMinutes: Volatile<number>
+ }
+ 
+-export const Config: z<Config> = z.object({
+-  announceToAgent: z.boolean().default(HUB_CONFIG_DEFAULTS.announceToAgent),
+-  enabled: z.boolean().default(HUB_CONFIG_DEFAULTS.enabled),
+-  showUseCount: z.boolean().default(HUB_CONFIG_DEFAULTS.showUseCount),
+-  showUseTime: z.boolean().default(HUB_CONFIG_DEFAULTS.showUseTime),
+-  showGroupSummary: z.boolean().default(HUB_CONFIG_DEFAULTS.showGroupSummary),
+-  statsWindowDays: z.number().min(0).max(3650).default(HUB_CONFIG_DEFAULTS.statsWindowDays),
+-  statsScanMinutes: z.number().min(1).max(1440).default(HUB_CONFIG_DEFAULTS.statsScanMinutes),
+-})
+-
+-/**
+- * Settings namespace hosting the hub's runtime config. The host serves every
+- * registered settings namespace to the web client, so the browser card and the
+- * settings page edit this namespace through the official settings transport,
+- * and the plugin consumes the same resolved value — one source of truth.
+- */
+-export const CONFIG_NAMESPACE = 'dsh-skill-hub' as SettingsNamespace
+-
+-/** Schema of the hub's settings namespace: the card's fields (booleans + optional dot colors). */
+-export const HubSettingsSchema: z<HubSettingsValue> = z.object({
+-  enabled: z.boolean().default(HUB_CONFIG_DEFAULTS.enabled),
+-  announceToAgent: z.boolean().default(HUB_CONFIG_DEFAULTS.announceToAgent),
+-  showUseCount: z.boolean().default(HUB_CONFIG_DEFAULTS.showUseCount),
+-  showUseTime: z.boolean().default(HUB_CONFIG_DEFAULTS.showUseTime),
+-  showGroupSummary: z.boolean().default(HUB_CONFIG_DEFAULTS.showGroupSummary),
+-  dotModelColor: z.string().pattern(HEX_COLOR_RE),
+-  dotUserColor: z.string().pattern(HEX_COLOR_RE),
+-  githubToken: z.string(),
+-  statsWindowDays: z.number().min(0).max(3650).default(HUB_CONFIG_DEFAULTS.statsWindowDays),
+-  statsScanMinutes: z.number().min(1).max(1440).default(HUB_CONFIG_DEFAULTS.statsScanMinutes),
++export const Config = z.object({
++  announceToAgent: z.boolean().default(HUB_CONFIG_DEFAULTS.announceToAgent).volatile(),
++  enabled: z.boolean().default(HUB_CONFIG_DEFAULTS.enabled).volatile(),
++  showUseCount: z.boolean().default(HUB_CONFIG_DEFAULTS.showUseCount).volatile(),
++  showUseTime: z.boolean().default(HUB_CONFIG_DEFAULTS.showUseTime).volatile(),
++  showGroupSummary: z.boolean().default(HUB_CONFIG_DEFAULTS.showGroupSummary).volatile(),
++  dotModelColor: z.string().pattern(HEX_COLOR_RE).volatile(),
++  dotUserColor: z.string().pattern(HEX_COLOR_RE).volatile(),
++  githubToken: z.string().volatile(),
++  statsWindowDays: z.number().min(0).max(3650).default(HUB_CONFIG_DEFAULTS.statsWindowDays).volatile(),
++  statsScanMinutes: z.number().min(1).max(1440).default(HUB_CONFIG_DEFAULTS.statsScanMinutes).volatile(),
+ })
+ 
+ /** Order of the announcement section within the tool-guidance band. */
+@@ -92,23 +102,42 @@ export const SKILL_HUB_GUIDANCE = [
+   'The dsh-skill-hub plugin is installed (the DSH Web GUI skill hub): Settings → "Skills" is the management page; the plugin\'s configuration card (enable / announcement toggles) lives on its own page in the Plugins manager (sidebar → 插件 → the plugin). Capabilities: full local skill catalog (project / custom / user / bundled roots via the official ctx.skills registry, including third-party providers); browsing by source and custom groups, each group header carrying a sliding switch to enable/disable the whole group in one click (cross-group conflicts prompt the user); market: a built-in catalog of curated repos (one-click add) plus custom repo sources, scan-and-install import, per-source installed / updatable / deleted-upstream badges with "check all" and "update all" actions; upstream source tracking: skills imported from GitHub repos (market sources or direct URLs) record the repo/commit snapshot, support update checks, selective sync, and follow-up deletion when the upstream removes a skill (moves it into a restorable trash; restoring keeps the source and scene membership); personal skills (no source record) are never tracked; invocation counts and last-used times; skill body inspection; discovery diagnostics; new-skill wizard (writes to ~/.dsh/skills or ~/.agents/skills). Limits: only user-level skills (user-dsh/user-agents roots) are writable; project/bundled/runtime skills are read-only; routes are loopback-only. When the user mentions "skill management / skill list / skill toggle / skill sync / skill market / update skills / new skill", this plugin is what they mean — collaborate accordingly.'
+ ].join('\n\n')
+ 
++/** Read an optional string config reference; the empty string means "inherit". */
++function optionalString(value: string | undefined): string | undefined {
++  return value === undefined || value === '' ? undefined : value
++}
++
+ /**
+  * Mount the skill hub routes and announcement.
+  * @param ctx - host plugin context carrying webServer/skills/systemPrompt/settings.
+- * @param config - resolved plugin config (schema defaults applied by the loader).
++ * @param config - resolved volatile config references for this profile entry.
+  */
+-export function apply(ctx: Context, config?: Config): void {
+-  // The hub's runtime configuration lives in dsh's own settings service: the
+-  // host serves every registered settings namespace to the web client, so the
+-  // browser card and the config route edit this namespace through the official
+-  // settings transport, and the host consumes the very same resolved value —
+-  // one source of truth. The cordis composition entry seeds the base layer; the
+-  // sidecar config survives only as a one-time migration source below.
+-  const base = config ?? {}
+-  const settingsScope = ctx.settings.register(CONFIG_NAMESPACE, HubSettingsSchema, { base })
+-  // The effective resolved config, read live from the settings namespace
+-  // (schema defaults, then the composition base, then the user layer).
+-  const current = (): HubConfig => settingsScope.get()
++export function apply(ctx: Context, config: Config): void {
++  // This plugin ships its own configuration card (the Plugins manager page),
++  // so the platform must not also generate a generic form page for the entry.
++  ctx.effect(() => ctx.settings.configure({ auto: false }), 'dsh-skill-hub: settings page policy')
++
++  // The effective resolved config, read live from this entry's references
++  // (schema defaults, then the composition base, then the profile user layer).
++  // Every read happens at the operation that needs it, so a volatile write is
++  // visible to the next route call without a remount.
++  const current = (): HubConfig => {
++    const dotModelColor = optionalString(config.dotModelColor.get())
++    const dotUserColor = optionalString(config.dotUserColor.get())
++    const githubToken = optionalString(config.githubToken.get())
++    return {
++      enabled: config.enabled.get(),
++      announceToAgent: config.announceToAgent.get(),
++      showUseCount: config.showUseCount.get(),
++      showUseTime: config.showUseTime.get(),
++      showGroupSummary: config.showGroupSummary.get(),
++      statsWindowDays: config.statsWindowDays.get(),
++      statsScanMinutes: config.statsScanMinutes.get(),
++      ...(dotModelColor !== undefined ? { dotModelColor } : {}),
++      ...(dotUserColor !== undefined ? { dotUserColor } : {}),
++      ...(githubToken !== undefined ? { githubToken } : {}),
++    }
++  }
+ 
+   const store = new SkillHubStore()
+   let disposeRoutes: (() => void) | undefined
+@@ -123,27 +152,25 @@ export function apply(ctx: Context, config?: Config): void {
+   // stats route's data rather than failing to load.
+   let stats: SkillStatsReader | undefined
+ 
+-  // The raw saved config layer (fields the user explicitly overrode); the
+-  // config route reports it so callers can mark overridden fields.
++  // The raw saved config layer (fields the profile patch explicitly carries);
++  // the config route reports it so callers can mark overridden fields.
+   const saved = (): Partial<HubConfig> => {
+-    const descriptor = ctx.settings.describe().find((entry) => entry.ns === CONFIG_NAMESPACE)
++    const descriptor = ctx.settings.describe().find((entry) => entry.ns === ENTRY_ID)
+     return (descriptor?.user as Partial<HubConfig> | undefined) ?? {}
+   }
+ 
+-  // Persist a config patch, re-point the live config, and re-sync every
+-  // surface through the settings transport. A patch value of undefined clears
+-  // the saved override (the key leaves the user section, so the field
+-  // re-inherits the base/default) — the old sidecar's reset semantics.
+-  // Runs inside the config route handler; the watcher below re-syncs the
+-  // surfaces once the namespace commits.
++  // Persist a config patch into this entry's profile row, then answer with the
++  // freshly committed values. `undefined` unsets the field, so it re-inherits
++  // the composition/default layer — the old reset semantics. Runs inside the
++  // config route handler; the volatile watcher below re-syncs the surfaces.
+   const updateConfig = async (patch: Partial<HubConfig>): Promise<HubConfig> => {
+-    const user: Record<string, unknown> = { ...saved() }
+-    for (const [key, value] of Object.entries(patch) as Array<[keyof HubConfig, boolean | string | number | undefined]>) {
+-      if (value === undefined) delete user[key]
+-      else user[key] = value
++    const ops: SettingsPathOp[] = []
++    for (const [key, value] of Object.entries(patch)) {
++      if (value === undefined) ops.push({ op: 'unset', path: [key] })
++      else ops.push({ op: 'set', path: [key], value })
+     }
+-    await settingsScope.replace(user)
+-    return settingsScope.get()
++    if (ops.length > 0) await ctx.settings.mutate(ENTRY_ID, ops)
++    return current()
+   }
+ 
+   // Register (or drop) every surface to match the current config. Each
+@@ -163,8 +190,8 @@ export function apply(ctx: Context, config?: Config): void {
+     }
+     const value = current()
+     // GitHub auth for market/source API calls: env GITHUB_TOKEN/GH_TOKEN is the
+-    // fallback (read at module load); an explicit settings value wins live and
+-    // applies without a restart via the settings watcher below.
++    // fallback (read at module load); an explicit config value wins live and
++    // applies without a restart via the volatile watcher below.
+     setGithubToken(value.githubToken)
+     if (value.announceToAgent) {
+       disposeSection = ctx.systemPrompt.section({
+@@ -208,19 +235,18 @@ export function apply(ctx: Context, config?: Config): void {
+     )
+   }
+ 
+-  // Initial registration from the composition entry, then re-sync whenever
+-  // the settings namespace commits (any writer — the card, the config route,
+-  // or the Host document editor).
++  // Initial registration from the composition entry, then re-sync whenever a
++  // volatile field changes: Loader commits the new values into these very
++  // references and notifies this instance without remounting it.
+   sync()
+   ctx.effect(
+-    () => settingsScope.watch(() => { sync() }),
+-    'dsh-skill-hub: settings config watch',
++    () => ctx.on('loader/volatile-update', () => { sync() }),
++    'dsh-skill-hub: config watch',
+   )
+ 
+-  // One-time migration: an install upgraded from the sidecar-configured
+-  // build seeds the settings namespace from the saved sidecar config when the
+-  // namespace has no user section yet. Later edits live only in the settings
+-  // document; the sidecar keeps its (now-stale) copy untouched.
++  // One-time migration: an install upgraded from the sidecar-configured build
++  // or from the removed global settings document seeds this entry when it has
++  // no user layer yet. Later edits live only in the profile patch.
+   // Startup: 清理 Issue #3 遗留的 .*.import-* 临时目录（尽早回收，不阻塞）
+   void (async () => {
+     const home = dshHome()
+@@ -247,12 +273,15 @@ export function apply(ctx: Context, config?: Config): void {
+ 
+   void (async () => {
+     try {
+-      const legacy = await store.getConfig()
+-      if (Object.keys(legacy).length > 0 && Object.keys(saved()).length === 0) {
+-        await settingsScope.update(legacy as Record<string, unknown>)
+-      }
++      if (Object.keys(saved()).length > 0) return
++      const sidecar = await store.getConfig()
++      const legacySection = await readLegacySettingsSection(dshHome(), LEGACY_SETTINGS_SECTION)
++      const patch = sanitizeLegacyConfig({ ...sidecar as Record<string, unknown>, ...legacySection })
++      if (Object.keys(patch).length === 0) return
++      await updateConfig(patch)
++      ctx.logger.info(`[dsh-skill-hub] adopted ${Object.keys(patch).length} legacy config field(s) into profile entry "${ENTRY_ID}"`)
+     } catch (error) {
+-      ctx.logger.warn('[dsh-skill-hub] sidecar config migration into the settings namespace failed', error)
++      ctx.logger.warn('[dsh-skill-hub] legacy config migration into the profile entry failed', error)
+     }
+   })()
+ 
+@@ -285,8 +314,8 @@ export function apply(ctx: Context, config?: Config): void {
+     void (async () => {
+       // 恢复 sidecar 里的增量扫描检查点后再建 reader（异步、不阻塞）：
+       // 重启后无需重新解压全部历史日志；每次扫描完都落盘（含上次总数），所以
+-      // 重启后面板秒出旧数、后台重扫。扫描间隔与滚动窗口都从设置命名空间
+-      // 实时读取——卡片里改完即生效，无需重启。
++      // 重启后面板秒出旧数、后台重扫。扫描间隔与滚动窗口都从本插件的
++      // Config 引用实时读取——卡片里改完即生效，无需重启。
+       const checkpoint = await store.getSkillStatsState().catch(() => undefined)
+       if (generation !== statsGeneration) return
+       const scanMinutes = (): number => {
+diff --git a/fixture/src/protocol.ts b/fixture/src/protocol.ts
+index aa8b9e3..10b5104 100644
+--- a/fixture/src/protocol.ts
++++ b/fixture/src/protocol.ts
+@@ -31,7 +31,7 @@ export type {
+ } from './protocol/catalog.ts'
+ export type { SkillStat, StatsResponse, SkillStatsCheckpoint } from './protocol/stats.ts'
+ export type { ErrorResponse, HubConfig, HubSettingsValue, RedactedHubConfig, ConfigResponse, ConfigRequest } from './protocol/config.ts'
+-export { HUB_CONFIG_DEFAULTS, HEX_COLOR_RE, GITHUB_TOKEN_RE, resolveHubConfig, redactGithubToken } from './protocol/config.ts'
++export { CONFIG_ENTRY_ID, HUB_CONFIG_DEFAULTS, HEX_COLOR_RE, GITHUB_TOKEN_RE, resolveHubConfig, redactGithubToken } from './protocol/config.ts'
+ export type {
+   MarketSourceRecord,
+   MarketSourcesResponse,
+diff --git a/fixture/src/protocol/config.ts b/fixture/src/protocol/config.ts
+index 94b1fca..b4f8fd4 100644
+--- a/fixture/src/protocol/config.ts
++++ b/fixture/src/protocol/config.ts
+@@ -3,6 +3,15 @@ export interface ErrorResponse {
+   error: string
+ }
+ 
++/**
++ * Profile entry id whose plugin Config carries the hub's runtime configuration.
++ * The bundle patch inserts exactly this id (`cordis.patch.yml`) and the browser
++ * half addresses the same entry through `ctx.configForms.get(CONFIG_ENTRY_ID)`.
++ * Browser-safe on purpose: both halves import it from here, never from the
++ * host entry (which pulls node builtins).
++ */
++export const CONFIG_ENTRY_ID = 'skill-hub'
++
+ /** The skill hub's own runtime configuration, edited from the settings card. */
+ export interface HubConfig {
+   /** Master switch: routes, provider, and announcement all go live with this. */
+@@ -25,8 +34,9 @@ export interface HubConfig {
+   statsScanMinutes?: number
+   /**
+    * GitHub personal access token for market/source API calls (anonymous quota
+-   * is 60 req/h, authed 5000/hr). Stored in the local settings doc; absent
+-   * means anonymous. Never logged.
++   * is 60 req/h, authed 5000/hr). Stored in the plugin's own profile entry
++   * configuration (the profile's cordis.patch.yml); absent means anonymous.
++   * Never logged and never echoed by the config route.
+    */
+   githubToken?: string
+ }
+@@ -41,10 +51,10 @@ export interface HubConfig {
+ export type RedactedHubConfig = Omit<HubConfig, 'githubToken'>
+ 
+ /**
+- * The resolved shape of the hub's settings namespace (schema defaults, then
+- * the composition base, then the user layer). Kept as a type alias so the
+- * browser-side settings scope snapshot is index-compatible with the card
+- * form's record shape.
++ * The client-visible shape of the hub's profile entry configuration (schema
++ * defaults, then the composition base, then the profile user layer). Kept as a
++ * type alias so the browser-side configuration form snapshot is
++ * index-compatible with the card form's record shape.
+  */
+ export type HubSettingsValue = {
+   enabled: boolean
+diff --git a/fixture/src/routes.test.ts b/fixture/src/routes.test.ts
+index 7c085d5..7f71083 100644
+--- a/fixture/src/routes.test.ts
++++ b/fixture/src/routes.test.ts
+@@ -941,6 +941,22 @@ describe('skill-hub routes', () => {
+     expect(bad.status).toBe(400)
+   })
+ 
++  it('patches the stats knobs on the config route and rejects out-of-range values', async () => {
++    const patches: Array<Partial<HubConfig>> = []
++    const updateConfig = async (patch: Partial<HubConfig>): Promise<HubConfig> => {
++      patches.push(patch)
++      return { enabled: true, announceToAgent: true, showUseCount: true, showUseTime: true, showGroupSummary: true, statsWindowDays: 30, statsScanMinutes: 5 }
++    }
++    const routes = makeRoutes({ ...deps, updateConfig })
++    const set = new FakeResponse()
++    await routes.find((r) => r.path === SKILL_HUB_API.config)?.handler(fakeReq('POST', SKILL_HUB_API.config, { statsWindowDays: 30, statsScanMinutes: null }), set as never)
++    expect(set.status).toBe(200)
++    expect(patches).toEqual([{ statsWindowDays: 30, statsScanMinutes: undefined }])
++    const bad = new FakeResponse()
++    await routes.find((r) => r.path === SKILL_HUB_API.config)?.handler(fakeReq('POST', SKILL_HUB_API.config, { statsWindowDays: -1 }), bad as never)
++    expect(bad.status).toBe(400)
++  })
++
+   it('rejects path traversal and untracked names in source delete', async () => {
+     // A tracked skill plus an untracked name and a `..`-bearing name.
+     await mkdir(join(home, 'skills', 'tracked-skill'), { recursive: true })
+diff --git a/fixture/src/routes/config.ts b/fixture/src/routes/config.ts
+index 72de2ed..e5d4802 100644
+--- a/fixture/src/routes/config.ts
++++ b/fixture/src/routes/config.ts
+@@ -84,6 +84,19 @@ export function configRoutes(deps: SkillHubRouteDeps): RouteSpec[] {
+           if (typeof value !== 'string' || !HEX_COLOR_RE.test(value)) { writeError(res, 400, key + ' must be a #rrggbb color or null'); return }
+           patch[key] = value
+         }
++        // 统计旋钮：与 Config schema 的区间一致（窗口 0–3650 天，扫描间隔 1–1440 分钟）。
++        for (const key of ['statsWindowDays', 'statsScanMinutes'] as const) {
++          const value = raw[key]
++          if (value === undefined) continue
++          if (value === null) { patch[key] = undefined; continue }
++          const min = key === 'statsWindowDays' ? 0 : 1
++          const max = key === 'statsWindowDays' ? 3650 : 1440
++          if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
++            writeError(res, 400, key + ' must be a number between ' + String(min) + ' and ' + String(max) + ', or null')
++            return
++          }
++          patch[key] = Math.floor(value)
++        }
+         if (raw.githubToken !== undefined) {
+           const value = raw.githubToken
+           if (value === null) { patch.githubToken = undefined; /* cleared → anonymous/env */ }
+diff --git a/fixture/src/settings-migrate.test.ts b/fixture/src/settings-migrate.test.ts
+new file mode 100644
+index 0000000..4911ada
+--- /dev/null
++++ b/fixture/src/settings-migrate.test.ts
+@@ -0,0 +1,85 @@
++/**
++ * Legacy settings adoption: the removed global settings document is read from
++ * both of its names (the host renames `settings.yaml` to `.imported` during its
++ * one-time import, which may land before or after this plugin's startup
++ * migration), and only schema-valid values reach the profile-entry patch.
++ */
++
++import { mkdtemp, rm, writeFile } from 'node:fs/promises'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++import { afterEach, beforeEach, describe, expect, it } from 'vitest'
++import { LEGACY_SETTINGS_SECTION, readLegacySettingsSection, sanitizeLegacyConfig } from './settings-migrate.ts'
++
++describe('readLegacySettingsSection', () => {
++  let home: string
++
++  beforeEach(async () => {
++    home = await mkdtemp(join(tmpdir(), 'skill-hub-legacy-'))
++  })
++
++  afterEach(async () => {
++    await rm(home, { recursive: true, force: true })
++  })
++
++  it('reads the section from the renamed document', async () => {
++    await writeFile(join(home, 'settings.yaml.imported'), `${LEGACY_SETTINGS_SECTION}:\n  enabled: false\n  dotModelColor: "#112233"\n`, 'utf8')
++    expect(await readLegacySettingsSection(home, LEGACY_SETTINGS_SECTION)).toEqual({ enabled: false, dotModelColor: '#112233' })
++  })
++
++  it('reads the section from a document the host has not imported yet', async () => {
++    await writeFile(join(home, 'settings.yaml'), `${LEGACY_SETTINGS_SECTION}:\n  announceToAgent: false\n`, 'utf8')
++    expect(await readLegacySettingsSection(home, LEGACY_SETTINGS_SECTION)).toEqual({ announceToAgent: false })
++  })
++
++  it('prefers the imported document and answers undefined when neither holds the section', async () => {
++    await writeFile(join(home, 'settings.yaml.imported'), `${LEGACY_SETTINGS_SECTION}:\n  enabled: true\n`, 'utf8')
++    await writeFile(join(home, 'settings.yaml'), `${LEGACY_SETTINGS_SECTION}:\n  enabled: false\n`, 'utf8')
++    expect(await readLegacySettingsSection(home, LEGACY_SETTINGS_SECTION)).toEqual({ enabled: true })
++    expect(await readLegacySettingsSection(home, 'other-plugin')).toBeUndefined()
++    expect(await readLegacySettingsSection(join(home, 'absent'), LEGACY_SETTINGS_SECTION)).toBeUndefined()
++  })
++})
++
++describe('sanitizeLegacyConfig', () => {
++  it('keeps the known fields with schema-valid values', () => {
++    expect(sanitizeLegacyConfig({
++      enabled: false,
++      announceToAgent: true,
++      showUseCount: true,
++      showUseTime: false,
++      showGroupSummary: true,
++      dotModelColor: '#aabbcc',
++      dotUserColor: '#123456',
++      githubToken: 'ghp_1234567890abcdef',
++      statsWindowDays: 30.7,
++      statsScanMinutes: 15.2,
++    })).toEqual({
++      enabled: false,
++      announceToAgent: true,
++      showUseCount: true,
++      showUseTime: false,
++      showGroupSummary: true,
++      dotModelColor: '#aabbcc',
++      dotUserColor: '#123456',
++      githubToken: 'ghp_1234567890abcdef',
++      statsWindowDays: 30,
++      statsScanMinutes: 15,
++    })
++  })
++
++  it('drops unknown keys and values the schema would refuse', () => {
++    expect(sanitizeLegacyConfig({
++      enabled: 'yes',
++      dotModelColor: 'not-a-color',
++      githubToken: 'not a token!',
++      statsWindowDays: -1,
++      statsScanMinutes: 5000,
++      unknownField: 'ignored',
++    })).toEqual({})
++  })
++
++  it('accepts an empty legacy document', () => {
++    expect(sanitizeLegacyConfig({})).toEqual({})
++  })
++})
+diff --git a/fixture/src/settings-migrate.ts b/fixture/src/settings-migrate.ts
+new file mode 100644
+index 0000000..285fe57
+--- /dev/null
++++ b/fixture/src/settings-migrate.ts
+@@ -0,0 +1,66 @@
++/**
++ * One-time adoption of the hub's pre-0.1.7 configuration.
++ *
++ * Before the profile-owned settings move, the hub's runtime configuration
++ * lived in the removed global settings document under its own namespace, and
++ * before that in the sidecar JSON. The host's one-time `settings.yaml` import
++ * maps a section to a profile entry id, so the hub's old namespace (which is
++ * not its entry id) is rejected and stays in the renamed file; these helpers
++ * read it back once and turn it into a validated profile-entry patch.
++ */
++
++import { load } from 'js-yaml'
++import { readFile } from 'node:fs/promises'
++import { join } from 'node:path'
++import { GITHUB_TOKEN_RE, HEX_COLOR_RE, type HubConfig } from './protocol.ts'
++
++/** Namespace of the removed global settings document for this plugin. */
++export const LEGACY_SETTINGS_SECTION = 'dsh-skill-hub'
++
++/**
++ * Read the removed global settings document's hub section, if it still holds
++ * one. The host imports and renames `settings.yaml` at boot; both names are
++ * read because the plugin's startup migration can run before or after the
++ * host's rename.
++ * @param home - Harness home holding the settings document.
++ * @param section - Legacy namespace key inside the document.
++ * @returns The raw section, or undefined when neither file carries it.
++ */
++export async function readLegacySettingsSection(home: string, section: string): Promise<Record<string, unknown> | undefined> {
++  for (const file of ['settings.yaml.imported', 'settings.yaml']) {
++    try {
++      const text = await readFile(join(home, file), 'utf8')
++      const document = load(text) as Record<string, unknown> | undefined
++      const values = document?.[section]
++      if (values !== null && typeof values === 'object' && !Array.isArray(values)) return values as Record<string, unknown>
++    } catch {
++      // Absent or unreadable: the next candidate (or nothing) is the answer.
++    }
++  }
++  return undefined
++}
++
++/**
++ * Keep only the known hub config fields whose legacy value still validates.
++ * The old document was schema-validated when written; a hand-edited file is
++ * not trusted to override that schema at adoption time.
++ * @param legacy - Raw field values from the removed store.
++ * @returns The profile-entry patch to adopt.
++ */
++export function sanitizeLegacyConfig(legacy: Record<string, unknown>): Partial<HubConfig> {
++  const patch: Record<string, unknown> = {}
++  for (const key of ['enabled', 'announceToAgent', 'showUseCount', 'showUseTime', 'showGroupSummary'] as const) {
++    if (typeof legacy[key] === 'boolean') patch[key] = legacy[key]
++  }
++  for (const key of ['dotModelColor', 'dotUserColor'] as const) {
++    if (typeof legacy[key] === 'string' && HEX_COLOR_RE.test(legacy[key])) patch[key] = legacy[key]
++  }
++  if (typeof legacy.githubToken === 'string' && GITHUB_TOKEN_RE.test(legacy.githubToken)) patch.githubToken = legacy.githubToken
++  if (typeof legacy.statsWindowDays === 'number' && Number.isFinite(legacy.statsWindowDays) && legacy.statsWindowDays >= 0 && legacy.statsWindowDays <= 3650) {
++    patch.statsWindowDays = Math.floor(legacy.statsWindowDays)
++  }
++  if (typeof legacy.statsScanMinutes === 'number' && Number.isFinite(legacy.statsScanMinutes) && legacy.statsScanMinutes >= 1 && legacy.statsScanMinutes <= 1440) {
++    patch.statsScanMinutes = Math.floor(legacy.statsScanMinutes)
++  }
++  return patch as Partial<HubConfig>
++}
+diff --git a/fixture/tsdown.config.ts b/fixture/tsdown.config.ts
+index add5097..6e3c4e6 100644
+--- a/fixture/tsdown.config.ts
++++ b/fixture/tsdown.config.ts
+@@ -23,19 +23,22 @@ import { transform } from 'lightningcss'
+ const ID = 'dsh-skill-hub'
+ 
+ /**
+- * The shell's shared module table (vendored from dsh-web-ui's
+- * shared/web-platform.ts): the only specifiers the browser loader can
+- * answer. Everything else must inline.
++ * The shell's shared module table, mirroring
++ * `@deepseek-ai/dsh-client-web/src/platform.ts` at the target harness release:
++ * the only specifiers the browser loader answers, and therefore the only ones
++ * the client bundle may externalise. Everything else must inline.
+  *
+- * `@deepseek-ai/dsh-client-store` is deliberately NOT in this table: the
+- * loader does not answer it, so the client bundle inlines it (see noExternal
+- * below) rather than requiring it at runtime.
++ * `@deepseek-ai/dsh-client-store` and `@deepseek-ai/dsh-client-ui-primitives`
++ * are part of that table, so the shared snapshot-store engine and the shared
++ * settings-form model keep one identity with the shell instead of being
++ * duplicated into this bundle.
+  */
+ const PLATFORM_MODULES = [
+   'react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@deepseek-ai/cordis',
++  '@deepseek-ai/dsh-client-store',
+   '@deepseek-ai/dsh-client-ui-slots',
+-  '@deepseek-ai/dsh-client-web-react',
+-  '@deepseek-ai/dsh-client-schema-form',
++  '@deepseek-ai/dsh-client-ui-primitives',
++  '@deepseek-ai/dsh-client-ui-dockkit',
+ ] as const
+ 
+ /** Externals resolved from the loader module table. */

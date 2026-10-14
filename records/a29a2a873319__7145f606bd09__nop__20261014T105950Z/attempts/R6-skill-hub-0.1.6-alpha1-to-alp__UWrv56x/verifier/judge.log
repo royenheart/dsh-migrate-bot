@@ -1,0 +1,27 @@
+PASS contract
+FAIL typecheck: > dsh-skill-hub@0.3.13 typecheck
+  > tsc --noEmit
+  
+  src/client/SkillHubSettingsCard.tsx(57,16): error TS2344: Type '"settings.plugin.item"' does not satisfy the constraint '"settings.trigger" | "settings.header" | "settings.action" | "settings.close" | "settings.section" | "settings.plugins.tab" | "settings.onboarding" | "settings.general.item"'.
+PASS test
+FAIL build: > dsh-skill-hub@0.3.13 prebuild
+  > node -e "require('fs').rmSync('lib',{recursive:true,force:true})"
+  
+  
+  > dsh-skill-hub@0.3.13 build
+  > tsc -p tsconfig.build.json && tsdown
+  
+  src/client/SkillHubSettingsCard.tsx(57,16): error TS2344: Type '"settings.plugin.item"' does not satisfy the constraint '"settings.trigger" | "settings.header" | "settings.action" | "settings.close" | "settings.section" | "settings.plugins.tab" | "settings.onboarding" | "settings.general.item"'.
+FAIL boot:           at file:///usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1667:77
+            at adapted (file:///usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1602:20)
+            at ModuleLoader.wrapped [as resolveSync] (file:///usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1675:8)
+            at #resolve (node:internal/modules/esm/loader:687:17) {
+          code: 'ERR_MODULE_NOT_FOUND',
+          url: 'file:///tmp/judge-home-ByDJDA/profiles/judge/node_modules/dsh-skill-hub/lib/index.js'
+        }
+      }
+    }
+  }
+  
+  Node.js v24.21.0
+{"score":45,"max":100,"checks":{"contract":1,"typecheck":0,"test":1,"build":0,"boot":0}}

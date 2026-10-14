@@ -1,0 +1,17 @@
+FAIL contract: does not admit 0.1.7-rc.2: devDependencies @deepseek-ai/dsh-api-session-controller@0.1.7-rc.1, devDependencies @deepseek-ai/dsh-session-turn-outline@0.1.7-rc.1
+PASS typecheck
+PASS test
+FAIL build:     "packages/client/ui-chat/src/client/chat/AssistantMarkdown.tsx",
+      "packages/client/ui-chat/src/client/chat/MessageItem.tsx",
+      "packages/client/ui-tool/src/client/tool/models/tool-call-model.ts",
+      "packages/client/ui-primitives/src/markdown/render.tsx"
+    ],
+    "addedRegistrations": [
+      "conversation.chat.turnTail | schedule-created | packages/client/ui-schedule/src/client/index.ts",
+      "tool.call.toolview | schedule_update | packages/client/ui-tool/src/client/tool/toolviews/details-row.tsx"
+    ],
+    "removedRegistrations": []
+  }
+  Review the differences and run the official bridge/visual tests. --record alone is not compatibility proof.
+PASS boot
+{"score":70,"max":100,"checks":{"contract":0,"typecheck":1,"test":1,"build":0,"boot":1}}

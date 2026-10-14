@@ -1,0 +1,142 @@
+{
+  "migrations": [
+    {
+      "id": "0.1.7-rc.2",
+      "target": {
+        "tag": "dsh-v0.1.7-rc.2",
+        "version": "0.1.7-rc.2"
+      },
+      "state": "unpublished",
+      "context": {
+        "input": {
+          "target": {
+            "tag": "dsh-v0.1.7-rc.2",
+            "version": "0.1.7-rc.2"
+          },
+          "source": {
+            "release": {
+              "tag": "dsh-v0.1.1-rc.2",
+              "version": "0.1.1-rc.2"
+            },
+            "origin": "declared-peers"
+          },
+          "settings": {
+            "reviewPolicy": "always",
+            "maxAttempts": 5,
+            "e2eFailurePolicy": "advisory",
+            "e2ePublish": false,
+            "checks": {
+              "cards": true,
+              "boot": true,
+              "web": true,
+              "e2e": true
+            },
+            "publish": false,
+            "reportChannels": []
+          }
+        },
+        "scope": "attempt",
+        "queue": [],
+        "reviewed": true,
+        "attempts": 1,
+        "lastFingerprint": "mechanical: error: devDependencies: @deepseek-ai/dsh-settings is \"<n>.<n>-rc.<n>\", which does not admit <n>.<n>-rc.<n>",
+        "failure": {
+          "check": "mechanical",
+          "outcome": "fail",
+          "fingerprint": "mechanical: error: devDependencies: @deepseek-ai/dsh-settings is \"<n>.<n>-rc.<n>\", which does not admit <n>.<n>-rc.<n>",
+          "detail": "error: devDependencies: @deepseek-ai/dsh-settings is \"0.1.1-rc.2\", which does not admit 0.1.7-rc.2"
+        },
+        "sourceBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "targetBoot": {
+          "check": "boot",
+          "outcome": "skipped",
+          "fingerprint": "",
+          "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+        },
+        "e2eBaseline": [],
+        "warnings": [],
+        "delivered": [],
+        "pending": [],
+        "merged": false,
+        "concluded": "unpublished",
+        "comments": []
+      },
+      "run": "local-2026-10-14T15-20-30-059Z",
+      "startedAt": "2026-10-14T15:20:30.832Z"
+    }
+  ],
+  "processed": {
+    "id": "0.1.7-rc.2",
+    "target": {
+      "tag": "dsh-v0.1.7-rc.2",
+      "version": "0.1.7-rc.2"
+    },
+    "state": "unpublished",
+    "context": {
+      "input": {
+        "target": {
+          "tag": "dsh-v0.1.7-rc.2",
+          "version": "0.1.7-rc.2"
+        },
+        "source": {
+          "release": {
+            "tag": "dsh-v0.1.1-rc.2",
+            "version": "0.1.1-rc.2"
+          },
+          "origin": "declared-peers"
+        },
+        "settings": {
+          "reviewPolicy": "always",
+          "maxAttempts": 5,
+          "e2eFailurePolicy": "advisory",
+          "e2ePublish": false,
+          "checks": {
+            "cards": true,
+            "boot": true,
+            "web": true,
+            "e2e": true
+          },
+          "publish": false,
+          "reportChannels": []
+        }
+      },
+      "scope": "attempt",
+      "queue": [],
+      "reviewed": true,
+      "attempts": 1,
+      "lastFingerprint": "mechanical: error: devDependencies: @deepseek-ai/dsh-settings is \"<n>.<n>-rc.<n>\", which does not admit <n>.<n>-rc.<n>",
+      "failure": {
+        "check": "mechanical",
+        "outcome": "fail",
+        "fingerprint": "mechanical: error: devDependencies: @deepseek-ai/dsh-settings is \"<n>.<n>-rc.<n>\", which does not admit <n>.<n>-rc.<n>",
+        "detail": "error: devDependencies: @deepseek-ai/dsh-settings is \"0.1.1-rc.2\", which does not admit 0.1.7-rc.2"
+      },
+      "sourceBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "targetBoot": {
+        "check": "boot",
+        "outcome": "skipped",
+        "fingerprint": "",
+        "detail": "every plugin has a browser half (dsh.client); the web check loads them in the web composition"
+      },
+      "e2eBaseline": [],
+      "warnings": [],
+      "delivered": [],
+      "pending": [],
+      "merged": false,
+      "concluded": "unpublished",
+      "comments": []
+    },
+    "run": "local-2026-10-14T15-20-30-059Z",
+    "startedAt": "2026-10-14T15:20:30.832Z"
+  }
+}
