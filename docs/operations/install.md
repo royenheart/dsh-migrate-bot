@@ -18,6 +18,26 @@ The Action runs the image `ghcr.io/royenheart/dsh-migrate-bot` of its release. T
 
 The first scheduled run migrates to the target release. Later runs skip a release that was already processed; a manual run with `force` migrates it again. A failure of the Action itself (status `error`) is retried by the next run.
 
+## Moving from v0
+
+A plugin repository that ran the v0 Action changes four things before its first v1 run:
+
+1. **The workflow.** Replace `.github/workflows/dsh-migrate.yml` with [examples/workflow.yml](../../examples/workflow.yml). The secret `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` keeps its name.
+2. **The configuration.** v1 refuses a key it does not know, so `.github/dsh-migrate.yml` is rewritten:
+
+   | v0 | v1 |
+   |---|---|
+   | `dshVersion: latest` | `target: latest`, the default |
+   | `review.policy: skip-if-mechanical-pass` | `review.policy: when-checks-fail` |
+   | `loop.maxAttempts` | `repair.maxAttempts` |
+   | `watch.enabled` | removed: the schedule in the workflow finds new releases |
+   | `issuePr.language` | removed: every body is English |
+
+3. **The end-to-end branch.** v0's `dsh-migrate/e2e` holds the whole plugin tree with a suite that starts dsh itself, which v1 would read as its suite. Delete the branch before the first run, or set `checks.e2e.branch` to a new name.
+4. **The old proposals.** v1 keeps its proposal on `dsh-migrate/proposal` and does not take over v0's `dsh-migrate/<version>-<time>` branches or their pull requests; close them once the v1 proposal is open.
+
+The state branch `dsh-migrate/state` needs nothing: v1 does not read v0's `seen.json` and writes its own files beside it, so its first run takes the source release from the plugin's declared ranges.
+
 ## Spend
 
 Before each agent session the Action asks DeepSeek for the account balance, and stops the migration when the account is unavailable. `quota.limit` caps the USD one migration may spend, priced from its own token usage at the published rates. Every check runs without an API key.
