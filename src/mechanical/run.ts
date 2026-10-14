@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { MigrateConfig } from '../config/schema.ts'
 import { extractMechanicalErrors } from './errors.ts'
-import { checkDependencyContract, npmPublishedVersions } from './dependencies.ts'
+import { checkDependencyContract, checkSourceImports, npmPublishedVersions } from './dependencies.ts'
 import { dshPeerSpecs, pinDshPeersCommand } from './peers.ts'
 import { scanKeyedSlots, scanPluginShape } from './scan.ts'
 import { typecheckCommand } from './typecheck.ts'
@@ -122,9 +122,14 @@ export function runMechanical(
   options: MechanicalOptions = {},
 ): MechanicalResult {
   const pkg = readPackageJson(root)
-  const published = options.published ?? npmPublishedVersions
+  // One registry lookup per package, however many manifests and sources name it.
+  const lookups = new Map<string, readonly string[] | undefined>()
+  const published = (name: string): readonly string[] | undefined => {
+    if (!lookups.has(name)) lookups.set(name, (options.published ?? npmPublishedVersions)(name))
+    return lookups.get(name)
+  }
   if (options.dshVersion !== undefined) {
-    const contract = checkDependencyContract(pkg, options.dshVersion, published)
+    const contract = [...checkDependencyContract(pkg, options.dshVersion, published), ...checkSourceImports(root, options.dshVersion, published)]
     if (contract.length > 0) {
       const text = contract.map(item => `error: ${item.message}`).join('\n')
       return { ok: false, errors: text, log: text, checks: 0 }

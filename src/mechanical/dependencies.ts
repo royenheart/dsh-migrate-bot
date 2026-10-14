@@ -1,5 +1,8 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import semver from 'semver'
+import ts from 'typescript'
 
 /**
  * The plugin's dependency contract with the target release.
@@ -51,6 +54,60 @@ export function checkDependencyContract(pkg: unknown, target: string, published:
     }
   }
   return findings
+}
+
+/** Directories of build output, which the plugin's build regenerates from its sources. */
+const BUILD_OUTPUT = new Set(['node_modules', 'lib', 'dist', 'build'])
+const SOURCE_FILE = /\.(?:[cm]?[jt]sx?)$/
+
+/**
+ * The other half of the contract: what the plugin's sources refer to. A source
+ * that still imports a dsh package the release does not publish fails at
+ * runtime whatever the manifest declares, a type that names one fails the
+ * typecheck, and a review can mark the change done while one reference
+ * remains. The tracked sources are parsed with TypeScript, JSDoc included:
+ * imports, re-exports, \`require\`, \`import()\` and \`import('…')\` types. Build
+ * output is left out, since the build regenerates it.
+ * @param root - the plugin's directory, inside a git checkout
+ */
+export function checkSourceImports(root: string, target: string, published: (name: string) => readonly string[] | undefined): DependencyFinding[] {
+  const listed = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { cwd: root, encoding: 'utf8' })
+  if (listed.status !== 0) return []
+  const findings: DependencyFinding[] = []
+  for (const file of listed.stdout.split('\0')) {
+    // A tracked file the migration deleted is still listed by git.
+    if (!SOURCE_FILE.test(file) || file.split('/').some(segment => BUILD_OUTPUT.has(segment)) || !existsSync(join(root, file))) continue
+    const source = ts.createSourceFile(file, readFileSync(join(root, file), 'utf8'), ts.ScriptTarget.Latest, true)
+    const reported = new Set<string>()
+    for (const specifier of moduleReferences(source)) {
+      const name = /^(@deepseek-ai\/dsh-[^/]+)/.exec(specifier.text)?.[1]
+      if (name === undefined || reported.has(name)) continue
+      const versions = published(name)
+      if (versions === undefined || versions.includes(target)) continue
+      reported.add(name)
+      const line = source.getLineAndCharacterOfPosition(specifier.getStart(source)).line + 1
+      findings.push({ message: `${file}:${String(line)} refers to ${name}, which ${target} does not publish (last published ${versions.at(-1) ?? 'never'})` })
+    }
+  }
+  return findings
+}
+
+/** Every module specifier a source names, in source order. */
+function moduleReferences(source: ts.SourceFile): ts.StringLiteralLike[] {
+  const found: ts.StringLiteralLike[] = []
+  const visit = (node: ts.Node): void => {
+    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier !== undefined && ts.isStringLiteralLike(node.moduleSpecifier)) found.push(node.moduleSpecifier)
+    if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === 'require'))) {
+      const [argument] = node.arguments
+      if (argument !== undefined && ts.isStringLiteralLike(argument)) found.push(argument)
+    }
+    if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) && ts.isStringLiteralLike(node.argument.literal)) found.push(node.argument.literal)
+    // JSDoc is attached to its host node rather than reached by forEachChild.
+    for (const doc of (node as { jsDoc?: ts.Node[] }).jsDoc ?? []) visit(doc)
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  return found
 }
 
 /** The published versions of a package from the npm registry; `undefined` when the lookup fails. */

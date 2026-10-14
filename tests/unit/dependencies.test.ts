@@ -1,9 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { checkDependencyContract } from '../../src/mechanical/dependencies.ts'
+import { checkDependencyContract, checkSourceImports } from '../../src/mechanical/dependencies.ts'
 import { runMechanical } from '../../src/mechanical/run.ts'
 import { parseConfig } from '../../src/config/load.ts'
 
@@ -47,6 +48,31 @@ test('the mechanical check fails on a broken contract before it installs anythin
     assert.equal(result.ok, false)
     assert.equal(result.errors, 'error: peerDependencies: @deepseek-ai/dsh-agent is "^0.1.0-rc.8", which does not admit 0.1.2-alpha.2')
     assert.equal(result.log.includes('npm install'), false)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('a source that still refers to a package the release does not publish, in code or in a JSDoc type, is named with its line; build output is left to the build', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-mig-imports-'))
+  try {
+    spawnSync('git', ['init', '-q'], { cwd: dir })
+    mkdirSync(join(dir, 'src'))
+    mkdirSync(join(dir, 'lib'))
+    writeFileSync(join(dir, 'src', 'client.ts'), "import { x } from 'react'\n\nimport { createStore } from '@deepseek-ai/dsh-client-runtime/store'\nexport const load = () => import('@deepseek-ai/dsh-agent')\n")
+    writeFileSync(join(dir, 'src', 'host.cjs'), "const runtime = require('@deepseek-ai/dsh-client-runtime')\n")
+    // A JSDoc type that still names the removed package: M7's leftover.
+    writeFileSync(join(dir, 'src', 'panel.js'), "/**\n * @param {import('@deepseek-ai/dsh-client-runtime/client').ClientContext} ctx\n */\nexport function apply(ctx) {}\n")
+    writeFileSync(join(dir, 'lib', 'client.js'), "import '@deepseek-ai/dsh-client-runtime'\n")
+    // A tracked source the migration deleted, which git still lists.
+    writeFileSync(join(dir, 'src', 'gone.ts'), "import '@deepseek-ai/dsh-client-runtime'\n")
+    spawnSync('git', ['add', 'src/gone.ts'], { cwd: dir })
+    rmSync(join(dir, 'src', 'gone.ts'))
+    assert.deepEqual(checkSourceImports(dir, '0.1.2-alpha.2', published).map(finding => finding.message), [
+      'src/client.ts:3 refers to @deepseek-ai/dsh-client-runtime, which 0.1.2-alpha.2 does not publish (last published 0.1.1-rc.2)',
+      'src/host.cjs:1 refers to @deepseek-ai/dsh-client-runtime, which 0.1.2-alpha.2 does not publish (last published 0.1.1-rc.2)',
+      'src/panel.js:2 refers to @deepseek-ai/dsh-client-runtime, which 0.1.2-alpha.2 does not publish (last published 0.1.1-rc.2)',
+    ])
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
