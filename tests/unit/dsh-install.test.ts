@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ensureDsh, installArgs } from '../../src/verify/dsh-install.ts'
+import { ensureDsh, installArgs, releaseCutoff } from '../../src/verify/dsh-install.ts'
 
 function cacheRoot(): string {
   return mkdtempSync(join(tmpdir(), 'dsh-mig-cache-'))
@@ -103,8 +103,21 @@ test('two versions never share a prefix', () => {
   }
 })
 
-test('a release is installed with the dependencies it was published with', () => {
-  assert.deepEqual(installArgs('/cache/dsh-0.1.0-rc.6', '0.1.0-rc.6', '2026-08-13T12:35:03.812Z'), [
-    'install', '-g', '--prefix', '/cache/dsh-0.1.0-rc.6', '--no-fund', '--no-audit', '--before', '2026-08-13T13:35:03.812Z', '@deepseek-ai/dsh@0.1.0-rc.6',
+test('a release is cut off before the next prerelease of its line, and one without a later prerelease is not cut off', () => {
+  // Publication times from the registry. One package of 0.2.0-rc.2 came 80 minutes after dsh itself, and
+  // some of 0.1.2-alpha.3's came before it: the cutoff sits before the next prerelease of the same line.
+  const times = {
+    created: '2026-08-01T00:00:00.000Z',
+    '0.1.2-alpha.2': '2026-08-30T14:10:52.613Z',
+    '0.1.2-alpha.3': '2026-08-31T16:20:52.856Z',
+    '0.2.0-rc.2': '2026-09-29T09:56:27.792Z',
+    '0.2.1-alpha.1': '2026-10-03T04:53:22.343Z',
+  }
+  assert.equal(releaseCutoff(times, '0.1.2-alpha.2'), '2026-08-31T14:20:52.856Z')
+  assert.equal(releaseCutoff(times, '0.2.0-rc.2'), undefined, 'a later release of another line cannot satisfy its ranges')
+  assert.equal(releaseCutoff(times, '0.2.1-alpha.1'), undefined)
+  assert.deepEqual(installArgs('/cache/dsh-0.1.2-alpha.2', '0.1.2-alpha.2', releaseCutoff(times, '0.1.2-alpha.2')), [
+    'install', '-g', '--prefix', '/cache/dsh-0.1.2-alpha.2', '--no-fund', '--no-audit', '--before', '2026-08-31T14:20:52.856Z', '@deepseek-ai/dsh@0.1.2-alpha.2',
   ])
+  assert.deepEqual(installArgs('/cache/dsh-0.2.0-rc.2', '0.2.0-rc.2', undefined), ['install', '-g', '--prefix', '/cache/dsh-0.2.0-rc.2', '--no-fund', '--no-audit', '@deepseek-ai/dsh@0.2.0-rc.2'])
 })
