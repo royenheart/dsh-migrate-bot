@@ -37,6 +37,7 @@ The upgrade-skill suite's static tasks and some others grade a written report wi
 | `--tasks` | Comma-separated task ids | every task |
 | `--concurrency` | Trials at once (Harbor `-n`) | `1` |
 | `--agent-timeout-multiplier` | Harbor's multiplier of each task's agent timeout | `1` |
+| `--agent-setup-timeout-multiplier` | Harbor's multiplier of the 360 s agent setup, which installs the agent runtime and, for a pipeline, Playwright and Chromium; several setups at once take longer | `4` |
 | `--model` | `provider/model` of the agent sessions | `deepseek-official/deepseek-v4-flash` |
 | `--harbor` | The Harbor executable (or `HARBOR_BIN`) | `harbor` |
 | `--allow-dirty` | Run from a tree with uncommitted changes; the record says so | off |

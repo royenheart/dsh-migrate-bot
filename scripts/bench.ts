@@ -152,6 +152,9 @@ async function run(argv: string[]): Promise<number> {
       'tasks': { type: 'string' },
       'concurrency': { type: 'string', default: '1' },
       'agent-timeout-multiplier': { type: 'string', default: '1' },
+      // Harbor allows a setup 360 s; installing the agent runtime and, for a pipeline, Playwright with
+      // Chromium takes longer when several trials set up at once, and a setup timeout scores nothing.
+      'agent-setup-timeout-multiplier': { type: 'string', default: '4' },
       'model': { type: 'string', default: 'deepseek-official/deepseek-v4-flash' },
       'harbor': { type: 'string', default: process.env.HARBOR_BIN ?? 'harbor' },
       'records': { type: 'string', default: RECORDS_DIR },
@@ -214,7 +217,7 @@ async function run(argv: string[]): Promise<number> {
   const createdAt = new Date().toISOString().replace(/\.\d+Z$/, 'Z')
   const id = `${producer.commit.slice(0, 12)}__${suiteCommit.slice(0, 12)}__${subject}__${createdAt.replace(/[-:]/g, '')}`
   const jobs = mkdtempSync(join(tmpdir(), 'dsh-migrate-bench-'))
-  const harborArgs = ['run', '-p', tasksDir, '-o', jobs, '--job-name', id, '-k', String(attempts), '-n', String(concurrency), '--agent-timeout-multiplier', String(multiplier)]
+  const harborArgs = ['run', '-p', tasksDir, '-o', jobs, '--job-name', id, '-k', String(attempts), '-n', String(concurrency), '--agent-timeout-multiplier', String(multiplier), '--agent-setup-timeout-multiplier', values['agent-setup-timeout-multiplier']]
   for (const task of runnable) harborArgs.push('-i', task.id)
   // Harbor asks before it hands the shell's variables to a verifier; a run that set them for the report judge has answered.
   if (runnable.some(task => suite.find(entry => entry.id === task.id)?.verifierEnv.length)) harborArgs.push('--yes')
