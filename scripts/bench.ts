@@ -42,6 +42,8 @@ type SuiteId = keyof typeof SUITES
 const KEYLESS: ReadonlySet<SubjectId> = new Set(['oracle', 'nop'])
 const RECORDS_DIR = join(REPO_ROOT, '.bench', 'records')
 const AGENT = 'tools.harbor.dsh_agent:DshAgent'
+/** The host of the model API the agent sessions call, which a task's agent network policy must let through. */
+const MODEL_API_HOST = 'api.deepseek.com'
 /** The files of a trial a record keeps, relative to the trial directory. */
 const AGENT_FILES = ['agent/proposed.diff', 'agent/agent.log', 'agent/report.log', 'agent/events.jsonl', 'agent/status.json', 'agent/cards.json']
 
@@ -108,7 +110,7 @@ function feasibleTasks(records: string, suiteId: SuiteId, version: string): Set<
 /** Which build served the model, asked once with a one-token request; a failed probe is logged and omitted. */
 async function probe(model: string, apiKey: string): Promise<BenchmarkRecord['model']['before']> {
   try {
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
+    const response = await fetch(`https://${MODEL_API_HOST}/chat/completions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ model, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 }),
@@ -231,6 +233,8 @@ async function run(argv: string[]): Promise<number> {
   } else {
     const packed = execFileSync('npm', ['pack', '--silent', '--pack-destination', jobs], { cwd: REPO_ROOT, encoding: 'utf8' }).trim().split('\n').at(-1) ?? ''
     harborArgs.push('-a', AGENT, '-m', values.model, '--ak', `subject=${subject}`, '--ak', `bot_tarball=${join(jobs, packed)}`)
+    // A task whose agent runs without network still lets the agent reach its model, as the suite's own runs allow theirs; a public task ignores it.
+    harborArgs.push('--allow-agent-host', MODEL_API_HOST)
   }
 
   const before = KEYLESS.has(subject) ? undefined : await probe(model, apiKey)
