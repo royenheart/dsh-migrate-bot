@@ -9,6 +9,8 @@ on:
     paths:
       - Dockerfile
       - container/**
+      - src/**
+      - tsconfig.json
       - package.json
       - package-lock.json
   push:
@@ -16,6 +18,8 @@ on:
     paths:
       - Dockerfile
       - container/**
+      - src/**
+      - tsconfig.json
       - package.json
       - package-lock.json
 
