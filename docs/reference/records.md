@@ -27,11 +27,11 @@ A record is `records/<id>/record.json` on the `bench/records` branch, schema 3, 
 | `suite.commit` | string | For the upgrade-skill suite, the commit the `vendor/dsh-plugin-upgrade-skill` submodule pinned; for this repository's suite, the git tree of `bench/tasks`. |
 | `suite.tasks` | list | Every selected task, run or not. |
 | `suite.tasks[].id` | string | The task directory name. |
-| `suite.tasks[].family` | string | The task id prefix: `S` static, `M` migration, `H` hands-on. |
+| `suite.tasks[].family` | string | The task id prefix: in the upgrade-skill suite `S` static, `M` migration, `H` hands-on, each with its own `meanReward.<family>`; in the span suite `R`, which has no mean of its own. |
 | `suite.tasks[].networkMode` | string | `network_mode` of the task. |
 | `suite.tasks[].agentTimeoutSec` | number | `agent.timeout_sec` of the task, before the multiplier. |
 | `suite.tasks[].applicable` | boolean | Whether the subject can attempt the task; a `pipeline` subject does not answer the static tasks. |
-| `suite.tasks[].feasible` | boolean | Whether every attempt of the newest oracle record of this suite commit scored 1.0 on the task; always true in an oracle record. |
+| `suite.tasks[].feasible` | boolean | Whether the environment can judge the task: every attempt of the newest oracle record of this suite version scored 1.0 on it and, when a nop record of that version exists, none of its attempts did; always true in an oracle or a nop record. |
 | `suite.tasks[].note` | string | Why the task is not applicable or not feasible. |
 | `suite.judge.baseUrl` | string | Endpoint of the report judge (`REPORT_JUDGE_BASE_URL`). |
 | `suite.judge.model` | string | Model of the report judge (`REPORT_JUDGE_MODEL`); scores from different judges do not compare. |
@@ -63,7 +63,7 @@ A record is `records/<id>/record.json` on the `bench/records` branch, schema 3, 
 | `attempts[].usage.cacheHitTokens` | integer | Input tokens served from the cache. |
 | `attempts[].usage.outputTokens` | integer | Output tokens, reasoning included. |
 | `attempts[].usage.usd` | number | Cost at the published rates, when the model has them. |
-| `attempts[].artifacts` | mapping | Files the attempt produced, by name: `proposed.diff`, `events.jsonl`, `agent.log`, `verifier.log`, `reports/*.md`. |
+| `attempts[].artifacts` | mapping | Files the attempt kept, by their path in the trial directory: those of `agent/proposed.diff`, `agent/agent.log`, `agent/report.log`, `agent/events.jsonl`, `agent/status.json` and `agent/cards.json` the subject wrote, and every file under `verifier/`. |
 | `attempts[].artifacts.<id>.path` | string | Path relative to the record directory. |
 | `attempts[].artifacts.<id>.sha256` | string | SHA-256 of the file, checked by `npm run bench -- validate`. |
 | `attempts[].artifacts.<id>.bytes` | integer | File size. |

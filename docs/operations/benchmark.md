@@ -19,12 +19,15 @@ Harbor 0.24.0 is the version `src/evaluation/harbor.ts` reads; a record names th
 
 ## A run
 
-The oracle comes first: it decides which tasks this machine can judge, and costs no API key. A `nop` run, also keyless, finds the tasks that doing nothing passes; the span suite needs one, the upgrade-skill suite may have one.
+The oracle comes first, in each suite you run and again whenever that suite changes: it decides which tasks this machine can judge, and costs no API key. A `nop` run, also keyless, finds the tasks that doing nothing passes; the span suite needs one, the upgrade-skill suite may have one.
 
 ```sh
 npm run bench -- run --subject oracle --attempts 1 --harbor ~/.harbor/bin/harbor
-npm run bench -- run --suite spans --subject nop --attempts 1 --harbor ~/.harbor/bin/harbor
 DEEPSEEK_API_KEY=… npm run bench -- run --subject pipeline --attempts 3 --harbor ~/.harbor/bin/harbor
+
+npm run bench -- run --suite spans --subject oracle --attempts 1 --harbor ~/.harbor/bin/harbor
+npm run bench -- run --suite spans --subject nop --attempts 1 --harbor ~/.harbor/bin/harbor
+DEEPSEEK_API_KEY=… npm run bench -- run --suite spans --subject pipeline --attempts 3 --harbor ~/.harbor/bin/harbor
 ```
 
 The upgrade-skill suite's static tasks and some others grade a written report with an LLM judge. They run only when the shell sets `REPORT_JUDGE_BASE_URL` (an OpenAI-compatible API prefix), `REPORT_JUDGE_MODEL` and `REPORT_JUDGE_API_KEY`; the judge must answer non-streamed chat completions with `response_format: json_object`. Read the key from its file inline, as the DeepSeek key is, and keep the same judge across the records you compare.
@@ -41,12 +44,13 @@ The upgrade-skill suite's static tasks and some others grade a written report wi
 | `--model` | `provider/model` of the agent sessions | `deepseek-official/deepseek-v4-flash` |
 | `--harbor` | The Harbor executable (or `HARBOR_BIN`) | `harbor` |
 | `--allow-dirty` | Run from a tree with uncommitted changes; the record says so | off |
+| `--records` | The records worktree: where the run reads the oracle and nop records and writes its own. `resume`, `compare` and `npm run site` take it too, and `validate` and `publish` take the directory as their argument | `.bench/records` |
 
 The run builds this repository, packs it for the task containers, probes the served model before and after, runs Harbor, and writes `records/<id>/record.json` with the files each attempt kept. It prints every metric. Harbor's job directory is left in the system temporary directory for inspection.
 
 A run of three attempts on the whole suite is a few hundred agent sessions and several hours. Lower `--tasks` to try a change, and keep the full suite for a record worth comparing against.
 
-A run writes its plan beside Harbor's job directory before Harbor starts, and prints the command that continues it. When a run is interrupted (the machine sleeps, the terminal closes, a process limit stops it), `npm run bench -- resume <job directory>` lets Harbor finish the trials that did not, keeps those that did, and writes the record the run would have written. It refuses to resume from another commit than the one the run started at, because the record names one. A run that ends with trials unfinished exits non-zero and prints the same command. For a long run, detach it from the terminal (`setsid nohup npm run bench -- run … > run.log 2>&1 &`).
+A run writes its plan beside Harbor's job directory before Harbor starts, and prints the command that continues it. When a run is interrupted (the machine sleeps, the terminal closes, a process limit stops it), `npm run bench -- resume <job directory>`, with the run's `--records` when it named one, lets Harbor finish the trials that did not, keeps those that did, and writes the record the run would have written. It refuses to resume from another commit than the one the run started at, because the record names one, and with another report judge in the shell than the run's (`REPORT_JUDGE_*`), because the record names that too. A run that ends with trials unfinished, including trials Harbor stopped, exits non-zero without writing a record ([why](../design/evaluation.md#6-records)) and prints the same command. For a long run, detach it from the terminal (`setsid nohup npm run bench -- run … > run.log 2>&1 &`).
 
 ## Comparing and publishing
 
@@ -62,7 +66,7 @@ gh workflow run bench-records.yml
 
 While the Action is being changed, the loop is: commit the change, run the subject the change concerns (`--tasks` narrows it while iterating), then publish. The Trend page puts each run on the subject's line with its commit message, and the Changes page shows what the change did to the statechart, the prompts and the source next to what it did to the score. A run needs a commit, not a pushed one: the snapshot keeps what the commit held.
 
-An oracle run exits non-zero when a reference solution scored below 1.0, and a nop run when doing nothing scored 1.0, after writing its record: those tasks are infeasible on this machine, and the other subjects skip them. The record is complete; resuming its job writes nothing, since a record is never rewritten.
+An oracle run exits non-zero when a reference solution scored below 1.0, and a nop run when doing nothing scored 1.0, after writing its record: those tasks are infeasible on this machine, and the other subjects skip them. The record is complete; resuming its job says so and exits zero without starting Harbor, since a record is never rewritten.
 
 ## On a shared machine
 

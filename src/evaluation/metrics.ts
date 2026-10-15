@@ -159,7 +159,7 @@ export const METRICS: readonly Metric[] = [
     return total === 0 ? null : hits / total
   } },
   { id: 'costPerAttempt', quality: 'efficiency', description: 'Mean USD per attempt that reported a cost.', compute: input => mean(eligibleAttempts(input).flatMap(attempt => attempt.usage?.usd === undefined ? [] : [attempt.usage.usd])) },
-  { id: 'costPerSuccess', quality: 'efficiency', description: 'Total USD divided by the number of attempts that fully migrated.', compute: (input) => {
+  { id: 'costPerSuccess', quality: 'efficiency', description: 'USD of the attempts that reported a cost, divided by the number of attempts that fully migrated; what a timeout stopped is not in it, so a subject that times out costs more than this says.', compute: (input) => {
     const attempts = eligibleAttempts(input)
     const successes = attempts.filter(attempt => attempt.outcome === 'scored' && (attempt.reward ?? 0) >= FULL).length
     const priced = attempts.flatMap(attempt => attempt.usage?.usd === undefined ? [] : [attempt.usage.usd])
@@ -170,7 +170,7 @@ export const METRICS: readonly Metric[] = [
   { id: 'timeoutRate', quality: 'efficiency', description: 'Share of attempts on eligible tasks that hit the agent timeout, scored or not.', compute: input => rate(input, attempt => attempt.exception === AGENT_TIMEOUT) },
   { id: 'infrastructureRate', quality: 'infrastructure', description: 'Share of attempts on eligible tasks that failed for a reason outside the subject: environment start, setup, verifier.', compute: input => rate(input, attempt => attempt.outcome === 'infrastructure') },
   { id: 'eligibleTasks', quality: 'infrastructure', description: 'Tasks that are applicable to the subject and feasible in the environment.', compute: input => input.tasks.filter(task => task.applicable && task.feasible).length },
-  { id: 'infeasibleTasks', quality: 'infrastructure', description: 'Applicable tasks the environment cannot run: the oracle scored below 1.0, or the network policy could not be enforced.', compute: input => input.tasks.filter(task => task.applicable && !task.feasible).length },
+  { id: 'infeasibleTasks', quality: 'infrastructure', description: 'Applicable tasks the environment cannot judge: the oracle scored below 1.0 on them, or doing nothing (`nop`) scored 1.0.', compute: input => input.tasks.filter(task => task.applicable && !task.feasible).length },
 ]
 
 /** A deterministic generator, so a recomputed interval equals the stored one. */

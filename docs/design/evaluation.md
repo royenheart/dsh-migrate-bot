@@ -1,11 +1,11 @@
 ---
 kind: design
-description: How the Action is evaluated on the community benchmark suite: the subjects, the outcomes of an attempt, the metrics, the comparison rule and the records.
+description: How the Action is evaluated on two benchmark suites: the subjects, the outcomes of an attempt, the metrics, the comparison rule and the records.
 ---
 
 # Evaluation
 
-The Action is scored on the community migration suite [`oh-my-dsh/dsh-plugin-upgrade-skill`](https://github.com/oh-my-dsh/dsh-plugin-upgrade-skill), run by [Harbor](https://github.com/harbor-framework/harbor). A run produces one immutable record; every number this project reports is computed from records by `src/evaluation/metrics.ts`. [The benchmark procedure](../operations/benchmark.md) says how to run one; the [metrics](../reference/metrics.md) and [records](../reference/records.md) references are generated from the code.
+The Action is scored on two [suites](#8-the-suites), the community migration suite [`oh-my-dsh/dsh-plugin-upgrade-skill`](https://github.com/oh-my-dsh/dsh-plugin-upgrade-skill) and this repository's span suite, run by [Harbor](https://github.com/harbor-framework/harbor). A run produces one immutable record; every number this project reports is computed from records by `src/evaluation/metrics.ts`. [The benchmark procedure](../operations/benchmark.md) says how to run one; the [metrics](../reference/metrics.md) and [records](../reference/records.md) references are generated from the code.
 
 ## 1. Decisions
 
@@ -30,7 +30,7 @@ The Action is scored on the community migration suite [`oh-my-dsh/dsh-plugin-upg
 | `oracle` | The task's reference solution |
 | `nop` | Nothing: the fixture as it was, which says what a task scores without a migration |
 
-Every subject but `oracle` runs in the agent runtime of `container/agent-runtime`, installed from its lockfile into the task container apart from the task's own dsh, and its setup ends with `dsh-migrate self-test`, so a runtime that cannot start a session fails the setup rather than scoring 0. The migrate profile goes into `/root/.dsh`, the home the task's dsh and its verifier read: a different home would hide the agent's changes from the verifier.
+Every subject but `oracle` and `nop` runs in the agent runtime of `container/agent-runtime`, installed from its lockfile into the task container apart from the task's own dsh ([what a run adds to a task](#8-the-suites)), and its setup ends with `dsh-migrate self-test`, so a runtime that cannot start a session fails the setup rather than scoring 0. The migrate profile goes into `/root/.dsh`, the home the task's dsh and its verifier read: a different home would hide the agent's changes from the verifier.
 
 A pipeline does not read the task statement. It takes its target from the dsh release the task installs globally and its source from the fixture's declared dependencies, exactly as it would in a consumer repository. Three consequences follow, recorded per task as `applicable`:
 
@@ -38,9 +38,11 @@ A pipeline does not read the task statement. It takes its target from the dsh re
 - A task that installs no dsh release gives a pipeline no target, so it is not applicable either.
 - A task whose agent runs without network gives a pipeline no way to install the releases its checks run on, so it is not applicable.
 
+A subject that runs a model may still reach the model API on such a task: the run adds that one host to the agent's allowlist (Harbor `--allow-agent-host`), as the suite's own runs add their model's, so a session attempts the task. A pipeline also installs releases from the registry, which that host does not cover, so it stays not applicable.
+
 The pipeline never sees the statement, so it never writes the report many statements ask for under `/app/agent-output/`: in the first runs 14 of 26 pipeline attempts lacked it, and no session attempt did. A missing report caps or costs a task's score whatever the migration did. So after the pipeline, one session of the same runtime and model is given the statement, the pipeline's state branch (its reviews, repair reports, patch reports and event log) and the fixture as the pipeline left it, and writes only that deliverable; its usage counts toward the attempt. It is a separate session, rather than the statement handed to the pipeline, because the pipeline is measured as a consumer runs it.
 
-For every subject, a task whose verifier reads a variable the run does not set (the suite's report judge reads `REPORT_JUDGE_BASE_URL`, `REPORT_JUDGE_MODEL` and `REPORT_JUDGE_API_KEY`) is not applicable, because Harbor refuses a job in which any task lacks one; the record names the missing variables. A run that sets them records the judge's endpoint and model with the suite, because scores from different judges do not compare. No record is written when Harbor ran no trial.
+For every subject, a task whose verifier reads a variable the run does not set (the suite's report judge reads `REPORT_JUDGE_BASE_URL`, `REPORT_JUDGE_MODEL` and `REPORT_JUDGE_API_KEY`) is not applicable, because Harbor refuses a job in which any task lacks one; the record names the missing variables. A run of that suite that sets them records the judge's endpoint and model with the suite, whichever of its tasks it ran, because scores from different judges do not compare.
 
 The fixture receives what a consumer would be proposed: the tree of a migration that ended `unpublished` (it changed and passed with publishing off). A migration that ended `failed`, `compatible` or `error` leaves the fixture as it was, and the verifier scores that.
 
@@ -57,21 +59,25 @@ Harbor runs the verifier after an agent run that timed out or exited non-zero, s
 | `exception` | No reward, and the agent run stopped with another exception | 0 |
 | `infrastructure` | No reward, and the trial stopped before the agent ran or in the verifier | Not counted; `infrastructureRate` |
 
+A trial Harbor stopped itself (`CancelledError`: the run was interrupted) is not an attempt and has no outcome: it has not finished, and resuming the run runs it again ([records](#6-records)).
+
 A task is *feasible* when every attempt of the newest `oracle` record of the same suite version scored 1.0 on it and, when a `nop` record of that version exists, no attempt of it did. A run of another subject refuses to start without that oracle record, and does not run infeasible tasks: the reference solution failing in this environment says the environment cannot judge the task, and doing nothing passing says the task cannot tell a migration from none.
 
 ## 4. Metrics
 
 The metrics, their qualities (effectiveness, consistency, efficiency, infrastructure) and the conventions they share are in [the metrics reference](../reference/metrics.md), generated from the table that computes them. CI recomputes every record's metrics from its attempts and refuses a record whose stored values differ, so a change to a formula changes `FORMULA` and every record keeps the version that computed it.
 
+The usage and cost metrics cover the attempts that reported usage. The adapter adds a subject's usage as each part of its agent run returns, so an attempt stopped at its timeout reports only what returned before: nothing for a session subject, and for a pipeline the usage of a pipeline that finished before its report session was stopped. What a timeout stopped is missing from those metrics and from `costPerSuccess`. Recovering it would need the stopped session's usage, which nothing records.
+
 What the metrics do not cover: whether a change is confined to what the migration needed (no reference-diff comparison), the agreement of the verifiers with themselves (no regrading), and steps per attempt (the adapter writes no trajectory). What happens to proposals in the consumer repositories is [the Field page](#7-the-report).
 
 ## 5. Comparing two records
 
-`npm run bench -- compare <base> <head>` pairs the tasks both records scored and reports, for `meanReward` and `passRate@1.0`, the mean per-task difference with its 95% paired bootstrap interval (`compare` in `src/evaluation/metrics.ts`). The verdict is `regression` when the interval lies below zero, `improvement` when it lies above, and `no-change` otherwise; with fewer than ten shared tasks the resamples repeat a handful of values, so the pair is `not-comparable`. The command exits non-zero on a regression, and [the Compare page](#7-the-report) runs the same function. Records of different suite commits are paired over the tasks they share, and the command says so.
+`npm run bench -- compare <base> <head>` pairs the tasks both records scored and reports, for `meanReward` and `passRate@1.0`, the mean per-task difference with its 95% paired bootstrap interval (`compare` in `src/evaluation/metrics.ts`). The verdict is `regression` when the interval lies below zero, `improvement` when it lies above, and `no-change` otherwise; with fewer than ten shared tasks the resamples repeat a handful of values, so the pair is `not-comparable`. A suite or a `--tasks` subset with fewer tasks than that, such as the span suite, never gets a verdict; its records are read on [the Trend and Task pages](#7-the-report). The command exits non-zero on a regression, and [the Compare page](#7-the-report) runs the same function. Records of different suite commits are paired over the tasks they share, and records whose report judges differ are compared although their judged scores do not compare ([subjects](#2-subjects)); the command and the page say both. A change to how the benchmark runs a subject is not in the snapshot ([records](#6-records)) and moves a score as a change of the Action would: on the upgrade-skill suite's offline tasks, a session record created before 2026-10-15 scored the agent without access to the model API, and one created since with it, so the two do not compare on those tasks.
 
 ## 6. Records
 
-A record is `records/<id>/record.json` on the `bench/records` branch, beside the files its attempts kept: `proposed.diff` (the fixture against its baseline commit), `agent.log`, for a pipeline `events.jsonl`, `status.json`, its card ledger `cards.json` and the report session's `report.log`, and the verifier's output. Each kept file carries its SHA-256. A record is written once, by the run that produced it, and never edited; a run that went wrong is rerun as a new record.
+A record is `records/<id>/record.json` on the `bench/records` branch, beside the files its attempts kept: `proposed.diff` (the fixture against its baseline commit), `agent.log`, for a pipeline `events.jsonl`, `status.json`, its card ledger `cards.json` and the report session's `report.log`, and the verifier's output. Each kept file carries its SHA-256. A record is written once, by the run that produced it, and never edited. It is written only when every trial the run planned has finished: a run that ends with trials unfinished, including trials Harbor stopped, writes none and is continued with `resume` ([procedure](../operations/benchmark.md#a-run)). A run that went wrong is rerun as a new record.
 
 The working tree must be clean, or the run passes `--allow-dirty` and the record says `producer.dirty`.
 
@@ -103,11 +109,13 @@ A run draws its tasks from one suite (`--suite`), and a record names the suite's
 | `upgrade-skill` | `vendor/dsh-plugin-upgrade-skill/benchmark/tasks`, written by the upgrade skill's authors | The commit the submodule pins, never a branch: the suite's own comparability rules require a frozen snapshot |
 | `spans` | `bench/tasks` in this repository | The git tree of `bench/tasks`, which an amended or rebased commit keeps |
 
+The adapter adds the agent runtime and, for a pipeline, Playwright with Chromium to a task's container, and the run lets a model's sessions reach the model API ([subjects](#2-subjects)); nothing else in the upgrade-skill suite's tasks changes: their environments, statements and verifiers run as the suite ships them.
+
 ### The span suite
 
 The upgrade-skill suite targets one release, so it says nothing about other release spans. The span suite adds tasks for the spans a consumer meets: a short prerelease bump, a step of one minor line, and a long jump across several. Each task is a migration a plugin author already made: the fixture is the plugin at the commit before it, and the reference solution is the commit that made it. A task's `README.md` names the repository, both commits and the licence, which the fixture keeps.
 
-A fixture leaves out what would hand the agent the answer or that no consumer commits: build output, the author's migration notes, agent notes, lockfiles of other package managers. The task image installs the target release globally with `npm install --before` an hour after its publication, so a prerelease resolves the dependencies it was published with.
+A fixture leaves out what would hand the agent the answer or that no consumer commits: build output, the author's migration notes, agent notes, lockfiles of other package managers. The task image installs the target release globally with `npm install --before` the time of the author's migration commit (of the last commit of the reference solution, when that spans later fixes), so a prerelease resolves the dependencies the author's migration met; how the Action itself cuts a release off is in [the checks](checks.md#the-five-checks). The verifier installs a plugin with npm under the same `before`. A pnpm plugin (R1, R5, R7, R8) is installed with `pnpm install --no-frozen-lockfile`, which takes no such date and re-resolves what its lockfile does not hold, the dsh packages the verifier pins to the target and their dependencies among them, from the registry as it stands at the run: the score of those tasks can change when the registry does.
 
 Every task has the same verifier, `bench/judge/judge.mjs`, copied into its `tests/` and configured by `tests/task.json`; `npm test` checks that every copy is current. It copies the plugin as the agent left it and scores, each 0 or 1 and weighted to a 0–100 score:
 
@@ -117,6 +125,8 @@ Every task has the same verifier, `bench/judge/judge.mjs`, copied into its `test
 | `typecheck`, `test`, `build` | The plugin's script passes with every dsh package it names that the target published pinned to the target, and the task's hidden tests in place | 20, 30, 15 |
 | `boot` | dsh of the target loads the built plugin: headless dsh reaches the model call, `dsh web` reports ready for a plugin with a browser half | 20 |
 | `unchanged` | A control task's listed paths are as the fixture had them | 30 |
+
+A span task scores what these checks see. A regression that shows only at run time, in a path that no test, build or boot reaches, is outside its score; a task's `README.md` says when its migration has one (R7's does).
 
 The hidden tests are the tests the author's migration changed, kept only where the migration forced the change; a test that records the author's own choice (dropping support for an older release, renaming a helper) stays as the fixture had it, because a migration that makes another choice is not wrong. A control task is a span on which the plugin needed only its dependency ranges raised; it scores a migration that leaves the code alone.
 

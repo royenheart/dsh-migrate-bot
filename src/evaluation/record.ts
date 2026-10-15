@@ -46,17 +46,17 @@ export const attemptSchema = z.strictObject({
     totalSec: z.number().min(0).optional().describe('The whole trial, environment setup included.'),
   }),
   usage: usageSchema.optional().describe('Token usage, when the subject reported it.'),
-  artifacts: z.record(z.string(), artifactSchema).describe('Files the attempt produced, by name: `proposed.diff`, `events.jsonl`, `agent.log`, `verifier.log`, `reports/*.md`.'),
+  artifacts: z.record(z.string(), artifactSchema).describe('Files the attempt kept, by their path in the trial directory: those of `agent/proposed.diff`, `agent/agent.log`, `agent/report.log`, `agent/events.jsonl`, `agent/status.json` and `agent/cards.json` the subject wrote, and every file under `verifier/`.'),
 })
 export type Attempt = z.infer<typeof attemptSchema>
 
 export const taskSchema = z.strictObject({
   id: z.string().min(1).describe('The task directory name.'),
-  family: z.string().min(1).describe('The task id prefix: `S` static, `M` migration, `H` hands-on.'),
+  family: z.string().min(1).describe('The task id prefix: in the upgrade-skill suite `S` static, `M` migration, `H` hands-on, each with its own `meanReward.<family>`; in the span suite `R`, which has no mean of its own.'),
   networkMode: z.string().min(1).describe('`network_mode` of the task.'),
   agentTimeoutSec: z.number().min(0).describe('`agent.timeout_sec` of the task, before the multiplier.'),
   applicable: z.boolean().describe('Whether the subject can attempt the task; a `pipeline` subject does not answer the static tasks.'),
-  feasible: z.boolean().describe('Whether every attempt of the newest oracle record of this suite commit scored 1.0 on the task; always true in an oracle record.'),
+  feasible: z.boolean().describe('Whether the environment can judge the task: every attempt of the newest oracle record of this suite version scored 1.0 on it and, when a nop record of that version exists, none of its attempts did; always true in an oracle or a nop record.'),
   note: z.string().optional().describe('Why the task is not applicable or not feasible.'),
 })
 export type TaskEntry = z.infer<typeof taskSchema>

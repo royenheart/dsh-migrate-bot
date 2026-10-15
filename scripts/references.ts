@@ -253,7 +253,7 @@ function metrics(): string {
 function records(): string {
   const schema = z.toJSONSchema(recordSchema, { io: 'output' }) as JsonSchema
   return page(
-    'Every field of a benchmark record, schema 3.',
+    `Every field of a benchmark record, schema ${String(RECORD_SCHEMA)}.`,
     'Benchmark record reference',
     `A record is \`records/<id>/record.json\` on the \`bench/records\` branch, schema ${String(RECORD_SCHEMA)}, beside the files its attempts kept. ${generatedFrom('src/evaluation/record.ts')}`,
     ['| Field | Type | Description |', '| --- | --- | --- |', ...configRows(schema, '', false)],

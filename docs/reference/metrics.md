@@ -32,10 +32,10 @@ Conventions, applied by every metric:
 | `outputTokens` | efficiency | no | Mean output tokens per attempt that reported usage. |
 | `cacheHitRatio` | efficiency | no | `cache-hit tokens / (cache-hit + uncached input tokens)` over every attempt that reported usage. |
 | `costPerAttempt` | efficiency | no | Mean USD per attempt that reported a cost. |
-| `costPerSuccess` | efficiency | no | Total USD divided by the number of attempts that fully migrated. |
+| `costPerSuccess` | efficiency | no | USD of the attempts that reported a cost, divided by the number of attempts that fully migrated; what a timeout stopped is not in it, so a subject that times out costs more than this says. |
 | `agentSecP50` | efficiency | no | Median agent wall time per attempt, in seconds. |
 | `agentSecP90` | efficiency | no | 90th percentile of the agent wall time per attempt, in seconds. |
 | `timeoutRate` | efficiency | no | Share of attempts on eligible tasks that hit the agent timeout, scored or not. |
 | `infrastructureRate` | infrastructure | no | Share of attempts on eligible tasks that failed for a reason outside the subject: environment start, setup, verifier. |
 | `eligibleTasks` | infrastructure | no | Tasks that are applicable to the subject and feasible in the environment. |
-| `infeasibleTasks` | infrastructure | no | Applicable tasks the environment cannot run: the oracle scored below 1.0, or the network policy could not be enforced. |
+| `infeasibleTasks` | infrastructure | no | Applicable tasks the environment cannot judge: the oracle scored below 1.0 on them, or doing nothing (`nop`) scored 1.0. |
