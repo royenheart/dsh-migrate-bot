@@ -211,7 +211,7 @@ class DshAgent(BaseAgent):
             ledger = await environment.exec(command=f"git -C {plugin} show dsh-migrate/state:migrations/{target}/cards.json")
             if ledger.return_code == 0:
                 (self.logs_dir / "cards.json").write_text(ledger.stdout or "", encoding="utf-8")
-            _add_session_usage(events, context)
+            _add_pipeline_usage(events, context)
         # The fixture receives what a consumer would be proposed: the tree of a
         # migration that ended `unpublished`, and nothing otherwise.
         if migration is not None and migration["state"] == "unpublished":
@@ -234,13 +234,13 @@ class DshAgent(BaseAgent):
         ))
 
 
-def _add_session_usage(events: str, context: AgentContext) -> None:
-    """The usage of a pipeline: the sum over its `session.done` events, counted as Harbor counts it."""
+def _add_pipeline_usage(events: str, context: AgentContext) -> None:
+    """The usage of a pipeline: the sum over every event that carries one (sessions, end-to-end suite, report), counted as Harbor counts it."""
     totals = {"inputTokens": 0, "cacheHitTokens": 0, "outputTokens": 0}
     usd: float | None = None
     for line in events.splitlines():
         entry = json.loads(line)
-        if entry["kind"] == "event" and entry["event"]["type"] == "session.done":
+        if entry["kind"] == "event":
             usage = entry["event"].get("usage", {})
             for key in totals:
                 totals[key] += usage.get(key, 0)
