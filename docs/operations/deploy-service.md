@@ -20,22 +20,22 @@ The preview image's tag names its dsh version, and `DSH_IMAGE` names the tag, so
 
 ## Configuration
 
-The service is configured only by its environment. It validates every variable at start and exits with the list of problems instead of listening.
+The service is configured only by its environment. It validates every variable at start and exits with the list of problems instead of listening. With `deploy-service/compose.yaml`, every variable comes from `deploy-service/.env`, except where the table says compose fixes it.
 
 | Variable | Required | Meaning |
 |---|---|---|
 | `DEPLOY_TOKEN` | yes | The bearer token the Action sends; at least 16 characters. The consumer stores the same value as `DSH_MIGRATE_DEPLOY_TOKEN` |
 | `GITHUB_WEBHOOK_SECRET` | yes | The secret of the repository webhook; at least 16 characters |
-| `DATA_DIR` | yes | Absolute path of the data directory, at most 64 characters because preview sockets live under it. With the `docker` provider it must be the same path on the host and in the service's container |
+| `DATA_DIR` | yes | Absolute path of the data directory, at most 62 bytes because preview sockets live under it. With the `docker` provider it must be the same path on the host and in the service's container |
 | `PUBLIC_URL` | yes | The service's public base URL; run pages and preview links are built from it |
-| `PROVIDER` | yes | `docker`, or `process` for CI and tests |
+| `PROVIDER` | yes | `docker`, or `process` for CI and tests. Compose fixes it to `docker` |
 | `DSH_IMAGE` | with `docker` | The preview image |
-| `DSH_VERSION` | with `process`, unless `DSH_BIN` is set | The dsh version installed into `DATA_DIR/dsh/` |
-| `DSH_BIN` | no | An installed `dsh` the `process` provider uses instead |
+| `DSH_VERSION` | with `process`, unless `DSH_BIN` is set | The dsh version installed into `DATA_DIR/dsh/`. Compose does not pass it to the service; in `.env` it is the preview image's build argument |
+| `DSH_BIN` | no | An installed `dsh` the `process` provider uses instead. Compose does not pass it |
 | `IDLE_MINUTES` | no, 120 | Minutes without a request through the preview proxy before an instance stops |
 | `TTL_DAYS` | no, 3 | Days from creation to a preview's first expiry. `extend` moves it out, never past the consumer's `deploy.preview.ttlDays` (7 by default) after creation, so keep it below that |
 | `PUBLIC_VIEWS` | no, `false` | `true` serves `/view/…` and `/p/…` without the token; only behind an identity-aware proxy |
-| `PORT`, `HOST` | no, 8080 and `0.0.0.0` | Where the service listens |
+| `PORT`, `HOST` | no, 8080 and `0.0.0.0` | Where the service listens. Compose fixes them to the defaults, because Caddy and `cloudflared` reach the service at `service:8080` |
 | `INSTANCE_PREFIX` | no, `dsh-preview-` | Prefix of every container the `docker` provider creates; it touches no other container. Two services on one Docker daemon need different prefixes |
 
 `--conformance` is the only flag; it is for a deployment the conformance suite checks, never for one a repository uses.
@@ -49,7 +49,8 @@ The service runs on any Linux host that meets these requirements, from any cloud
 | Docker Engine with the Compose plugin | The stack is `deploy-service/compose.yaml`, and the `docker` provider starts each preview as a container |
 | Inbound 80 and 443 with a DNS name for the host, or a Cloudflare Tunnel | Caddy obtains a certificate for `PUBLIC_HOSTNAME`; a tunnel needs no inbound port, for a host behind NAT |
 | Outbound access to GitHub and the npm registry | The service clones the previewed repository, and a preview installs its dependencies |
-| A data directory whose absolute path is at most 64 characters, on storage that survives a re-created host | `DATA_DIR` holds every record and working copy |
+| A data directory whose absolute path is at most 62 bytes, on storage that survives a re-created host | `DATA_DIR` holds every record and working copy |
+| Node.js 22.19 or later with npm, where the conformance suite runs | `npm ci && npm run build` builds the suite ([Verifying a deployment](#verifying-a-deployment)); the service itself runs in its image |
 | On a cloud host whose metadata endpoint serves secrets, containers cut off from it | A preview's dependency install has a network: add `iptables -I DOCKER-USER -d 169.254.169.254/32 -j DROP` and keep it across restarts, as the Terraform module's `deploy-service/terraform/cloud-init.yaml.tftpl` does |
 
 `deploy-service/compose.yaml` runs the service, builds the preview image, and fronts the service with Caddy, which obtains a certificate for `PUBLIC_HOSTNAME`, or with `cloudflared`, which connects a Cloudflare Tunnel so the machine needs no inbound port.
@@ -78,6 +79,7 @@ terraform output -raw deploy_token
 | `github_webhook_secret` | required, sensitive | The repository webhook's secret |
 | `server_type` | `cpx21` | Hetzner server type |
 | `location` | `fsn1` | Hetzner location of the server and the volume |
+| `image` | `ubuntu-24.04` | Operating system image of the server; cloud-init expects Ubuntu |
 | `public_hostname` | `<server IPv4>.sslip.io` | Hostname the service answers on; point a DNS record at `server_ipv4` when you set your own. Required with a tunnel |
 | `cloudflare_tunnel_token` | empty, sensitive | Run behind a Cloudflare Tunnel with no inbound port |
 | `ssh_key_ids` | none | Hetzner SSH key ids for root; the firewall opens no SSH port |
@@ -136,4 +138,4 @@ cd deploy-service && npm ci && npm run build
 DEPLOY_TOKEN=… node dist/conformance/run.js --url https://deploy.example.com
 ```
 
-Against a production deployment, the preview checks need `--preview owner/name#N` naming a preview with an unpublished change in its working copy; without one they are skipped. A throwaway deployment started with `--conformance` (the Terraform input `conformance_mode`) runs every check with `--conformance`, including the refusals of a slow answer, an oversize answer and a redirect. The manual workflow `deploy-service-cloud-check` does exactly that on a Hetzner Cloud server it creates and destroys; it needs the repository secrets `HCLOUD_TOKEN` and `DSH_DEPLOY_CHECK_WEBHOOK_SECRET`.
+Against a production deployment, the preview checks need `--preview owner/name#N` naming a preview with an unpublished change in its working copy; without one they are skipped. The suite changes that preview: it extends it by a day with a ceiling of 365 days, which can move its expiry past the consumer's `deploy.preview.ttlDays`; it freezes a revision and reports a refusal for it; and it `redeploy`s it, which stops the instance and rebuilds it from the pull request's head. It never pushes anything. A throwaway deployment started with `--conformance` (the Terraform input `conformance_mode`) runs every check with `--conformance`, including the refusals of a slow answer, an oversize answer and a redirect. The manual workflow `deploy-service-cloud-check` does exactly that on a Hetzner Cloud server it creates and destroys; it needs the repository secrets `HCLOUD_TOKEN` and `DSH_DEPLOY_CHECK_WEBHOOK_SECRET`.

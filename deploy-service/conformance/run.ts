@@ -5,14 +5,14 @@ import { runConformance } from './suite.ts'
 /**
  * Run the conformance suite against a deploy service.
  *
- *   node dist/conformance/run.js --url https://deploy.example.com --token "$DEPLOY_TOKEN" [--conformance] [--preview owner/name#N]
+ *   DEPLOY_TOKEN=… node dist/conformance/run.js --url https://deploy.example.com [--conformance] [--preview owner/name#N]
  *
- * The token may also come from `DEPLOY_TOKEN`, which keeps it out of the
- * process list. The exit status is 0 when no check failed; a skipped check is
+ * The token comes from `DEPLOY_TOKEN`, which keeps it out of the process
+ * list; `--token` exists for a shell without that variable. The exit status is 0 when no check failed; a skipped check is
  * reported with its reason and does not fail the run.
  */
 
-const USAGE = 'usage: run.js --url URL --token TOKEN [--conformance] [--preview owner/name#N]\n'
+const USAGE = 'usage: run.js --url URL [--conformance] [--preview owner/name#N]; the token comes from DEPLOY_TOKEN, or --token TOKEN\n'
 
 function main(): Promise<number> | number {
   const { values } = parseArgs({

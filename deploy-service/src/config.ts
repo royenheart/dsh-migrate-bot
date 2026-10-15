@@ -16,8 +16,9 @@ const minutes = z.coerce.number().int().min(1)
 export const envSchema = z.object({
   DEPLOY_TOKEN: z.string().min(16, 'must be at least 16 characters'),
   GITHUB_WEBHOOK_SECRET: z.string().min(16, 'must be at least 16 characters'),
-  // Preview sockets live under it, and a Unix socket path is limited to 108 bytes.
-  DATA_DIR: z.string().refine(isAbsolute, 'must be an absolute path').refine(dir => dir.length <= 64, 'must be at most 64 characters, because preview sockets live under it'),
+  // A preview socket is DATA_DIR/previews/<id>/sockets/plugin.sock, 46 characters
+  // more, and a Unix socket path is limited to 108 bytes.
+  DATA_DIR: z.string().refine(isAbsolute, 'must be an absolute path').refine(dir => Buffer.byteLength(dir) <= 62, 'must be at most 62 bytes, because preview sockets live under it'),
   PUBLIC_URL: z.url({ protocol: /^https?$/ }).transform(url => url.replace(/\/+$/, '')),
   PROVIDER: z.enum(['docker', 'process']),
   DSH_IMAGE: z.string().min(1).optional(),

@@ -33,6 +33,9 @@ services:
       DSH_IMAGE: ${DSH_IMAGE:-dsh-migrate-preview:0.2.0-rc.2}
       IDLE_MINUTES: ${IDLE_MINUTES:-120}
       TTL_DAYS: ${TTL_DAYS:-3}
+      INSTANCE_PREFIX: ${INSTANCE_PREFIX:-dsh-preview-}
+      # Fixed: Caddy and cloudflared reach the service at service:8080.
+      HOST: 0.0.0.0
       PORT: "8080"
     volumes:
       - ${DATA_DIR}:${DATA_DIR}
