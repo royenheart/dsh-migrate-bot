@@ -46,8 +46,6 @@ export function checkModule(path: string, source: string): PurityViolation[] {
 }
 
 export function verifyPureCore(): PurityViolation[] {
-  return CORE.flatMap(dir => readdirSync(join(REPO_ROOT, dir)).filter(name => name.endsWith('.ts')).flatMap((name) => {
-    const path = `${dir}/${name}`
-    return checkModule(path, readText(join(REPO_ROOT, path)))
-  }))
+  const modules = [...CORE.flatMap(dir => readdirSync(join(REPO_ROOT, dir)).filter(name => name.endsWith('.ts')).map(name => `${dir}/${name}`)), ...ALSO_PURE]
+  return modules.flatMap(path => checkModule(path, readText(join(REPO_ROOT, path))))
 }

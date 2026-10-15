@@ -21,8 +21,8 @@ export const EXCLUDED_DIRS = new Set([
   'vendor',
 ])
 
-/** Third-party trees outside `vendor`: the plugins the span suite's tasks are built from, and their authors' migrations. */
-export const THIRD_PARTY = /^bench\/tasks\/[^/]+\/(environment\/fixture|solution)(\/|$)/
+/** Third-party files outside `vendor`: the plugins the span suite's tasks are built from, and their authors' migrations (`solution/migration.patch`). */
+export const THIRD_PARTY = /^bench\/tasks\/[^/]+\/(environment\/fixture(\/|$)|solution\/migration\.patch$)/
 
 /** Whether a repository-relative path is someone else's file. */
 export function isExcluded(path: string): boolean {

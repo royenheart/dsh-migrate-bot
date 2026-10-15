@@ -2,7 +2,11 @@
  * Gate: every tracked text file is written in English.
  *
  * A letter outside the Latin script — Chinese, Cyrillic, Greek — fails the
- * gate, wherever it is: code, comments, documents, templates, fixtures.
+ * gate, wherever it is: code, comments, documents, templates, fixtures. It
+ * reads every tracked text file except what others wrote: a span task's
+ * third-party plugin and its author's patch (`THIRD_PARTY`), kept as their
+ * authors wrote them, and a submodule. A file with a NUL byte is binary and
+ * skipped.
  * Punctuation and symbols (`—`, `→`, `≥`, `×`) are not letters and pass. The
  * Unicode script property decides, so no list of ranges is maintained here.
  */
