@@ -62,7 +62,7 @@ gh workflow run bench-records.yml
 
 While the Action is being changed, the loop is: commit the change, run the subject the change concerns (`--tasks` narrows it while iterating), then publish. The Trend page puts each run on the subject's line with its commit message, and the Changes page shows what the change did to the statechart, the prompts and the source next to what it did to the score. A run needs a commit, not a pushed one: the snapshot keeps what the commit held.
 
-An oracle run exits non-zero when a reference solution scored below 1.0, after writing its record: those tasks are infeasible on this machine, and the other subjects skip them.
+An oracle run exits non-zero when a reference solution scored below 1.0, and a nop run when doing nothing scored 1.0, after writing its record: those tasks are infeasible on this machine, and the other subjects skip them. The record is complete; resuming its job writes nothing, since a record is never rewritten.
 
 ## On a shared machine
 

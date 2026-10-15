@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { validateRecords } from '../../scripts/bench.ts'
 import { botSnapshot, checkSnapshot, storeSnapshot } from '../../scripts/snapshot.ts'
-import { attemptOf, outcomeOf, type TrialResult } from '../../src/evaluation/harbor.ts'
+import { attemptOf, finished, outcomeOf, type TrialResult } from '../../src/evaluation/harbor.ts'
 import { AGENT_TIMEOUT, bootstrap, compare, computeMetrics, MIN_PAIRED_TASKS, taskScores, type MetricInput } from '../../src/evaluation/metrics.ts'
 import type { Attempt, BenchmarkRecord, TaskEntry } from '../../src/evaluation/record.ts'
 
@@ -111,6 +111,11 @@ test('the outcome of a trial is the phase that stopped it', () => {
   assert.equal(outcomeOf(trial({ agent_execution: span, exception_info: { exception_type: AGENT_TIMEOUT } })), 'timeout')
   assert.equal(outcomeOf(trial({ agent_execution: span, exception_info: { exception_type: 'RuntimeError' } })), 'exception')
   assert.equal(outcomeOf(trial({ exception_info: { exception_type: 'EnvironmentStartTimeoutError' } })), 'infrastructure')
+})
+
+test('a trial Harbor stopped has not finished, so the run resumes it rather than recording it', () => {
+  assert.equal(finished(trial({ agent_execution: { started_at: span.started_at }, exception_info: { exception_type: 'CancelledError' } })), false)
+  assert.equal(finished(trial({ agent_execution: span, exception_info: { exception_type: AGENT_TIMEOUT } })), true)
 })
 
 test('an attempt separates cache hits from Harbor input tokens and keeps the agent exit code', () => {

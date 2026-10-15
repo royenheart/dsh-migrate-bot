@@ -37,6 +37,14 @@ export function readTrial(dir: string): TrialResult {
   return trialSchema.parse(JSON.parse(readFileSync(join(dir, 'result.json'), 'utf8')))
 }
 
+/** The exception type Harbor records for a trial it stopped itself; `harbor job resume` reruns such a trial. */
+const CANCELLED = 'CancelledError'
+
+/** Whether the trial ran to its end: one Harbor stopped is not an attempt of the subject, and a resumed job runs it again. */
+export function finished(trial: TrialResult): boolean {
+  return trial.exception_info?.exception_type !== CANCELLED
+}
+
 /**
  * Why an attempt has its reward or has none, from the phase the trial reached.
  *

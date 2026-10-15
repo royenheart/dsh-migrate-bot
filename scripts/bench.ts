@@ -20,7 +20,7 @@ import { tmpdir, type, release } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import { isDeepStrictEqual, parseArgs } from 'node:util'
 import { z } from 'zod'
-import { attemptOf, readTrial } from '../src/evaluation/harbor.ts'
+import { attemptOf, finished, readTrial } from '../src/evaluation/harbor.ts'
 import { compare, computeMetrics } from '../src/evaluation/metrics.ts'
 import { recordSchema, RECORD_SCHEMA, SUBJECTS, type Attempt, type BenchmarkRecord, type SubjectId, type TaskEntry } from '../src/evaluation/record.ts'
 import { UPGRADE_SKILLS } from '../src/skills/upgrade.ts'
@@ -47,6 +47,10 @@ const AGENT_FILES = ['agent/proposed.diff', 'agent/agent.log', 'agent/report.log
 
 const git = (args: string[], cwd = REPO_ROOT): string => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 const recordPath = (records: string, id: string): string => join(records, 'records', id, 'record.json')
+/** A path as one shell word, so a printed command can be pasted back. */
+const shellWord = (path: string): string => /^[\w@%+=:,./-]+$/.test(path) ? path : `'${path.replaceAll("'", "'\\''")}'`
+/** The command that continues a run, naming its records directory when it is not the default. */
+const resumeCommand = (jobDir: string, records: string): string => `npm run bench -- resume ${shellWord(jobDir)}${records === RECORDS_DIR ? '' : ` --records ${shellWord(records)}`}`
 
 function readRecord(path: string): BenchmarkRecord {
   return recordSchema.parse(JSON.parse(readFileSync(path, 'utf8')))
@@ -85,7 +89,8 @@ function suiteVersion(suite: SuiteId): string {
  * this suite version scored 1.0, and, when a nop record exists, doing nothing
  * did not, since such a task cannot tell a migration from none.
  */
-function feasibleTasks(records: string, repository: string, version: string): Set<string> {
+function feasibleTasks(records: string, suiteId: SuiteId, version: string): Set<string> {
+  const repository = SUITES[suiteId].repository
   const dir = join(records, 'records')
   const newest = (subject: SubjectId): BenchmarkRecord | undefined => (existsSync(dir) ? readdirSync(dir) : [])
     .filter(id => existsSync(recordPath(records, id)))
@@ -94,7 +99,7 @@ function feasibleTasks(records: string, repository: string, version: string): Se
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     .at(-1)
   const oracle = newest('oracle')
-  if (oracle === undefined) throw new Error(`no oracle record of ${repository} at ${version}; run \`npm run bench -- run --subject oracle\` first`)
+  if (oracle === undefined) throw new Error(`no oracle record of ${repository} at ${version}; run \`npm run bench -- run --subject oracle --suite ${suiteId}${records === RECORDS_DIR ? '' : ` --records ${shellWord(records)}`}\` first`)
   const failed = new Set(oracle.attempts.filter(attempt => attempt.reward !== 1).map(attempt => attempt.task))
   for (const attempt of newest('nop')?.attempts ?? []) if (attempt.reward === 1) failed.add(attempt.task)
   return new Set(oracle.suite.tasks.filter(task => !failed.has(task.id) && oracle.attempts.some(attempt => attempt.task === task.id)).map(task => task.id))
@@ -188,7 +193,7 @@ async function run(argv: string[]): Promise<number> {
   const suiteCommit = suiteVersion(suiteId)
   const python = join(dirname(values.harbor), 'python3')
   const selected = values.tasks?.split(',').map(id => id.trim())
-  const feasible = KEYLESS.has(subject) ? undefined : feasibleTasks(records, SUITES[suiteId].repository, suiteCommit)
+  const feasible = KEYLESS.has(subject) ? undefined : feasibleTasks(records, suiteId, suiteCommit)
   const suite = suiteTasks(existsSync(python) ? python : 'python3', tasksDir)
   const tasks: TaskEntry[] = suite
     .filter(task => selected === undefined || selected.includes(task.id))
@@ -250,7 +255,7 @@ async function run(argv: string[]): Promise<number> {
   const jobDir = join(jobs, id)
   writeFileSync(planPath(jobDir), `${JSON.stringify(plan, null, 2)}\n`)
   console.log(`harbor ${harborArgs.join(' ')}`)
-  console.log(`an interrupted run continues with: npm run bench -- resume ${jobDir}`)
+  console.log(`an interrupted run continues with: ${resumeCommand(jobDir, records)}`)
   return harborThenRecord(plan, jobDir, values.harbor, harborArgs, records, apiKey)
 }
 
@@ -277,18 +282,27 @@ type RunPlan = z.infer<typeof runPlanSchema>
 
 const planPath = (jobDir: string): string => `${jobDir}.plan.json`
 
-/** Run Harbor (a new job or a resumed one), then write the record of every trial the job holds. */
+/** Run Harbor (a new job or a resumed one), then, when every planned trial has finished, write the record of them. */
 async function harborThenRecord(plan: RunPlan, jobDir: string, harborBin: string, harborArgs: string[], records: string, apiKey: string): Promise<number> {
   const harbor = spawnSync(harborBin, harborArgs, { cwd: REPO_ROOT, stdio: 'inherit', env: { ...process.env, PYTHONPATH: REPO_ROOT } })
   if (harbor.error !== undefined) throw harbor.error
   if (!existsSync(jobDir)) throw new Error(`harbor exited ${String(harbor.status)} without a job directory`)
-  const after = KEYLESS.has(plan.subject) ? undefined : await probe(plan.model.model, apiKey)
 
-  const recordDir = join(records, 'records', plan.id)
+  const { subject, attempts } = plan
+  const tasks = plan.suite.tasks
   const trials = readdirSync(jobDir).filter(name => existsSync(join(jobDir, name, 'result.json')) && statSync(join(jobDir, name)).isDirectory())
     .map(name => ({ dir: join(jobDir, name), result: readTrial(join(jobDir, name)) }))
+    .filter(trial => finished(trial.result))
     .sort((a, b) => (a.result.started_at ?? '').localeCompare(b.result.started_at ?? ''))
-  if (trials.length === 0) throw new Error(`harbor exited ${String(harbor.status)} before any trial; no record is written`)
+  // A record is written once, so only when every trial the run planned has finished.
+  const recordDir = join(records, 'records', plan.id)
+  const expected = tasks.filter(task => task.applicable && task.feasible).length * attempts
+  if (trials.length < expected) {
+    console.error(`harbor exited ${String(harbor.status)} with ${String(expected - trials.length)} of ${String(expected)} trials unfinished; no record is written. Continue with: ${resumeCommand(jobDir, records)}`)
+    return 1
+  }
+  const after = KEYLESS.has(plan.subject) ? undefined : await probe(plan.model.model, apiKey)
+
   const counter = new Map<string, number>()
   const recorded: Attempt[] = trials.map(({ dir, result }) => {
     const parsed = attemptOf(result)
@@ -298,8 +312,6 @@ async function harborThenRecord(plan: RunPlan, jobDir: string, harborBin: string
     return { ...parsed, task, attempt, artifacts: keepArtifacts(dir, recordDir, parsed.trial) }
   })
 
-  const { subject, attempts } = plan
-  const tasks = plan.suite.tasks
   const agentRuntime = (JSON.parse(readFileSync(join(REPO_ROOT, 'container', 'agent-runtime', 'package.json'), 'utf8')) as { dependencies: Record<string, string> }).dependencies['@deepseek-ai/dsh'] ?? ''
   const record: BenchmarkRecord = recordSchema.parse({
     schema: RECORD_SCHEMA,
@@ -328,11 +340,6 @@ async function harborThenRecord(plan: RunPlan, jobDir: string, harborBin: string
   writeFileSync(join(recordDir, 'record.json'), `${JSON.stringify(record, null, 2)}\n`)
   console.log(`wrote ${relative(REPO_ROOT, join(recordDir, 'record.json'))}`)
   for (const [metric, value] of Object.entries(record.metrics.values)) console.log(`  ${metric}: ${value === null ? '—' : String(value)}`)
-  const expected = tasks.filter(task => task.applicable && task.feasible).length * attempts
-  if (recorded.length < expected) {
-    console.error(`${String(expected - recorded.length)} of ${String(expected)} trials did not finish; continue with: npm run bench -- resume ${jobDir}`)
-    return 1
-  }
   // An oracle or a nop run exists to say which tasks this environment can judge.
   const infeasible = (subject === 'oracle' ? tasks.filter(task => recorded.some(attempt => attempt.task === task.id && attempt.reward !== 1))
     : subject === 'nop' ? tasks.filter(task => recorded.some(attempt => attempt.task === task.id && attempt.reward === 1)) : []).map(task => task.id)
@@ -356,6 +363,12 @@ async function resume(argv: string[]): Promise<number> {
   const jobDir = positionals[0]
   if (jobDir === undefined || !existsSync(planPath(jobDir))) throw new Error('resume needs the job directory a run printed, with its plan beside it')
   const plan = runPlanSchema.parse(JSON.parse(readFileSync(planPath(jobDir), 'utf8')))
+  // A record is never rewritten, so a job whose record exists has nothing left to resume, whatever is checked out.
+  const written = recordPath(values.records, plan.id)
+  if (existsSync(written)) {
+    console.log(`${relative(REPO_ROOT, written)} is already written; nothing to resume`)
+    return 0
+  }
   // The record names one producer commit; trials from different code would mix two subjects.
   if (git(['rev-parse', 'HEAD']) !== plan.producer.commit) throw new Error(`the run was started at ${plan.producer.commit}; check that commit out to resume it`)
   const apiKey = process.env.DEEPSEEK_API_KEY ?? ''
@@ -427,7 +440,7 @@ function publish(argv: string[]): number {
     return `- ${record.id}: ${record.subject.id}, meanReward ${String(record.metrics.values.meanReward)} over ${String(record.metrics.values.eligibleTasks)} task(s) at "${record.producer.message}"`
   })
   git(['commit', '--quiet', '-m', `chore(bench): record ${String(added.length)} run(s)`, '-m', lines.join('\n')], records)
-  console.log(`committed in ${records}:\n${lines.join('\n')}\npublish with:\n  git -C ${records} push origin bench/records\n  gh workflow run bench-records.yml`)
+  console.log(`committed in ${records}:\n${lines.join('\n')}\npublish with:\n  git -C ${shellWord(records)} push origin bench/records\n  gh workflow run bench-records.yml`)
   return 0
 }
 
