@@ -21,7 +21,11 @@ A newer release takes over the open proposal instead of opening a second one. Ev
 3. Optionally copy [examples/dsh-migrate.yml](examples/dsh-migrate.yml) to `.github/dsh-migrate.yml`.
 4. Enable **Allow GitHub Actions to create and approve pull requests** in the repository settings.
 
-[docs/operations/install.md](docs/operations/install.md) explains each step, the report channel tokens, and the comment commands. Every configuration key is in the [configuration reference](docs/reference/configuration.md).
+A coding agent working in the plugin repository can do this instead, asking the maintainer what it cannot find out: give it a prompt such as
+
+> Set up dsh-migrate in this repository by following https://github.com/royenheart/dsh-migrate-bot/blob/<release>/docs/operations/install.md#setting-it-up-with-an-agent
+
+with `<release>` the release to pin. [docs/operations/install.md](docs/operations/install.md) explains each step, the questions an agent asks, the report channel tokens, and the comment commands. Every configuration key is in the [configuration reference](docs/reference/configuration.md).
 
 ## The state branch and the badge
 

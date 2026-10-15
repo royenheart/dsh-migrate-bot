@@ -1,9 +1,64 @@
 ---
 kind: operations
-description: Setting the Action up in a plugin repository: secrets, the workflow, permissions, report channels and the deploy service.
+description: Setting the Action up in a plugin repository, by hand or with a coding agent: secrets, the workflow, permissions, report channels and the deploy service.
 ---
 
 # Installing the Action
+
+## Setting it up with an agent
+
+A coding agent working in the plugin repository can set the Action up by following this section; the maintainer only answers its questions and adds the secrets. The agent reads the documents of the release it pins, at `https://github.com/royenheart/dsh-migrate-bot/blob/<release>/`, because keys and defaults change between releases. The rest of this page and the [configuration reference](../reference/configuration.md) hold the facts it applies.
+
+### Looking before asking
+
+The agent first finds out what it can without asking, and reports it:
+
+| Fact | How |
+|---|---|
+| The repository holds a plugin | A tracked `package.json` that declares `dsh.bundle`, at the root or below it. Without one the Action has nothing to migrate: stop and say so |
+| The plugin has a browser half | Its `package.json` declares `dsh.client`; only then does the end-to-end check matter |
+| The plugin has its own checks | `package.json` scripts `build`, `typecheck` and `test`; without any, the mechanical check is skipped unless `tests.commands` names commands |
+| The v0 Action is installed | A workflow under `.github/workflows/` that uses `royenheart/dsh-migrate-bot@v0`, a `.github/dsh-migrate.yml` with v0 keys, a remote branch `dsh-migrate/e2e`, or open pull requests from `dsh-migrate/<version>-<time>` branches (`git ls-remote origin 'refs/heads/dsh-migrate/*'`, and the `headRefName` of `gh pr list --json number,headRefName,title`) |
+| The API key secret exists | `gh secret list`, which shows names only |
+| Actions may open pull requests | `gh api repos/OWNER/REPO/actions/permissions/workflow`, field `can_approve_pull_request_reviews` |
+| The releases | `gh release list -R royenheart/dsh-migrate-bot`; a prerelease is a release candidate |
+
+### Questions for the maintainer
+
+Each question has a default. The agent asks every question that applies, says the default and what it means, and writes only the answers that differ from it.
+
+| Question | Default | Becomes |
+|---|---|---|
+| Which release of the Action to pin | The newest release; a release candidate only when the maintainer wants to try one | The `@<release>` of the reusable workflow in the workflow file |
+| When the scheduled run starts, in UTC | Every day at 03:00 | The cron of the workflow file |
+| The most one migration may spend, in USD | No cap; recommend setting one | `quota.limit` |
+| Whether the reviews run when the unmodified plugin already passes every check | They run | `review.policy: when-checks-fail` skips them, which costs less on a release that breaks nothing |
+| How many repair attempts a migration gets | 5 | `repair.maxAttempts` |
+| Which commands test the plugin, when its scripts do not | Its `build`, `typecheck` and `test` scripts | `tests.commands` |
+| For a plugin with a browser half: whether to keep the end-to-end check, and whether a broken end-to-end test should fail the migration | Kept; a failure is reported in the proposal and never fails the migration | `checks.e2e.enabled`, `checks.e2e.failurePolicy: blocking` |
+| Whether to send merge reports to another repository | None | `reports.channels.<id>.enabled`, each with its own token ([report channels](#report-channels)); ask per channel, naming the repository it writes to |
+| Whether a deploy service previews pull requests | No | The `deploy` keys; [running the deploy service](deploy-service.md#setting-it-up-with-an-agent) has its own questions |
+| For a v0 installation: keep the old end-to-end suite, and what to do with the old proposals | Rename `dsh-migrate/e2e` to `dsh-migrate/e2e-v0`; leave the pull requests open until the first v1 proposal | [Moving from v0](#moving-from-v0) |
+
+### Applying the answers
+
+1. Create a branch, for example `dsh-migrate-setup`.
+2. Write `.github/workflows/dsh-migrate.yml` from `examples/workflow.yml` of the pinned release, with the chosen cron and the reusable workflow at `@<release>`. A v0 workflow file is replaced, not merged.
+3. Write `.github/dsh-migrate.yml` with the answers that differ from the defaults, and nothing else. Every key must be in the configuration reference of the pinned release; a v0 file is rewritten by the table in [Moving from v0](#moving-from-v0).
+4. When the API key secret is missing, ask the maintainer to add it: `gh secret set DEEPSEEK_API_KEY_DSH_MIGRATE_BOT`, which prompts for the value, or Settings → Secrets and variables → Actions. The same goes for every report channel and deploy service token.
+5. When Actions may not open pull requests, ask before changing the setting, then keep the default token permission as it is and turn only this on: `gh api -X PUT repos/OWNER/REPO/actions/permissions/workflow -f default_workflow_permissions=<the current value> -F can_approve_pull_request_reviews=true`. An organisation policy can forbid it; the maintainer then changes it there.
+6. For a v0 installation, and only with the maintainer's answer: rename the end-to-end branch (`git fetch origin dsh-migrate/e2e`, `git push origin FETCH_HEAD:refs/heads/dsh-migrate/e2e-v0`, then `git push origin --delete dsh-migrate/e2e`).
+7. Open a pull request with the two files, listing each answer and each repository setting changed.
+
+### The first run
+
+The scheduled and manual triggers read the workflow from the default branch, so the first run waits for the pull request to be merged. Then `gh workflow run dsh-migrate.yml`, optionally with `-f target=<version>`, starts a migration, and `gh run watch` follows it. The run's summary and its `status` output say how it ended: `compatible` (nothing to change), `proposed` (a proposal issue and pull request are open for the maintainer to review), `failed` (the checks still fail after the repair attempts; the summary and the log say why), `error` (the Action itself failed, for example on a configuration key it does not know, whose message names the replacement) or `skipped` (the release was already processed; `-f force=true` runs it again). For a v0 installation, the agent offers to close the old proposals once the first v1 proposal is open.
+
+### What the agent never does
+
+- Ask for a key or a token in the conversation, or put one in a file, a command line or a commit. The maintainer enters secrets in GitHub.
+- Enable a report channel or a deploy service the maintainer did not ask for, since each sends data to a service outside the repository.
+- Push to the default branch, delete or rename a branch, close a pull request or change a repository setting without the maintainer's answer.
 
 ## The workflow
 

@@ -1,6 +1,6 @@
 ---
 kind: operations
-description: Running the reference deploy service with Docker Compose or the Terraform module, wiring a consumer repository to it, and verifying it with the conformance suite.
+description: Running the reference deploy service on any host with Docker, by hand or with a coding agent, or on Hetzner Cloud with the Terraform module; wiring a consumer repository to it, and verifying it with the conformance suite.
 ---
 
 # Running the deploy service
@@ -40,7 +40,17 @@ The service is configured only by its environment. It validates every variable a
 
 `--conformance` is the only flag; it is for a deployment the conformance suite checks, never for one a repository uses.
 
-## On a machine with Docker
+## On any host with Docker
+
+The service runs on any Linux host that meets these requirements, from any cloud or VPS provider or on a machine of your own:
+
+| Requirement | Why |
+|---|---|
+| Docker Engine with the Compose plugin | The stack is `deploy-service/compose.yaml`, and the `docker` provider starts each preview as a container |
+| Inbound 80 and 443 with a DNS name for the host, or a Cloudflare Tunnel | Caddy obtains a certificate for `PUBLIC_HOSTNAME`; a tunnel needs no inbound port, for a host behind NAT |
+| Outbound access to GitHub and the npm registry | The service clones the previewed repository, and a preview installs its dependencies |
+| A data directory whose absolute path is at most 64 characters, on storage that survives a re-created host | `DATA_DIR` holds every record and working copy |
+| On a cloud host whose metadata endpoint serves secrets, containers cut off from it | A preview's dependency install has a network: add `iptables -I DOCKER-USER -d 169.254.169.254/32 -j DROP` and keep it across restarts, as the Terraform module's `deploy-service/terraform/cloud-init.yaml.tftpl` does |
 
 `deploy-service/compose.yaml` runs the service, builds the preview image, and fronts the service with Caddy, which obtains a certificate for `PUBLIC_HOSTNAME`, or with `cloudflared`, which connects a Cloudflare Tunnel so the machine needs no inbound port.
 
@@ -51,9 +61,9 @@ The service is configured only by its environment. It validates every variable a
 
 The Docker socket is mounted into the service container only, so the service can start preview containers; a preview container never sees it. A serving preview has no network; the dependency install runs on Docker's default bridge, so block the cloud metadata endpoint for containers on a machine whose metadata holds secrets, as the Terraform module does. With a tunnel, create the tunnel in Cloudflare Zero Trust with a public hostname that routes to `http://service:8080`, and put an Access application with your policy on the paths `/view/*` and `/p/*`; set `PUBLIC_VIEWS=true` only once that policy is in place. The API paths (`/runs`, `/previews`, `/github/webhook`) must stay reachable without Access, because GitHub and the runner cannot log in: the token and the webhook signature protect them. Without an identity-aware proxy, keep `PUBLIC_VIEWS=false`; the pages then answer only requests that carry the token, which a browser does not send.
 
-## On Hetzner Cloud with Terraform
+## On Hetzner Cloud with the Terraform module
 
-`deploy-service/terraform/` creates one server, a separate volume for `DATA_DIR` that a re-created server keeps, and a firewall that opens 80 and 443, or nothing inbound when a tunnel token is given. Cloud-init installs Docker, drops container traffic to the metadata endpoint (`169.254.169.254`, which serves the user data and its secrets), mounts the volume, clones this repository at `source_ref`, writes `.env` with a generated `DEPLOY_TOKEN`, builds both images, and starts the stack. The cost is that of one small server and one volume while they exist.
+The Terraform module is one way to get such a host, on Hetzner Cloud; on another provider, create the host by its own means and follow the section above, whose steps `deploy-service/terraform/cloud-init.yaml.tftpl` also performs. `deploy-service/terraform/` creates one server, a separate volume for `DATA_DIR` that a re-created server keeps, and a firewall that opens 80 and 443, or nothing inbound when a tunnel token is given. Cloud-init installs Docker, drops container traffic to the metadata endpoint (`169.254.169.254`, which serves the user data and its secrets), mounts the volume, clones this repository at `source_ref`, writes `.env` with a generated `DEPLOY_TOKEN`, builds both images, and starts the stack. The cost is that of one small server and one volume while they exist.
 
 ```sh
 cd deploy-service/terraform
@@ -87,6 +97,21 @@ terraform output -raw deploy_token
 
 The webhook secret and the generated token are in the Terraform state and in the server's user data, so keep the state where only the operator can read it. The first boot takes several minutes, most of it building the two images; `curl "$(terraform output -raw endpoint)/healthz"` answers once the service listens.
 
+## Setting it up with an agent
+
+A coding agent can run the service for a maintainer by following this page; it asks, then applies the sections above. It reads the page of the release the consumer pins, as [installing the Action with an agent](install.md#setting-it-up-with-an-agent) does.
+
+| Question | Default | Becomes |
+|---|---|---|
+| Which host runs the service: a host the maintainer already has, a new one at a provider of their choice, or Hetzner Cloud with the Terraform module | None; the agent does not choose a provider or create billable resources unasked | The section it follows |
+| How the service is reached: a DNS name pointing at the host, or a Cloudflare Tunnel | A DNS name | `PUBLIC_HOSTNAME` and `COMPOSE_PROFILES=public`, or the tunnel token and `COMPOSE_PROFILES=tunnel` |
+| Who may open run pages and previews | Only requests that carry the token | `PUBLIC_VIEWS=true` only behind an identity-aware proxy the maintainer has set up |
+| Where the data lives | `/srv/dsh-deploy` | `DATA_DIR` |
+| Which dsh release previews run | The one in `deploy-service/.env.example` | `DSH_VERSION`, `DSH_IMAGE` |
+| Which repositories use it | The one being set up | A webhook in each; the service previews public repositories only |
+
+On the host, the agent checks the requirements of [On any host with Docker](#on-any-host-with-docker) before writing anything, generates `DEPLOY_TOKEN` and `GITHUB_WEBHOOK_SECRET` there with `openssl rand -hex 32` into `deploy-service/.env`, readable only by its owner, and never prints them. It starts the stack, waits for `/healthz`, and runs the conformance suite ([Verifying a deployment](#verifying-a-deployment)). The maintainer then copies `DEPLOY_TOKEN` into the consumer's secret `DSH_MIGRATE_DEPLOY_TOKEN` and the webhook secret into the webhook, or lets the agent pipe each from `.env` into `gh secret set` and into `gh api --input`, so that no value appears in the conversation or on a command line. The consumer side is [Wiring a consumer repository](#wiring-a-consumer-repository).
+
 ## Wiring a consumer repository
 
 1. In the consumer's `.github/dsh-migrate.yml`:
@@ -111,4 +136,4 @@ cd deploy-service && npm ci && npm run build
 DEPLOY_TOKEN=… node dist/conformance/run.js --url https://deploy.example.com
 ```
 
-Against a production deployment, the preview checks need `--preview owner/name#N` naming a preview with an unpublished change in its working copy; without one they are skipped. A throwaway deployment started with `--conformance` (the Terraform input `conformance_mode`) runs every check with `--conformance`, including the refusals of a slow answer, an oversize answer and a redirect. The manual workflow `deploy-service-cloud-check` does exactly that on a server it creates and destroys; it needs the repository secrets `HCLOUD_TOKEN` and `DSH_DEPLOY_CHECK_WEBHOOK_SECRET`.
+Against a production deployment, the preview checks need `--preview owner/name#N` naming a preview with an unpublished change in its working copy; without one they are skipped. A throwaway deployment started with `--conformance` (the Terraform input `conformance_mode`) runs every check with `--conformance`, including the refusals of a slow answer, an oversize answer and a redirect. The manual workflow `deploy-service-cloud-check` does exactly that on a Hetzner Cloud server it creates and destroys; it needs the repository secrets `HCLOUD_TOKEN` and `DSH_DEPLOY_CHECK_WEBHOOK_SECRET`.

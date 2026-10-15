@@ -9,6 +9,7 @@ The entry point to the documentation: `AGENTS.md` holds the rules and links here
 | The product, its inputs and outputs, and how to consume the Action | `README.md` | [Usage](../README.md#what-it-does) |
 | Where to start as a contributor, and what to run before pushing | `README.md` | [Contributing](../README.md#contributing) |
 | Installing the Action: secrets, the workflow, permissions, report channels, the deploy service | `docs/operations/install.md` | [The workflow](operations/install.md#the-workflow) |
+| Setting the Action up in a plugin repository with a coding agent: what it looks up, what it asks, what it never does | `docs/operations/install.md` | [Setting it up with an agent](operations/install.md#setting-it-up-with-an-agent) |
 | Releasing the Action | `docs/operations/release.md` | [Releasing](operations/release.md#releasing) |
 | How a migration runs as a statechart over an event log, and why | `docs/design/workflow.md` | [Decisions](design/workflow.md#1-decisions) |
 | The invariants the workflow keeps, and the tests that hold them | `docs/design/workflow.md` | [Invariants](design/workflow.md#3-invariants) |
@@ -35,6 +36,7 @@ The entry point to the documentation: `AGENTS.md` holds the rules and links here
 | How the reference deploy service is built: run store, idempotency, preview manager, instance providers | `docs/design/deploy-service.md` | [The reference implementation](design/deploy-service.md#9-the-reference-implementation) |
 | Checking any deploy service against the Action's client | `docs/design/deploy-service.md` | [The conformance suite](design/deploy-service.md#10-the-conformance-suite) |
 | Running the reference deploy service: images, configuration, compose, Terraform, wiring a repository, verifying | `docs/operations/deploy-service.md` | [Configuration](operations/deploy-service.md#configuration) |
+| What a host needs to run the deploy service, at any provider | `docs/operations/deploy-service.md` | [On any host with Docker](operations/deploy-service.md#on-any-host-with-docker) |
 | The rules for every agent session in this repository | `AGENTS.md` | [Rules](../AGENTS.md#rules) |
 | Every project term, its name in code, and the words it replaces | `docs/glossary.md` | [Migrations](glossary.md#migrations) |
 | How documentation is organised, written, and kept from drifting | `docs/AGENTS.md` | [The tier taxonomy: one home per fact](AGENTS.md#the-tier-taxonomy-one-home-per-fact) |
