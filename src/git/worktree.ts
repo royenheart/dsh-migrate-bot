@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { git, gitOut } from './run.ts'
 
 /**
@@ -23,12 +23,16 @@ export function isIgnoredPath(path: string): boolean {
     : normalized === ignored)
 }
 
-/** Add the ignored paths to `.git/info/exclude`, so git never reports them. */
+/**
+ * Add the ignored paths to the repository's `info/exclude`, so git never
+ * reports them. Git names the file, since a linked worktree or a submodule
+ * has a `.git` file rather than a directory.
+ */
 export function excludeIgnoredPaths(cwd: string): void {
-  const dotGit = join(cwd, '.git')
-  if (!existsSync(dotGit) || !statSync(dotGit).isDirectory()) return
-  const exclude = join(dotGit, 'info', 'exclude')
-  mkdirSync(join(dotGit, 'info'), { recursive: true })
+  const found = git(['rev-parse', '--path-format=absolute', '--git-path', 'info/exclude'], { cwd })
+  if (found.status !== 0) return
+  const exclude = found.stdout.trim()
+  mkdirSync(dirname(exclude), { recursive: true })
   const existing = existsSync(exclude) ? readFileSync(exclude, 'utf8') : ''
   const present = new Set(existing.split('\n').map(line => line.trim()))
   const missing = IGNORED_PATHS.filter(path => !present.has(path))
