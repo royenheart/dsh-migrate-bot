@@ -33,8 +33,12 @@ const TESTS = dirname(new URL(import.meta.url).pathname)
 const FIXTURE = '/app/fixture'
 const task = JSON.parse(readFileSync(join(TESTS, 'task.json'), 'utf8'))
 const WEIGHTS = { contract: 15, typecheck: 20, test: 30, build: 15, boot: 20, unchanged: 30, ...task.weights }
-const SCRIPT_MS = 15 * 60_000
+// Harbor stops the verifier at the tasks' `[verifier] timeout_sec` (2400 s) and then scores nothing, as if the environment
+// had failed. The install and the three scripts share one deadline that leaves time for the boot and the copying around
+// them, so a step the agent made hang fails its check instead.
+const VERIFIER_MS = 2400_000
 const BOOT_MS = 120_000
+const STEPS_DEADLINE = Date.now() + VERIFIER_MS - BOOT_MS - 5 * 60_000
 const semver = createRequire(join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim(), 'npm', 'package.json'))('semver')
 
 const results = {}
@@ -75,7 +79,7 @@ writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
 const hidden = join(TESTS, 'hidden')
 if (existsSync(hidden)) cpSync(hidden, work, { recursive: true })
 
-const run = (command, args) => spawnSync(command, args, { cwd: work, encoding: 'utf8', timeout: SCRIPT_MS, maxBuffer: 64 * 1024 * 1024, env: { ...process.env, CI: '1' } })
+const run = (command, args) => spawnSync(command, args, { cwd: work, encoding: 'utf8', timeout: Math.max(1, STEPS_DEADLINE - Date.now()), maxBuffer: 64 * 1024 * 1024, env: { ...process.env, CI: '1' } })
 const install = existsSync(join(work, 'pnpm-lock.yaml'))
   ? run('pnpm', ['install', '--no-frozen-lockfile'])
   : run('npm', ['install', '--no-audit', '--no-fund', ...(task.before === undefined ? [] : [`--before=${task.before}`])])
