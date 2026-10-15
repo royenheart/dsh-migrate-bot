@@ -111,6 +111,7 @@ async function publishSuiteOf(deps: E2EDeps, context: MigrationContext): Promise
     ({ type: 'e2e.published', outcome, detail, ...(usage === undefined ? {} : { usage }) })
   const target = context.input.target
   const suiteDir = suiteDirOf(deps.runDir)
+  if (!hasClientSurface(deps.workdir)) return event('unchanged', 'no plugin has a browser half (dsh.client)')
   let usage: ReturnType<typeof usageOf>
   if (context.e2eBaseline.length === 0) {
     const installed = deps.install(target)
