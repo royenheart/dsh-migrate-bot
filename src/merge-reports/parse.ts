@@ -25,16 +25,28 @@ export const duplicatePayloadSchema = z.object({ decisions: z.array(duplicateDec
 
 export type ParseResult<T> = { ok: true; value: T } | { ok: false; reason: string }
 
-const FENCE = '```'
+/** A fence line as CommonMark reads one: up to three spaces, then three or more backticks. */
+const FENCE_LINE = /^ {0,3}(`{3,})(.*)$/
 
-/** The body of the last fenced block in a session's output. */
+/**
+ * The body of the last fenced block in a session's output. Fences are lines,
+ * so backticks inside a JSON string (a report body quoting code) are not one.
+ */
 export function lastFencedBlock(text: string): string | undefined {
-  const end = text.lastIndexOf(`\n${FENCE}`)
-  if (end < 0) return undefined
-  const open = text.lastIndexOf(FENCE, end - 1)
-  if (open < 0) return undefined
-  const firstLine = text.indexOf('\n', open)
-  return firstLine < 0 || firstLine > end ? undefined : text.slice(firstLine + 1, end)
+  let last: string | undefined
+  let open: { fence: string; lines: string[] } | undefined
+  for (const line of text.split('\n')) {
+    const fence = FENCE_LINE.exec(line)
+    if (open === undefined) {
+      if (fence !== null) open = { fence: fence[1] ?? '', lines: [] }
+    } else if (fence !== null && (fence[1] ?? '').length >= open.fence.length && (fence[2] ?? '').trim() === '') {
+      last = open.lines.join('\n')
+      open = undefined
+    } else {
+      open.lines.push(line)
+    }
+  }
+  return last
 }
 
 /**

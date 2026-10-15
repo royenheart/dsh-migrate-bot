@@ -15,8 +15,9 @@ import type { SessionUsage } from '../workflow/model.ts'
  * Send one migration's merge report to one channel.
  *
  * A channel that cannot run — no token, no API key, nothing to classify — is
- * skipped with the reason; a session whose output does not parse is a failure
- * with the reason. Neither stops the other channels.
+ * skipped with the reason; a session whose output does not parse, or a GitHub
+ * call that fails, is a failure with the reason. Neither stops the other
+ * channels.
  */
 
 export interface ReportDeps {
@@ -46,6 +47,23 @@ export async function runReportChannel(
   migration: ReportedMigration,
   deps: ReportDeps,
   mode: 'deliver' | 'dry-run',
+): Promise<ReportOutcome> {
+  const progress: { usage?: SessionUsage | undefined; posted: string[] } = { posted: [] }
+  try {
+    return await reportToChannel(channelId, migration, deps, mode, progress)
+  } catch (error) {
+    // A token without access, a missing discussion category, a rate limit: this channel failed, the others still run.
+    const detail = inline(error instanceof Error ? error.message : String(error), 300)
+    return { outcome: 'failed', detail: progress.posted.length === 0 ? detail : `${detail}; already posted: ${progress.posted.join(' ')}`, usage: progress.usage }
+  }
+}
+
+async function reportToChannel(
+  channelId: string,
+  migration: ReportedMigration,
+  deps: ReportDeps,
+  mode: 'deliver' | 'dry-run',
+  progress: { usage?: SessionUsage | undefined; posted: string[] },
 ): Promise<ReportOutcome> {
   const channel = resolveChannels(deps.config).find(entry => entry.id === channelId)
   if (channel === undefined) return { outcome: 'skipped', detail: `no channel \`${channelId}\` is configured` }
@@ -86,19 +104,21 @@ export async function runReportChannel(
       cacheHitTokens: session.usage.cacheHitTokens,
       ...(session.usage.costUsd === undefined ? {} : { usd: session.usage.costUsd }),
     }
+  progress.usage = usage
   const client = new GitHubClient(token, deps.env, deps.fetchImpl)
 
+  // The payload is the last fenced JSON block of everything the session printed; the report the runner extracts is its first plain or markdown block.
   if (!duplicateCheck) {
-    const parsed = parsePayload(session.report, reportPayloadSchema)
+    const parsed = parsePayload(session.raw, reportPayloadSchema)
     if (!parsed.ok) return { outcome: 'failed', detail: parsed.reason, usage }
     if (mode === 'dry-run') return { outcome: 'dry-run', detail: `${parsed.value.title}\n\n${parsed.value.body.slice(0, 1_200)}`, usage }
     const url = await deliver(client, channel, parsed.value)
     return { outcome: 'delivered', detail: `${channel.method} created in ${channel.repo}`, url, usage }
   }
 
-  const parsed = parsePayload(session.report, duplicatePayloadSchema)
+  const parsed = parsePayload(session.raw, duplicatePayloadSchema)
   if (!parsed.ok) return { outcome: 'failed', detail: parsed.reason, usage }
-  const posted: string[] = []
+  const posted = progress.posted
   const held: string[] = []
   for (const draft of drafts) {
     const decision = parsed.value.decisions.find(entry => entry.slug === draft.slug)

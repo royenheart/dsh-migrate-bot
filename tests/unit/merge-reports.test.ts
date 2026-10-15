@@ -72,6 +72,14 @@ test('output that breaks the contract is a failure, never a half-written issue',
   assert.equal(github.external.length, 0)
 })
 
+test('a GitHub call that fails is a failure of this channel, not an error of the migration', async () => {
+  const { deps, migration } = fixture(REPORT)
+  const failing: typeof fetch = async (url, init) => String(url).includes('dsh-migrate-bot/issues') ? new Response('{"message":"Resource not accessible"}', { status: 403 }) : (deps.fetchImpl as typeof fetch)(url, init)
+  const outcome = await runReportChannel('migrate-bot', migration, { ...deps, fetchImpl: failing }, 'deliver')
+  assert.equal(outcome.outcome, 'failed')
+  assert.match(outcome.detail, /403|not accessible/i)
+})
+
 test('a dry run produces the payload and delivers nothing', async () => {
   const { deps, migration, github } = fixture(REPORT)
   const outcome = await runReportChannel('migrate-bot', migration, deps, 'dry-run')
@@ -98,6 +106,9 @@ test('the duplicate check posts a cleared draft as a discussion and holds one al
 
 test('the payload is read from the last fenced block only', () => {
   assert.equal(lastFencedBlock('```json\n{"a":1}\n```\ntext\n```json\n{"b":2}\n```'), '{"b":2}')
+  // A body that quotes code holds backticks inside a JSON string, never on a line of their own.
+  const quoting = '```json\n{"title":"t","body":"Steps:\\n```ts\\nfoo()\\n```\\nend"}\n```\n'
+  assert.deepEqual(parsePayload(quoting, reportPayloadSchema), { ok: true, value: { title: 't', body: 'Steps:\n```ts\nfoo()\n```\nend' } })
   assert.equal(lastFencedBlock('no fence'), undefined)
   assert.equal(parsePayload('```json\n{"title":" ","body":"b"}\n```', reportPayloadSchema).ok, false)
 })
