@@ -46,7 +46,11 @@ export function checkDependencyContract(pkg: unknown, target: string, published:
       const versions = published(name)
       if (versions === undefined) continue
       if (!versions.includes(target)) {
-        if (block === 'peerDependencies' && meta[name]?.optional === true) continue
+        if (block === 'peerDependencies' && meta[name]?.optional === true) {
+          // npm installs it for nobody, but dsh still holds every peer range to the release, prereleases included.
+          if (!semver.satisfies(target, range, { includePrerelease: true })) findings.push({ message: `${block}: ${name} is "${range}", which dsh refuses on ${target}` })
+          continue
+        }
         findings.push({ message: `${block}: ${name} is not published at ${target}; the harness removed or renamed it (last published ${versions.at(-1) ?? 'never'})` })
       } else if (!semver.satisfies(target, range)) {
         findings.push({ message: `${block}: ${name} is "${range}", which does not admit ${target}` })

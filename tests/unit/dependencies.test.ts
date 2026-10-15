@@ -33,6 +33,11 @@ test('an optional peer the harness stopped publishing harms nothing, but its ran
     peerDependenciesMeta: { '@deepseek-ai/dsh-client-runtime': { optional: true }, '@deepseek-ai/dsh-agent': { optional: true } },
   }, '0.1.2-alpha.2', published)
   assert.deepEqual(findings.map(finding => finding.message), ['peerDependencies: @deepseek-ai/dsh-agent is "^0.1.0-rc.8", which does not admit 0.1.2-alpha.2'])
+  const refused = checkDependencyContract({
+    peerDependencies: { '@deepseek-ai/dsh-client-runtime': '^0.1.0-rc.8' },
+    peerDependenciesMeta: { '@deepseek-ai/dsh-client-runtime': { optional: true } },
+  }, '0.2.0-rc.2', published)
+  assert.deepEqual(refused.map(finding => finding.message), ['peerDependencies: @deepseek-ai/dsh-client-runtime is "^0.1.0-rc.8", which dsh refuses on 0.2.0-rc.2'])
 })
 
 test('a range written for the target cohort passes, and an unreadable registry decides nothing', () => {
