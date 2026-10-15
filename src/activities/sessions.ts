@@ -7,7 +7,7 @@ import { decideQuota } from '../quota/check.ts'
 import { isQuotaError } from '../quota/errors.ts'
 import { parseBlocker } from '../verify/blocker.ts'
 import { describeBaseline } from '../domain/outcome.ts'
-import type { AgentRunner } from '../agents/types.ts'
+import type { AgentRequest, AgentRunner } from '../agents/types.ts'
 import type { SessionProgress } from '../agents/session-status.ts'
 import type { MigrateConfig } from '../config/schema.ts'
 import type { QuotaQuery } from '../quota/types.ts'
@@ -108,6 +108,30 @@ export class SessionRunner {
           harness,
           baselineNote: describeBaseline(context),
         }) + this.cards(context)
+    }
+  }
+
+  /**
+   * A session outside the reviews and repairs, the end-to-end authoring, held
+   * to the same spend cap and counted in what this migration spent.
+   */
+  async runOther(request: Pick<AgentRequest, 'kind' | 'prompt' | 'workdir' | 'env'>): Promise<{ usage?: SessionUsage | undefined } | { failure: string }> {
+    const cap = await this.capReached()
+    if (cap !== undefined) return { failure: `spend cap: ${cap}` }
+    try {
+      const result = await this.deps.agent.run({
+        ...request,
+        agent: this.deps.config.agent,
+        apiKey: this.deps.apiKey,
+        usageSoFar: this.spent,
+        ...(this.deps.config.quota.limit === undefined ? {} : { usageLimit: this.deps.config.quota.limit }),
+      })
+      const usage = usageOf(result.usage)
+      this.spent += usage?.usd ?? 0
+      return { usage }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      return { failure: isQuotaError(error) ? `spend cap: ${detail}` : detail }
     }
   }
 

@@ -101,8 +101,7 @@ test('no baseline is recorded without a source release, without a browser half, 
     const deps = (install: () => { bin: string } | { failure: string }) => ({
       workdir: tree,
       config: parseConfig({}),
-      agent: { run: async () => { throw new Error('no session may start') } },
-      apiKey: 'k',
+      session: async () => { throw new Error('no session may start') },
       runDir: join(root, 'run'),
       install,
     })

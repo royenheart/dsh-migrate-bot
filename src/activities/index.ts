@@ -64,7 +64,7 @@ export function createActivities(deps: ActivityDeps): ActivityRunner {
     return sessions
   }
   const reports: Map<string, string> = new Map()
-  const e2eDeps: E2EDeps = { workdir: deps.workdir, config: deps.config, agent: deps.agent, apiKey: deps.apiKey ?? '', runDir, install: release => checks.install(release) }
+  const e2eDeps: E2EDeps = { workdir: deps.workdir, config: deps.config, session: request => sessionRunner().runOther(request), runDir, install: release => checks.install(release) }
 
   return async (request, context) => {
     switch (request.activity) {
