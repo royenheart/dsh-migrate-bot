@@ -120,7 +120,7 @@ export const migrationMachine = setup({
     run: (_, _params: ActivityRequest) => {},
     /** The proposal says which end-to-end tests broke; the pull request shows where and how. */
     warnE2E: assign({
-      warnings: ({ context }) => [...context.warnings, `end-to-end tests that passed before the migration fail now (advisory, see the checks): ${context.failure?.fingerprint ?? ''}`],
+      warnings: ({ context }) => [...context.warnings, `${context.e2eBaseline.length > 0 ? 'end-to-end tests that passed before the migration fail now' : 'end-to-end tests fail, and no baseline shows they passed before the migration'} (advisory, see the checks): ${context.failure?.fingerprint ?? ''}`],
     }),
     acceptReportCommand: assign({
       comments: ({ context, event }) => event.type === 'command.report' ? [...context.comments, event.comment] : context.comments,
@@ -433,7 +433,7 @@ export const migrationMachine = setup({
         },
       },
     },
-    compatible: { type: 'final', description: 'The unmodified tree passes every check on the target release.' },
+    compatible: { type: 'final', description: 'The unmodified tree passes every check on the target release, an advisory end-to-end failure on the way through the host\'s UI aside, which the summary reports.' },
     unpublished: { type: 'final', description: 'The tree changed and passed, and publishing is turned off.' },
     failed: { type: 'final', description: 'The checks still fail; the migration stopped.' },
     error: { type: 'final', description: 'An activity failed for a reason outside the plugin.' },

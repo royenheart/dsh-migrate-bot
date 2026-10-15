@@ -171,8 +171,9 @@ export class CheckRunner {
         const broken = baseline.length > 0 ? baseline.filter(id => !run.passed.includes(id)) : run.failed
         if (broken.length === 0) return { outcome: 'pass', fingerprint: '', output: `${String(run.passed.length)} test(s) passed` }
         const heading = baseline.length > 0 ? 'These tests passed on the source release and do not pass now:' : 'These tests fail:'
-        // A failure in a check step is the plugin's; one on the way there through the host's UI, or one that cannot be placed, is not shown to be.
-        const blame = broken.some(id => run.phases[id] === 'check') ? 'plugin' : 'host'
+        // A baseline test that failed in a check step is the plugin's. One on the way there through the host's UI, one that cannot be
+        // placed, or one never shown to pass on the source release is not shown to be.
+        const blame = baseline.length > 0 && broken.some(id => run.phases[id] === 'check') ? 'plugin' : 'host'
         const where = (id: string): string => ` (failed in ${run.phases[id] === 'check' ? 'a check step' : run.phases[id] === 'reach' ? 'a reach step, on the way through the host\'s UI' : 'no step'})`
         return { outcome: 'fail', blame, fingerprint: `e2e: ${[...broken].sort().join(' | ').slice(0, 300)}`, output: `${heading}\n${broken.map(id => `- ${id}${where(id)}${run.errors[id] === undefined ? '' : `: ${run.errors[id]}`}`).join('\n')}\n\n${run.output}` }
       }
