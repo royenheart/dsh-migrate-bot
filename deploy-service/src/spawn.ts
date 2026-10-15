@@ -12,6 +12,8 @@ export interface SpawnResult {
   /** The exit code; `null` when the process was killed or could not start. */
   code: number | null
   stdout: string
+  /** `stdout` exactly as written, for output that is not UTF-8 text, such as a diff. */
+  stdoutBytes: Buffer
   stderr: string
   /** Killed by the watchdog or the output bound. */
   killed: 'timeout' | 'output' | undefined
@@ -54,7 +56,8 @@ export function runProcess(bin: string, args: readonly string[], options: { cwd?
     child.on('error', (failure) => { error = failure.message })
     child.on('close', (code) => {
       clearTimeout(timer)
-      resolve({ code, stdout: Buffer.concat(stdout).toString('utf8'), stderr: Buffer.concat(stderr).toString('utf8'), killed, error })
+      const bytes = Buffer.concat(stdout)
+      resolve({ code, stdout: bytes.toString('utf8'), stdoutBytes: bytes, stderr: Buffer.concat(stderr).toString('utf8'), killed, error })
     })
   })
 }

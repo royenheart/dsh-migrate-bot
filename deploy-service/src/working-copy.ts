@@ -17,7 +17,8 @@ import { runProcess } from './spawn.ts'
 
 export interface GitResult {
   ok: boolean
-  stdout: string
+  /** What git wrote to stdout, as bytes: a diff is not necessarily UTF-8. */
+  stdout: Buffer
   detail: string
 }
 
@@ -53,7 +54,7 @@ export async function git(tree: Tree, args: readonly string[], env: NodeJS.Proce
     },
   })
   const detail = result.error ?? (result.killed === undefined ? result.stderr.trim() || result.stdout.trim() : `killed (${result.killed})`)
-  return { ok: result.code === 0, stdout: result.stdout, detail: detail === '' ? `git ${args[0] ?? ''} exited ${String(result.code)}` : detail.slice(0, 1000) }
+  return { ok: result.code === 0, stdout: result.stdoutBytes, detail: detail === '' ? `git ${args[0] ?? ''} exited ${String(result.code)}` : detail.slice(0, 1000) }
 }
 
 /** Directories a dependency install creates, which are never part of a preview's change. */
@@ -81,19 +82,40 @@ export async function checkout(tree: Tree, cloneUrl: string, sha: string): Promi
   }
   mkdirSync(join(tree.gitDir, 'info'), { recursive: true })
   appendFileSync(join(tree.gitDir, 'info', 'exclude'), `${EXCLUDED.join('\n')}\n`)
-  return { ok: true, stdout: '', detail: `checked out ${sha.slice(0, 12)}` }
+  return { ok: true, stdout: Buffer.alloc(0), detail: `checked out ${sha.slice(0, 12)}` }
 }
 
 /**
- * The working copy's change against `baseSha`, as one binary-safe unified diff.
+ * Keep what a candidate's install and build created out of every later change.
+ *
+ * Run after the provider built the candidate: each untracked path the
+ * repository does not ignore, such as build output, is added to the git
+ * directory's exclude file, so a freeze counts only what was changed after the
+ * build. Paths are handled as bytes, and a path an exclude file cannot name,
+ * one holding a newline or ending in a carriage return, is left out and counts
+ * as changed.
+ * @param tree - the candidate.
+ */
+export async function excludeBuildOutput(tree: Tree): Promise<GitResult> {
+  const listed = await git(tree, ['ls-files', '-z', '--others', '--exclude-standard', '--directory'])
+  if (!listed.ok) return { ...listed, detail: `git ls-files: ${listed.detail}` }
+  const paths = listed.stdout.toString('latin1').split('\0').filter(path => path !== '' && !path.includes('\n') && !path.endsWith('\r'))
+  if (paths.length > 0) appendFileSync(join(tree.gitDir, 'info', 'exclude'), `${paths.map(path => `/${path.replace(/[\\*?[\] ]/g, '\\$&')}`).join('\n')}\n`, 'latin1')
+  return { ok: true, stdout: Buffer.alloc(0), detail: `excluded ${String(paths.length)} path(s)` }
+}
+
+/**
+ * The working copy's change against `baseSha`, as one binary-safe unified diff
+ * in bytes.
  *
  * The tree is staged into a temporary index, never the tree's own, so untracked
  * files count and the tree is left exactly as it was. Ignored files do not
- * count, which keeps installed dependencies out of the change.
+ * count, which keeps installed dependencies and, through `excludeBuildOutput`,
+ * build output out of the change.
  * @param tree - the working copy.
  * @param baseSha - the commit the copy was built from.
  */
-export async function freeze(tree: Tree, baseSha: string): Promise<{ ok: true; diff: string } | { ok: false; detail: string }> {
+export async function freeze(tree: Tree, baseSha: string): Promise<{ ok: true; diff: Buffer } | { ok: false; detail: string }> {
   const scratch = mkdtempSync(join(tmpdir(), 'dsh-deploy-index-'))
   try {
     const env = { GIT_INDEX_FILE: join(scratch, 'index') }
@@ -114,11 +136,14 @@ export async function freeze(tree: Tree, baseSha: string): Promise<{ ok: true; d
  * @param tree - the tree to apply to.
  * @param diff - what `freeze` produced from another tree.
  */
-export async function carry(tree: Tree, diff: string): Promise<GitResult> {
+export async function carry(tree: Tree, diff: Buffer): Promise<GitResult> {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-deploy-carry-'))
   try {
     const file = join(dir, 'change.diff')
     appendFileSync(file, diff)
+    // A build changes the files' owner and ctime, so the index no longer matches
+    // them until it is refreshed, and `--3way` refuses a file it does not match.
+    await git(tree, ['update-index', '-q', '--refresh'])
     return await git(tree, ['apply', '--3way', '--whitespace=nowarn', file])
   } finally {
     rmSync(dir, { recursive: true, force: true })

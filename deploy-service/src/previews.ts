@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import { readJson, writeJson } from './files.ts'
 import { failure, json, type Answer } from './http.ts'
-import { carry, checkout, freeze, git, type Tree } from './working-copy.ts'
+import { carry, checkout, excludeBuildOutput, freeze, git, type Tree } from './working-copy.ts'
 import type { InstanceProvider, InstanceSpec, RunningInstance } from './providers/types.ts'
 
 /**
@@ -75,7 +75,8 @@ const recordSchema = z.object({
   createdAt: z.string(),
   expiresAt: z.string(),
   building: z.boolean(),
-  lastBuild: z.object({ ok: z.boolean(), detail: z.string(), sha: z.string(), at: z.string() }).optional(),
+  /** `unapplied` names the file under `unapplied/` a promotion set the working copy's change aside in. */
+  lastBuild: z.object({ ok: z.boolean(), detail: z.string(), sha: z.string(), at: z.string(), unapplied: z.string().optional() }).optional(),
   /** How many revisions this preview has frozen; the next one is numbered after it. */
   revisionCount: z.number().int(),
   revisions: z.array(revisionSchema),
@@ -296,7 +297,7 @@ export class PreviewManager {
     this.save({ ...initial, building: true })
     const sha = initial.headSha
     const candidate = this.tree(id, generation)
-    let outcome: { ok: boolean; detail: string } = { ok: false, detail: 'The build stopped.' }
+    let outcome: { ok: boolean; detail: string; unapplied?: string } = { ok: false, detail: 'The build stopped.' }
     this.options.log(`preview ${id}: building ${initial.repository}#${String(initial.pullRequest)} at ${sha.slice(0, 12)}`)
     try {
       const checkedOut = await checkout(candidate, initial.cloneUrl, sha)
@@ -306,6 +307,10 @@ export class PreviewManager {
         outcome = { ok: false, detail: `Commit ${sha.slice(0, 12)} has no package.json with a name, so there is no plugin to load.` }
       } else {
         outcome = await this.options.provider.build(this.spec(id), candidate.workTree)
+        if (outcome.ok) {
+          const excluded = await excludeBuildOutput(candidate)
+          if (!excluded.ok) outcome = { ok: false, detail: `What the build created could not be kept out of the working copy's change: ${excluded.detail}` }
+        }
       }
       if (!current()) return
       if (outcome.ok) {
@@ -318,11 +323,14 @@ export class PreviewManager {
             return result
           } catch (error) {
             const why = error instanceof Error ? error.message : String(error)
-            return { ok: false, detail: result.ok ? `The instance did not start: ${why}` : `${result.detail} The previous build did not start again: ${why}` }
+            // A change set aside by the promotion stays named, whether or not the instance runs.
+            return result.ok
+              ? { ok: false, detail: `${result.unapplied === undefined ? '' : `${result.detail.trim()} `}The instance did not start: ${why}`, ...(result.unapplied === undefined ? {} : { unapplied: result.unapplied }) }
+              : { ok: false, detail: `${result.detail} The previous build did not start again: ${why}` }
           }
         })
         if (promoted === undefined) return
-        outcome = promoted.ok ? { ok: true, detail: `${checked}${promoted.detail}` } : promoted
+        outcome = promoted.ok ? { ...promoted, detail: `${checked}${promoted.detail}` } : promoted
       }
     } catch (error) {
       outcome = { ok: false, detail: error instanceof Error ? error.message : String(error) }
@@ -343,20 +351,22 @@ export class PreviewManager {
    *
    * The instance is stopped first, so nothing edits the working copy while its
    * change is read.
-   * @returns whether the candidate was promoted, and a sentence about the change.
+   * @returns whether the candidate was promoted, a sentence about the change, and the file the change was set aside in when it did not apply.
    */
-  private async promote(id: string, candidate: Tree, sha: string): Promise<{ ok: boolean; detail: string }> {
+  private async promote(id: string, candidate: Tree, sha: string): Promise<{ ok: boolean; detail: string; unapplied?: string }> {
     await this.options.provider.stop(id)
     const work = this.tree(id)
     const record = this.records.get(id)
     let detail = ''
+    let unapplied: string | undefined
     if (record?.builtSha !== undefined && existsSync(work.workTree)) {
       const frozen = await freeze(work, record.builtSha)
       if (!frozen.ok) return { ok: false, detail: `The working copy's change could not be read, so the new head was not promoted: ${frozen.detail}` }
-      if (frozen.diff !== '') {
+      if (frozen.diff.length > 0) {
         const carried = await carry(candidate, frozen.diff)
         if (!carried.ok) {
-          detail = ` The working copy's change did not apply to the new head; it is kept as unapplied/${this.keepUnapplied(id, frozen.diff)}.`
+          unapplied = this.keepUnapplied(id, frozen.diff)
+          detail = ` The working copy's change did not apply to the new head; it is kept as unapplied/${unapplied}.`
           // A three-way apply that conflicted leaves markers in the files and
           // the change in the index; resetting the index and the tracked files
           // returns the candidate to the head that passed the check, and keeps
@@ -368,6 +378,8 @@ export class PreviewManager {
           if (!checked.ok) {
             return { ok: false, detail: `The new head passed the boot check, but not with the working copy's change carried onto it, so the previous build keeps serving. ${checked.detail}` }
           }
+          const excluded = await excludeBuildOutput(candidate)
+          if (!excluded.ok) return { ok: false, detail: `What the build created could not be kept out of the working copy's change: ${excluded.detail}` }
           detail = ' The working copy\'s change was carried onto the new head and checked with it.'
         }
       }
@@ -380,11 +392,11 @@ export class PreviewManager {
     }
     const latest = this.records.get(id)
     if (latest !== undefined) this.save({ ...latest, builtSha: sha })
-    return { ok: true, detail }
+    return unapplied === undefined ? { ok: true, detail } : { ok: true, detail, unapplied }
   }
 
   /** Write a change that did not carry onto a new head, keeping the last `KEPT`; returns its file name. */
-  private keepUnapplied(id: string, diff: string): string {
+  private keepUnapplied(id: string, diff: Buffer): string {
     const dir = this.dirs(id).unapplied
     mkdirSync(dir, { recursive: true })
     const name = `${new Date().toISOString().replace(/[:.]/g, '-')}.diff`
@@ -448,7 +460,7 @@ export class PreviewManager {
       state,
       ...(record.builtSha === undefined ? {} : { url: base, safeUrl: `${base}safe/`, headSha: record.builtSha }),
       expiresAt: record.expiresAt,
-      ...(record.lastBuild?.ok === false ? { detail: record.lastBuild.detail } : {}),
+      ...(record.lastBuild !== undefined && (!record.lastBuild.ok || record.lastBuild.unapplied !== undefined) ? { detail: record.lastBuild.detail } : {}),
     }
   }
 
@@ -507,8 +519,8 @@ export class PreviewManager {
     if (record?.builtSha === undefined || !existsSync(work.workTree)) return failure(409, 'this preview has no working copy yet')
     const frozen = await freeze(work, record.builtSha)
     if (!frozen.ok) return failure(500, `the working copy could not be frozen: ${frozen.detail}`)
-    if (frozen.diff === '') return failure(409, `the working copy has no changes against ${record.builtSha.slice(0, 12)}`)
-    if (Buffer.byteLength(frozen.diff) > MAX_DIFF_BYTES) return failure(413, `the working copy's change is larger than the ${String(MAX_DIFF_BYTES / 1024 / 1024)} MiB the Action reads`)
+    if (frozen.diff.length === 0) return failure(409, `the working copy has no changes against ${record.builtSha.slice(0, 12)}`)
+    if (frozen.diff.byteLength > MAX_DIFF_BYTES) return failure(413, `the working copy's change is larger than the ${String(MAX_DIFF_BYTES / 1024 / 1024)} MiB the Action reads`)
     const digest = createHash('sha256').update(frozen.diff).digest('hex')
     // Re-read: an `extend` may have saved the record while the diff was taken.
     const latestRecord = this.records.get(id) ?? record
@@ -541,7 +553,7 @@ export class PreviewManager {
     if (!record.revisions.some(entry => entry.revision === revision) || !existsSync(file)) {
       return failure(404, `revision ${revision} is unknown or has been pruned`)
     }
-    return { status: 200, contentType: 'text/x-diff; charset=utf-8', body: readFileSync(file, 'utf8') }
+    return { status: 200, contentType: 'text/x-diff', body: readFileSync(file) }
   }
 
   /**
@@ -631,7 +643,7 @@ export class PreviewManager {
         const result = await git(work, args)
         if (!result.ok) return failure(500, `seeding failed at git ${args[0] ?? ''}: ${result.detail}`)
       }
-      const sha = (await git(work, ['rev-parse', 'HEAD'])).stdout.trim()
+      const sha = (await git(work, ['rev-parse', 'HEAD'])).stdout.toString('utf8').trim()
       writeFileSync(join(work.workTree, 'CONFORMANCE.md'), 'A change for the conformance suite to publish.\n')
       const now = new Date()
       const record = this.save({

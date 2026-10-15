@@ -10,7 +10,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 export interface Answer {
   status: number
   contentType: string
-  body: string
+  /** Bytes for a body that is not UTF-8 text, such as a frozen diff. */
+  body: string | Buffer
   headers?: Record<string, string>
 }
 

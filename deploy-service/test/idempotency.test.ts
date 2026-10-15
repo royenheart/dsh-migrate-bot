@@ -76,7 +76,7 @@ test('answers survive a restart and are pruned after the retention', async () =>
   const restarted = new IdempotencyStore(dir)
   const replay = await restarted.run({ method: 'POST', path: '/p', key: 'k' }, async () => json(200, { first: false }))
   assert.equal(replay.replayed, true)
-  assert.match(replay.answer.body, /"first":true/)
+  assert.match(String(replay.answer.body), /"first":true/)
   const [file] = readdirSync(dir)
   const old = (Date.now() - restarted.retentionMs - 60_000) / 1000
   utimesSync(join(dir, file ?? ''), old, old)

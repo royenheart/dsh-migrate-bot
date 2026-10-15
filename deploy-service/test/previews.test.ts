@@ -311,7 +311,57 @@ test('a change that does not apply to the new head is kept aside, and the clean 
     const unapplied = readdirSync(join(service.dataDir, 'previews', ID, 'unapplied'))
     assert.equal(unapplied.length, 1)
     assert.match(readFileSync(join(service.dataDir, 'previews', ID, 'unapplied', unapplied[0] ?? ''), 'utf8'), /return "mine"/)
-    assert.match(String(service.previews.find(KEY)?.lastBuild?.detail), /kept as unapplied\//)
+    assert.match(String(promoted.detail), /kept as unapplied\//, 'the state says the change was set aside')
+  } finally {
+    await service.close()
+    repo.cleanup()
+  }
+})
+
+test('what a build creates is not part of the change, so a rebuild carries the edits', async () => {
+  const repo = pluginRepository()
+  const service = await startService()
+  try {
+    let builds = 0
+    service.provider.output = (dir) => {
+      builds += 1
+      mkdirSync(join(dir, 'dist'), { recursive: true })
+      writeFileSync(join(dir, 'dist', 'index.js'), `// build ${String(builds)}\n`)
+    }
+    await deliver(service, { action: 'opened', number: 7, sha: repo.head, cloneUrl: repo.origin })
+    writeFileSync(join(work(service), 'index.js'), 'export const apply = () => { return "mine" }\n')
+    const frozen = await (await service.call('POST', PATH, { body: { action: 'publish' } })).json() as { revision: string }
+    const diff = await (await service.call('GET', `${PATH}/scratch?revision=${encodeURIComponent(frozen.revision)}`)).text()
+    assert.match(diff, /return "mine"/)
+    assert.doesNotMatch(diff, /dist\//)
+
+    const moved = repo.commit('next.js', 'export const next = true\n')
+    await deliver(service, { action: 'synchronize', number: 7, sha: moved, cloneUrl: repo.origin })
+    const promoted = await state(service)
+    assert.deepEqual([promoted.state, promoted.headSha, promoted.detail], ['ready', moved, undefined])
+    assert.equal(readFileSync(join(work(service), 'index.js'), 'utf8'), 'export const apply = () => { return "mine" }\n')
+    assert.ok(!existsSync(join(service.dataDir, 'previews', ID, 'unapplied')))
+  } finally {
+    await service.close()
+    repo.cleanup()
+  }
+})
+
+test('a file that is not UTF-8 is frozen, served and carried byte for byte', async () => {
+  const repo = pluginRepository()
+  const service = await startService()
+  try {
+    await deliver(service, { action: 'opened', number: 7, sha: repo.head, cloneUrl: repo.origin })
+    const latin1 = Buffer.from('caf\xe9 cr\xe8me\n', 'latin1')
+    writeFileSync(join(work(service), 'notes.txt'), latin1)
+    const frozen = await (await service.call('POST', PATH, { body: { action: 'publish' } })).json() as { revision: string }
+    const served = Buffer.from(await (await service.call('GET', `${PATH}/scratch?revision=${encodeURIComponent(frozen.revision)}`)).arrayBuffer())
+    assert.ok(served.includes(Buffer.from('+caf\xe9 cr\xe8me', 'latin1')))
+
+    const moved = repo.commit('next.js', 'export const next = true\n')
+    await deliver(service, { action: 'synchronize', number: 7, sha: moved, cloneUrl: repo.origin })
+    assert.equal((await state(service)).headSha, moved)
+    assert.deepEqual(readFileSync(join(work(service), 'notes.txt')), latin1)
   } finally {
     await service.close()
     repo.cleanup()

@@ -73,11 +73,14 @@ export class FakeProvider implements InstanceProvider {
   results: BuildResult[] = [{ ok: true, detail: 'The boot check passed (fake).' }]
   /** How long a start takes. */
   startDelayMs = 0
+  /** What a build writes into the candidate, as an install or a build step would. */
+  output: (candidateDir: string) => void = () => {}
   private readonly instances = new Map<string, RunningInstance>()
   private readonly servers = new Map<string, Server[]>()
 
   async build(_spec: InstanceSpec, candidateDir: string): Promise<BuildResult> {
     this.builds.push(readdirSync(candidateDir).sort())
+    this.output(candidateDir)
     const result = this.results.length > 1 ? this.results.shift() : this.results[0]
     return result ?? { ok: false, detail: 'no result' }
   }

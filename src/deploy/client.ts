@@ -272,7 +272,7 @@ const previewStateSchema = z.object({
   headSha: field,
   /** When the instance stops being served, ISO 8601. */
   expiresAt: field,
-  /** Why the last build failed, when it did. */
+  /** A sentence on the state, such as why the last build failed or why there is no preview. */
   detail: field,
 })
 export type PreviewState = { [K in keyof z.infer<typeof previewStateSchema>]?: string }

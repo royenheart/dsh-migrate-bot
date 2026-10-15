@@ -67,7 +67,9 @@ function install() {
     if (result.status !== 0) fail(`npm ${args.join(' ')} exited ${String(result.status)}`)
   }
   if (!existsSync(join(pluginDir, 'package.json'))) fail('the working copy has no package.json')
-  run([existsSync(join(pluginDir, 'package-lock.json')) ? 'ci' : 'install', '--no-audit', '--no-fund'])
+  // Without a committed lockfile the install writes none: one written into the
+  // working copy would count as part of the person's change.
+  run([...existsSync(join(pluginDir, 'package-lock.json')) ? ['ci'] : ['install', '--no-package-lock'], '--no-audit', '--no-fund'])
   run(['run', 'build', '--if-present'])
 }
 
