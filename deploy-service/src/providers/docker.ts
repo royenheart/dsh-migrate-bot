@@ -1,6 +1,7 @@
+import { spawn } from 'node:child_process'
 import { lchownSync, lstatSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { runProcess } from '../spawn.ts'
+import { runProcess, type SpawnResult } from '../spawn.ts'
 import { buildResult, CHECK_TIMEOUT_MS, INSTALL_TIMEOUT_MS, OUTPUT_BYTES, waitForReady } from './common.ts'
 import type { BuildResult, InstanceProvider, InstanceSpec, RunningInstance } from './types.ts'
 
@@ -63,14 +64,39 @@ export class DockerProvider implements InstanceProvider {
     return { ok: result.code === 0, output: `${result.stdout}${result.stderr}`.trim() }
   }
 
+  /**
+   * Remove every container this provider names: its prefix, a preview id, and
+   * one of its suffixes, so a service whose prefix extends this one's keeps its own.
+   *
+   * For the start of the service, when none of them is in use: a restart
+   * leaves the instances, and the install or check of a build it interrupted.
+   */
+  async removeLeftovers(): Promise<void> {
+    const listed = await this.docker(['ps', '--all', '--filter', `name=${this.options.prefix}`, '--format', '{{.Names}}'])
+    const ours = (name: string): boolean => name.startsWith(this.options.prefix) && /^[0-9a-f]{16}(-install|-check|-forward)?$/.test(name.slice(this.options.prefix.length))
+    const names = listed.ok ? listed.output.split('\n').map(line => line.trim()).filter(ours) : []
+    if (names.length > 0) await this.docker(['rm', '--force', ...names])
+  }
+
+  /**
+   * `docker run --rm` the container `name` to its end. The watchdog of
+   * `runProcess` kills only the CLI client, so a container it killed is removed here.
+   */
+  private async runToEnd(name: string, args: readonly string[], timeoutMs: number): Promise<SpawnResult> {
+    const result = await runProcess('docker', args, { maxBytes: OUTPUT_BYTES, timeoutMs })
+    if (result.killed !== undefined) await this.docker(['rm', '--force', name])
+    return result
+  }
+
   async build(spec: InstanceSpec, candidateDir: string): Promise<BuildResult> {
     const user = this.user([candidateDir])
     const common = ['run', '--rm', '--init', ...LIMITS, ...user, '-e', 'PLUGIN_DIR=/plugin', '-e', 'HOME=/tmp', '-e', 'npm_config_cache=/tmp/.npm', '-v', `${candidateDir}:/plugin`, '-w', '/plugin']
-    await this.docker(['rm', '--force', this.name(spec.id, '-install'), this.name(spec.id, '-check')])
-    const options = { maxBytes: OUTPUT_BYTES }
-    const install = await runProcess('docker', [...common, '--name', this.name(spec.id, '-install'), this.options.image, 'install'], { ...options, timeoutMs: INSTALL_TIMEOUT_MS })
+    const installer = this.name(spec.id, '-install')
+    const checker = this.name(spec.id, '-check')
+    await this.docker(['rm', '--force', installer, checker])
+    const install = await this.runToEnd(installer, [...common, '--name', installer, this.options.image, 'install'], INSTALL_TIMEOUT_MS)
     if (install.code !== 0) return buildResult(install, undefined)
-    const check = await runProcess('docker', [...common, '--name', this.name(spec.id, '-check'), '--network', 'none', this.options.image, 'check'], { ...options, timeoutMs: CHECK_TIMEOUT_MS + 30_000 })
+    const check = await this.runToEnd(checker, [...common, '--name', checker, '--network', 'none', this.options.image, 'check'], CHECK_TIMEOUT_MS + 30_000)
     return buildResult(install, check)
   }
 
@@ -108,6 +134,22 @@ export class DockerProvider implements InstanceProvider {
     try {
       const running = await waitForReady(spec, () => alive)
       this.instances.set(spec.id, running)
+      // As the process provider's exit handler does: a container that exits
+      // (out of memory, a crash) stops the instance, both containers, so
+      // `running` no longer names it and the next visit starts it again. They
+      // are removed by id, so a start that already reused their names keeps its own.
+      const ids = [serve.output, forward.output].flatMap(output => containerId(output) ?? [])
+      for (const container of [name, forwarder]) {
+        const wait = spawn('docker', ['wait', container], { stdio: 'ignore' })
+        const exited = (): void => {
+          if (this.instances.get(spec.id) !== running) return
+          this.options.log(`instance ${spec.id}: container ${container} exited`)
+          this.instances.delete(spec.id)
+          if (ids.length > 0) void this.docker(['rm', '--force', ...ids])
+        }
+        wait.on('exit', exited)
+        wait.on('error', exited)
+      }
       return running
     } catch (error) {
       const logs = await this.docker(['logs', '--tail', '20', name])
@@ -131,6 +173,11 @@ export class DockerProvider implements InstanceProvider {
   running(id: string): RunningInstance | undefined {
     return this.instances.get(id)
   }
+}
+
+/** The id `docker run --detach` printed: the line of its output that is a full container id. */
+function containerId(output: string): string | undefined {
+  return output.split('\n').map(line => line.trim()).reverse().find(line => /^[0-9a-f]{64}$/.test(line))
 }
 
 /** `chown -R` that changes links themselves and never follows them. */

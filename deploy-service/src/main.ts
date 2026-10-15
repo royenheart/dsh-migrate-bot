@@ -20,9 +20,12 @@ function log(message: string): void {
   process.stdout.write(`${new Date().toISOString()} ${message}\n`)
 }
 
-function providerFor(config: ServiceConfig): InstanceProvider {
+async function providerFor(config: ServiceConfig): Promise<InstanceProvider> {
   if (config.PROVIDER === 'docker') {
-    return new DockerProvider({ image: config.DSH_IMAGE ?? '', prefix: config.INSTANCE_PREFIX, log })
+    const docker = new DockerProvider({ image: config.DSH_IMAGE ?? '', prefix: config.INSTANCE_PREFIX, log })
+    // Nothing runs after a start: remove what an earlier run of the service left.
+    await docker.removeLeftovers()
+    return docker
   }
   return new ProcessProvider({ dshBin: config.DSH_BIN, dshVersion: config.DSH_VERSION, dataDir: config.DATA_DIR, log })
 }
@@ -35,7 +38,7 @@ async function main(): Promise<void> {
   }
   const { config } = loaded
   mkdirSync(config.DATA_DIR, { recursive: true })
-  const provider = providerFor(config)
+  const provider = await providerFor(config)
   const previews = new PreviewManager({
     dataDir: config.DATA_DIR,
     publicUrl: config.PUBLIC_URL,

@@ -36,7 +36,7 @@ The service is configured only by its environment. It validates every variable a
 | `TTL_DAYS` | no, 3 | Days from creation to a preview's first expiry. `extend` moves it out, never past the consumer's `deploy.preview.ttlDays` (7 by default) after creation, so keep it below that |
 | `PUBLIC_VIEWS` | no, `false` | `true` serves `/view/…` and `/p/…` without the token; only behind an identity-aware proxy |
 | `PORT`, `HOST` | no, 8080 and `0.0.0.0` | Where the service listens |
-| `INSTANCE_PREFIX` | no, `dsh-preview-` | Prefix of every container the `docker` provider creates; it touches no other container |
+| `INSTANCE_PREFIX` | no, `dsh-preview-` | Prefix of every container the `docker` provider creates; it touches no other container. Two services on one Docker daemon need different prefixes |
 
 `--conformance` is the only flag; it is for a deployment the conformance suite checks, never for one a repository uses.
 
