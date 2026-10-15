@@ -63,7 +63,8 @@ export class CheckRunner {
       check: request.check,
       outcome: output.outcome,
       fingerprint: output.outcome === 'fail' ? output.fingerprint : '',
-      detail: output.output.length <= EXCERPT ? output.output : `…${output.output.slice(-EXCERPT)}`,
+      // A failure's end says what broke; why a check was skipped is said first.
+      detail: output.output.length <= EXCERPT ? output.output : output.outcome === 'skipped' ? `${output.output.slice(0, EXCERPT)}…` : `…${output.output.slice(-EXCERPT)}`,
       ...(output.outcome === 'fail' && output.blame !== undefined ? { blame: output.blame } : {}),
     }
   }
@@ -112,7 +113,7 @@ export class CheckRunner {
         // A tree with no plugin is checked at its root, where the shape scan says what it lacks.
         const plugins = found.length === 0 ? [{ dir: '', name: '' }] : found
         const named = plugins.length > 1
-        // Pinned as the release was published: a prerelease's own packages otherwise resolve their peers to a later prerelease of the line.
+        // Pinned as the release was published, with the install's cutoff (`releaseCutoff`).
         const times = releaseTimes(config.timeouts.commandMs)
         const before = times === undefined ? undefined : releaseCutoff(times, release.version)
         const results = plugins.map(plugin => ({ plugin, result: runMechanical(join(workdir, plugin.dir), config, { dshVersion: release.version, timeoutMs: config.timeouts.commandMs, before, env }) }))

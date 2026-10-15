@@ -34,27 +34,27 @@ export function installArgs(prefix: string, version: string, before: string | un
   return ['install', '-g', '--prefix', prefix, '--no-fund', '--no-audit', ...(before === undefined ? [] : ['--before', before]), `@deepseek-ai/dsh@${version}`]
 }
 
-/** How long a release's packages take to appear around dsh's own: up to 80 minutes was seen (0.2.0-rc.2). */
-const RELEASE_SPREAD_MS = 2 * 60 * 60 * 1000
+/** How far a release's packages spread around dsh's own (docs/design/checks.md says what was seen). */
+const RELEASE_SPREAD_MS = 3 * 60 * 60 * 1000
 
 /**
- * The `--before` date of a release. Until 0.1.7-alpha.2 a release's packages
- * declare `^` ranges on each other, which npm satisfies with a later
- * prerelease of the same \`major.minor.patch\` and with nothing of another; so
- * the cutoff is set before the next prerelease of the same line, by the time a
- * release takes to publish, since its first packages appear before dsh's own.
- * A release with no later prerelease of its line needs no cutoff.
+ * The `--before` date of a release: before the next release of dsh. Until
+ * 0.1.7-alpha.2 a release's packages declare `^` ranges on each other and on
+ * the separately versioned Cordis packages, which npm would otherwise satisfy
+ * with what later releases published. The cutoff sits the spread before the
+ * next release; when the two came less than twice the spread apart, it sits
+ * halfway between them. The newest release has no cutoff.
  * @param times - `npm view @deepseek-ai/dsh time`: publication time by version
  */
 export function releaseCutoff(times: Readonly<Record<string, string>>, version: string): string | undefined {
   const published = times[version]
-  const line = version.split('-')[0]
   if (published === undefined) return undefined
+  const at = Date.parse(published)
   const next = Object.entries(times)
-    .filter(([key, at]) => key.split('-')[0] === line && Date.parse(at) > Date.parse(published))
-    .map(([, at]) => Date.parse(at))
+    .filter(([key, when]) => /^\d/.test(key) && Date.parse(when) > at)
+    .map(([, when]) => Date.parse(when))
     .sort((a, b) => a - b)[0]
-  return next === undefined ? undefined : new Date(next - RELEASE_SPREAD_MS).toISOString()
+  return next === undefined ? undefined : new Date(Math.max(next - RELEASE_SPREAD_MS, (at + next) / 2)).toISOString()
 }
 
 /** When each release of dsh was published, from the npm registry, or `undefined` when it does not say. */

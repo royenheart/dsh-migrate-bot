@@ -4,8 +4,9 @@
  * `src/workflow/` and `src/domain/` are the statechart, its model and the rules
  * it decides with; the property tests replay them without a file system, a
  * process or a network. A module there may import, at run time, only another
- * such module, the configuration schema, and the packages below. Type-only
- * imports are free. Imports are read with the TypeScript parser.
+ * such module, one of `ALSO_PURE` (which are held to the same rule), and the
+ * packages below. Type-only imports are free. Imports are read with the
+ * TypeScript parser.
  */
 
 import { readdirSync } from 'node:fs'
@@ -14,7 +15,7 @@ import ts from 'typescript'
 import { readText, REPO_ROOT } from './repo.ts'
 
 const CORE = ['src/workflow', 'src/domain']
-const ALSO_PURE = ['src/config/schema.ts']
+const ALSO_PURE = ['src/config/schema.ts', 'src/render/text.ts']
 const PACKAGES = new Set(['xstate', 'zod', 'semver'])
 
 export interface PurityViolation {
