@@ -228,6 +228,10 @@ async function run(argv: string[]): Promise<number> {
   for (const task of runnable) harborArgs.push('-i', task.id)
   // Harbor asks before it hands the shell's variables to a verifier; a run that set them for the report judge has answered.
   if (runnable.some(task => suite.find(entry => entry.id === task.id)?.verifierEnv.length)) harborArgs.push('--yes')
+  // A suite whose verifiers read the report judge's variables names the judge in each record, whichever of its tasks ran,
+  // when the run sets every one of them: without one, none of those tasks is applicable.
+  const judgeVariables = [...new Set(suite.flatMap(entry => entry.verifierEnv.filter(name => name.startsWith('REPORT_JUDGE_'))))]
+  const judged = judgeVariables.length > 0 && judgeVariables.every(name => (process.env[name] ?? '') !== '')
   if (KEYLESS.has(subject)) {
     harborArgs.push('-a', subject)
   } else {
@@ -251,7 +255,7 @@ async function run(argv: string[]): Promise<number> {
       repository: SUITES[suiteId].repository,
       commit: suiteCommit,
       tasks,
-      ...(process.env.REPORT_JUDGE_MODEL ? { judge: { baseUrl: process.env.REPORT_JUDGE_BASE_URL ?? '', model: process.env.REPORT_JUDGE_MODEL } } : {}),
+      ...(judged ? { judge: { baseUrl: process.env.REPORT_JUDGE_BASE_URL ?? '', model: process.env.REPORT_JUDGE_MODEL ?? '' } } : {}),
     },
     skillsCommit: git(['rev-parse', 'HEAD'], SKILLS_DIR),
     names: Object.fromEntries(idOf),
@@ -377,6 +381,11 @@ async function resume(argv: string[]): Promise<number> {
   if (git(['rev-parse', 'HEAD']) !== plan.producer.commit) throw new Error(`the run was started at ${plan.producer.commit}; check that commit out to resume it`)
   const apiKey = process.env.DEEPSEEK_API_KEY ?? ''
   if (!KEYLESS.has(plan.subject) && apiKey === '') throw new Error('DEEPSEEK_API_KEY is not set')
+  // The record names the run's report judge, and a remaining trial that a judge grades is graded by the one in the shell: they must be one.
+  const judge = plan.suite.judge
+  if (judge !== undefined && (process.env.REPORT_JUDGE_MODEL !== judge.model || (process.env.REPORT_JUDGE_BASE_URL ?? '') !== judge.baseUrl || (process.env.REPORT_JUDGE_API_KEY ?? '') === '')) {
+    throw new Error(`the run's report judge is ${judge.model} at ${judge.baseUrl}; set the same REPORT_JUDGE_* to resume it`)
+  }
   return harborThenRecord(plan, jobDir, values.harbor, ['job', 'resume', '-p', jobDir], values.records, apiKey)
 }
 
@@ -388,6 +397,8 @@ function compareRecords(argv: string[]): number {
   const input = (record: BenchmarkRecord): Parameters<typeof compare>[0] => ({ tasks: record.suite.tasks, attempts: record.attempts, k: record.subject.attempts })
   console.log(`${base.subject.id} @ ${base.producer.commit.slice(0, 12)} → ${head.subject.id} @ ${head.producer.commit.slice(0, 12)}`)
   if (base.suite.commit !== head.suite.commit) console.log(`suite commits differ: ${base.suite.commit.slice(0, 12)} → ${head.suite.commit.slice(0, 12)}; only tasks in both are paired`)
+  const judge = (record: BenchmarkRecord): string => record.suite.judge === undefined ? 'none' : `${record.suite.judge.model} at ${record.suite.judge.baseUrl}`
+  if (!isDeepStrictEqual(base.suite.judge, head.suite.judge)) console.log(`report judges differ: ${judge(base)} → ${judge(head)}; scores of the reports they graded do not compare`)
   let regressed = false
   for (const row of compare(input(base), input(head))) {
     const interval = row.interval === undefined ? '' : ` [${row.interval.join(', ')}]`

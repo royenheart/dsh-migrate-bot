@@ -12,6 +12,8 @@ async function show(baseId, headId) {
   const notes = []
   if (base.subject.id !== head.subject.id) notes.push(`The subjects differ (${base.subject.id} → ${head.subject.id}): the comparison measures the subjects, not a change to one.`)
   if (base.suite.commit !== head.suite.commit) notes.push(`The suite commits differ (${short(base.suite.commit)} → ${short(head.suite.commit)}): only the tasks both scored are paired.`)
+  const judge = record => record.suite.judge === undefined ? 'none' : `${record.suite.judge.model} at ${record.suite.judge.baseUrl}`
+  if (judge(base) !== judge(head)) notes.push(`The report judges differ (${judge(base)} → ${judge(head)}): scores of the reports they graded do not compare.`)
   if (base.producer.dirty || head.producer.dirty) notes.push('A record was produced from a tree with uncommitted changes.')
   document.getElementById('notes').innerHTML = notes.map(note => `<p class="warning">${escape(note)}</p>`).join('')
     + `<p>${base.producer.snapshot === head.producer.snapshot ? 'The Action was the same in both runs.' : `<a href="changes.html?from=${encodeURIComponent(base.id)}&to=${encodeURIComponent(head.id)}">What changed in the Action between these runs</a>`}</p>`
