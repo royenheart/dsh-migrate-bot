@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { parseArgs } from 'node:util'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -30,18 +31,19 @@ function argv(inputs: Record<string, string>, args: string[] = []): string[] {
 
 test('the inputs of a run become its arguments, and an empty input none', () => {
   assert.deepEqual(argv({ INPUT_WORKDIR: '.', INPUT_CONFIG: 'cfg.yml', INPUT_TARGET: '', INPUT_FORCE: 'true', INPUT_SKIP_GITHUB: 'false' }), [
-    'run', '--workdir', '<workspace>/.', '--config', 'cfg.yml', '--force',
+    'run', '--workdir', '<workspace>/.', '--config=cfg.yml', '--force',
   ])
 })
 
 test('a closed pull request and a comment carry their own inputs', () => {
   assert.deepEqual(argv({ INPUT_COMMAND: 'pull-request-closed', INPUT_PULL_REQUEST: '9', INPUT_MERGED: 'true' }), [
-    'pull-request-closed', '--workdir', '<workspace>/.', '--number', '9', '--merged', 'true',
+    'pull-request-closed', '--workdir', '<workspace>/.', '--number=9', '--merged=true',
   ])
-  const comment = argv({ INPUT_COMMAND: 'comment', INPUT_COMMENT_BODY: '/dsh-migrate status\n--force', INPUT_COMMENT_ID: '77', INPUT_ISSUE_NUMBER: '9' })
+  const comment = argv({ INPUT_COMMAND: 'comment', INPUT_COMMENT_BODY: '- /dsh-migrate status\n--force', INPUT_COMMENT_ID: '77', INPUT_ISSUE_NUMBER: '9' })
   assert.deepEqual(comment.slice(0, 1), ['comment'])
-  // A comment body is one argument whatever it contains.
-  assert.equal(comment[comment.indexOf('--body') + 1], '/dsh-migrate status\n--force')
+  // A comment body is one argument whatever it contains, a leading `-` included.
+  assert.ok(comment.includes('--body=- /dsh-migrate status\n--force'))
+  assert.equal(parseArgs({ args: comment.slice(1), strict: false }).values.body, '- /dsh-migrate status\n--force')
 })
 
 test('arguments given to docker run pass through unchanged', () => {

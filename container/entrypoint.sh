@@ -18,7 +18,8 @@ fi
 workdir="${INPUT_WORKDIR:-.}"
 [[ "$workdir" = /* ]] || workdir="$workspace/$workdir"
 args=("${INPUT_COMMAND:-run}" --workdir "$workdir")
-option() { if [[ -n "${2:-}" ]]; then args+=("$1" "$2"); fi; }
+# `--name=value`: a value that starts with `-`, such as a comment beginning with a list item, stays a value.
+option() { if [[ -n "${2:-}" ]]; then args+=("$1=$2"); fi; }
 flag() { if [[ "${2:-false}" == [Tt]rue ]]; then args+=("$1"); fi; }
 option --config "${INPUT_CONFIG:-}"
 option --target "${INPUT_TARGET:-}"
