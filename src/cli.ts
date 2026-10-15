@@ -306,7 +306,7 @@ async function comment(runtime: Runtime, options: Options): Promise<number> {
   }
   let reply: string
   if (!mayRunCommands({ authorAssociation: options.association, authorLogin: options.author })) {
-    reply = '**`/dsh-migrate` is refused for this account.** Commands are limited to users with write access to this repository.'
+    reply = '**`/dsh-migrate` is refused for this account.** Commands are limited to the owners, members and collaborators of this repository.'
   } else if (!parsed.ok) {
     reply = parsed.reason === 'help' ? renderCommandHelp() : parsed.reason
   } else if (!runtime.config.deploy.commands) {

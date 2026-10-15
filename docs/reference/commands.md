@@ -5,7 +5,7 @@ description: The /dsh-migrate comment commands and their flags.
 
 # Comment commands reference
 
-A user with write access runs a command by commenting `/dsh-migrate <verb>` on a proposal's issue or pull request. This page is generated from `src/commands/table.ts` by `scripts/references.ts`; edit the source, not this page.
+A commenter the Action admits ([who](../design/workflow.md#9-comment-commands)) runs a command by commenting `/dsh-migrate <verb>` on a proposal's issue or pull request. This page is generated from `src/commands/table.ts` by `scripts/references.ts`; edit the source, not this page.
 
 | Command | Needs a deploy service | Description |
 | --- | --- | --- |

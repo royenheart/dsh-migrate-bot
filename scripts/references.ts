@@ -218,7 +218,7 @@ function commands(): string {
   return page(
     'The /dsh-migrate comment commands and their flags.',
     'Comment commands reference',
-    `A user with write access runs a command by commenting \`${COMMAND_PREFIX} <verb>\` on a proposal's issue or pull request. ${generatedFrom('src/commands/table.ts')}`,
+    `A commenter the Action admits ([who](../design/workflow.md#9-comment-commands)) runs a command by commenting \`${COMMAND_PREFIX} <verb>\` on a proposal's issue or pull request. ${generatedFrom('src/commands/table.ts')}`,
     [
       '| Command | Needs a deploy service | Description |',
       '| --- | --- | --- |',

@@ -20,7 +20,16 @@ import type { MigrationEvent, Proposal } from '../workflow/model.ts'
 
 export const PROPOSAL_BRANCH = 'dsh-migrate/proposal'
 
-const issueSchema = z.object({ number: z.number(), html_url: z.string(), body: z.string().nullable().optional(), pull_request: z.unknown().optional() })
+const issueSchema = z.object({
+  number: z.number(),
+  html_url: z.string(),
+  body: z.string().nullable().optional(),
+  pull_request: z.unknown().optional(),
+  user: z.object({ type: z.string() }).nullable().optional(),
+  author_association: z.string().optional(),
+})
+/** Who may have opened the proposal issue: a bot account, as the Action's token is, or someone the repository trusts. Anyone can write the marker. */
+const TRUSTED_AUTHORS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR'])
 const pullSchema = z.object({ number: z.number(), html_url: z.string() })
 const commentSchema = z.object({ body: z.string().nullable().optional() })
 
@@ -47,7 +56,8 @@ export async function publishProposal(
 
   const inherited = context.input.proposal
   const issue = inherited?.issue.number ?? (await deps.github.paginate(`/repos/${repo}/issues?state=open`, issueSchema))
-    .find(candidate => candidate.pull_request === undefined && candidate.body?.includes(PROPOSAL_MARKER) === true)?.number
+    .find(candidate => candidate.pull_request === undefined && candidate.body?.includes(PROPOSAL_MARKER) === true
+      && (candidate.user?.type === 'Bot' || TRUSTED_AUTHORS.has(candidate.author_association ?? '')))?.number
   const issueLink = issue === undefined
     ? await deps.github.rest('POST', `/repos/${repo}/issues`, issueSchema, { title: documents.title, body: documents.issue })
     : await deps.github.rest('PATCH', `/repos/${repo}/issues/${String(issue)}`, issueSchema, { title: documents.title, body: documents.issue, state: 'open' })

@@ -53,7 +53,7 @@ export class FakeGitHub {
   }
 
   private issueJson(issue: FakeIssue): unknown {
-    return { number: issue.number, html_url: `https://github.com/${this.repo}/issues/${String(issue.number)}`, title: issue.title, body: issue.body, state: issue.state }
+    return { number: issue.number, html_url: `https://github.com/${this.repo}/issues/${String(issue.number)}`, title: issue.title, body: issue.body, state: issue.state, user: { type: 'Bot' } }
   }
 
   private pullJson(pull: FakePull): unknown {
