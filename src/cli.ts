@@ -9,7 +9,7 @@ import { createDshRunner, formatSessionProgress } from './agents/dsh.ts'
 import { runSelfTest } from './agents/self-test.ts'
 import { createActivities } from './activities/index.ts'
 import { checkTree } from './activities/check-tree.ts'
-import { maintainerCommits } from './activities/proposal.ts'
+import { maintainerCommits, pullRequestState } from './activities/proposal.ts'
 import { parseCommand, mayRunCommands } from './commands/parse.ts'
 import { runCommand } from './commands/run.ts'
 import { renderCommandHelp } from './commands/table.ts'
@@ -49,7 +49,7 @@ options:
   --workdir DIR         the plugin checkout (default: the current directory)
   --config FILE         the configuration (default: .github/dsh-migrate.yml when it exists)
   --target RELEASE      override the configured target release
-  --force               run even when the target release was already processed
+  --force               run even when the target release was already processed, unless its proposal is still open
   --skip-github         do not publish a proposal
 `
 
@@ -215,6 +215,8 @@ async function run(runtime: Runtime, force: boolean): Promise<number> {
   }
   const target = await resolveTarget(runtime.config.target)
   const engine = engineFor(runtime)
+  await reconcileOpenProposal(runtime, engine)
+  await resumeReporting(runtime, engine)
   const projection = engine.status()
   const proposal = projection.open?.context.proposal
   const decision = decideStart({
@@ -242,6 +244,36 @@ async function run(runtime: Runtime, force: boolean): Promise<number> {
   }
 }
 
+/**
+ * Deliver the close of the open proposal's pull request when its own event
+ * never arrived: a job that failed, or one GitHub cancelled while another of
+ * the concurrency group waited. Without this a merged proposal would stay
+ * open, and the next release would take a closed pull request over.
+ */
+async function reconcileOpenProposal(runtime: Runtime, engine: InJobEngine): Promise<void> {
+  const open = engine.status().open
+  const pullRequest = open?.context.proposal?.pullRequest.number
+  if (open === undefined || pullRequest === undefined || runtime.github === undefined) return
+  const state = await pullRequestState(runtime.github.client, runtime.github.repository, pullRequest)
+  if (state.open) return
+  log(`the proposal's pull request #${String(pullRequest)} was ${state.merged ? 'merged' : 'closed'} without its event reaching this Action; delivering it`)
+  await engine.deliver(open.id, { type: 'pull-request.closed', number: pullRequest, merged: state.merged })
+}
+
+/**
+ * Finish a reporting pass a cut-short job left: its log keeps the channels
+ * still to send, and no other event may ever reach the migration, as after
+ * the merge, or with comment commands turned off.
+ */
+async function resumeReporting(runtime: Runtime, engine: InJobEngine): Promise<void> {
+  // A report is delivered through GitHub; without it the pass would end in error instead of waiting.
+  if (runtime.github === undefined) return
+  for (const view of engine.status().migrations.filter(migration => migration.state === 'reporting')) {
+    log(`${view.id}: a reporting pass was cut short; sending the rest`)
+    await engine.resume(view.id)
+  }
+}
+
 async function pullRequestClosed(runtime: Runtime, options: Options): Promise<number> {
   const number = Number(options.number)
   if (!Number.isInteger(number) || number <= 0 || (options.merged !== 'true' && options.merged !== 'false')) {
@@ -249,7 +281,11 @@ async function pullRequestClosed(runtime: Runtime, options: Options): Promise<nu
     return 2
   }
   const engine = engineFor(runtime)
-  const migration = engine.status().migrations.find(view => view.context.proposal?.pullRequest.number === number)
+  // The open proposal first: an older migration whose proposal a newer one took over carries the same number.
+  const projection = engine.status()
+  const migration = projection.open?.context.proposal?.pullRequest.number === number
+    ? projection.open
+    : projection.migrations.find(view => view.context.proposal?.pullRequest.number === number)
   if (migration === undefined) {
     log(`pull request #${String(number)} is not a proposal of this Action; nothing to do`)
     return 0

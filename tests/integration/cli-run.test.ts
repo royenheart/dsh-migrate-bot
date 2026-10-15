@@ -118,8 +118,11 @@ test('a migration runs to a proposal, and its merge is reported to the enabled c
     assert.equal(skipped.status, 0)
     assert.match(skipped.output, /skipped \(unchanged-release\)/)
 
-    const merged = await run(['pull-request-closed', '--workdir', repo.work, '--number', String(pull?.number), '--merged', 'true'], env)
+    // The merge's own job never ran (GitHub cancelled it while another job waited): the next run finds the pull request merged.
+    Object.assign(pull ?? {}, { state: 'closed', merged: true })
+    const merged = await run(['run', '--workdir', repo.work, '--target', '0.2.0'], env)
     assert.equal(merged.status, 0, merged.output)
+    assert.match(merged.output, /was merged without its event reaching this Action/)
     assert.deepEqual(github.external.map(report => [report.repo, report.title]), [['royenheart/dsh-migrate-bot', 'Clean migration']])
 
     const state = new StateStore(repo.clone()).read()

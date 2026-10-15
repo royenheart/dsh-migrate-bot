@@ -40,6 +40,9 @@ stateDiagram-v2
   publishing --> concluded
   concluded --> publishingE2E
   concluded --> settled
+  publishingE2E --> reporting
+  publishingE2E --> rejected
+  publishingE2E --> superseded
   publishingE2E --> settled
   settled --> awaitingMerge
   settled --> unpublished
@@ -48,6 +51,8 @@ stateDiagram-v2
   awaitingMerge --> rejected
   awaitingMerge --> superseded
   accepted --> reporting
+  reporting --> rejected
+  reporting --> superseded
   reporting --> accepted
   reporting --> awaitingMerge
   compatible --> [*]
@@ -88,7 +93,7 @@ An *activity* state asks the engine for one activity and leaves on its result. A
 | `reporting` | group |  | Send the merge report to every enabled channel that has not taken it yet. |
 | `reporting.next` | decision |  |  |
 | `reporting.running` | activity | computed from the context | Send the merge report to the next channel. |
-| `compatible` | final |  | The unmodified tree passes every check on the target release. |
+| `compatible` | final |  | The unmodified tree passes every check on the target release, an advisory end-to-end failure on the way through the host's UI aside, which the summary reports. |
 | `unpublished` | final |  | The tree changed and passed, and publishing is turned off. |
 | `failed` | final |  | The checks still fail; the migration stopped. |
 | `error` | final |  | An activity failed for a reason outside the plugin. |
@@ -138,6 +143,10 @@ Transitions of one state are tried in order; the first whose guard holds is take
 | `publishing` | `proposal.published` | — | `concluded` |
 | `concluded` | immediately | `publishesE2E` | `publishingE2E` |
 | `concluded` | immediately | — | `settled` |
+| `publishingE2E` | `pull-request.closed` | `proposalMerged` | `reporting` |
+| `publishingE2E` | `pull-request.closed` | `proposalClosed` | `rejected` |
+| `publishingE2E` | `proposal.superseded` | `concludedIn(awaitingMerge)` | `superseded` |
+| `publishingE2E` | `command.report` | `newComment` | `reporting` |
 | `publishingE2E` | `e2e.published` | — | `settled` |
 | `settled` | immediately | `concludedIn(awaitingMerge)` | `awaitingMerge` |
 | `settled` | immediately | `concludedIn(unpublished)` | `unpublished` |
@@ -147,6 +156,9 @@ Transitions of one state are tried in order; the first whose guard holds is take
 | `awaitingMerge` | `proposal.superseded` | — | `superseded` |
 | `awaitingMerge` | `command.report` | `newComment` | `reporting` |
 | `accepted` | `command.report` | `newComment` | `reporting` |
+| `reporting` | `pull-request.closed` | `proposalMergedNow` | `reporting` |
+| `reporting` | `pull-request.closed` | `proposalClosedOpen` | `rejected` |
+| `reporting` | `proposal.superseded` | `notMerged` | `superseded` |
 | `reporting.next` | immediately | `pendingEmptyAndMerged` | `accepted` |
 | `reporting.next` | immediately | `pendingEmpty` | `awaitingMerge` |
 | `reporting.next` | immediately | — | `reporting.running` |
@@ -175,6 +187,9 @@ Transitions of one state are tried in order; the first whose guard holds is take
 | `changed` | The tree changed. |
 | `proposalMerged` | The closed pull request is this proposal, and it was merged. |
 | `proposalClosed` | The closed pull request is this proposal. |
+| `notMerged` | The proposal was not merged. |
+| `proposalMergedNow` | The closed pull request is this proposal, it was merged, and no merge was recorded yet. |
+| `proposalClosedOpen` | The closed pull request is this proposal, and it was open until now. |
 | `pendingEmpty` | Every channel of the reporting pass has been tried. |
 | `pendingEmptyAndMerged` | Every channel of the reporting pass has been tried, and the proposal was merged. |
 | `newComment` | The `report` command comes from a comment not handled before. |

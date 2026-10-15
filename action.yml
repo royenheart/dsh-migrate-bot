@@ -22,7 +22,7 @@ inputs:
     required: false
     default: ''
   force:
-    description: run only. Migrate even when the target release was already processed
+    description: run only. Migrate even when the target release was already processed, unless its proposal is still open
     required: false
     default: 'false'
   skip_github:

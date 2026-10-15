@@ -26,7 +26,7 @@ export interface ActivityResult {
 export type ActivityRunner = (request: ActivityRequest, context: MigrationContext) => Promise<ActivityResult>
 
 /** Activities whose effect leaves the job; the log is pushed right after each. */
-const EFFECTFUL = new Set<ActivityRequest['activity']>(['publishProposal', 'deliverReport'])
+const EFFECTFUL = new Set<ActivityRequest['activity']>(['publishProposal', 'publishE2E', 'deliverReport'])
 
 export class EngineError extends Error {
   override readonly name = 'EngineError'
@@ -74,6 +74,16 @@ export class InJobEngine {
   async deliver(id: string, event: MigrationEvent): Promise<MigrationView> {
     if (!this.state.logs.has(id)) throw new EngineError(`no migration ${id} on the state branch`)
     this.append(id, { kind: 'event', at: this.now().toISOString(), event })
+    return await this.advance(id)
+  }
+
+  /**
+   * Run what a migration's state still asks for, without an event: the rest
+   * of a reporting pass whose job was cut short.
+   * @param id - the migration id.
+   */
+  async resume(id: string): Promise<MigrationView> {
+    if (!this.state.logs.has(id)) throw new EngineError(`no migration ${id} on the state branch`)
     return await this.advance(id)
   }
 

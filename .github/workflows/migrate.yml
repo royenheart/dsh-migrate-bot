@@ -18,7 +18,7 @@ on:
         required: false
         default: ''
       force:
-        description: Migrate even when the target release was already processed
+        description: Migrate even when the target release was already processed, unless its proposal is still open
         type: boolean
         required: false
         default: false

@@ -59,8 +59,9 @@ export function commandKey(repository: string, pullRequest: number, verb: string
 /** The migration whose proposal the comment's thread belongs to. */
 function migrationOf(projection: Projection, issueNumber: number | undefined): MigrationView | undefined {
   if (issueNumber === undefined) return undefined
-  return projection.migrations.find(view => view.context.proposal?.pullRequest.number === issueNumber
-    || view.context.proposal?.issue.number === issueNumber)
+  const belongs = (view: MigrationView): boolean => view.context.proposal?.pullRequest.number === issueNumber || view.context.proposal?.issue.number === issueNumber
+  // The open proposal first: a migration whose proposal a newer one took over carries the same numbers.
+  return projection.open !== undefined && belongs(projection.open) ? projection.open : projection.migrations.find(belongs)
 }
 
 export async function runCommand(input: CommandRunInput): Promise<CommandOutcome> {

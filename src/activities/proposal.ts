@@ -84,6 +84,14 @@ export async function publishProposal(
   return { event: { type: 'proposal.published', proposal }, files }
 }
 
+const pullStateSchema = z.object({ state: z.string(), merged: z.boolean().optional() })
+
+/** Whether a proposal's pull request is still open, or how it was closed. */
+export async function pullRequestState(github: GitHubClient, repository: Repository, pullRequest: number): Promise<{ open: true } | { open: false; merged: boolean }> {
+  const pull = await github.rest('GET', `/repos/${slugOf(repository)}/pulls/${String(pullRequest)}`, pullStateSchema)
+  return pull.state === 'open' ? { open: true } : { open: false, merged: pull.merged === true }
+}
+
 const commitSchema = z.object({
   author: z.object({ login: z.string() }).nullable(),
   commit: z.object({ author: z.object({ email: z.string() }).nullable() }),

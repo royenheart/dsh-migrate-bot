@@ -91,26 +91,30 @@ test('a newer release takes over the open proposal and the old migration ends su
   }
 })
 
-test('a reporting pass cut short resumes where it stopped when the event is delivered again', async () => {
-  const repo = checkout()
-  try {
-    const store = new StateStore(repo.work)
-    const migration = input('0.2.0', { settings: settings({ reportChannels: ['migrate-bot', 'upgrade-skill'] }) })
-    const cut = logOf(migration, [
-      ...proposedEvents(proposal(9)),
-      { type: 'pull-request.closed', number: 9, merged: true },
-      { type: 'report.done', channel: 'migrate-bot', outcome: 'delivered', detail: '' },
-    ])
-    assert.ok(store.write(undefined, new Map([[logPath('0.2.0'), serializeLog(cut)]]), 'cut').ok)
-    const calls: ActivityRequest[] = []
-    const view = await engine(repo, scripted(proposal(9), calls), repo.clone())
-      .deliver('0.2.0', { type: 'pull-request.closed', number: 9, merged: true })
-    assert.deepEqual(calls, [{ activity: 'deliverReport', channel: 'upgrade-skill' }])
-    assert.equal(view.state, 'accepted')
-  } finally {
-    repo.cleanup()
-  }
-})
+for (const how of ['without an event', 'on an event its state ignores'] as const) {
+  test(`a reporting pass cut short resumes where it stopped, ${how}`, async () => {
+    const repo = checkout()
+    try {
+      const store = new StateStore(repo.work)
+      const migration = input('0.2.0', { settings: settings({ reportChannels: ['migrate-bot', 'upgrade-skill'] }) })
+      const cut = logOf(migration, [
+        ...proposedEvents(proposal(9)),
+        { type: 'pull-request.closed', number: 9, merged: true },
+        { type: 'report.done', channel: 'migrate-bot', outcome: 'delivered', detail: '' },
+      ])
+      assert.ok(store.write(undefined, new Map([[logPath('0.2.0'), serializeLog(cut)]]), 'cut').ok)
+      const calls: ActivityRequest[] = []
+      const later = engine(repo, scripted(proposal(9), calls), repo.clone())
+      const view = how === 'without an event'
+        ? await later.resume('0.2.0')
+        : await later.deliver('0.2.0', { type: 'pull-request.closed', number: 9, merged: true })
+      assert.deepEqual(calls, [{ activity: 'deliverReport', channel: 'upgrade-skill' }])
+      assert.equal(view.state, 'accepted')
+    } finally {
+      repo.cleanup()
+    }
+  })
+}
 
 test('an activity that throws ends the migration in error, and the error is recorded', async () => {
   const repo = checkout()

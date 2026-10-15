@@ -100,6 +100,9 @@ export const GUARD_DESCRIPTIONS = {
   changed: 'The tree changed.',
   proposalMerged: 'The closed pull request is this proposal, and it was merged.',
   proposalClosed: 'The closed pull request is this proposal.',
+  notMerged: 'The proposal was not merged.',
+  proposalMergedNow: 'The closed pull request is this proposal, it was merged, and no merge was recorded yet.',
+  proposalClosedOpen: 'The closed pull request is this proposal, and it was open until now.',
   pendingEmpty: 'Every channel of the reporting pass has been tried.',
   pendingEmptyAndMerged: 'Every channel of the reporting pass has been tried, and the proposal was merged.',
   newComment: 'The `report` command comes from a comment not handled before.',
@@ -121,6 +124,13 @@ export const migrationMachine = setup({
     /** The proposal says which end-to-end tests broke; the pull request shows where and how. */
     warnE2E: assign({
       warnings: ({ context }) => [...context.warnings, `${context.e2eBaseline.length > 0 ? 'end-to-end tests that passed before the migration fail now' : 'end-to-end tests fail, and no baseline shows they passed before the migration'} (advisory, see the checks): ${context.failure?.fingerprint ?? ''}`],
+    }),
+    /**
+     * An event from outside reached the migration while it publishes the suite, so the job that
+     * held the migrated tree and the suite has ended; another job has neither, and must not publish.
+     */
+    abandonSuite: assign({
+      warnings: ({ context }) => [...context.warnings, 'end-to-end suite may not have been updated: the job that migrated the tree ended before it recorded publishing it'],
     }),
     acceptReportCommand: assign({
       comments: ({ context, event }) => event.type === 'command.report' ? [...context.comments, event.comment] : context.comments,
@@ -151,6 +161,11 @@ export const migrationMachine = setup({
     proposalMerged: ({ context, event }) => event.type === 'pull-request.closed' && event.merged
       && event.number === context.proposal?.pullRequest.number,
     proposalClosed: ({ context, event }) => event.type === 'pull-request.closed'
+      && event.number === context.proposal?.pullRequest.number,
+    notMerged: ({ context }) => !context.merged,
+    proposalMergedNow: ({ context, event }) => !context.merged && event.type === 'pull-request.closed' && event.merged
+      && event.number === context.proposal?.pullRequest.number,
+    proposalClosedOpen: ({ context, event }) => !context.merged && event.type === 'pull-request.closed'
       && event.number === context.proposal?.pullRequest.number,
     pendingEmpty: ({ context }) => context.pending.length === 0,
     pendingEmptyAndMerged: ({ context }) => context.pending.length === 0 && context.merged,
@@ -363,7 +378,15 @@ export const migrationMachine = setup({
     publishingE2E: {
       description: 'Publish the end-to-end suite on its branch, writing or extending it first when there is no end-to-end baseline. It runs after the conclusion, so the proposal never waits for it, and it never blocks.',
       entry: { type: 'run', params: { activity: 'publishE2E' } },
+      // The proposal is open while the suite is published. An event from outside arrives only after the
+      // job that publishes it was cut short: its merge, close, takeover or report is not lost, and the suite is given up.
       on: {
+        'pull-request.closed': [
+          { guard: 'proposalMerged', target: 'reporting', actions: [assign({ merged: true }), 'abandonSuite'] },
+          { guard: 'proposalClosed', target: 'rejected' },
+        ],
+        'proposal.superseded': { guard: { type: 'concludedIn', params: { state: 'awaitingMerge' } }, target: 'superseded' },
+        'command.report': { guard: 'newComment', target: 'reporting', actions: ['abandonSuite', 'acceptReportCommand'] },
         'e2e.published': {
           target: 'settled',
           actions: assign({
@@ -404,6 +427,14 @@ export const migrationMachine = setup({
         pending: ({ context }) => context.input.settings.reportChannels
           .filter(channel => !context.delivered.includes(channel)),
       }),
+      // A `report` pass before the merge keeps the proposal open; its merge, close or takeover is not lost.
+      on: {
+        'pull-request.closed': [
+          { guard: 'proposalMergedNow', target: '#migration.reporting', reenter: true, actions: assign({ merged: true }) },
+          { guard: 'proposalClosedOpen', target: '#migration.rejected' },
+        ],
+        'proposal.superseded': { guard: 'notMerged', target: '#migration.superseded' },
+      },
       initial: 'next',
       states: {
         next: {

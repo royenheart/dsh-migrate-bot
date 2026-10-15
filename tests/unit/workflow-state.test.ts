@@ -52,8 +52,8 @@ test('I1 a new release takes over the open proposal instead of opening a second 
     proposal: open,
     supersedes: '0.2.0',
   })
-  // A forced re-run of the same release keeps the proposal and supersedes nothing.
-  assert.deepEqual(decideStart({ target: release('0.2.0'), projection, force: true, maintainerCommits: 0 }), { action: 'start', proposal: open })
+  // A forced re-run of the release whose proposal is open would replace the log that holds it.
+  assert.equal(decideStart({ target: release('0.2.0'), projection, force: true, maintainerCommits: 0 }).action, 'skip')
 })
 
 test('a proposal with maintainer commits is never taken over', () => {
@@ -83,4 +83,19 @@ test('the end-to-end suite is published after the proposal, which stays open mea
   const settled = projectionOf({ '0.2.0': logOf(withSuite, [...proposed, { type: 'e2e.published', outcome: 'failed', detail: 'push refused' }]) })
   assert.equal(settled.migrations[0]?.state, 'awaitingMerge')
   assert.deepEqual(settled.migrations[0]?.context.warnings, ['end-to-end suite not updated: push refused'])
+  // A merge delivered while the suite is still being published (its job was cut short) is not lost.
+  const mergedMeanwhile = projectionOf({ '0.2.0': logOf(withSuite, [...proposed, { type: 'pull-request.closed', number: 9, merged: true }]) })
+  assert.equal(mergedMeanwhile.migrations[0]?.state, 'accepted')
+  assert.equal(mergedMeanwhile.verified?.version, '0.2.0')
+  // A report command there means the job holding the migrated tree is gone: the report runs, and the suite is given up.
+  const reportedMeanwhile = projectionOf({ '0.2.0': logOf(withSuite, [...proposed, { type: 'command.report', resend: false, comment: 'c1' }]) })
+  assert.equal(reportedMeanwhile.migrations[0]?.state, 'awaitingMerge')
+  assert.match(reportedMeanwhile.migrations[0]?.context.warnings.join('\n') ?? '', /suite may not have been updated: the job that migrated the tree ended/)
+  // So is one delivered while a report before the merge is still being sent.
+  const reported = input('0.2.0', { settings: settings({ reportChannels: ['migrate-bot'] }) })
+  const reporting = [...proposedEvents(proposal(9)), { type: 'command.report' as const, resend: false, comment: 'c1' }]
+  const mergedWhileReporting = projectionOf({ '0.2.0': logOf(reported, [...reporting, { type: 'pull-request.closed', number: 9, merged: true }]) })
+  assert.equal(mergedWhileReporting.migrations[0]?.state, 'reporting')
+  assert.equal(mergedWhileReporting.migrations[0]?.context.merged, true)
+  assert.equal(projectionOf({ '0.2.0': logOf(reported, [...reporting, { type: 'pull-request.closed', number: 9, merged: false }]) }).migrations[0]?.state, 'rejected')
 })
