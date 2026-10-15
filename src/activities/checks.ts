@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { runMechanical } from '../mechanical/run.ts'
+import { withoutSecrets } from '../secrets.ts'
 import { cardsInSpan, checkLedger, ledgerPathOf, ledgerSchema, renderCardList, type CardLedger } from '../skills/cards.ts'
 import { declaresClient, findPlugins } from '../plugins.ts'
 import { bootProbe, normalizeSignature } from '../verify/boot.ts'
@@ -81,6 +82,8 @@ export class CheckRunner {
 
   private async execute(request: Extract<ActivityRequest, { activity: 'check' }>, release: Release): Promise<CheckOutput> {
     const { workdir, config } = this.deps
+    // Every check is keyless; none sees a secret the Action holds.
+    const env = withoutSecrets(process.env, config)
     switch (request.check) {
       case 'cards': {
         const source = request.source
@@ -111,7 +114,7 @@ export class CheckRunner {
         // Pinned as the release was published: a prerelease's own packages otherwise resolve their peers to a later prerelease of the line.
         const times = releaseTimes(config.timeouts.commandMs)
         const before = times === undefined ? undefined : releaseCutoff(times, release.version)
-        const results = plugins.map(plugin => ({ plugin, result: runMechanical(join(workdir, plugin.dir), config, { dshVersion: release.version, timeoutMs: config.timeouts.commandMs, before }) }))
+        const results = plugins.map(plugin => ({ plugin, result: runMechanical(join(workdir, plugin.dir), config, { dshVersion: release.version, timeoutMs: config.timeouts.commandMs, before, env }) }))
         const failed = results.filter(({ result }) => !result.ok)
         if (failed.length > 0) {
           const first = failed[0] as (typeof failed)[number]
@@ -142,12 +145,12 @@ export class CheckRunner {
         if (plugins.length > 0 && headless.length === 0) {
           return { outcome: 'skipped', fingerprint: '', output: 'every plugin has a browser half (dsh.client); the web check loads them in the web composition' }
         }
-        const probe = await bootProbe({ workdir, bin: installed.bin, dshTag: release.tag, timeoutMs: config.checks.boot.timeoutMs, plugins: headless.length > 0 ? headless : undefined })
+        const probe = await bootProbe({ workdir, bin: installed.bin, dshTag: release.tag, timeoutMs: config.checks.boot.timeoutMs, plugins: headless.length > 0 ? headless : undefined, env })
         return { outcome: probe.outcome === 'pass' ? 'pass' : 'fail', fingerprint: probe.signature, output: probe.detail }
       }
       case 'web': {
         if (!hasClientSurface(workdir)) return { outcome: 'skipped', fingerprint: '', output: 'the plugin declares no dsh.client surface' }
-        const smoke = await webSmoke({ workdir, bin: this.dsh(release), timeoutMs: config.checks.web.timeoutMs, dshTag: release.tag })
+        const smoke = await webSmoke({ workdir, bin: this.dsh(release), timeoutMs: config.checks.web.timeoutMs, dshTag: release.tag, env })
         if (smoke.skipped !== undefined) return { outcome: 'skipped', fingerprint: '', output: smoke.skipped }
         return { outcome: smoke.ok ? 'pass' : 'fail', fingerprint: smoke.signature, output: smoke.detail }
       }
@@ -157,11 +160,11 @@ export class CheckRunner {
         const present = existsSync(join(suiteDir, 'package.json'))
           || readSuite({ workdir, branch: config.checks.e2e.branch, dir: config.checks.e2e.dir, dest: suiteDir })
         if (!present) return { outcome: 'skipped', fingerprint: '', output: `no suite on ${config.checks.e2e.branch} yet` }
-        const served = await startWebHost({ workdir, bin: this.dsh(release), timeoutMs: config.checks.web.timeoutMs, dshTag: release.tag })
+        const served = await startWebHost({ workdir, bin: this.dsh(release), timeoutMs: config.checks.web.timeoutMs, dshTag: release.tag, env })
         if (!served.ok) return { outcome: 'fail', fingerprint: served.failure.signature, output: served.failure.detail }
         let run: SuiteRun
         try {
-          run = runSuite({ suiteDir, webUrl: served.host.url, timeoutMs: config.timeouts.commandMs })
+          run = runSuite({ suiteDir, webUrl: served.host.url, timeoutMs: config.timeouts.commandMs, env })
         } finally {
           served.host.stop()
         }

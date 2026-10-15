@@ -5,6 +5,7 @@ import { restoreTree, snapshotTree } from '../git/worktree.ts'
 import { pluginNames } from '../plugins.ts'
 import { inline } from '../render/text.ts'
 import { startWebHost, hasClientSurface } from '../verify/web.ts'
+import { withoutSecrets } from '../secrets.ts'
 import { usageOf } from './sessions.ts'
 import type { AgentRunner } from '../agents/types.ts'
 import type { MigrateConfig } from '../config/schema.ts'
@@ -71,7 +72,7 @@ export async function characterize(deps: E2EDeps, context: MigrationContext): Pr
   const suiteDir = suiteDirOf(deps.runDir)
   rmSync(suiteDir, { recursive: true, force: true })
   const existing = readSuite({ workdir: deps.workdir, branch: deps.config.checks.e2e.branch, dir: deps.config.checks.e2e.dir, dest: suiteDir })
-  const served = await startWebHost({ workdir: deps.workdir, bin: installed.bin, timeoutMs: deps.config.checks.web.timeoutMs, dshTag: source.tag })
+  const served = await startWebHost({ workdir: deps.workdir, bin: installed.bin, timeoutMs: deps.config.checks.web.timeoutMs, dshTag: source.tag, env: withoutSecrets(process.env, deps.config) })
   if (!served.ok) return event('skipped', `the source release does not serve the plugins: ${served.failure.signature}`)
   let usage: ReturnType<typeof usageOf>
   try {
@@ -81,7 +82,7 @@ export async function characterize(deps: E2EDeps, context: MigrationContext): Pr
       if ('failure' in authored) return event('failed', authored.failure)
       usage = authored.usage
     }
-    const run = runSuite({ suiteDir, webUrl: served.host.url, timeoutMs: deps.config.timeouts.commandMs })
+    const run = runSuite({ suiteDir, webUrl: served.host.url, timeoutMs: deps.config.timeouts.commandMs, env: withoutSecrets(process.env, deps.config) })
     if (run.error !== undefined) return event('failed', run.error, [], usage)
     if (run.passed.length === 0) return event('failed', 'no test of the suite passes on the source release', [], usage)
     writeLedger(suiteDir, source.tag)
@@ -116,7 +117,7 @@ async function publishSuiteOf(deps: E2EDeps, context: MigrationContext): Promise
     if ('failure' in installed) return event('failed', installed.failure)
     rmSync(suiteDir, { recursive: true, force: true })
     const existing = readSuite({ workdir: deps.workdir, branch: deps.config.checks.e2e.branch, dir: deps.config.checks.e2e.dir, dest: suiteDir })
-    const served = await startWebHost({ workdir: deps.workdir, bin: installed.bin, timeoutMs: deps.config.checks.web.timeoutMs, dshTag: target.tag })
+    const served = await startWebHost({ workdir: deps.workdir, bin: installed.bin, timeoutMs: deps.config.checks.web.timeoutMs, dshTag: target.tag, env: withoutSecrets(process.env, deps.config) })
     if (!served.ok) return event('failed', `the target release does not serve the plugins: ${served.failure.signature}`)
     try {
       mkdirSync(suiteDir, { recursive: true })

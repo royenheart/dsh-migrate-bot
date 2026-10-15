@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_API_KEY_ENV, loadSecrets } from '../../src/secrets.ts'
+import { DEFAULT_API_KEY_ENV } from '../../src/config/schema.ts'
+import { loadSecrets } from '../../src/secrets.ts'
 
 test('reads the default migrate-bot env name first', () => {
   const secrets = loadSecrets([], {

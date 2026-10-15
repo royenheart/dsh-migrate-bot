@@ -67,6 +67,8 @@ export interface WebSmokeOptions {
   readyPattern?: RegExp | undefined
   /** The release's `dsh web --help`; read from the binary unless a test supplies it. */
   webHelp?: string | undefined
+  /** The environment dsh starts from; the Action's own unless the caller removed its secrets. */
+  env?: NodeJS.ProcessEnv | undefined
 }
 
 /**
@@ -166,7 +168,7 @@ async function serveWeb(options: WebSmokeOptions, keep: boolean): Promise<Served
     writeProbeProfile(home, profile, names, ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', ...names])
     linkPlugins(dir, options.workdir, plugins)
     const env: NodeJS.ProcessEnv = {
-      ...process.env,
+      ...(options.env ?? process.env),
       DSH_HOME: home,
       DEEPSEEK_API_KEY: process.env.DSH_MIGRATE_PROBE_API_KEY ?? 'probe-placeholder-key',
       DEEPSEEK_BASE_URL: process.env.DSH_MIGRATE_PROBE_BASE_URL ?? 'http://127.0.0.1:9/v1',

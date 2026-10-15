@@ -6,6 +6,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { z } from 'zod'
 import { botEnv, git, gitOut } from '../git/run.ts'
 import { inline } from '../render/text.ts'
+import { scrubWebOutput } from '../verify/web.ts'
 
 /**
  * The end-to-end suite: a self-contained Playwright project that drives the
@@ -206,25 +207,27 @@ const NO_TESTS: SuiteReport = { passed: [], failed: [], errors: {}, phases: {} }
  * Install the suite's dependencies when they are missing and run it against a
  * served `dsh web`.
  */
-export function runSuite(input: { suiteDir: string; webUrl: string; timeoutMs: number }): SuiteRun {
+export function runSuite(input: { suiteDir: string; webUrl: string; timeoutMs: number; env?: NodeJS.ProcessEnv | undefined }): SuiteRun {
   if (!existsSync(join(input.suiteDir, 'package.json'))) return { error: 'the suite has no package.json', ...NO_TESTS, output: '' }
   const run = (command: string, args: string[]): SpawnSyncReturns<string> => spawnSync(command, args, {
     cwd: input.suiteDir,
     encoding: 'utf8',
     timeout: input.timeoutMs,
     maxBuffer: 64 * 1024 * 1024,
-    env: { ...process.env, CI: '1', DSH_MIGRATE_WEB_URL: input.webUrl },
+    env: { ...(input.env ?? process.env), CI: '1', DSH_MIGRATE_WEB_URL: input.webUrl },
   })
   if (!existsSync(join(input.suiteDir, 'node_modules'))) {
     const install = run('npm', ['install', '--no-audit', '--no-fund'])
     if (install.status !== 0) return { error: `npm install failed: ${inline(`${install.stdout}${install.stderr}`.slice(-800), 800)}`, ...NO_TESTS, output: '' }
   }
   const result = run('npx', ['playwright', 'test', '--reporter=json'])
-  const output = `${result.stderr ?? ''}`.slice(-4000)
+  // The launch URL carries the session token; a test's error may quote it.
+  const output = scrubWebOutput(`${result.stderr ?? ''}`).slice(-4000)
   if (result.error !== undefined && result.signal !== null) return { error: `the suite exceeded its ${String(Math.round(input.timeoutMs / 1000))}s watchdog`, ...NO_TESTS, output }
   const report = readReport(result.stdout ?? '')
-  if (report === undefined) return { error: `the suite did not report: ${inline(output || (result.stdout ?? ''), 600)}`, ...NO_TESTS, output }
-  return { ...report, output }
+  if (report === undefined) return { error: `the suite did not report: ${inline(output || scrubWebOutput(result.stdout ?? ''), 600)}`, ...NO_TESTS, output }
+  const errors = Object.fromEntries(Object.entries(report.errors).map(([id, message]) => [id, scrubWebOutput(message)]))
+  return { ...report, errors, output }
 }
 
 /** Write the ledger beside a suite whose index is valid. */

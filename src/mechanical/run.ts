@@ -37,19 +37,21 @@ export interface MechanicalOptions {
   published?: (name: string) => readonly string[] | undefined
   /** The release's `--before` date, so the pinned packages resolve as they were published. */
   before?: string | undefined
+  /** The environment the commands start from; the Action's own unless the caller removed its secrets. */
+  env?: NodeJS.ProcessEnv | undefined
 }
 
 function runCommand(
   command: string,
   cwd: string,
-  extraEnv: NodeJS.ProcessEnv = {},
+  env: NodeJS.ProcessEnv,
   timeoutMs?: number,
 ): { ok: boolean; output: string } {
   const result = spawnSync(command, {
     cwd,
     shell: true,
     encoding: 'utf8',
-    env: { ...process.env, ...extraEnv },
+    env,
     ...(timeoutMs === undefined ? {} : { timeout: timeoutMs, killSignal: 'SIGKILL' as const }),
   })
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`
@@ -135,9 +137,10 @@ export function runMechanical(
       return { ok: false, errors: text, log: text, checks: 0 }
     }
   }
-  const extraEnv: NodeJS.ProcessEnv = options.dshVersion === undefined
-    ? {}
-    : { DSH_MIGRATE_TARGET_VERSION: options.dshVersion }
+  const extraEnv: NodeJS.ProcessEnv = {
+    ...(options.env ?? process.env),
+    ...(options.dshVersion === undefined ? {} : { DSH_MIGRATE_TARGET_VERSION: options.dshVersion }),
+  }
   const prefix = installCommands(root, pkg, options.dshVersion, published, options.before)
   const timeoutMs = options.timeoutMs
 

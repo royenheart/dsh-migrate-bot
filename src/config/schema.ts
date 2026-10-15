@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import { DEFAULT_API_KEY_ENV } from '../secrets.ts'
+
+/** Default GitHub Actions secret / env var that holds the DeepSeek API key. */
+export const DEFAULT_API_KEY_ENV = 'DEEPSEEK_API_KEY_DSH_MIGRATE_BOT'
+/** Default env var that holds the deploy service token. */
+export const DEFAULT_DEPLOY_TOKEN_ENV = 'DSH_MIGRATE_DEPLOY_TOKEN'
 
 /**
  * The consumer configuration, `.github/dsh-migrate.yml`.
@@ -103,7 +107,7 @@ export const configSchema = z.strictObject({
     enabled: z.boolean().default(false).describe('Use a deploy service.'),
     endpoint: z.url({ protocol: /^https?$/ }).optional().transform(url => url?.replace(/\/+$/, ''))
       .describe('Base URL of the deploy service. Required when `enabled`.'),
-    tokenEnv: envName.default('DSH_MIGRATE_DEPLOY_TOKEN').describe('Environment variable holding the deploy service token.'),
+    tokenEnv: envName.default(DEFAULT_DEPLOY_TOKEN_ENV).describe('Environment variable holding the deploy service token.'),
     logStream: z.boolean().default(true).describe('Stream the run log to the deploy service.'),
     commands: z.boolean().default(true).describe('Accept `/dsh-migrate` comment commands.'),
     preview: z.strictObject({

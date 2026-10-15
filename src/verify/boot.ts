@@ -227,6 +227,8 @@ export interface BootProbeOptions {
   keepHome?: boolean | undefined
   /** The plugins to load; every plugin of the tree when omitted. */
   plugins?: readonly Plugin[] | undefined
+  /** The environment dsh starts from; the Action's own unless the caller removed its secrets. */
+  env?: NodeJS.ProcessEnv | undefined
 }
 
 /**
@@ -298,7 +300,7 @@ export async function bootProbe(options: BootProbeOptions): Promise<BootProbeRes
     linkPlugins(join(home, 'profiles', profile), options.workdir, plugins)
 
     const env: NodeJS.ProcessEnv = {
-      ...process.env,
+      ...(options.env ?? process.env),
       DSH_HOME: home,
       // Keyless: a placeholder key plus a dead endpoint. Reaching the model
       // call is the success signal, so no real credential is ever needed.
