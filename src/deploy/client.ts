@@ -48,6 +48,8 @@ export type DeployResult =
      * the parser.
      */
     text?: string
+    /** The same answer as bytes: a patch of a file that is not UTF-8 survives only as these. */
+    bytes?: Buffer
     /**
      * The deploy service recognised the key and answered with the result it already
      * gave, instead of doing the work again. Reported so the reply can say so
@@ -176,6 +178,7 @@ export async function deployRequest(input: {
       ok: true,
       detail: `${input.method} ${input.path} accepted`,
       text,
+      bytes: read.bytes,
       ...(parsed === undefined ? {} : { body: parsed }),
       // Header values are case-insensitive, and a deploy service that answers `True` has
       // replayed just as much as one that answers `true`.
@@ -224,28 +227,31 @@ export interface PublishOutcome {
 async function readBounded(
   response: Response,
   budget: number = MAX_ANSWER_BYTES,
-): Promise<{ text: string; truncated: boolean }> {
-  if (response.body === null) return { text: '', truncated: false }
+): Promise<{ text: string; bytes: Buffer; truncated: boolean }> {
+  if (response.body === null) return { text: '', bytes: Buffer.alloc(0), truncated: false }
   const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let text = ''
+  const chunks: Uint8Array[] = []
   let bytes = 0
+  const read = (truncated: boolean): { text: string; bytes: Buffer; truncated: boolean } => {
+    const all = Buffer.concat(chunks)
+    return { text: new TextDecoder().decode(all), bytes: all, truncated }
+  }
   try {
     for (;;) {
       const chunk = await reader.read()
-      if (chunk.done) return { text: text + decoder.decode(), truncated: false }
+      if (chunk.done) return read(false)
       bytes += chunk.value.byteLength
       if (bytes > budget) {
         await reader.cancel()
-        return { text, truncated: true }
+        return read(true)
       }
-      text += decoder.decode(chunk.value, { stream: true })
+      chunks.push(chunk.value)
     }
   } catch {
     // A stream that failed mid-answer delivered part of an answer, and a partial
     // answer that is accepted as a whole one is how a truncated patch reaches a
     // branch: it is treated exactly like an answer that ran past the cap.
-    return { text, truncated: true }
+    return read(true)
   }
 }
 

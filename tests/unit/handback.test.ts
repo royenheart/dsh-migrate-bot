@@ -372,7 +372,7 @@ test('a branch name or commit a deploy service chose is refused before it reache
   assert.equal(invalidPublishTarget({ branch: 'dsh-migrate/0.1.6', headSha: 'a'.repeat(40), revision: 'r' }), undefined)
   assert.match(invalidPublishTarget({ branch: '--force', headSha: 'a'.repeat(40), revision: 'r' }) ?? '', /not a branch name/)
   assert.match(invalidPublishTarget({ branch: 'a..b', headSha: 'a'.repeat(40), revision: 'r' }) ?? '', /not a branch name/)
-  assert.match(invalidPublishTarget({ branch: 'main', headSha: 'HEAD~1', revision: 'r' }) ?? '', /not a commit/)
+  assert.match(invalidPublishTarget({ branch: 'main', headSha: 'HEAD~1', revision: 'r' }) ?? '', /not a full commit hash/)
   assert.match(invalidPublishTarget({ branch: 'main', headSha: 'a'.repeat(40), revision: 'r\nx' }) ?? '', /commit message/)
 
   const f = fixture()

@@ -270,11 +270,11 @@ async function report(
   if (!result.ok) log(`publish: the deploy service was not told how it ended: ${result.reason}`)
 }
 
-/** The diff a scratch answer carries, whether served as JSON or as a patch. */
-function diffOf(answer: { body?: unknown; text?: string }): { diff: string } | { reason: string } {
+/** The diff a scratch answer carries, whether served as JSON or as a patch, which is kept as bytes. */
+function diffOf(answer: { body?: unknown; text?: string; bytes?: Buffer }): { diff: string | Buffer } | { reason: string } {
   const isJson = typeof answer.body === 'object' && answer.body !== null
   const parsed = z.object({ diff: z.string() }).safeParse(answer.body)
   if (isJson && !parsed.success) return { reason: 'the deploy service answered the frozen revision as JSON without a `diff` field' }
-  const diff = parsed.success ? parsed.data.diff : answer.text ?? ''
-  return diff.trim() === '' ? { reason: 'the deploy service served the frozen revision as an empty diff' } : { diff }
+  const diff = parsed.success ? parsed.data.diff : answer.bytes ?? answer.text ?? ''
+  return diff.toString().trim() === '' ? { reason: 'the deploy service served the frozen revision as an empty diff' } : { diff }
 }

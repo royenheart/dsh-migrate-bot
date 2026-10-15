@@ -34,8 +34,8 @@ export interface HandbackInput {
   headSha: string
   /** The frozen revision, as the deploy service named it. */
   revision: string
-  /** The diff the deploy service served for that revision. */
-  diff: string
+  /** The diff the deploy service served for that revision, as bytes when it was served as a patch. */
+  diff: string | Buffer
   repository: string
   pullRequest: number
   /** Where the temporary worktree goes. */
@@ -53,7 +53,7 @@ export interface GitOutcome {
   detail: string
 }
 
-export type GitRunner = (args: readonly string[], cwd: string, input?: string) => GitOutcome
+export type GitRunner = (args: readonly string[], cwd: string, input?: string | Buffer) => GitOutcome
 
 export type HandbackResult =
   | {
@@ -105,10 +105,10 @@ export function invalidBranch(branch: string): string | undefined {
   return undefined
 }
 
-/** Why a commit cannot be checked out, if it cannot. */
+/** Why a commit cannot be checked out, if it cannot: it is compared with the branch tip, a full lowercase hash. */
 export function invalidCommit(headSha: string): string | undefined {
-  if (!/^[0-9a-f]{7,40}$/i.test(headSha)) {
-    return `\`${headSha}\` is not a commit this Action will check out`
+  if (!/^[0-9a-f]{40}$/.test(headSha)) {
+    return `\`${headSha}\` is not a full commit hash, which this Action needs to compare with the branch`
   }
   return undefined
 }
@@ -372,7 +372,7 @@ export function publishSubject(revision: string, pullRequest: number): string {
   return `dsh-migrate: publish ${revision} (PR #${String(pullRequest)})`
 }
 
-function defaultRun(args: readonly string[], cwd: string, input?: string): GitOutcome {
+function defaultRun(args: readonly string[], cwd: string, input?: string | Buffer): GitOutcome {
   const result = spawnSync('git', [...GIT_SAFE, ...args], {
     cwd,
     encoding: 'utf8',
