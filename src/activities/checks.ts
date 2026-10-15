@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { runMechanical } from '../mechanical/run.ts'
 import { withoutSecrets } from '../secrets.ts'
+import { isIgnoredPath } from '../git/worktree.ts'
 import { cardsInSpan, checkLedger, ledgerPathOf, ledgerSchema, renderCardList, type CardLedger } from '../skills/cards.ts'
 import { declaresClient, findPlugins } from '../plugins.ts'
 import { bootProbe, normalizeSignature } from '../verify/boot.ts'
@@ -93,7 +94,7 @@ export class CheckRunner {
         const path = ledgerPathOf(this.deps.runDir)
         const parsed = existsSync(path) ? safeLedger(readFileSync(path, 'utf8')) : { error: `no card ledger at ${path}` }
         if ('error' in parsed) return { outcome: 'fail', fingerprint: `cards: ${normalizeSignature(parsed.error)}`, output: `${parsed.error}\n\n${renderCardList(cards)}` }
-        const problems = checkLedger(cards, parsed.ledger, file => existsSync(join(workdir, file)))
+        const problems = checkLedger(cards, parsed.ledger, file => !isIgnoredPath(file) && existsSync(join(workdir, file)))
         if (problems.length > 0) {
           const byId = new Map(cards.map(card => [card.id, card]))
           return {

@@ -47,6 +47,8 @@ test('a migration crosses the cards after its source up to its target, in releas
   assert.ok(cards.some(card => card.id === 'DSH-0.1.2-A1-25'))
   assert.ok(cards.every(card => card.level !== '' && card.type !== ''), 'every card of the skill has a type and an action level')
   assert.deepEqual(cardsInSpan(references, '0.2.0-rc.1', '0.2.0-rc.1'), [])
+  // A recipe written as a numbered list on the lines below its field is read whole.
+  assert.match(cardsInSpan(references, '0.1.7-rc.2', '0.2.0-rc.1').find(card => card.id === 'DSH-0.2.0-RC1-01')?.recipe ?? '', /^1\. Rewrite each DSH peer[\s\S]*2\. Ship the peer fix/)
 })
 
 test('the ledger accounts for every card, finishes the required ones, and points into the tree', () => {
@@ -63,6 +65,9 @@ test('the ledger accounts for every card, finishes the required ones, and points
   assert.deepEqual(checkLedger(cards, { cards: [entry('DSH-0.1.2-A1-10', { evidence: ['src/gone.ts'] }), entry('DSH-0.1.2-A1-25', { applies: false })] }, exists), [
     { id: 'DSH-0.1.2-A1-10', problem: 'evidence not in the tree: src/gone.ts' },
     { id: 'DSH-0.1.2-A1-25', problem: 'required although it does not apply' },
+  ])
+  assert.deepEqual(checkLedger(cards, { cards: [entry('DSH-0.1.2-A1-10', { evidence: ['../outside.ts', ''] }), entry('DSH-0.1.2-A1-25', { required: false, status: 'not-needed' })] }, () => true), [
+    { id: 'DSH-0.1.2-A1-10', problem: 'evidence not in the tree: ../outside.ts, ' },
   ])
 })
 

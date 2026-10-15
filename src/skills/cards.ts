@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { isAbsolute, join, posix } from 'node:path'
 import semver from 'semver'
 import { z } from 'zod'
 import { inline } from '../render/text.ts'
@@ -41,7 +41,7 @@ const RELEASE_FILE = /^v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)\.md$/
 /** The cards of one release file. */
 export function parseCards(text: string, release: string): Card[] {
   const cards: Card[] = []
-  let current: { id: string; title: string; fields: Map<string, string> } | undefined
+  let current: { id: string; title: string; fields: Map<string, string>; last?: string | undefined } | undefined
   const close = (): void => {
     if (current === undefined) return
     const field = (name: string): string => current?.fields.get(name) ?? ''
@@ -59,8 +59,18 @@ export function parseCards(text: string, release: string): Card[] {
       current = undefined
       continue
     }
+    if (current === undefined) continue
     const field = CARD_FIELD.exec(line)
-    if (current !== undefined && field !== null && !current.fields.has(field[1] ?? '')) current.fields.set(field[1] ?? '', (field[2] ?? '').trim())
+    if (field !== null) {
+      const name = field[1] ?? ''
+      current.last = current.fields.has(name) ? undefined : name
+      if (current.last !== undefined) current.fields.set(name, (field[2] ?? '').trim())
+    } else if (current.last !== undefined && /^\s+\S/.test(line)) {
+      // A field continues on indented lines: a numbered recipe, a nested list.
+      current.fields.set(current.last, `${current.fields.get(current.last) ?? ''} ${line.trim()}`.trim())
+    } else if (line.trim() !== '') {
+      current.last = undefined
+    }
   }
   close()
   return cards
@@ -127,10 +137,16 @@ export function checkLedger(cards: readonly Card[], ledger: CardLedger, exists: 
     const entry = entries.get(card.id)
     if (entry === undefined) return [{ id: card.id, problem: 'not in the ledger' }]
     if (entry.required && !entry.applies) return [{ id: card.id, problem: 'required although it does not apply' }]
+    if (entry.applies && !entry.required && card.level === 'required') return [{ id: card.id, problem: 'applies at level required but is marked not required' }]
     if (entry.required && entry.status !== 'done') return [{ id: card.id, problem: `required and ${entry.status}` }]
     if (entry.status !== 'done') return []
     if (entry.evidence.length === 0) return [{ id: card.id, problem: 'done without evidence' }]
-    const missing = entry.evidence.filter(path => !exists(path.replace(/:\d+(?::\d+)?$/, '')))
+    // A path in the tree: relative, inside it, and naming something; `exists` also refuses ignored paths.
+    const missing = entry.evidence.filter((path) => {
+      const file = path.replace(/:\d+(?::\d+)?$/, '')
+      const normal = posix.normalize(file)
+      return file === '' || isAbsolute(file) || normal === '.' || normal === '..' || normal.startsWith('../') || !exists(normal)
+    })
     return missing.length === 0 ? [] : [{ id: card.id, problem: `evidence not in the tree: ${missing.join(', ')}` }]
   })
 }

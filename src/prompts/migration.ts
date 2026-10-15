@@ -162,9 +162,9 @@ Keep a ledger of them at \`${input.path}\`, outside the plugin tree, with one en
 \`\`\`
 
 - \`applies\`: whether the change touches this plugin: it uses the API, package, slot, setting or behaviour the card names.
-- \`required\`: whether this migration must act on it. A card that applies is required when its level is \`required\`, \`required-if-hit\`, or \`conditional\` with its condition met. An \`optional\` capability card that applies is required too when the plugin carries a patch, monkey-patch, shim, private API call or local workaround that the card's capability or recipe replaces: once the release offers the public way, a migration retires the workaround. Otherwise it is not required.
+- \`required\`: whether this migration must act on it. A card that applies is required when its level is \`required\` or \`required-if-hit\`, or when its level names a condition (\`conditional\`, \`required-if-<condition>\`) that holds for this plugin and target. An \`optional\` capability card that applies is required too when the plugin carries a patch, monkey-patch, shim, private API call or local workaround that the card's capability or recipe replaces: once the release offers the public way, a migration retires the workaround. Otherwise it is not required.
 - \`status\`: \`done\` when acted on, with \`evidence\` naming the files that show it (\`path\` or \`path:line\`, relative to the plugin repository); \`not-needed\` when it does not apply or is not required; \`open\` when it is required and not done.
 - \`note\`: one line on why.
 
-After your edits the cards check fails while a card is missing from the ledger, a required card is not done, or its evidence names a file that does not exist. Update the ledger whenever you change the plugin.`
+After your edits the cards check fails while a card is missing from the ledger, a required card is not done, a card that applies at level \`required\` is marked not required, or its evidence does not name a file or directory of the plugin repository. Update the ledger whenever you change the plugin.`
 }
