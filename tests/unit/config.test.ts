@@ -81,7 +81,7 @@ test('a built-in report channel needs only enabled; another channel must say whe
     () => parseConfig({ reports: { channels: { mine: { enabled: true, repo: 'me/notes' } } } }),
     /reports\.channels\.mine\.method is required/,
   )
-  const own = parseConfig({ reports: { channels: { mine: { enabled: true, repo: 'me/notes', method: 'issue', prompt: 'Summarize.' } } } })
+  const own = parseConfig({ reports: { channels: { mine: { enabled: true, repo: 'me/notes', method: 'issue', prompt: 'Summarize.', tokenEnv: 'NOTES_TOKEN' } } } })
   assert.equal(own.reports.channels.mine?.method, 'issue')
   assert.throws(() => parseConfig({ reports: { channels: { mine: { method: 'pull' } } } }), /method/)
 })

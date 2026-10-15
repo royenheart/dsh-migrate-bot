@@ -58,11 +58,11 @@ function replacedKey(document: unknown): string | undefined {
   return undefined
 }
 
-/** Report channels that are not built in must say where, how, and what to send. */
+/** Report channels that are not built in must say where, how, what to send, and with which token. */
 function checkUserChannels(config: MigrateConfig): void {
   for (const [id, channel] of Object.entries(config.reports.channels)) {
     if (id in BUILTIN_CHANNELS) continue
-    for (const field of ['repo', 'method', 'prompt'] as const) {
+    for (const field of ['repo', 'method', 'prompt', 'tokenEnv'] as const) {
       if (channel[field] === undefined) {
         throw new ConfigError(`reports.channels.${id}.${field} is required for a channel that is not built in`)
       }

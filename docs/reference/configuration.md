@@ -21,8 +21,8 @@ A consumer configures the Action in `.github/dsh-migrate.yml`. Every key is opti
 | `agent.reasoningEffort` | `off` \| `low` \| `high` \| `max` | `max` | Provider reasoning effort. |
 | `agent.upgradeSkills` | boolean | `true` | Load the `plugin-upgrade` skill of the community upgrade skills into the review and repair sessions. The skill ships in the image; nothing is fetched or sent. |
 | `repair.maxAttempts` | integer | `5` | Attempt limit: the most repair attempts one migration runs. |
-| `secrets.apiKeyEnv` | string | `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` | Environment variable holding the DeepSeek API key. |
-| `quota.limit` | number | — | Spend cap: the most USD one migration may spend, priced from its own usage. |
+| `secrets.apiKeyEnv` | string | `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` | Environment variable holding the DeepSeek API key. The reusable workflow sets only the default name; another name needs a job that runs the Action itself. |
+| `quota.limit` | number | — | Spend cap: the most USD the agent sessions of one migration job (reviews, repair attempts, end-to-end authoring) may spend, priced from their own usage. |
 | `checks.cards.enabled` | boolean | `true` | After the reviews, hold the tree to the ledger the sessions keep of the upgrade skill's change cards between the source and the target release. Needs `agent.upgradeSkills`. |
 | `checks.boot.enabled` | boolean | `true` | Run the boot check. |
 | `checks.boot.timeoutMs` | integer | `180000` | Watchdog for one boot check, in milliseconds. |
@@ -41,13 +41,13 @@ A consumer configures the Action in `.github/dsh-migrate.yml`. Every key is opti
 | `reports.channels.<id>.enabled` | boolean | `false` | Send merge reports to this channel. |
 | `reports.channels.<id>.repo` | string | — | Repository the channel writes to. Required for a channel that is not built in. |
 | `reports.channels.<id>.method` | `issue` \| `discussion` | — | `issue` or `discussion`. Required for a channel that is not built in. |
-| `reports.channels.<id>.tokenEnv` | string | — | Environment variable holding a token that may write to `repo`. |
+| `reports.channels.<id>.tokenEnv` | string | — | Environment variable holding a token that may write to `repo`. Required for a channel that is not built in, whose job must set the variable: the reusable workflow sets only the built-in names. |
 | `reports.channels.<id>.prompt` | string | — | Replaces the channel prompt. Required for a channel that is not built in. |
 | `reports.channels.<id>.labels` | list of string | — | Labels applied to a created issue. |
 | `reports.channels.<id>.discussionCategory` | string | — | Discussion category slug, for `method: discussion`. |
 | `deploy.enabled` | boolean | `false` | Use a deploy service. |
 | `deploy.endpoint` | URL | — | Base URL of the deploy service. Required when `enabled`. |
-| `deploy.tokenEnv` | string | `DSH_MIGRATE_DEPLOY_TOKEN` | Environment variable holding the deploy service token. |
+| `deploy.tokenEnv` | string | `DSH_MIGRATE_DEPLOY_TOKEN` | Environment variable holding the deploy service token. The reusable workflow sets only the default name; another name needs a job that runs the Action itself. |
 | `deploy.logStream` | boolean | `true` | Stream the run log to the deploy service. |
 | `deploy.commands` | boolean | `true` | Accept `/dsh-migrate` comment commands. |
 | `deploy.preview.enabled` | boolean | `true` | Allow preview deployments. |

@@ -37,7 +37,8 @@ repair:
 #   repair: |
 #     custom repair prompt
 
-# Spend cap: the most USD one migration may spend, priced from its own usage.
+# Spend cap: the most USD the agent sessions of one migration job may spend
+# (reviews, repair attempts, end-to-end authoring), priced from their usage.
 # quota:
 #   limit: 2
 

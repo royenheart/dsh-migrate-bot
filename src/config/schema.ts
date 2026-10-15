@@ -39,7 +39,7 @@ const reportChannelSchema = z.strictObject({
   enabled: z.boolean().default(false).describe('Send merge reports to this channel.'),
   repo: repoSlug.optional().describe('Repository the channel writes to. Required for a channel that is not built in.'),
   method: z.enum(REPORT_METHODS).optional().describe('`issue` or `discussion`. Required for a channel that is not built in.'),
-  tokenEnv: envName.optional().describe('Environment variable holding a token that may write to `repo`.'),
+  tokenEnv: envName.optional().describe('Environment variable holding a token that may write to `repo`. Required for a channel that is not built in, whose job must set the variable: the reusable workflow sets only the built-in names.'),
   prompt: z.string().min(1).optional().describe('Replaces the channel prompt. Required for a channel that is not built in.'),
   labels: z.array(z.string().min(1)).optional().describe('Labels applied to a created issue.'),
   discussionCategory: z.string().min(1).optional().describe('Discussion category slug, for `method: discussion`.'),
@@ -72,10 +72,10 @@ export const configSchema = z.strictObject({
     maxAttempts: z.number().int().min(1).default(5).describe('Attempt limit: the most repair attempts one migration runs.'),
   }).prefault({}),
   secrets: z.strictObject({
-    apiKeyEnv: envName.default(DEFAULT_API_KEY_ENV).describe('Environment variable holding the DeepSeek API key.'),
+    apiKeyEnv: envName.default(DEFAULT_API_KEY_ENV).describe('Environment variable holding the DeepSeek API key. The reusable workflow sets only the default name; another name needs a job that runs the Action itself.'),
   }).prefault({}),
   quota: z.strictObject({
-    limit: z.number().positive().optional().describe('Spend cap: the most USD one migration may spend, priced from its own usage.'),
+    limit: z.number().positive().optional().describe('Spend cap: the most USD the agent sessions of one migration job (reviews, repair attempts, end-to-end authoring) may spend, priced from their own usage.'),
   }).prefault({}),
   checks: z.strictObject({
     cards: z.strictObject({
@@ -107,7 +107,7 @@ export const configSchema = z.strictObject({
     enabled: z.boolean().default(false).describe('Use a deploy service.'),
     endpoint: z.url({ protocol: /^https?$/ }).optional().transform(url => url?.replace(/\/+$/, ''))
       .describe('Base URL of the deploy service. Required when `enabled`.'),
-    tokenEnv: envName.default(DEFAULT_DEPLOY_TOKEN_ENV).describe('Environment variable holding the deploy service token.'),
+    tokenEnv: envName.default(DEFAULT_DEPLOY_TOKEN_ENV).describe('Environment variable holding the deploy service token. The reusable workflow sets only the default name; another name needs a job that runs the Action itself.'),
     logStream: z.boolean().default(true).describe('Stream the run log to the deploy service.'),
     commands: z.boolean().default(true).describe('Accept `/dsh-migrate` comment commands.'),
     preview: z.strictObject({
