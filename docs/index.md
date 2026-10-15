@@ -1,27 +1,36 @@
 # Documentation index
 
-The entry point to the documentation: `AGENTS.md` holds the rules and links here, and this table sends a reader to the one document, and the one section, that owns a subject. Read the two rows for [README.md](../README.md) and [AGENTS.md](../AGENTS.md) first; everything else is looked up when a task needs it rather than read up front.
+The entry point to the documentation: `AGENTS.md` holds the rules and links here, and this table sends a reader to the one document, and the one section, that owns a subject. Read the rows for [README.md](../README.md) and [AGENTS.md](../AGENTS.md) first; everything else is looked up when a task needs it rather than read up front.
 
 `scripts/verify-doc-index.ts` computes every entry point below from the target document's actual headings, and fails when a section is renamed, a home disappears, or a document is added without a row. The shape is fixed for the same reason: one topic, one backticked home path, and exactly one link, whose path must equal the home and whose fragment must name a real section.
 
 | Topic | Home | Entry point |
 |---|---|---|
-| The product, its inputs and outputs, and how to consume the Action | `README.md` | [Usage](../README.md#what-it-does) |
+| The product, its inputs and outputs, and how to consume the Action | `README.md` | [What it does](../README.md#what-it-does) |
 | Where to start as a contributor, and what to run before pushing | `README.md` | [Contributing](../README.md#contributing) |
+| Running the Action locally, and what a run without GitHub still writes | `README.md` | [Run it locally](../README.md#run-it-locally) |
 | Installing the Action: secrets, the workflow, permissions, report channels, the deploy service | `docs/operations/install.md` | [The workflow](operations/install.md#the-workflow) |
 | Setting the Action up in a plugin repository with a coding agent: what it looks up, what it asks, what it never does | `docs/operations/install.md` | [Setting it up with an agent](operations/install.md#setting-it-up-with-an-agent) |
+| Moving a plugin repository from the v0 Action: the workflow, the secrets, the configuration, the branches | `docs/operations/install.md` | [Moving from v0](operations/install.md#moving-from-v0) |
+| A copy of the reusable workflow, for a variable name or a report channel of your own | `docs/operations/install.md` | [A copy of the reusable workflow](operations/install.md#a-copy-of-the-reusable-workflow) |
+| What the spend cap counts, and which sessions it does not | `docs/operations/install.md` | [Spend](operations/install.md#spend) |
 | Releasing the Action | `docs/operations/release.md` | [Releasing](operations/release.md#releasing) |
+| Which tag a consumer pins, and release candidates | `docs/operations/release.md` | [What a consumer pins](operations/release.md#what-a-consumer-pins) |
 | How a migration runs as a statechart over an event log, and why | `docs/design/workflow.md` | [Decisions](design/workflow.md#1-decisions) |
 | The invariants the workflow keeps, and the tests that hold them | `docs/design/workflow.md` | [Invariants](design/workflow.md#3-invariants) |
 | What the state branch stores, and what is derived from it | `docs/design/workflow.md` | [The state branch](design/workflow.md#4-the-state-branch) |
-| Merge reports: the channels, their evidence, and their tokens | `docs/design/workflow.md` | [Merge reports](design/workflow.md#8-merge-reports) |
+| When a run starts, skips or takes over a migration, and what it catches up first | `docs/design/workflow.md` | [Starting a migration](design/workflow.md#6-starting-a-migration) |
+| Merge reports: the channels, their evidence, and why each needs a token | `docs/design/workflow.md` | [Merge reports](design/workflow.md#8-merge-reports) |
+| Who may run a comment command, and how a repeated delivery is handled | `docs/design/workflow.md` | [Comment commands](design/workflow.md#9-comment-commands) |
 | Every state, transition and guard of the migration statechart | `docs/reference/workflow.md` | [States](reference/workflow.md#states) |
 | The comment commands | `docs/reference/commands.md` | [Comment commands reference](reference/commands.md#comment-commands-reference) |
 | The five checks, the change-card ledger, the end-to-end suite and its baseline, and watchdogs | `docs/design/checks.md` | [The five checks](design/checks.md#the-five-checks) |
+| What the code a check runs can read, and why it is no sandbox | `docs/design/checks.md` | [What the code a check runs can read](design/checks.md#what-the-code-a-check-runs-can-read) |
 | The agent runtime and its self-test | `docs/design/checks.md` | [The agent runtime](design/checks.md#the-agent-runtime) |
 | The 2026-09-29 outage of every agent session | `docs/postmortems/2026-09-29-agent-runtime-drift.md` | [What broke](postmortems/2026-09-29-agent-runtime-drift.md#what-broke) |
 | Every configuration key, its type and its default | `docs/reference/configuration.md` | [Configuration reference](reference/configuration.md#configuration-reference) |
 | What is evaluated, the outcomes of an attempt, and the comparison rule | `docs/design/evaluation.md` | [Subjects](design/evaluation.md#2-subjects) |
+| The two suites a run draws its tasks from, and what the benchmark adds to their tasks | `docs/design/evaluation.md` | [The suites](design/evaluation.md#8-the-suites) |
 | The benchmark report: its pages, the diff viewer, and the field outcomes of proposals | `docs/design/evaluation.md` | [The report](design/evaluation.md#7-the-report) |
 | Running the benchmark, comparing records, and publishing them | `docs/operations/benchmark.md` | [A run](operations/benchmark.md#a-run) |
 | Every benchmark metric and its definition | `docs/reference/metrics.md` | [Metrics reference](reference/metrics.md#metrics-reference) |

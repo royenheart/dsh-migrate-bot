@@ -7,6 +7,7 @@ Rules for every agent session in this repository. [README.md](README.md) describ
 ```sh
 npm ci                      # Node ^22.19 || >=24
 npm test                    # build + unit, integration and mechanical tests
+npm run test:e2e            # build + the end-to-end tests: the Action against the built deploy service, installing dsh
 npx tsc --noEmit            # type check without emitting
 npm run gates               # repository gates
 node dist/scripts/references.js --write   # regenerate docs/reference/ after changing its source
@@ -23,7 +24,7 @@ npm run deploy-service:build && npm run deploy-service:test   # the reference de
 - **Generated text is never hand-edited.** The changelog and `docs/reference/` are generated from their sources; edit the source and run its generator.
 - **Change the workflow in the statechart first.** A state, event, guard or activity exists only in `src/workflow/machine.ts`; the reference is generated from it, and the property tests in `tests/unit/workflow-machine.test.ts` must pass ([design](docs/design/workflow.md)). `src/workflow/` and `src/domain/` import nothing with side effects; the `pure-core` gate checks it.
 - **Measured numbers live in records.** Rewards, durations and pass rates are computed from the records on `bench/records`; no document restates one.
-- **Run the suite's tasks as they are.** The benchmark changes nothing in a task, its environment or its verifier ([design](docs/design/evaluation.md#2-subjects)), and `vendor/dsh-plugin-upgrade-skill` stays pinned to one commit.
+- **Run the upgrade-skill suite's tasks as they are.** The benchmark changes nothing in their fixtures, verifiers or reference solutions, adding only the agent runtime and access to the model API ([design](docs/design/evaluation.md#8-the-suites)), and `vendor/dsh-plugin-upgrade-skill` stays pinned to one commit.
 - **Commit with Commitizen** (`npm run commit`). `feat`, `fix`, `docs`, `refactor` and `perf` reach the changelog. Only `feat`, `fix`, `refactor` and `perf` bump the version, so a documentation-only change is released with the next functional one. [CHANGELOG.j2](CHANGELOG.j2) is the changelog template.
 - **Gate code adds no dependencies.** The gates in `scripts/` use the Node standard library, TypeScript and the repository's own modules.
 - **Check Docker before acting on it.** A `docker` command acts on the whole daemon, which runs other people's workloads. Run `docker ps` and `docker network ls` before anything that creates, removes or prunes, scope every cleanup to resources this work created, and never run an unfiltered destructive command. A benchmark run is bounded by the daemon's address pool ([procedure](docs/operations/benchmark.md#on-a-shared-machine)).

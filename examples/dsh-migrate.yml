@@ -19,7 +19,8 @@ review:
 repair:
   maxAttempts: 5
 
-# Repository secret / env var that holds the DeepSeek API key.
+# Env var that holds the DeepSeek API key. The reusable workflow sets only the
+# default name; another needs docs/operations/install.md#a-copy-of-the-reusable-workflow.
 # secrets:
 #   apiKeyEnv: MY_DEEPSEEK_KEY
 
@@ -37,8 +38,7 @@ repair:
 #   repair: |
 #     custom repair prompt
 
-# Spend cap: the most USD the agent sessions of one migration job may spend
-# (reviews, repair attempts, end-to-end authoring), priced from their usage.
+# Spend cap in USD; docs/operations/install.md#spend says what it counts.
 # quota:
 #   limit: 2
 
@@ -53,7 +53,8 @@ repair:
 #       enabled: false          # issue -> royenheart/dsh-migrate-bot
 #     harness-discussion:
 #       enabled: false          # discussion -> deepseek-ai/deepseek-harness (Ideas)
-#     my-team-log:              # a channel of your own
+#     my-team-log:              # a channel of your own: its token needs a
+#                               # copy of the reusable workflow (docs/operations/install.md#a-copy-of-the-reusable-workflow)
 #       enabled: false
 #       repo: my-org/migration-log
 #       method: issue           # issue | discussion

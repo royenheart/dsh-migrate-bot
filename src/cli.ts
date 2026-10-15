@@ -50,7 +50,7 @@ options:
   --config FILE         the configuration (default: .github/dsh-migrate.yml when it exists)
   --target RELEASE      override the configured target release
   --force               run even when the target release was already processed, unless its proposal is still open
-  --skip-github         do not publish a proposal
+  --skip-github         do not call the GitHub API; what such a run still writes is in the README (Run it locally)
 `
 
 const OPTIONS = {

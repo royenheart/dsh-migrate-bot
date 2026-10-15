@@ -8,7 +8,7 @@ Each fact has exactly one home — the tier whose job it is. Everywhere else, li
 
 | Tier | Job | Does not belong there |
 |---|---|---|
-| [../README.md](../README.md) | The product: what the Action does, and how to consume it | Design rationale, benchmark methodology, open work, and the configuration table, which [reference/](reference/configuration.md) owns |
+| [../README.md](../README.md) | The product: what the Action does, and where a consumer and a contributor start | Design rationale, benchmark methodology, open work, the installation steps, which [operations/](operations/install.md) owns, and the configuration table, which [reference/](reference/configuration.md) owns |
 | [../AGENTS.md](../AGENTS.md) | Rules an agent needs in context every session, one to three lines each | Worked examples, incident narratives, anything restated from a linked home |
 | [glossary.md](glossary.md) | Every project term, once | Procedures, rationale |
 | [index.md](index.md) | The lookup table: subject → owning document → owning section | Any fact of its own; every row points somewhere else |

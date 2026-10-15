@@ -33,7 +33,7 @@ Every document uses these terms as written here and does not redefine them. *Rep
 | **repair attempt** | One repair session after a failing check, and the checks that follow it. | session kind `repair`, `repair.maxAttempts` | fix session |
 | **stop reason** | Why the repair loop ended without a passing tree. | `STOP_REASONS` | — |
 | **upstream blocker** | A repair report that ends in a valid `BLOCKER: upstream` block. | `blocker: valid` | — |
-| **spend cap** | The USD one migration may spend. | `quota.limit` | — |
+| **spend cap** | The most USD the agent sessions of one migration job may spend ([what it counts](operations/install.md#spend)). | `quota.limit` | — |
 | **extension point** | A slot, RPC, setting or event the harness exposes to plugins. | — | seam |
 | **review report** | The Markdown an overlap, extension-point or repair session writes. | `migrations/<version>/reports/` | — |
 | **patch report** | A report on one change the plugin still needs from dsh, with the upstream threads that exist or a discussion draft. | `migrations/<version>/patch-reports/` | per-patch report |
@@ -63,12 +63,12 @@ Every document uses these terms as written here and does not redefine them. *Rep
 
 | Term | Definition | In code and configuration | Replaces |
 |---|---|---|---|
-| **benchmark suite** | The Harbor tasks of `oh-my-dsh/dsh-plugin-upgrade-skill` at the commit `vendor/dsh-plugin-upgrade-skill` pins. | `SUITE_DIR` | exam suite |
+| **benchmark suite** | A set of Harbor tasks a run draws from: `upgrade-skill`, the tasks of `oh-my-dsh/dsh-plugin-upgrade-skill` at the commit `vendor/dsh-plugin-upgrade-skill` pins, or `spans`, the real migrations in `bench/tasks`. | `SUITES` | exam suite |
 | **benchmark task** | One task directory of the suite. | `TaskEntry` | exam task |
-| **subject** | What a benchmark run measures: `pipeline`, `pipeline+skills`, `session`, `session+skills` or `oracle`. | `SUBJECTS` | migration mode, native mode |
+| **subject** | What a benchmark run measures: `pipeline`, `pipeline+skills`, `session`, `session+skills`, `oracle` or `nop`. | `SUBJECTS` | migration mode, native mode |
 | **attempt** | One Harbor trial of a subject on a task. In a migration, the word is always **repair attempt**. | `Attempt` | — |
 | **attempt outcome** | Why an attempt has its reward or has none: `scored`, `timeout`, `exception` or `infrastructure`. | `OUTCOMES` | — |
-| **feasible task** | A task whose reference solution scored 1.0 on every attempt of the newest oracle record. | `feasible` | — |
+| **feasible task** | A task whose reference solution scored 1.0 on every attempt of the newest oracle record of its suite version, and that doing nothing did not, when a nop record exists. | `feasible` | — |
 | **benchmark record** | The immutable result of one benchmark run, on the `bench/records` branch. | `recordSchema` | — |
 | **field outcome** | What became of a proposal in a consumer repository, derived from its event log. | `FieldMigration` | — |
 

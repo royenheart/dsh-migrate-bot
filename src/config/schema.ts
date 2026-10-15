@@ -39,7 +39,7 @@ const reportChannelSchema = z.strictObject({
   enabled: z.boolean().default(false).describe('Send merge reports to this channel.'),
   repo: repoSlug.optional().describe('Repository the channel writes to. Required for a channel that is not built in.'),
   method: z.enum(REPORT_METHODS).optional().describe('`issue` or `discussion`. Required for a channel that is not built in.'),
-  tokenEnv: envName.optional().describe('Environment variable holding a token that may write to `repo`. Required for a channel that is not built in, whose job must set the variable: the reusable workflow sets only the built-in names.'),
+  tokenEnv: envName.optional().describe('Environment variable holding a token that may write to `repo`; required for a channel that is not built in ([which names reach the Action](../operations/install.md#the-workflow)).'),
   prompt: z.string().min(1).optional().describe('Replaces the channel prompt. Required for a channel that is not built in.'),
   labels: z.array(z.string().min(1)).optional().describe('Labels applied to a created issue.'),
   discussionCategory: z.string().min(1).optional().describe('Discussion category slug, for `method: discussion`.'),
@@ -72,10 +72,10 @@ export const configSchema = z.strictObject({
     maxAttempts: z.number().int().min(1).default(5).describe('Attempt limit: the most repair attempts one migration runs.'),
   }).prefault({}),
   secrets: z.strictObject({
-    apiKeyEnv: envName.default(DEFAULT_API_KEY_ENV).describe('Environment variable holding the DeepSeek API key. The reusable workflow sets only the default name; another name needs a job that runs the Action itself.'),
+    apiKeyEnv: envName.default(DEFAULT_API_KEY_ENV).describe('Environment variable holding the DeepSeek API key ([which names reach the Action](../operations/install.md#the-workflow)).'),
   }).prefault({}),
   quota: z.strictObject({
-    limit: z.number().positive().optional().describe('Spend cap: the most USD the agent sessions of one migration job (reviews, repair attempts, end-to-end authoring) may spend, priced from their own usage.'),
+    limit: z.number().positive().optional().describe('Spend cap in USD ([what it counts](../operations/install.md#spend)).'),
   }).prefault({}),
   checks: z.strictObject({
     cards: z.strictObject({
@@ -90,7 +90,7 @@ export const configSchema = z.strictObject({
         .transform(normalizeDir),
       publish: z.boolean().default(true).describe('After the migration concludes, keep the suite on its branch, writing it first when no end-to-end baseline was recorded. Off, the suite is still read, recorded and checked against, but never written after the conclusion or pushed.'),
       failurePolicy: z.enum(E2E_FAILURE_POLICIES).default('advisory')
-        .describe('`advisory` never lets an end-to-end failure stop a migration: a test that failed on the way through the host\'s UI is reported at once, one that failed in the plugin\'s part is repaired and reported when the repairs do not fix it. `blocking` repairs every failure and fails the migration when the repairs do not fix it.'),
+        .describe('`advisory` never lets an end-to-end failure stop a migration; `blocking` fails it when the repairs do not fix one ([which failures are repaired](../design/checks.md#the-end-to-end-suite-and-its-baseline)).'),
     }).prefault({}),
   }).prefault({}),
   timeouts: z.strictObject({
@@ -107,7 +107,7 @@ export const configSchema = z.strictObject({
     enabled: z.boolean().default(false).describe('Use a deploy service.'),
     endpoint: z.url({ protocol: /^https?$/ }).optional().transform(url => url?.replace(/\/+$/, ''))
       .describe('Base URL of the deploy service. Required when `enabled`.'),
-    tokenEnv: envName.default(DEFAULT_DEPLOY_TOKEN_ENV).describe('Environment variable holding the deploy service token. The reusable workflow sets only the default name; another name needs a job that runs the Action itself.'),
+    tokenEnv: envName.default(DEFAULT_DEPLOY_TOKEN_ENV).describe('Environment variable holding the deploy service token ([which names reach the Action](../operations/install.md#the-workflow)).'),
     logStream: z.boolean().default(true).describe('Stream the run log to the deploy service.'),
     commands: z.boolean().default(true).describe('Accept `/dsh-migrate` comment commands.'),
     preview: z.strictObject({

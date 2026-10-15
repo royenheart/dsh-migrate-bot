@@ -1,6 +1,8 @@
-# Copy to .github/workflows/dsh-migrate.yml in the plugin repository and set
-# the cron. The jobs live in the reusable workflow this calls; this file only
-# chooses the triggers. docs/operations/install.md explains every part.
+# Copy to .github/workflows/dsh-migrate.yml in the plugin repository, set
+# the cron, and pin the release: `@v1` exists once 1.0.0 is released, and a
+# release candidate is pinned by its tag (docs/operations/release.md). The
+# jobs live in the reusable workflow this calls; this file only chooses the
+# triggers. docs/operations/install.md explains every part.
 
 name: dsh-migrate
 
