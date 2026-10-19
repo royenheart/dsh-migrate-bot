@@ -1,5 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { Worker } from 'node:worker_threads'
 import { openLogStream } from '../../src/deploy/log-stream.ts'
 import { parseConfig } from '../../src/config/load.ts'
 import { deployRequest } from '../../src/deploy/client.ts'
@@ -8,30 +10,50 @@ const CONFIG = parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.
 const ENV = { DSH_MIGRATE_DEPLOY_TOKEN: 'secret' }
 
 interface Call {
-  url: string
+  path: string
   body: string
+  /** When the service received it, in ms since the epoch. */
+  at: number
 }
 
-/** A deploy service that answers `/runs` and records every request in order. */
-function service(options: { openStatus?: number; eventStatus?: number; finishStatus?: number; url?: unknown } = {}): {
-  fetchImpl: typeof fetch
-  calls: Call[]
-} {
-  const calls: Call[] = []
-  const fetchImpl: typeof fetch = async (input, init) => {
-    const url = String(input)
-    const body = typeof init?.body === 'string' ? init.body : ''
-    calls.push({ url, body })
-    if (url.endsWith('/runs')) {
-      const status = options.openStatus ?? 200
-      return status === 200
-        ? new Response(JSON.stringify({ url: 'url' in options ? options.url : 'https://deploy.test/view/abc' }), { status })
-        : new Response('nope', { status })
-    }
-    if (url.endsWith('/finish')) return new Response('{}', { status: options.finishStatus ?? 200 })
-    return new Response('{}', { status: options.eventStatus ?? 200 })
+/**
+ * A deploy service that answers `/runs` and records every request in order. It
+ * listens in a thread of its own, so it keeps answering while the test's
+ * thread is blocked, as a run's thread is during a check.
+ */
+async function service(options: { openStatus?: number; eventStatus?: number; finishStatus?: number; url?: unknown } = {}): Promise<{
+  config: ReturnType<typeof parseConfig>
+  calls: () => Promise<Call[]>
+  stop: () => Promise<void>
+}> {
+  const worker = new Worker(`
+    const { parentPort, workerData: o } = require('node:worker_threads')
+    const calls = []
+    const server = require('node:http').createServer((request, response) => {
+      let body = ''
+      request.on('data', chunk => { body += chunk })
+      request.on('end', () => {
+        calls.push({ path: request.url, body, at: Date.now() })
+        const opening = request.url === '/runs'
+        const status = opening ? (o.openStatus ?? 200) : request.url.endsWith('/finish') ? (o.finishStatus ?? 200) : (o.eventStatus ?? 200)
+        const answer = opening && status === 200 ? JSON.stringify({ url: 'url' in o ? o.url : 'https://deploy.test/view/abc' }) : status === 200 ? '{}' : 'nope'
+        response.writeHead(status, { 'content-type': status === 200 ? 'application/json' : 'text/plain' })
+        response.end(answer)
+      })
+    })
+    server.listen(0, '127.0.0.1', () => parentPort.postMessage({ port: server.address().port }))
+    parentPort.on('message', message => {
+      if (message === 'calls') parentPort.postMessage({ calls })
+      else server.close(() => parentPort.close())
+    })
+  `, { eval: true, workerData: options })
+  const next = async (): Promise<Record<string, unknown>> => await new Promise(resolve => worker.once('message', resolve))
+  const { port } = await next() as { port: number }
+  return {
+    config: parseConfig({ deploy: { enabled: true, endpoint: `http://127.0.0.1:${String(port)}` } }),
+    calls: async () => { worker.postMessage('calls'); return (await next()).calls as Call[] },
+    stop: async () => { await worker.terminate() },
   }
-  return { fetchImpl, calls }
 }
 
 /** Run `body` with stderr captured, and return what it wrote. */
@@ -104,129 +126,133 @@ test('an enabled stream with no token is a skip, not a failure', async () => {
 
 test('a deploy service that refuses the run leaves the migration alone', async () => {
   const logs: string[] = []
-  const { fetchImpl, calls } = service({ openStatus: 500 })
-  const stream = await openLogStream({
-    config: CONFIG,
-    env: ENV,
-    repository: 'me/plugin',
-    runId: 'run-1',
-    fetchImpl,
-    log: message => logs.push(message),
-  })
-  assert.equal(stream.url, undefined)
-  assert.match(logs[0] ?? '', /answered 500/)
-  // The stream is silent from then on: no event and no finish reach a service
-  // that has no record to put them in.
-  stream.publish('anything')
-  await stream.close()
-  assert.equal(calls.length, 1)
+  const svc = await service({ openStatus: 500 })
+  try {
+    const stream = await openLogStream({ config: svc.config, env: ENV, repository: 'me/plugin', runId: 'run-1', log: message => logs.push(message) })
+    assert.equal(stream.url, undefined)
+    assert.match(logs[0] ?? '', /answered 500/)
+    // The stream is silent from then on: no event and no finish reach a service
+    // that has no record to put them in.
+    stream.publish('anything')
+    await stream.close()
+    assert.equal((await svc.calls()).length, 1)
+  } finally {
+    await svc.stop()
+  }
 })
 
 test('lines stream in order with increasing sequence numbers, and close finishes the run', async () => {
   const logs: string[] = []
-  const { fetchImpl, calls } = service()
-  const stream = await openLogStream({
-    config: CONFIG,
-    env: ENV,
-    repository: 'me/plugin',
-    runId: 'run-7',
-    fetchImpl,
-    log: message => logs.push(message),
-  })
-  assert.equal(stream.url, 'https://deploy.test/view/abc')
-  assert.match(logs.join('\n'), /log stream: https:\/\/deploy\.test\/view\/abc/)
-  stream.publish('stage: harness checkout')
-  stream.publish('dsh: 3 steps')
-  await stream.close()
+  const svc = await service()
+  try {
+    const stream = await openLogStream({ config: svc.config, env: ENV, repository: 'me/plugin', runId: 'run-7', log: message => logs.push(message) })
+    assert.equal(stream.url, 'https://deploy.test/view/abc')
+    assert.match(logs.join('\n'), /log stream: https:\/\/deploy\.test\/view\/abc/)
+    stream.publish('stage: harness checkout')
+    stream.publish('dsh: 3 steps')
+    await stream.close()
 
-  assert.deepEqual(calls.map(call => call.url), [
-    'https://deploy.test/runs',
-    'https://deploy.test/runs/run-7/events',
-    'https://deploy.test/runs/run-7/events',
-    'https://deploy.test/runs/run-7/finish',
-  ])
-  assert.deepEqual(JSON.parse(calls[0]?.body ?? '{}'), { runId: 'run-7', repository: 'me/plugin', kind: 'migration' })
-  const events = calls.filter(call => call.url.endsWith('/events')).map(call => JSON.parse(call.body) as { seq: number; message: string })
-  assert.deepEqual(events.map(event => event.seq), [1, 2])
-  assert.deepEqual(events.map(event => event.message), ['stage: harness checkout', 'dsh: 3 steps'])
-  assert.deepEqual(JSON.parse(calls[calls.length - 1]?.body ?? '{}'), { events: 2, attempted: 2, complete: true })
+    const calls = await svc.calls()
+    assert.deepEqual(calls.map(call => call.path), ['/runs', '/runs/run-7/events', '/runs/run-7/events', '/runs/run-7/finish'])
+    assert.deepEqual(JSON.parse(calls[0]?.body ?? '{}'), { runId: 'run-7', repository: 'me/plugin', kind: 'migration' })
+    const events = calls.filter(call => call.path.endsWith('/events')).map(call => JSON.parse(call.body) as { seq: number; message: string })
+    assert.deepEqual(events.map(event => event.seq), [1, 2])
+    assert.deepEqual(events.map(event => event.message), ['stage: harness checkout', 'dsh: 3 steps'])
+    assert.deepEqual(JSON.parse(calls[calls.length - 1]?.body ?? '{}'), { events: 2, attempted: 2, complete: true })
+  } finally {
+    await svc.stop()
+  }
+})
+
+test('events go out while the run thread is blocked, as it is while a check runs', async () => {
+  const svc = await service()
+  try {
+    const stream = await openLogStream({ config: svc.config, env: ENV, repository: 'me/plugin', runId: 'run-8', log: () => {} })
+    stream.publish('boot check (source release)')
+    const blocked = Date.now()
+    spawnSync('sleep', ['1.5'])
+    const released = Date.now()
+    await stream.close()
+    const event = (await svc.calls()).find(call => call.path.endsWith('/events'))
+    assert.ok(event !== undefined && event.at < released, 'the event reached the service before the block ended')
+    assert.ok(event.at >= blocked - 100)
+  } finally {
+    await svc.stop()
+  }
 })
 
 test('a run id is one path segment, whatever it contains', async () => {
-  const { fetchImpl, calls } = service()
-  const stream = await openLogStream({ config: CONFIG, env: ENV, repository: 'me/plugin', runId: '12/attempt 2', fetchImpl, log: () => {} })
-  stream.publish('one')
-  await stream.close()
-  assert.deepEqual(calls.slice(1).map(call => call.url), [
-    'https://deploy.test/runs/12%2Fattempt%202/events',
-    'https://deploy.test/runs/12%2Fattempt%202/finish',
-  ])
+  const svc = await service()
+  try {
+    const stream = await openLogStream({ config: svc.config, env: ENV, repository: 'me/plugin', runId: '12/attempt 2', log: () => {} })
+    stream.publish('one')
+    await stream.close()
+    assert.deepEqual((await svc.calls()).slice(1).map(call => call.path), ['/runs/12%2Fattempt%202/events', '/runs/12%2Fattempt%202/finish'])
+  } finally {
+    await svc.stop()
+  }
 })
 
 test('the first stream failure reports once and ends the stream', async () => {
-  const { fetchImpl, calls } = service({ eventStatus: 503, finishStatus: 503 })
-  const written = await captureStderr(async () => {
-    const stream = await openLogStream({
-      config: CONFIG,
-      env: ENV,
-      repository: 'me/plugin',
-      runId: 'run-9',
-      fetchImpl,
-      log: () => {},
+  const svc = await service({ eventStatus: 503, finishStatus: 503 })
+  try {
+    const written = await captureStderr(async () => {
+      const stream = await openLogStream({ config: svc.config, env: ENV, repository: 'me/plugin', runId: 'run-9', log: () => {} })
+      stream.publish('one')
+      stream.publish('two')
+      stream.publish('three')
+      await stream.close()
     })
-    stream.publish('one')
-    stream.publish('two')
-    stream.publish('three')
-    await stream.close()
-  })
-  // A deploy service that refused once keeps refusing, so the stream stops
-  // rather than burning a timeout per event for the rest of the run.
-  assert.equal(calls.filter(call => call.url.endsWith('/events')).length, 1)
-  const reported = written.filter(line => line.includes('stream stopped'))
-  assert.equal(reported.length, 1)
-  assert.match(reported[0] ?? '', /503/)
-  // The finish call this stub also refuses is reported too: a record that was
-  // not sealed is exactly the failure a reader needs to hear about.
-  assert.match(written.join(''), /not sealed/)
-  // The record is still sealed, and says what actually arrived.
-  const finish = calls.find(call => call.url.endsWith('/finish'))
-  assert.ok(finish, 'a stopped stream still finishes the run')
-  assert.deepEqual(JSON.parse(finish.body), { events: 0, attempted: 3, complete: false })
+    const calls = await svc.calls()
+    // A deploy service that refused once keeps refusing, so the stream stops
+    // rather than burning a timeout per event for the rest of the run.
+    assert.equal(calls.filter(call => call.path.endsWith('/events')).length, 1)
+    const reported = written.filter(line => line.includes('stream stopped'))
+    assert.equal(reported.length, 1)
+    assert.match(reported[0] ?? '', /503/)
+    // The finish call this stub also refuses is reported too: a record that was
+    // not sealed is exactly the failure a reader needs to hear about.
+    assert.match(written.join(''), /not sealed/)
+    // The record is still sealed, and says what actually arrived.
+    const finish = calls.find(call => call.path.endsWith('/finish'))
+    assert.ok(finish, 'a stopped stream still finishes the run')
+    assert.deepEqual(JSON.parse(finish.body), { events: 0, attempted: 3, complete: false })
+  } finally {
+    await svc.stop()
+  }
 })
 
 test('a stream that never failed seals quietly', async () => {
-  const { fetchImpl } = service()
-  const written = await captureStderr(async () => {
-    const stream = await openLogStream({ config: CONFIG, env: ENV, repository: 'me/plugin', runId: 'run-10', fetchImpl, log: () => {} })
-    stream.publish('one')
-    await stream.close()
-  })
-  assert.deepEqual(written.filter(line => line.includes('log stream')), [])
+  const svc = await service()
+  try {
+    const written = await captureStderr(async () => {
+      const stream = await openLogStream({ config: svc.config, env: ENV, repository: 'me/plugin', runId: 'run-10', log: () => {} })
+      stream.publish('one')
+      await stream.close()
+    })
+    assert.deepEqual(written.filter(line => line.includes('log stream')), [])
+  } finally {
+    await svc.stop()
+  }
 })
 
 test('closing seals the record once, and nothing published after it is sent', async () => {
-  const { fetchImpl, calls } = service()
-  const stream = await openLogStream({
-    config: CONFIG,
-    env: ENV,
-    repository: 'me/plugin',
-    runId: 'run-11',
-    fetchImpl,
-    log: () => {},
-  })
-  stream.publish('one')
-  await Promise.all([stream.close(), stream.close()])
-  await stream.close()
-  stream.publish('after close')
-  // Give a queued post the chance to go out, if one had been queued.
-  await new Promise(resolve => setImmediate(resolve))
-  assert.equal(calls.filter(call => call.url.endsWith('/events')).length, 1)
-  assert.equal(calls.filter(call => call.url.endsWith('/finish')).length, 1)
-  assert.deepEqual(JSON.parse(calls.find(call => call.url.endsWith('/finish'))?.body ?? '{}'), {
-    events: 1,
-    attempted: 1,
-    complete: true,
-  })
+  const svc = await service()
+  try {
+    const stream = await openLogStream({ config: svc.config, env: ENV, repository: 'me/plugin', runId: 'run-11', log: () => {} })
+    stream.publish('one')
+    await Promise.all([stream.close(), stream.close()])
+    await stream.close()
+    stream.publish('after close')
+    // Give a queued post the chance to go out, if one had been queued.
+    await new Promise(resolve => setTimeout(resolve, 50))
+    const calls = await svc.calls()
+    assert.equal(calls.filter(call => call.path.endsWith('/events')).length, 1)
+    assert.equal(calls.filter(call => call.path.endsWith('/finish')).length, 1)
+    assert.deepEqual(JSON.parse(calls.find(call => call.path.endsWith('/finish'))?.body ?? '{}'), { events: 1, attempted: 1, complete: true })
+  } finally {
+    await svc.stop()
+  }
 })
 
 test('a request to the deploy service never throws, whatever it answers', async () => {
@@ -247,15 +273,14 @@ test('a request to the deploy service never throws, whatever it answers', async 
 test('the page a deploy service names is exposed only when it is a page', async () => {
   const open = async (url: unknown): Promise<{ url: string | undefined; logs: string[] }> => {
     const logs: string[] = []
-    const stream = await openLogStream({
-      config: CONFIG,
-      env: ENV,
-      repository: 'me/plugin',
-      runId: 'run-12',
-      fetchImpl: service({ url }).fetchImpl,
-      log: message => logs.push(message),
-    })
-    return { url: stream.url, logs }
+    const svc = await service({ url })
+    try {
+      const stream = await openLogStream({ config: svc.config, env: ENV, repository: 'me/plugin', runId: 'run-12', log: message => logs.push(message) })
+      await stream.close()
+      return { url: stream.url, logs }
+    } finally {
+      await svc.stop()
+    }
   }
 
   // A `)` would end a markdown link early wherever the URL is linked.
