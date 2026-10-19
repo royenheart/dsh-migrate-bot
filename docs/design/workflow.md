@@ -95,7 +95,7 @@ A run also stops before the machine starts when the agent runtime fails its self
 | `characterize` | API spend when a session writes the suite; nothing is pushed | Not repeated, like `session` |
 | `publishE2E` | Pushes the suite branch | The commit's parent is the branch tip it read, so a repeat with the same suite is `unchanged` and a concurrent push is refused, not overwritten |
 | `inspectTree` | None | — |
-| `publishProposal` | Pushes `dsh-migrate/proposal`; creates or updates the issue and the pull request; comments the patch reports | The branch is force-pushed; the issue and pull request are the inherited ones, or the open ones carrying the proposal marker whose issue a bot account (the Action's token is one) or an owner, member or collaborator opened; the comments carry a marker per migration |
+| `publishProposal` | Pushes `dsh-migrate/proposal` with the default branch's `.github/workflows/`, as GitHub refuses a token without the `workflows` permission a branch whose workflow files differ, and names in the proposal any workflow change of the migration that this leaves out; creates or updates the issue and the pull request; comments the patch reports | The branch is force-pushed; the issue and pull request are the inherited ones, or the open ones carrying the proposal marker whose issue a bot account (the Action's token is one) or an owner, member or collaborator opened; the comments carry a marker per migration |
 | `deliverReport` | Creates an issue or a discussion in the channel's repository | The log records each delivery before the next one, and the machine skips channels that already took the report |
 
 ## 8. Merge reports
