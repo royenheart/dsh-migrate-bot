@@ -1,0 +1,24 @@
+schema_version = "1.4"
+
+[task]
+name = "dsh-migrate-spans/r5-router-0.1.2-to-0.1.5"
+version = "1.0.0"
+description = "Migrate dsh-router, a web plugin written for dsh 0.1.2-rc.1, to dsh 0.1.5-rc.1"
+keywords = ["dsh", "plugin-migration", "real-migration", "web-plugin"]
+
+[metadata]
+difficulty = "medium"
+category = "programming"
+tags = ["dsh", "plugin-upgrade", "span-0.1.2-to-0.1.5"]
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 2400.0
+
+[environment]
+network_mode = "public"
+cpus = 2
+memory_mb = 4096
+storage_mb = 8192

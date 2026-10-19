@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Diff · dsh-migrate benchmark</title>
+<link rel="stylesheet" href="assets/site.css">
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+</head>
+<body>
+<main>
+  <h1>What an attempt produced</h1>
+  <div class="controls">
+    <label>Subject <select id="subject"></select></label>
+    <label>Task <select id="task"></select></label>
+    <label>Artifact <select id="artifact"></select></label>
+    <label>View <select id="view"></select></label>
+  </div>
+  <div class="controls">
+    <label>From <select id="from"></select></label><label>attempt <select id="fromAttempt"></select></label>
+    <label>To <select id="to"></select></label><label>attempt <select id="toAttempt"></select></label>
+    <span class="muted" id="changes"></span>
+  </div>
+  <div id="stats"></div>
+  <div id="editor"></div>
+</main>
+<script type="module" src="assets/diff.js"></script>
+</body>
+</html>

@@ -1,11 +1,9 @@
 # DeepSeek Harness plugin migrator. Build context is the repo root.
-# Pins: Node 24 (dsh needs >=22.19), @deepseek-ai/dsh CLI.
+# Pins: Node 24 (dsh needs >=22.19) and the agent runtime in
+# container/agent-runtime/package-lock.json.
 ARG NODE_IMAGE=node:24-bookworm-slim
 FROM ${NODE_IMAGE}
 
-ARG DSH_CLI_VERSION=0.1.1-rc.2
-# Optional file:// or https:// tarball if npm does not publish this rc.
-ARG DSH_TARBALL=
 ARG DEBIAN_MIRROR=
 ARG NPM_REGISTRY=
 # Optional browser-download mirror (Playwright honors it as an env var).
@@ -29,18 +27,20 @@ RUN set -eux; \
   apt-get install -y --no-install-recommends git ca-certificates python3 make g++; \
   rm -rf /var/lib/apt/lists/*
 
-# Global dsh changes rarely; keep it above COPY src so CLI edits rebuild quickly.
+# The agent runtime: the dsh installation agent sessions run in. It is
+# installed from a committed lockfile so every transitive package is pinned, and
+# it changes rarely, so it stays above COPY src.
+WORKDIR /opt/agent-runtime
+COPY container/agent-runtime/package.json container/agent-runtime/package-lock.json ./
 RUN set -eux; \
   if [ -n "$NPM_REGISTRY" ]; then npm config set registry "$NPM_REGISTRY"; fi; \
-  if [ -n "$DSH_TARBALL" ]; then \
-    npm install -g --omit=dev "$DSH_TARBALL"; \
-  else \
-    npm install -g --omit=dev "@deepseek-ai/dsh@${DSH_CLI_VERSION}"; \
-  fi
+  npm ci --omit=dev; \
+  ln -s /opt/agent-runtime/node_modules/.bin/dsh /usr/local/bin/dsh
 
-# Headless Chromium for the agent-authored end-to-end suite. Browsers live in a
-# shared path so a plugin's own playwright resolves them without re-downloading;
-# the system libraries come from --with-deps.
+# Headless Chromium for the end-to-end suite. Browsers live in a shared path so
+# the suite's @playwright/test, pinned to this version (PLAYWRIGHT_VERSION in
+# src/e2e/suite.ts), resolves them without downloading; the system libraries
+# come from --with-deps.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN set -eux; \
   npm install -g playwright@1.61.1; \
@@ -53,7 +53,7 @@ RUN set -eux; \
 # vendor/dsh-plugin-upgrade-skill submodule pins. It is cloned rather than
 # copied from the submodule because a Docker action's build context does not
 # carry submodules. scripts/verify-skills-pin.ts fails when the two drift.
-ARG UPGRADE_SKILL_COMMIT=ecab245c6c1831c51b0240aca13573b94a6e525e
+ARG UPGRADE_SKILL_COMMIT=ef075767b476e8000c716a18f848028eebcd5aef
 RUN git clone --filter=blob:none --no-checkout https://github.com/oh-my-dsh/dsh-plugin-upgrade-skill.git /opt/dsh-migrate/vendor/upgrade-skill \
   && git -C /opt/dsh-migrate/vendor/upgrade-skill fetch --depth 1 origin "$UPGRADE_SKILL_COMMIT" \
   && git -C /opt/dsh-migrate/vendor/upgrade-skill checkout --detach FETCH_HEAD \
@@ -81,6 +81,9 @@ RUN set -eux; \
 
 ENV DSH_HOME=/opt/dsh-home
 ENV DSH_MIGRATE_APP_ROOT=/opt/dsh-migrate
+
+# An image whose agent runtime cannot start a session is not shipped.
+RUN dsh-migrate self-test
 
 WORKDIR /github/workspace
 ENTRYPOINT ["/opt/dsh-migrate/container/entrypoint.sh"]

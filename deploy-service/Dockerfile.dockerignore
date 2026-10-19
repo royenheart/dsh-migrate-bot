@@ -1,0 +1,10 @@
+# The service image needs the Action's src/ and manifest, and this package.
+*
+!package.json
+!src
+!deploy-service
+deploy-service/.env
+deploy-service/node_modules
+deploy-service/dist
+deploy-service/terraform
+deploy-service/test

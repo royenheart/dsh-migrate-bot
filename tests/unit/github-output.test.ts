@@ -45,15 +45,15 @@ test('dsh runner passes profile, prompt, and DSH_MIGRATE_* env', async () => {
     },
   })
   const result = await runner.run({
-    kind: 'absorption',
+    kind: 'overlap',
     prompt: 'review the plugin',
     workdir: process.cwd(),
-    dsh: {
+    agent: {
       provider: 'deepseek-official',
       model: 'deepseek-v4-flash',
       thinking: 'enabled',
       reasoningEffort: 'max',
-      mode: 'standard',
+      upgradeSkills: false,
     },
     apiKey: 'sk-test',
   })
@@ -62,5 +62,5 @@ test('dsh runner passes profile, prompt, and DSH_MIGRATE_* env', async () => {
   assert.equal(captured?.env.DEEPSEEK_API_KEY, 'sk-test')
   assert.equal(captured?.env.DSH_MIGRATE_MODEL, 'deepseek-v4-flash')
   assert.equal(captured?.env.DSH_MIGRATE_TASK, 'review the plugin')
-  assert.equal(captured?.env.DSH_MIGRATE_MODE, 'standard')
+  assert.equal(captured?.env.DSH_PERMISSION_MODE, 'danger-full-access')
 })

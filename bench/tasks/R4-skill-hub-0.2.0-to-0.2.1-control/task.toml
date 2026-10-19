@@ -1,0 +1,24 @@
+schema_version = "1.4"
+
+[task]
+name = "dsh-migrate-spans/r4-skill-hub-0.2.0-to-0.2.1-control"
+version = "1.0.0"
+description = "Migrate dsh-skill-hub, a web plugin written for dsh 0.2.0-rc.2, to dsh 0.2.1-alpha.2"
+keywords = ["dsh", "plugin-migration", "real-migration", "web-plugin", "control"]
+
+[metadata]
+difficulty = "easy"
+category = "programming"
+tags = ["dsh", "plugin-upgrade", "span-0.2.0-rc.2-to-0.2.1-alpha.2"]
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 2400.0
+
+[environment]
+network_mode = "public"
+cpus = 2
+memory_mb = 4096
+storage_mb = 8192

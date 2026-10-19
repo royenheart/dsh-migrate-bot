@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { hasClientSurface, scrubWebOutput, WEB_READY_PATTERN, webSmoke } from '../../src/verify/web.ts'
+import { hasClientSurface, scrubWebOutput, WEB_READY_PATTERN, webArgs, webSmoke } from '../../src/verify/web.ts'
 
 function plugin(fields: Record<string, unknown>): string {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-mig-web-'))
@@ -35,7 +35,7 @@ test('a plugin without a client surface skips the web layer instead of failing i
       },
     })
     assert.equal(result.ok, true)
-    assert.match(result.skipped ?? '', /no dsh\.client surface/)
+    assert.match(result.skipped ?? '', /no plugin declares a dsh\.client surface/)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -49,6 +49,7 @@ test('a server that reports ready passes, and the profile mounts the web bundle'
       workdir: dir,
       bin: '/bin/dsh',
       timeoutMs: 5_000,
+      webHelp: 'Options:\n  --host <host>\n  --no-open  do not open the Web UI\n',
       spawnImpl: async (args, options) => {
         seen = {
           args,
@@ -60,7 +61,7 @@ test('a server that reports ready passes, and the profile mounts the web bundle'
     })
     assert.equal(result.ok, true)
     assert.equal(result.signature, 'web: server ready')
-    assert.deepEqual(seen?.args, ['web', '--port', '0', '--no-open'])
+    assert.deepEqual(seen?.args, ['--profile', 'probe-web', '--port', '0', '--no-open'])
     assert.deepEqual(seen?.bundles, ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@acme/plugin'])
     assert.equal(seen?.env.DEEPSEEK_BASE_URL, 'http://127.0.0.1:9/v1')
   } finally {
@@ -128,4 +129,24 @@ test('the live session token never reaches a report', async () => {
 test('the ready pattern matches what dsh web actually prints', () => {
   assert.equal(WEB_READY_PATTERN.test('dsh web: listening on http://127.0.0.1:4000'), true)
   assert.equal(WEB_READY_PATTERN.test('dsh: plugin(s) failed to load: x'), false)
+})
+
+test('the profile under test is served, and the browser kept closed with --no-open only where the release has the flag', () => {
+  // `dsh web` is `dsh --profile web`: it would serve a fresh default profile without the plugins.
+  assert.deepEqual(webArgs('Options:\n  --no-open  do not open the Web UI\n', 'probe-web'), ['--profile', 'probe-web', '--port', '0', '--no-open'])
+  // 0.1.0-rc.6 has no --no-open and opens no browser.
+  assert.deepEqual(webArgs('Options:\n  --host <host>\n  --port <port>\n', 'probe-web'), ['--profile', 'probe-web', '--port', '0'])
+})
+
+test('a server that left a plugin out is not ready for it', async () => {
+  const dir = plugin({ dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web' } } })
+  try {
+    // Verbatim shape from dsh 0.2.0-rc.1, which skips the bundle and serves anyway.
+    const output = 'dsh: skipping profile bundle "@acme/plugin": Error: Plugin @acme/plugin@1.0.0 is incompatible with dsh 0.2.0-rc.1: peerDependencies {"@deepseek-ai/dsh-llm":"^0.1.5-rc.2"}\ndsh web: http://127.0.0.1:44323/?token=abc\n'
+    const result = await webSmoke({ workdir: dir, bin: '/bin/dsh', timeoutMs: 5_000, webHelp: '', spawnImpl: async () => ({ code: null, output, timedOut: false, ready: true }) })
+    assert.equal(result.ok, false)
+    assert.match(result.signature, /^web load: @acme\/plugin: Error: Plugin @acme\/plugin@/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

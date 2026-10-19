@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -46,6 +46,18 @@ test('a plugin that fails to load is named in the signature', () => {
   assert.equal(result.outcome, 'fail')
   assert.match(result.signature, /^load: /)
   assert.match(result.signature, /@acme\/dsh-plugin-foo/)
+})
+
+test('a bundle dsh skipped fails the boot, though dsh went on to the model call', () => {
+  // Verbatim shape from dsh 0.2.0-rc.1, which refuses a plugin whose peer ranges do not admit it and boots without it.
+  const result = classifyBoot({
+    code: 1,
+    stdout: '',
+    stderr: 'dsh: skipping profile bundle "dsh-router-core": Error: Plugin dsh-router-core@0.4.2 is incompatible with dsh 0.2.0-rc.1: peerDependencies {"@deepseek-ai/dsh-llm":"^0.1.5-rc.2"}\ndsh: TRANSPORT: DeepSeek API request to http://127.0.0.1:9/v1 failed',
+    timedOut: false,
+  })
+  assert.equal(result.outcome, 'fail')
+  assert.match(result.signature, /^load: dsh-router-core: Error: Plugin dsh-router-core@/)
 })
 
 test('a plugin waiting on a missing service fails', () => {
@@ -132,13 +144,15 @@ test('differing failures keep differing signatures', () => {
   assert.notEqual(one.signature, two.signature)
 })
 
-test('the scratch profile names the plugin in its bundle list', () => {
+test('the scratch profile names the plugin in its bundle list and loads its patches once', () => {
   const home = mkdtempSync(join(tmpdir(), 'dsh-mig-home-'))
   try {
-    writeProbeProfile(home, 'probe', '@acme/dsh-plugin-foo')
+    writeProbeProfile(home, 'probe', ['@acme/dsh-plugin-foo'])
     const pkg: unknown = JSON.parse(readFileSync(join(home, 'profiles', 'probe', 'package.json'), 'utf8'))
-    const bundles = (pkg as { dsh: { profile: { bundles: string[] } } }).dsh.profile.bundles
-    assert.deepEqual(bundles, ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', '@acme/dsh-plugin-foo'])
+    assert.deepEqual((pkg as { dsh: { profile: unknown } }).dsh.profile, {
+      bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', '@acme/dsh-plugin-foo'],
+      patchReload: 'startup',
+    })
   } finally {
     rmSync(home, { recursive: true, force: true })
   }
@@ -148,7 +162,7 @@ test('the probe is keyless and points the model route at a dead port', async () 
   const workdir = mkdtempSync(join(tmpdir(), 'dsh-mig-plugin-'))
   let seen: { args: string[]; env: NodeJS.ProcessEnv; bin: string } | undefined
   try {
-    writeFileSync(join(workdir, 'package.json'), JSON.stringify({ name: '@acme/dsh-plugin-foo' }))
+    writeFileSync(join(workdir, 'package.json'), JSON.stringify({ name: '@acme/dsh-plugin-foo', dsh: { bundle: { patch: './cordis.patch.yml' } } }))
     const result = await bootProbe({
       workdir,
       timeoutMs: 5_000,
@@ -171,7 +185,7 @@ test('the probe is keyless and points the model route at a dead port', async () 
   }
 })
 
-test('a plugin without a usable package name fails fast instead of booting', async () => {
+test('a tree without a plugin fails fast instead of booting', async () => {
   const workdir = mkdtempSync(join(tmpdir(), 'dsh-mig-plugin-'))
   try {
     mkdirSync(join(workdir, 'src'))
@@ -183,7 +197,32 @@ test('a plugin without a usable package name fails fast instead of booting', asy
       },
     })
     assert.equal(result.outcome, 'fail')
-    assert.match(result.signature, /package\.json/)
+    assert.match(result.signature, /no plugin/)
+  } finally {
+    rmSync(workdir, { recursive: true, force: true })
+  }
+})
+
+test('every plugin of a repository boots in one profile', async () => {
+  const workdir = mkdtempSync(join(tmpdir(), 'dsh-mig-plugins-'))
+  let profile: { bundles: string[]; linked: string[] } | undefined
+  try {
+    for (const [dir, name] of [['host', '@acme/host'], ['web', '@acme/web']] as const) {
+      mkdirSync(join(workdir, dir))
+      writeFileSync(join(workdir, dir, 'package.json'), JSON.stringify({ name, dsh: { bundle: { patch: './cordis.patch.yml' } } }))
+    }
+    const result = await bootProbe({
+      workdir,
+      timeoutMs: 5_000,
+      spawnImpl: async (_args, options): Promise<BootSpawnResult> => {
+        const dir = join(options.env.DSH_HOME ?? '', 'profiles', 'probe')
+        const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { dsh: { profile: { bundles: string[] } } }
+        profile = { bundles: manifest.dsh.profile.bundles, linked: ['@acme/host', '@acme/web'].filter(name => existsSync(join(dir, 'node_modules', name, 'package.json'))) }
+        return { code: 1, stdout: '', stderr: MODEL_ERROR, timedOut: false }
+      },
+    })
+    assert.equal(result.outcome, 'pass')
+    assert.deepEqual(profile, { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', '@acme/host', '@acme/web'], linked: ['@acme/host', '@acme/web'] })
   } finally {
     rmSync(workdir, { recursive: true, force: true })
   }

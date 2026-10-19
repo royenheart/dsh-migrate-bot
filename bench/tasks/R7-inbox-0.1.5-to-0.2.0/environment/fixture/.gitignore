@@ -1,0 +1,20 @@
+# Temporary reference copy of the official dsh distribution, used while
+# reading upstream source. Delete it once it is no longer needed.
+.research/
+
+# Dependencies and build output
+node_modules/
+dist/
+lib/
+coverage/
+# pnpm's store, when it lands inside the repo (this machine's default)
+.pnpm-store/
+
+# Logs and local scratch
+*.log
+.DS_Store
+Thumbs.db
+
+# Anything holding a registry token: `.npmrc` is a credential file, and this
+# repository is public.
+.npmrc

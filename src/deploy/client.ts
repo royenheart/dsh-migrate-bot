@@ -1,20 +1,38 @@
 /**
- * Talking to the deploy target the user runs.
+ * Talking to the deploy service the user runs.
  *
- * Every call is best effort. The target is somebody else's service: it can be
+ * Every call is best effort. The deploy service is somebody else's service: it can be
  * down, misconfigured, rate-limited, or not exist, and none of that may fail a
  * migration that is otherwise fine. A refusal is returned as a reason for the
- * caller to report, never thrown, which is the same posture the feedback
- * channels take toward their destinations.
+ * caller to report, never thrown, which is how the report channels treat their
+ * destinations too.
  */
 
+import { z } from 'zod'
 import { inline } from '../render/text.ts'
+import type { MigrateConfig } from '../config/schema.ts'
 
-/** Where and with which token to reach the target. */
-export interface DeployTarget {
+/** Where and with which token to reach the deploy service. */
+export interface DeployService {
   /** Base URL, without a trailing slash. */
   endpoint: string
   token: string
+}
+
+/**
+ * The deploy service from config and environment, or why there is none.
+ *
+ * It lives beside the client rather than with the commands so the run log
+ * stream, and anything else that only talks to the service, can be built
+ * without the command executor.
+ * @param config - the validated configuration.
+ * @param env - where the token is read from.
+ */
+export function resolveDeployService(config: MigrateConfig, env: NodeJS.ProcessEnv): DeployService | { reason: string } {
+  if (!config.deploy.enabled || config.deploy.endpoint === undefined) return { reason: 'no deploy service is configured (`deploy.enabled` is false)' }
+  const token = env[config.deploy.tokenEnv]
+  if (token === undefined || token === '') return { reason: `\`${config.deploy.tokenEnv}\` is not set, so the deploy service cannot be reached` }
+  return { endpoint: config.deploy.endpoint, token }
 }
 
 export type DeployResult =
@@ -30,8 +48,10 @@ export type DeployResult =
      * the parser.
      */
     text?: string
+    /** The same answer as bytes: a patch of a file that is not UTF-8 survives only as these. */
+    bytes?: Buffer
     /**
-     * The target recognised the key and answered with the result it already
+     * The deploy service recognised the key and answered with the result it already
      * gave, instead of doing the work again. Reported so the reply can say so
      * rather than implying a second rebuild happened.
      */
@@ -45,7 +65,7 @@ const DEFAULT_TIMEOUT_MS = 20_000
 /**
  * How much of an answer is read before it is refused.
  *
- * A timeout bounds the time, not the bytes: a target that streams forever inside
+ * A timeout bounds the time, not the bytes: a deploy service that streams forever inside
  * its twenty seconds would otherwise be buffered whole by whoever asked. The
  * reader stops pulling at this many bytes, so the cap is a bound rather than a
  * description of what was already paid for.
@@ -56,8 +76,8 @@ const MAX_ANSWER_BYTES = 2 * 1024 * 1024
 const REPORT_TIMEOUT_MS = 5_000
 
 /**
- * One request to the target.
- * @param input.target - where and with which token.
+ * One request to the deploy service.
+ * @param input.service - where and with which token.
  * @param input.method - HTTP method.
  * @param input.path - path under the base URL, starting with `/`.
  * @param input.body - JSON body, when the method takes one.
@@ -65,18 +85,18 @@ const REPORT_TIMEOUT_MS = 5_000
  * @param input.timeoutMs - how long to wait before abandoning the call.
  */
 export async function deployRequest(input: {
-  target: DeployTarget
+  service: DeployService
   method: 'GET' | 'POST' | 'DELETE'
   path: string
   body?: unknown
   /**
    * Stable key for this command.
    *
-   * Sent so a target can treat a repeat as the same command rather than a new
+   * Sent so a deploy service can treat a repeat as the same command rather than a new
    * one. A redelivered webhook, a re-run workflow, or a double-posted comment
-   * carries the same key, and a target that honours it cannot act twice on one
+   * carries the same key, and a deploy service that honours it cannot act twice on one
    * instruction. Only mutating methods carry it: a `GET` has nothing to
-   * suppress, and sending it there would ask a target to cache a read.
+   * suppress, and sending it there would ask a deploy service to cache a read.
    */
   idempotencyKey?: string | undefined
   fetchImpl?: typeof fetch
@@ -99,13 +119,13 @@ export async function deployRequest(input: {
   maxBytes?: number
 }): Promise<DeployResult> {
   const fetchImpl = input.fetchImpl ?? fetch
-  const url = `${input.target.endpoint}${input.path}`
+  const url = `${input.service.endpoint}${input.path}`
   try {
     const response = await fetchImpl(url, {
       method: input.method,
       headers: {
         Accept: 'application/json',
-        Authorization: `Bearer ${input.target.token}`,
+        Authorization: `Bearer ${input.service.token}`,
         'User-Agent': 'dsh-migrate-action',
         ...(input.idempotencyKey === undefined || input.method === 'GET'
           ? {}
@@ -123,7 +143,7 @@ export async function deployRequest(input: {
       const where = response.headers.get('location')
       return {
         ok: false,
-        reason: `${url} answered a redirect${where === null ? '' : ` to ${inline(where, 200)}`}, which is not the deploy target's API`,
+        reason: `${url} answered a redirect${where === null ? '' : ` to ${inline(where, 200)}`}, which is not the deploy service's API`,
       }
     }
     const read = await readBounded(response, input.maxBytes ?? MAX_ANSWER_BYTES)
@@ -147,7 +167,7 @@ export async function deployRequest(input: {
       parsed = text === '' ? undefined : JSON.parse(text)
     } catch {
       // A 2xx that is not JSON is a page, not an answer: an identity proxy's
-      // login form arrives this way, and reporting it as "the target recorded no
+      // login form arrives this way, and reporting it as "the deploy service recorded no
       // instance" is a statement the answer does not support.
       if ((input.answer ?? 'json') === 'json') {
         return { ok: false, reason: `${url} answered 2xx with something that is not JSON` }
@@ -158,8 +178,9 @@ export async function deployRequest(input: {
       ok: true,
       detail: `${input.method} ${input.path} accepted`,
       text,
+      bytes: read.bytes,
       ...(parsed === undefined ? {} : { body: parsed }),
-      // Header values are case-insensitive, and a target that answers `True` has
+      // Header values are case-insensitive, and a deploy service that answers `True` has
       // replayed just as much as one that answers `true`.
       ...((response.headers.get('Idempotency-Replayed') ?? '').toLowerCase() === 'true'
         ? { replayed: true as const }
@@ -172,30 +193,25 @@ export async function deployRequest(input: {
 }
 
 /**
- * How a publish ended, as the target is told it.
+ * How a publish ended, as the deploy service is told it.
  *
  * `stage` is present only on a refusal, and names what stopped it: the remote
  * could not be read, the branch moved past the frozen revision, the diff did not
- * apply, a gate refused, or the push was rejected.
+ * apply, a check refused, or the push was rejected.
  */
 export interface PublishOutcome {
   revision: string
   outcome: 'published' | 'refused'
-  stage?: 'remote' | 'base' | 'apply' | 'gates' | 'push' | 'error'
+  stage?: 'remote' | 'base' | 'apply' | 'checks' | 'push' | 'error'
   /** The commit that landed, when one did. */
   commit?: string
-  /**
-   * The commit was already on the branch: this delivery pushed nothing.
-   *
-   * Without it a preview reads `published` with an empty gate list and cannot
-   * tell a fresh push from a retry of one whose reply never arrived.
-   */
+  /** The commit was already on the branch: this delivery pushed nothing. */
   alreadyPublished?: true
   branch: string
-  /** The harness the gates verified against, when one was resolved. */
+  /** The release the checks ran against, when they ran. */
   tag?: string
-  /** What the gates said, one entry per layer that ran. */
-  gates?: { layer: string; ok: boolean; detail?: string }[]
+  /** What each check said. */
+  checks?: { check: string; outcome: string }[]
   detail?: string
 }
 
@@ -211,100 +227,79 @@ export interface PublishOutcome {
 async function readBounded(
   response: Response,
   budget: number = MAX_ANSWER_BYTES,
-): Promise<{ text: string; truncated: boolean }> {
-  if (response.body === null) return { text: '', truncated: false }
+): Promise<{ text: string; bytes: Buffer; truncated: boolean }> {
+  if (response.body === null) return { text: '', bytes: Buffer.alloc(0), truncated: false }
   const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let text = ''
+  const chunks: Uint8Array[] = []
   let bytes = 0
+  const read = (truncated: boolean): { text: string; bytes: Buffer; truncated: boolean } => {
+    const all = Buffer.concat(chunks)
+    return { text: new TextDecoder().decode(all), bytes: all, truncated }
+  }
   try {
     for (;;) {
       const chunk = await reader.read()
-      if (chunk.done) return { text: text + decoder.decode(), truncated: false }
+      if (chunk.done) return read(false)
       bytes += chunk.value.byteLength
       if (bytes > budget) {
         await reader.cancel()
-        return { text, truncated: true }
+        return read(true)
       }
-      text += decoder.decode(chunk.value, { stream: true })
+      chunks.push(chunk.value)
     }
   } catch {
     // A stream that failed mid-answer delivered part of an answer, and a partial
     // answer that is accepted as a whole one is how a truncated patch reaches a
     // branch: it is treated exactly like an answer that ran past the cap.
-    return { text, truncated: true }
+    return read(true)
   }
 }
 
-/** The preview's own state, as much of it as a caller can rely on. */
-export interface PreviewState {
-  /** The target's word for what the instance is doing: `running`, `stopped`, `none`, … */
-  state?: string
-  url?: string
-  safeUrl?: string
-  /** The commit the serving build was made from. */
-  headSha?: string
-  /** When the instance stops being served, ISO 8601, when the target knows. */
-  expiresAt?: string
-  /** How many days the last `extend` bought, when the target reports it. */
-  extendedDays?: number
-  /** The revision a publish froze, when the target is holding one. */
-  revision?: string
-}
+/**
+ * A field the deploy service may omit. Whitespace is not a value: rendering it
+ * produces an empty code span in a sentence a maintainer reads. A field of the
+ * wrong type is dropped rather than refusing the whole answer, because the
+ * answer is reported, not acted on.
+ */
+const field = z.string().trim().min(1).optional().catch(undefined)
 
-function asString(value: unknown): string | undefined {
-  // Whitespace is not a value: rendering it produces an empty code span and a
-  // dangling comma in a sentence a maintainer reads.
-  return typeof value === 'string' && value.trim() !== '' ? value : undefined
-}
+const previewStateSchema = z.object({
+  /** What the instance is doing: `building`, `ready`, `stopped`, `failed`, `none`. */
+  state: field,
+  url: field,
+  safeUrl: field,
+  /** The commit the serving build was made from. */
+  headSha: field,
+  /** When the instance stops being served, ISO 8601. */
+  expiresAt: field,
+  /** A sentence on the state, such as why the last build failed or why there is no preview. */
+  detail: field,
+})
+export type PreviewState = { [K in keyof z.infer<typeof previewStateSchema>]?: string }
 
 /**
- * Read a preview's state out of whatever the target answered.
- *
- * Lenient by design: the target is somebody else's service and this is a report,
- * so a field it spells differently is a field that goes unreported rather than a
- * refusal. An answer that is not an object at all yields nothing, which the
- * caller renders as "the target described no instance".
- * @param body - the parsed JSON body of `GET /previews/{repository}/{pullRequest}`.
+ * Read a preview's state out of what the deploy service answered to
+ * `GET /previews/{repository}/{pullRequest}`. An answer that is not an object
+ * yields nothing, which the caller renders as "no preview".
  */
 export function parsePreviewState(body: unknown): PreviewState {
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) return {}
-  const record = body as Record<string, unknown>
-  const state: PreviewState = {}
-  const state_ = asString(record.state) ?? asString(record.status)
-  if (state_ !== undefined) state.state = state_
-  const url = asString(record.url)
-  if (url !== undefined) state.url = url
-  const safeUrl = asString(record.safeUrl) ?? asString(record.safe_url)
-  if (safeUrl !== undefined) state.safeUrl = safeUrl
-  const headSha = asString(record.headSha) ?? asString(record.head_sha)
-  if (headSha !== undefined) state.headSha = headSha
-  const expiresAt = asString(record.expiresAt) ?? asString(record.expires_at)
-  if (expiresAt !== undefined) state.expiresAt = expiresAt
-  const extendedDays = record.extendedDays ?? record.extended_days
-  if (typeof extendedDays === 'number' && Number.isFinite(extendedDays)) state.extendedDays = extendedDays
-  const revision = asString(record.revision)
-  if (revision !== undefined) state.revision = revision
-  return state
+  const parsed = previewStateSchema.safeParse(body)
+  if (!parsed.success) return {}
+  return Object.fromEntries(Object.entries(parsed.data).filter(([, value]) => value !== undefined))
 }
 
+const frozenRevisionSchema = z.object({ revision: z.string().trim().min(1), headSha: field })
+
 /**
- * The four fields a publish must answer with for the hand-back to continue.
- *
- * A target that only acknowledges the request has not frozen anything, and the
+ * The fields a publish answers with for the hand-back to continue. A deploy
+ * service that only acknowledges the request has not frozen anything, and the
  * Action says so rather than pretending a publish happened.
  * @param body - the parsed JSON body of the publish call.
  */
-export function parseFrozenRevision(body: unknown): { revision: string; baseSha?: string; headSha?: string } | undefined {
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) return undefined
-  const record = body as Record<string, unknown>
-  const revision = asString(record.revision)
-  if (revision === undefined) return undefined
-  return {
-    revision,
-    ...(asString(record.baseSha) === undefined ? {} : { baseSha: asString(record.baseSha) as string }),
-    ...(asString(record.headSha) === undefined ? {} : { headSha: asString(record.headSha) as string }),
-  }
+export function parseFrozenRevision(body: unknown): { revision: string; headSha?: string } | undefined {
+  const parsed = frozenRevisionSchema.safeParse(body)
+  if (!parsed.success) return undefined
+  return { revision: parsed.data.revision, ...(parsed.data.headSha === undefined ? {} : { headSha: parsed.data.headSha }) }
 }
 
 /** What identifies the pull request a command is about. */
@@ -314,12 +309,12 @@ export interface PreviewKey {
 }
 
 /**
- * The deploy target's preview API, as this Action uses it.
- * @param target - where and with which token.
+ * The deploy service's preview API, as this Action uses it.
+ * @param service - where and with which token.
  * @param fetchImpl - injectable fetch.
  */
 export function createDeployClient(
-  target: DeployTarget,
+  service: DeployService,
   fetchImpl?: typeof fetch,
   idempotencyKey?: string,
 ): {
@@ -328,20 +323,20 @@ export function createDeployClient(
   /**
    * Ask for the preview's expiry to move out.
    *
-   * The numbers travel with the request because the target is what enforces
+   * The numbers travel with the request because the deploy service is what enforces
    * them: `days` is what this one command asks for, and `maxTtlDays` is the
-   * ceiling the user configured, past which the target must refuse however many
+   * ceiling the user configured, past which the deploy service must refuse however many
    * commands arrive.
    */
   extend(key: PreviewKey, request: { days: number; maxTtlDays: number }): Promise<DeployResult>
   publish(key: PreviewKey): Promise<DeployResult>
   /**
-   * Tell the target how a publish ended.
+   * Tell the deploy service how a publish ended.
    *
-   * The hand-back is otherwise one-way: the target froze a revision and never
+   * The hand-back is otherwise one-way: the deploy service froze a revision and never
    * learns whether the change reached the branch or which gate refused it, so a
    * preview can only say "published" or nothing at all. Best effort like every
-   * other call here — a target that does not implement it is a logged skip.
+   * other call here — a deploy service that does not implement it is a logged skip.
    */
   publishResult(key: PreviewKey, result: PublishOutcome): Promise<DeployResult>
   status(key: PreviewKey): Promise<DeployResult>
@@ -351,7 +346,7 @@ export function createDeployClient(
   const path = (key: PreviewKey): string => `/previews/${encodeURIComponent(key.repository)}/${String(key.pullRequest)}`
   const call = (method: 'GET' | 'POST' | 'DELETE', key: PreviewKey, body?: unknown): Promise<DeployResult> =>
     deployRequest({
-      target,
+      service,
       method,
       path: path(key),
       ...(body === undefined ? {} : { body }),
@@ -365,7 +360,7 @@ export function createDeployClient(
     publish: key => call('POST', key, { action: 'publish' }),
     publishResult: (key, result) =>
       deployRequest({
-        target,
+        service,
         method: 'POST',
         path: `${path(key)}/publish-result`,
         body: result,
@@ -377,7 +372,7 @@ export function createDeployClient(
     status: key => call('GET', key),
     // A read, so it carries no idempotency key: there is nothing to suppress.
     scratch: (key, revision) => deployRequest({
-      target,
+      service,
       method: 'GET',
       path: `${path(key)}/scratch?revision=${encodeURIComponent(revision)}`,
       // A patch is what this call answers with, not JSON.

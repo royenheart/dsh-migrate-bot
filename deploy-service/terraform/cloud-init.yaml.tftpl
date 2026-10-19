@@ -1,0 +1,72 @@
+#cloud-config
+# Installs Docker, mounts the data volume at DATA_DIR, builds the service and
+# preview images from the repository, and starts the compose stack. Every
+# secret below is written to files only root can read.
+package_update: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - git
+  - curl
+
+write_files:
+  # The metadata endpoint serves this file's user data, secrets included; no
+  # container (the dependency install of a preview has a network) may reach it.
+  - path: /etc/systemd/system/docker.service.d/metadata.conf
+    content: |
+      [Service]
+      ExecStartPost=/usr/sbin/iptables -I DOCKER-USER -d 169.254.169.254/32 -j DROP
+  - path: /opt/dsh-deploy/env
+    permissions: "0600"
+    content: |
+      DEPLOY_TOKEN=${deploy_token}
+      GITHUB_WEBHOOK_SECRET=${github_webhook_secret}
+      DATA_DIR=${data_dir}
+      PUBLIC_VIEWS=${public_views}
+      DSH_VERSION=${dsh_version}
+      DSH_IMAGE=dsh-migrate-preview:${dsh_version}
+      CLOUDFLARE_TUNNEL_TOKEN=${tunnel_token}
+      COMPOSE_PROFILES=${profile}
+      DEPLOY_SERVICE_FLAGS=${service_flags}
+  - path: /opt/dsh-deploy/bootstrap.sh
+    permissions: "0700"
+    content: |
+      #!/bin/sh
+      set -eu
+      # The volume is attached after the server exists; wait for it.
+      device=/dev/disk/by-id/scsi-0HC_Volume_${volume_id}
+      tries=0
+      until [ -e "$device" ]; do
+        tries=$((tries + 1))
+        [ "$tries" -le 120 ] || { echo "the data volume never appeared" >&2; exit 1; }
+        sleep 5
+      done
+      mkdir -p ${data_dir}
+      grep -q "$device" /etc/fstab || echo "$device ${data_dir} ext4 discard,nofail,defaults 0 0" >> /etc/fstab
+      mountpoint -q ${data_dir} || mount ${data_dir}
+
+      hostname="${public_hostname}"
+      if [ -z "$hostname" ]; then
+        hostname="$(curl -fsS http://169.254.169.254/hetzner/v1/metadata/public-ipv4).sslip.io"
+      fi
+      grep -q '^PUBLIC_HOSTNAME=' /opt/dsh-deploy/env || {
+        echo "PUBLIC_HOSTNAME=$hostname" >> /opt/dsh-deploy/env
+        echo "PUBLIC_URL=https://$hostname" >> /opt/dsh-deploy/env
+      }
+
+      if [ ! -d /opt/dsh-deploy/src/.git ]; then
+        git clone --filter=blob:none "${source_repository}" /opt/dsh-deploy/src
+      fi
+      git -C /opt/dsh-deploy/src fetch --quiet origin "${source_ref}"
+      git -C /opt/dsh-deploy/src checkout --quiet --detach FETCH_HEAD
+      ln -sf /opt/dsh-deploy/env /opt/dsh-deploy/src/deploy-service/.env
+
+      cd /opt/dsh-deploy/src/deploy-service
+      docker compose --profile build-only build preview-image
+      docker compose up -d --build
+
+runcmd:
+  - systemctl daemon-reload
+  - systemctl enable docker
+  - systemctl restart docker
+  - /opt/dsh-deploy/bootstrap.sh

@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 # Install the migrate profile into $DSH_HOME.
-# No agent preset is installed: sessions mount the `standard` preset shipped
-# with @deepseek-ai/dsh-agent-presets.
 set -euo pipefail
 DSH_HOME="${DSH_HOME:-$HOME/.dsh}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -18,6 +16,4 @@ agent-default-model:
 llm-deepseek:
   thinking: enabled
   reasoningEffort: max
-agent-presets:
-  default: standard
 EOF

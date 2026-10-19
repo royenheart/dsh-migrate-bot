@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { PACKAGE_ROOT } from '../paths.ts'
 import { QuotaError } from '../quota/errors.ts'
 import {
   decodeStatusLine,
@@ -123,9 +124,8 @@ function defaultSpawn(
 }
 
 /**
- * Drive one dsh headless-style session through the migrate profile.
- * The profile (prepared in the container) mounts the standard preset and pins V4 Flash / max.
- * LLM text stays in the captured stdout and is not printed live.
+ * Drive one dsh headless-style session through the migrate profile of the
+ * agent runtime. LLM text stays in the captured stdout and is not printed live.
  */
 export function createDshRunner(options: {
   spawnImpl?: DshSpawn | undefined
@@ -143,16 +143,20 @@ export function createDshRunner(options: {
       const env: NodeJS.ProcessEnv = {
         ...process.env,
         DEEPSEEK_API_KEY: request.apiKey,
-        DSH_MIGRATE_PROVIDER: request.dsh.provider,
-        DSH_MIGRATE_MODEL: request.dsh.model,
-        DSH_MIGRATE_THINKING: request.dsh.thinking,
-        DSH_MIGRATE_EFFORT: request.dsh.reasoningEffort,
-        DSH_MIGRATE_MODE: request.dsh.mode,
+        DSH_MIGRATE_PROVIDER: request.agent.provider,
+        DSH_MIGRATE_MODEL: request.agent.model,
+        DSH_MIGRATE_THINKING: request.agent.thinking,
+        DSH_MIGRATE_EFFORT: request.agent.reasoningEffort,
+        // The job's container is the isolation boundary, and a headless session
+        // has nobody to answer an approval prompt.
+        DSH_PERMISSION_MODE: 'danger-full-access',
         DSH_MIGRATE_TASK: request.prompt,
         DSH_MIGRATE_STATUS_INTERVAL_MS: process.env.DSH_MIGRATE_STATUS_INTERVAL_MS ?? '10000',
         DSH_MIGRATE_USAGE_SO_FAR: String(request.usageSoFar ?? 0),
+        DSH_MIGRATE_APP_ROOT: PACKAGE_ROOT,
       }
       if (request.usageLimit !== undefined) env.DSH_MIGRATE_USAGE_LIMIT = String(request.usageLimit)
+      Object.assign(env, request.env)
       if (options.dshHome !== undefined) env.DSH_HOME = options.dshHome
 
       let lastUsage: SessionProgress | undefined

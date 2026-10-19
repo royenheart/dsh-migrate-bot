@@ -1,0 +1,24 @@
+schema_version = "1.4"
+
+[task]
+name = "dsh-migrate-spans/r3-better-display-0.1.7-rc1-to-rc2"
+version = "1.0.0"
+description = "Migrate dsh-better-display, a web plugin written for dsh 0.1.7-rc.1, to dsh 0.1.7-rc.2"
+keywords = ["dsh", "plugin-migration", "real-migration", "web-plugin"]
+
+[metadata]
+difficulty = "easy"
+category = "programming"
+tags = ["dsh", "plugin-upgrade", "span-0.1.7-rc.1-to-0.1.7-rc.2"]
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 2400.0
+
+[environment]
+network_mode = "public"
+cpus = 2
+memory_mb = 4096
+storage_mb = 8192

@@ -14,7 +14,13 @@ import { verifyDocIndex } from './verify-doc-index.ts'
 import { verifyMarkdownLinks } from './verify-md-links.ts'
 import { verifySkillsPin } from './verify-skills-pin.ts'
 import { verifyPriceTable } from './verify-price-table.ts'
-import { syncReadme } from './sync-readme-benchmark.ts'
+import { staleReferences } from './references.ts'
+import { verifyEnglish } from './verify-english.ts'
+import { verifyMarkdownWrap } from './verify-md-wrap.ts'
+import { verifyPureCore } from './verify-pure-core.ts'
+import { readReleaseFiles, verifyRelease } from './verify-release.ts'
+import { GLOSSARY, termDocuments, verifyTerms } from './verify-terms.ts'
+import { readText } from './repo.ts'
 
 /** What one gate reported. */
 interface GateResult {
@@ -23,17 +29,9 @@ interface GateResult {
   detail: string
 }
 
-/**
- * Run the README benchmark block gate without writing.
- * @returns whether the block matches the records on disk.
- */
-function checkReadmeBenchmark(): GateResult {
-  const { changed } = syncReadme(true)
-  return {
-    name: 'readme-benchmark',
-    ok: !changed,
-    detail: changed ? 'README benchmark block is stale; run `npm run sync:readme`' : 'up to date',
-  }
+/** A gate whose result is a list of problems. */
+function listed(name: string, passed: string, problems: string[]): GateResult {
+  return { name, ok: problems.length === 0, detail: problems.length === 0 ? passed : problems.join('; ') }
 }
 
 /**
@@ -87,7 +85,19 @@ export function runGates(): GateResult[] {
           ? `pricing/deepseek.json matches the runtime table (${String(priceTable.ageDays)} days old)`
           : priceTable.violations.map(v => v.detail).join('; '),
     },
-    checkReadmeBenchmark(),
+    listed('terms', 'no replaced word in prose, every term defined once', verifyTerms(termDocuments(), readText(GLOSSARY)).map(v => `${v.file}:${String(v.line)} ${v.detail}`)),
+    listed('english', 'every tracked text file is English', verifyEnglish().map(v => `${v.file}:${String(v.line)} ${v.detail}`)),
+    listed('md-wrap', 'every Markdown paragraph is one line', verifyMarkdownWrap().map(v => `${v.file}:${String(v.line)} continues a paragraph`)),
+    listed('release', 'every file states the version in VERSION', verifyRelease(readReleaseFiles())),
+    listed('pure-core', 'src/workflow and src/domain import nothing with side effects', verifyPureCore().map(v => `${v.file} ${v.detail}`)),
+    (() => {
+      const stale = staleReferences()
+      return {
+        name: 'references',
+        ok: stale.length === 0,
+        detail: stale.length === 0 ? 'docs/reference matches the code it is generated from' : `stale: ${stale.join(', ')}; run node dist/scripts/references.js --write`,
+      }
+    })(),
   ]
 }
 

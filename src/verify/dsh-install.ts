@@ -22,12 +22,57 @@ export interface DshInstallOptions {
   install?: ((prefix: string, version: string) => { ok: boolean; detail: string }) | undefined
 }
 
+/**
+ * The npm arguments that install a release with the dependencies it was
+ * published with: `--before` excludes every version published from the next
+ * release on, so a later release of a transitive dependency cannot change it.
+ * A fresh install of an older release otherwise resolves today's Cordis and
+ * fails to boot for reasons the plugin has nothing to do with.
+ * @param before - the release's cutoff ({@link releaseCutoff}); none for the newest release.
+ */
+export function installArgs(prefix: string, version: string, before: string | undefined): string[] {
+  return ['install', '-g', '--prefix', prefix, '--no-fund', '--no-audit', ...(before === undefined ? [] : ['--before', before]), `@deepseek-ai/dsh@${version}`]
+}
+
+/** How far a release's packages spread around dsh's own (docs/design/checks.md says what was seen). */
+const RELEASE_SPREAD_MS = 3 * 60 * 60 * 1000
+
+/**
+ * The `--before` date of a release: before the next release of dsh. Until
+ * 0.1.7-alpha.2 a release's packages declare `^` ranges on each other and on
+ * the separately versioned Cordis packages, which npm would otherwise satisfy
+ * with what later releases published. The cutoff sits the spread before the
+ * next release; when the two came less than twice the spread apart, it sits
+ * halfway between them. The newest release has no cutoff.
+ * @param times - `npm view @deepseek-ai/dsh time`: publication time by version
+ */
+export function releaseCutoff(times: Readonly<Record<string, string>>, version: string): string | undefined {
+  const published = times[version]
+  if (published === undefined) return undefined
+  const at = Date.parse(published)
+  const next = Object.entries(times)
+    .filter(([key, when]) => /^\d/.test(key) && Date.parse(when) > at)
+    .map(([, when]) => Date.parse(when))
+    .sort((a, b) => a - b)[0]
+  return next === undefined ? undefined : new Date(Math.max(next - RELEASE_SPREAD_MS, (at + next) / 2)).toISOString()
+}
+
+/** When each release of dsh was published, from the npm registry, or `undefined` when it does not say. */
+export function releaseTimes(timeoutMs: number): Record<string, string> | undefined {
+  const result = spawnSync('npm', ['view', '@deepseek-ai/dsh', 'time', '--json'], { encoding: 'utf8', timeout: timeoutMs, env: process.env })
+  if (result.status !== 0) return undefined
+  try {
+    const times = JSON.parse(result.stdout) as Record<string, unknown>
+    return Object.fromEntries(Object.entries(times).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+  } catch {
+    return undefined
+  }
+}
+
 function npmInstall(prefix: string, version: string, timeoutMs: number): { ok: boolean; detail: string } {
-  const result = spawnSync(
-    'npm',
-    ['install', '-g', '--prefix', prefix, '--no-fund', '--no-audit', `@deepseek-ai/dsh@${version}`],
-    { encoding: 'utf8', timeout: timeoutMs, env: process.env },
-  )
+  const times = releaseTimes(timeoutMs)
+  if (times?.[version] === undefined) return { ok: false, detail: `the npm registry did not say when @deepseek-ai/dsh@${version} was published` }
+  const result = spawnSync('npm', installArgs(prefix, version, releaseCutoff(times, version)), { encoding: 'utf8', timeout: timeoutMs, env: process.env })
   if (result.status !== 0) {
     const detail = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim().slice(-2000)
     return { ok: false, detail: detail === '' ? `npm install exited ${String(result.status)}` : detail }

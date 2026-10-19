@@ -1,18 +1,16 @@
 /**
- * One-shot dsh runner for the migrate profile: headless task + preset mount.
- * Stock `@deepseek-ai/dsh-headless` does not join a preset roster; this copy
- * of that driver calls `agentPresets.mount` during setup when the roster is
- * composed (see @deepseek-ai/dsh-agent-presets README, "Composing a child agent").
+ * One-shot dsh runner for the migrate profile, derived from the
+ * `@deepseek-ai/dsh-headless` driver of the pinned agent runtime.
  *
- * LLM text is written to stdout only after the session is idle. Progress
- * lines go to stderr as `dsh-migrate-status: …` so the Action can print
- * turns/steps/usage without streaming model output.
+ * It differs from the stock driver in two ways: progress lines go to stderr as
+ * `dsh-migrate-status: …` every few seconds so the Action can print turns,
+ * steps and usage, and the spend cap is enforced while the session runs.
+ * LLM text is written to stdout only after the session is idle.
  */
 import { randomUUID } from 'node:crypto'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import { readSessionEvents } from './session-events.js'
 
 export const name = 'dsh-migrate-runner'
 export const inject = ['agentDefaultModel', 'agents', 'sessions']
@@ -45,65 +43,17 @@ function fail(io, error) {
   io.exit(1)
 }
 
-function fallbackProgress(events, elapsedSeconds) {
-  let turns = 0
-  let steps = 0
-  let inputTokens = 0
-  let outputTokens = 0
-  let cacheHitTokens = 0
-  let cacheMissTokens = 0
-  for (const event of events) {
-    const type = event?.type
-    const data = event?.data ?? event
-    if (type === 'turn/start') turns += 1
-    if (type === 'step/start') steps += 1
-    const usage = data?.usage
-      ?? (data?.chunk?.type === 'usage' ? data.chunk.usage : undefined)
-    if (usage === undefined || typeof usage !== 'object') continue
-    if (typeof usage.inputTokens === 'number' && typeof usage.outputTokens === 'number') {
-      inputTokens += usage.inputTokens
-      outputTokens += usage.outputTokens
-      cacheHitTokens += usage.cacheReadTokens ?? 0
-      cacheMissTokens += usage.cacheMissTokens ?? usage.inputTokens
-      continue
-    }
-    if (typeof usage.prompt_tokens === 'number' && typeof usage.completion_tokens === 'number') {
-      const hit = usage.prompt_cache_hit_tokens
-        ?? usage.prompt_tokens_details?.cached_tokens
-        ?? 0
-      const miss = usage.prompt_cache_miss_tokens ?? Math.max(0, usage.prompt_tokens - hit)
-      inputTokens += miss
-      outputTokens += usage.completion_tokens
-      cacheHitTokens += hit
-      cacheMissTokens += miss
-    }
-  }
-  return {
-    turns,
-    steps,
-    elapsedSeconds: Math.max(0, Math.floor(elapsedSeconds)),
-    inputTokens,
-    outputTokens,
-    cacheHitTokens,
-    cacheMissTokens,
-  }
-}
-
 function usageUnits(progress) {
   return typeof progress.costUsd === 'number' ? progress.costUsd : 0
 }
 
 async function loadProgress() {
+  // The session accounting is the Action's own, so a session is counted and
+  // priced exactly as the spend cap and the reports count it.
   const root = process.env.DSH_MIGRATE_APP_ROOT
-  if (root) {
-    try {
-      const mod = await import(`${root}/dist/src/agents/session-status.js`)
-      return mod.summarizeSessionEvents
-    } catch {
-      return fallbackProgress
-    }
-  }
-  return fallbackProgress
+  if (!root) throw new Error('DSH_MIGRATE_APP_ROOT is not set; dsh-migrate passes it to every session')
+  const mod = await import(`${root}/dist/src/agents/session-status.js`)
+  return mod.summarizeSessionEvents
 }
 
 function isQuotaReason(reason) {
@@ -124,7 +74,6 @@ async function run(ctx, task, io) {
   const selection = defaultModel.currentSelection()
   const provider = process.env.DSH_MIGRATE_PROVIDER || selection.provider
   const model = process.env.DSH_MIGRATE_MODEL || selection.model
-  const mode = process.env.DSH_MIGRATE_MODE || 'standard'
   const current = { ...selection, provider, model }
   const progressOf = await loadProgress()
   const startedAt = Date.now()
@@ -132,13 +81,9 @@ async function run(ctx, task, io) {
 
   const { agent } = await agents.create({
     sessionId: SessionId(`session-${randomUUID()}`),
-    meta: { cwd: process.cwd(), agentPreset: mode },
+    meta: { cwd: process.cwd() },
     agentOptions: { provider, model },
-    setup: async (agentCtx) => {
-      const presets = ctx.get('agentPresets')
-      if (presets !== undefined) {
-        await presets.mount(agentCtx, mode)
-      }
+    setup: (agentCtx) => {
       installModelSelection(agentCtx, { current, assembled: undefined })
     },
   })
@@ -148,7 +93,7 @@ async function run(ctx, task, io) {
   const limit = Number(process.env.DSH_MIGRATE_USAGE_LIMIT || 0)
   const timer = setInterval(() => {
     try {
-      const progress = progressOf(readSessionEvents(agent.session), (Date.now() - startedAt) / 1000, {
+      const progress = progressOf(agent.session.snapshotEvents(), (Date.now() - startedAt) / 1000, {
         model: process.env.DSH_MIGRATE_MODEL || 'deepseek-v4-flash',
       })
       io.stderr.write(`dsh-migrate-status: ${JSON.stringify(progress)}\n`)
@@ -170,7 +115,7 @@ async function run(ctx, task, io) {
   await agent.whenIdle()
   clearInterval(timer)
   await sessions.flush(agent.session)
-  const finalProgress = progressOf(readSessionEvents(agent.session), (Date.now() - startedAt) / 1000, {
+  const finalProgress = progressOf(agent.session.snapshotEvents(), (Date.now() - startedAt) / 1000, {
     model: process.env.DSH_MIGRATE_MODEL || 'deepseek-v4-flash',
   })
   io.stderr.write(`dsh-migrate-status: ${JSON.stringify(finalProgress)}\n`)
@@ -180,7 +125,7 @@ async function run(ctx, task, io) {
     io.exit(1)
     return
   }
-  const outcome = summarize(readSessionEvents(agent.session), firstSeq)
+  const outcome = summarize(agent.session.snapshotEvents(), firstSeq)
   if (isQuotaReason(outcome.reason)) {
     io.stderr.write(`dsh-migrate: insufficient balance: ${outcome.reason.error.code}: ${outcome.reason.error.message}\n`)
     io.exit(1)

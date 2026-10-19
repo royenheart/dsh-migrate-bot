@@ -4,10 +4,10 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { MigrateConfig } from '../config/schema.ts'
 import { extractMechanicalErrors } from './errors.ts'
+import { checkDependencyContract, checkSourceImports, npmPublishedVersions } from './dependencies.ts'
 import { dshPeerSpecs, pinDshPeersCommand } from './peers.ts'
 import { scanKeyedSlots, scanPluginShape } from './scan.ts'
 import { typecheckCommand } from './typecheck.ts'
-import { inline } from '../render/text.ts'
 
 export interface MechanicalResult {
   ok: boolean
@@ -33,19 +33,25 @@ export interface MechanicalOptions {
    * the runner's own six-hour limit.
    */
   timeoutMs?: number
+  /** Published versions of a package; the npm registry unless a test injects one. */
+  published?: (name: string) => readonly string[] | undefined
+  /** The release's `--before` date, so the pinned packages resolve as they were published. */
+  before?: string | undefined
+  /** The environment the commands start from; the Action's own unless the caller removed its secrets. */
+  env?: NodeJS.ProcessEnv | undefined
 }
 
 function runCommand(
   command: string,
   cwd: string,
-  extraEnv: NodeJS.ProcessEnv = {},
+  env: NodeJS.ProcessEnv,
   timeoutMs?: number,
 ): { ok: boolean; output: string } {
   const result = spawnSync(command, {
     cwd,
     shell: true,
     encoding: 'utf8',
-    env: { ...process.env, ...extraEnv },
+    env,
     ...(timeoutMs === undefined ? {} : { timeout: timeoutMs, killSignal: 'SIGKILL' as const }),
   })
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`
@@ -62,41 +68,6 @@ function readPackageJson(root: string): unknown {
   return JSON.parse(readFileSync(pkgPath, 'utf8')) as unknown
 }
 
-/**
- * The `name` in a plugin's `package.json`, when that file holds a usable one.
- *
- * The package.json belongs to the tree being migrated, so a file that is not
- * JSON, or a name that is not a non-empty string, is nothing rather than a
- * crash: this is read once to name the plugin in the boot probe's profile and
- * again to name it in a report, and neither is worth failing a run over.
- * @param workdir - the plugin working tree.
- */
-export function readPackageName(workdir: string): string | undefined {
-  try {
-    const pkg = readPackageJson(workdir)
-    if (typeof pkg !== 'object' || pkg === null) return undefined
-    const name = (pkg as { name?: unknown }).name
-    return typeof name === 'string' && name !== '' ? name : undefined
-  } catch {
-    return undefined
-  }
-}
-
-/**
- * The name a report calls the plugin by.
- *
- * That name lands in an issue title and an issue body, so it is collapsed to one
- * line and bounded like every other value that came from outside this Action; a
- * tree with no usable name is called `plugin` rather than nothing.
- * @param workdir - the plugin working tree.
- */
-export function readPluginName(workdir: string): string {
-  const name = readPackageName(workdir)
-  if (name === undefined) return 'plugin'
-  const collapsed = inline(name, 80)
-  return collapsed === '' ? 'plugin' : collapsed
-}
-
 function packageScripts(pkg: unknown): Record<string, string> {
   if (typeof pkg !== 'object' || pkg === null) return {}
   const scripts = (pkg as Record<string, unknown>).scripts
@@ -110,13 +81,13 @@ function packageScripts(pkg: unknown): Record<string, string> {
  * `npm install` when node_modules is missing, then pin dsh packages to the
  * target version when one was resolved.
  */
-function installCommands(root: string, pkg: unknown, dshVersion: string | undefined): string[] {
+function installCommands(root: string, pkg: unknown, dshVersion: string | undefined, published: (name: string) => readonly string[] | undefined, before: string | undefined): string[] {
   const commands: string[] = []
   if (pkg !== undefined && !existsSync(join(root, 'node_modules'))) {
     commands.push('npm install')
   }
   if (dshVersion !== undefined && pkg !== undefined) {
-    const pin = pinDshPeersCommand(dshPeerSpecs(pkg, dshVersion))
+    const pin = pinDshPeersCommand(dshPeerSpecs(pkg, dshVersion, published), before)
     if (pin !== undefined) commands.push(pin)
   }
   return commands
@@ -153,10 +124,24 @@ export function runMechanical(
   options: MechanicalOptions = {},
 ): MechanicalResult {
   const pkg = readPackageJson(root)
-  const extraEnv: NodeJS.ProcessEnv = options.dshVersion === undefined
-    ? {}
-    : { DSH_MIGRATE_TARGET_VERSION: options.dshVersion }
-  const prefix = installCommands(root, pkg, options.dshVersion)
+  // One registry lookup per package, however many manifests and sources name it.
+  const lookups = new Map<string, readonly string[] | undefined>()
+  const published = (name: string): readonly string[] | undefined => {
+    if (!lookups.has(name)) lookups.set(name, (options.published ?? npmPublishedVersions)(name))
+    return lookups.get(name)
+  }
+  if (options.dshVersion !== undefined) {
+    const contract = [...checkDependencyContract(pkg, options.dshVersion, published), ...checkSourceImports(root, options.dshVersion, published)]
+    if (contract.length > 0) {
+      const text = contract.map(item => `error: ${item.message}`).join('\n')
+      return { ok: false, errors: text, log: text, checks: 0 }
+    }
+  }
+  const extraEnv: NodeJS.ProcessEnv = {
+    ...(options.env ?? process.env),
+    ...(options.dshVersion === undefined ? {} : { DSH_MIGRATE_TARGET_VERSION: options.dshVersion }),
+  }
+  const prefix = installCommands(root, pkg, options.dshVersion, published, options.before)
   const timeoutMs = options.timeoutMs
 
   if (config.tests !== undefined) {

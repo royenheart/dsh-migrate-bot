@@ -1,6 +1,6 @@
 {
   "name": "@royenheart/dsh-migrate-action",
-  "version": "0.3.4",
+  "version": "1.0.0-rc.1",
   "description": "Containerized GitHub Action that migrates third-party DeepSeek Harness plugins across harness releases.",
   "license": "MIT",
   "type": "module",
@@ -18,21 +18,27 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test dist/tests/unit/*.test.js dist/tests/e2e/mechanical.test.js",
+    "build": "rm -rf dist && tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/tests/unit/*.test.js dist/tests/integration/*.test.js dist/tests/e2e/mechanical.test.js",
     "test:e2e": "npm run build && node --test dist/tests/e2e/*.test.js",
     "gates": "npm run build && node dist/scripts/run-gates.js",
-    "sync:readme": "npm run build && node dist/scripts/sync-readme-benchmark.js",
     "commit": "cz commit",
     "bump": "cz bump --changelog",
-    "check:upstream": "./scripts/run-upstream-oracle.sh",
-    "bench:upstream": "./tools/harbor/run-benchmark.sh"
+    "bench": "npm run build && node dist/scripts/bench.js",
+    "site": "npm run build && node dist/scripts/site.js",
+    "deploy-service:build": "npm --prefix deploy-service ci && npm --prefix deploy-service run build",
+    "deploy-service:test": "npm --prefix deploy-service test"
   },
   "dependencies": {
+    "semver": "^7.8.5",
     "typescript": "^5.9.2",
-    "yaml": "^2.8.1"
+    "xstate": "^5.33.2",
+    "yaml": "^2.8.1",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@types/node": "^24.3.0"
+    "@types/node": "^24.3.0",
+    "@types/semver": "^7.8.0",
+    "fast-check": "^4.10.2"
   }
 }

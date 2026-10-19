@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -8,6 +8,7 @@ import { parseConfig } from '../../src/config/load.ts'
 import { runMechanical } from '../../src/mechanical/run.ts'
 import { checkoutHarness } from '../../src/harness/checkout.ts'
 import { AgentTimeoutError, createDshRunner } from '../../src/agents/dsh.ts'
+import { PACKAGE_ROOT } from '../../src/paths.ts'
 
 function fixture(files: Record<string, string>): string {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-mig-timeout-'))
@@ -27,7 +28,7 @@ test('the watchdog defaults are set and overridable', () => {
 test('nonsense watchdog values are rejected rather than silently ignored', () => {
   assert.throws(() => parseConfig({ timeouts: { agentMs: 10 } }), /timeouts\.agentMs/)
   assert.throws(() => parseConfig({ timeouts: { commandMs: 'soon' } }), /timeouts\.commandMs/)
-  assert.throws(() => parseConfig({ timeouts: [] }), /timeouts must be a mapping/)
+  assert.throws(() => parseConfig({ timeouts: [] }), /expected object[\s\S]*at timeouts/)
 })
 
 test('a hung mechanical command is killed by the watchdog and reported as a failure', () => {
@@ -80,10 +81,10 @@ test('a session that outlives its watchdog throws instead of holding the job', a
   })
   await assert.rejects(
     () => runner.run({
-      kind: 'fix',
+      kind: 'repair',
       prompt: 'p',
       workdir: process.cwd(),
-      dsh: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max', mode: 'standard' },
+      agent: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max', upgradeSkills: false },
       apiKey: 'k',
     }),
     (error: unknown) => {
@@ -104,11 +105,15 @@ test('a session that finishes normally still returns its report', async () => {
     },
   })
   const result = await runner.run({
-    kind: 'absorption',
+    kind: 'overlap',
     prompt: 'p',
     workdir: process.cwd(),
-    dsh: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max', mode: 'standard' },
+    agent: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max', upgradeSkills: false },
     apiKey: 'k',
   })
   assert.equal(result.report, '# Report\nok')
+})
+
+test('the package root a session is given holds the accounting that prices it', () => {
+  assert.ok(existsSync(join(PACKAGE_ROOT, 'dist', 'src', 'agents', 'session-status.js')), `no session accounting under ${PACKAGE_ROOT}`)
 })

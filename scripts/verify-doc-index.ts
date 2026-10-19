@@ -2,7 +2,7 @@
  * Gate: `docs/index.md` is a complete, resolvable index of the repository's docs.
  *
  * The index is the progressive-disclosure entry point: `AGENTS.md` carries
- * standing orders and links here, and this table is what sends a reader to the
+ * rules and links here, and this table is what sends a reader to the
  * one document — and the one section — that owns a subject. A hand-maintained
  * table like that rots in two directions, and this gate closes both:
  *

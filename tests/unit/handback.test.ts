@@ -10,15 +10,16 @@ import {
   publishSubject,
   type HandbackInput,
 } from '../../src/deploy/handback.ts'
-import { createGateRunner, renderGateReport } from '../../src/verify/gates.ts'
+import { renderTreeCheck, type TreeCheckReport } from '../../src/activities/check-tree.ts'
 import { parseCommand } from '../../src/commands/parse.ts'
-import { runCommand } from '../../src/commands/run.ts'
-import type { BootOutcome } from '../../src/verify/boot.ts'
+import { commandKey, runCommand, type CommandRunInput } from '../../src/commands/run.ts'
+import { GitHubClient } from '../../src/github/client.ts'
 import { parseConfig } from '../../src/config/load.ts'
+import type { Release } from '../../src/workflow/model.ts'
 
 /**
  * A plugin repository with a pull request branch on a bare remote: the shape a
- * publish has to land in, with nothing stubbed except the gates.
+ * publish has to land in, with nothing stubbed except the checks.
  */
 function fixture(): {
   bare: string
@@ -39,6 +40,8 @@ function fixture(): {
     assert.equal(result.status, 0, `${args.join(' ')}\n${result.stderr}`)
   }
   spawnSync('git', ['init', '--bare', bare], { encoding: 'utf8' })
+  // No detached maintenance in a fixture (git 2.54 starts it after a push, a fetch or a commit): its repack writes temporary files into objects/ that a local clone copies and that removing the repository races.
+  spawnSync('git', ['-C', bare, 'config', 'maintenance.auto', 'false'], { encoding: 'utf8' })
   git(['init'])
   git(['config', 'user.name', 'test'])
   git(['config', 'user.email', 'test@example.test'])
@@ -57,7 +60,7 @@ function fixture(): {
   const headSha = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: work, encoding: 'utf8' }).stdout.trim()
   git(['checkout', 'master'])
 
-  // A scratch diff on top of that head, as a target would serve it.
+  // A scratch diff on top of that head, as a deploy service would serve it.
   const scratch = mkdtempSync(join(tmpdir(), 'dsh-handback-scratch-'))
   git(['worktree', 'add', '--detach', scratch, headSha])
   writeFileSync(join(scratch, 'index.js'), 'export const name = "plugin"\nexport const migrated = true\nexport const tried = "scratch"\n')
@@ -79,7 +82,23 @@ function fixture(): {
   }
 }
 
-const PASSING = async () => ({ ok: true, steps: [{ layer: 'mechanical' as const, ok: true, detail: 'passed' }], detail: 'mechanical: pass' })
+const RELEASE: Release = { tag: 'dsh-v0.1.6', version: '0.1.6' }
+
+const PASSING = async (): Promise<TreeCheckReport> => ({
+  ok: true,
+  results: [{ check: 'mechanical', outcome: 'pass', fingerprint: '', detail: 'passed' }],
+  release: RELEASE,
+  detail: 'mechanical: pass',
+})
+
+/** A tree check the boot check refused. */
+const BOOT_FAILS = async (): Promise<TreeCheckReport> => ({
+  ok: false,
+  results: [{ check: 'boot', outcome: 'fail', fingerprint: 'load: throws', detail: 'the plugin throws on load' }],
+  refusedBy: 'boot',
+  release: RELEASE,
+  detail: 'the plugin does not load',
+})
 
 function input(f: ReturnType<typeof fixture>, overrides: Partial<HandbackInput> = {}): HandbackInput {
   return {
@@ -91,13 +110,13 @@ function input(f: ReturnType<typeof fixture>, overrides: Partial<HandbackInput> 
     repository: 'me/plugin',
     pullRequest: 12,
     treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-    runGates: PASSING,
+    checkTree: PASSING,
     log: () => {},
     ...overrides,
   }
 }
 
-test('a frozen revision is applied, gated, and pushed to the pull request branch', async () => {
+test('a frozen revision is applied, checked, and pushed to the pull request branch', async () => {
   const f = fixture()
   try {
     const before = spawnSync('git', ['-C', f.bare, 'rev-parse', f.branch], { encoding: 'utf8' }).stdout.trim()
@@ -107,7 +126,7 @@ test('a frozen revision is applied, gated, and pushed to the pull request branch
 
     const after = spawnSync('git', ['-C', f.bare, 'rev-parse', f.branch], { encoding: 'utf8' }).stdout.trim()
     assert.notEqual(after, before)
-    // The branch carries the change, on top of the head the target froze.
+    // The branch carries the change, on top of the head the deploy service froze.
     const shown = spawnSync('git', ['-C', f.bare, 'show', `${f.branch}:index.js`], { encoding: 'utf8' }).stdout
     assert.match(shown, /tried = "scratch"/)
     const parent = spawnSync('git', ['-C', f.bare, 'rev-parse', `${f.branch}^`], { encoding: 'utf8' }).stdout.trim()
@@ -120,24 +139,18 @@ test('a frozen revision is applied, gated, and pushed to the pull request branch
   }
 })
 
-test('a failing gate leaves the branch exactly where it was', async () => {
+test('a failing check leaves the branch exactly where it was', async () => {
   const f = fixture()
   try {
     const before = spawnSync('git', ['-C', f.bare, 'rev-parse', f.branch], { encoding: 'utf8' }).stdout.trim()
-    const result = await applyHandback(input(f, {
-      runGates: async () => ({
-        ok: false,
-        steps: [{ layer: 'boot' as const, ok: false, detail: 'the plugin throws on load' }],
-        refusedBy: 'boot' as const,
-        detail: 'the plugin does not load',
-      }),
-    }))
+    const result = await applyHandback(input(f, { checkTree: BOOT_FAILS }))
     assert.equal(result.ok, false)
-    assert.equal(result.ok ? '' : result.stage, 'gates')
+    assert.equal(result.ok ? '' : result.stage, 'checks')
     const after = spawnSync('git', ['-C', f.bare, 'rev-parse', f.branch], { encoding: 'utf8' }).stdout.trim()
     assert.equal(after, before)
-    // The gate's own verdict is what the refused publish reports.
-    assert.match(result.ok ? '' : renderGateReport(result.gates ?? { ok: false, steps: [], detail: '' }), /boot`: fail/)
+    // The check's own verdict is what the refused publish reports.
+    assert.equal(result.ok ? undefined : result.checks?.refusedBy, 'boot')
+    assert.match(result.ok || result.checks === undefined ? '' : renderTreeCheck(result.checks), /boot`: fail/)
   } finally {
     f.cleanup()
   }
@@ -150,17 +163,19 @@ test('a revision already on the branch is not applied twice', async () => {
     assert.equal(first.ok, true, first.ok ? '' : first.detail)
     // The same revision arrives again: a retry of a publish whose reply never
     // reached the thread. It must not conflict with what it already pushed.
-    let gated = 0
+    let checked = 0
     const second = await applyHandback(input(f, {
-      runGates: async () => {
-        gated += 1
+      checkTree: async () => {
+        checked += 1
         return PASSING()
       },
     }))
     assert.equal(second.ok, true, second.ok ? '' : second.detail)
     assert.equal(second.ok && second.alreadyPublished, true)
     assert.equal(second.ok && second.commit, first.ok ? first.commit : '')
-    assert.equal(gated, 0)
+    assert.equal(checked, 0)
+    // Nothing was checked again, and the result does not pretend otherwise.
+    assert.equal(second.ok ? second.checks : 'refused', undefined)
   } finally {
     f.cleanup()
   }
@@ -199,23 +214,23 @@ function compete(f: ReturnType<typeof fixture>, name: string): void {
   rmSync(other, { recursive: true, force: true })
 }
 
-test('a branch that moved since the freeze is refused before the gates are spent', async () => {
+test('a branch that moved since the freeze is refused before the checks are spent', async () => {
   const f = fixture()
   try {
     compete(f, 'theirs')
-    let gated = 0
+    let checked = 0
     const result = await applyHandback(input(f, {
-      runGates: async () => {
-        gated += 1
+      checkTree: async () => {
+        checked += 1
         return PASSING()
       },
     }))
     assert.equal(result.ok, false)
     assert.equal(result.ok ? '' : result.stage, 'base')
-    // The remedy is the one the contract names, and the gate run was not spent.
+    // The remedy is the one the contract names, and the checks were not spent.
     assert.match(result.ok ? '' : result.detail, /rebuild scratch onto the new head and publish again/)
-    assert.equal(gated, 0)
-    // Nothing of the target's reached the branch.
+    assert.equal(checked, 0)
+    // Nothing of the deploy service's reached the branch.
     const log = spawnSync('git', ['-C', f.bare, 'log', '--format=%s', f.branch], { encoding: 'utf8' }).stdout
     assert.doesNotMatch(log, /publish/)
   } finally {
@@ -223,12 +238,12 @@ test('a branch that moved since the freeze is refused before the gates are spent
   }
 })
 
-test('a branch that moves while the gates run is refused, not pushed', async () => {
+test('a branch that moves while the checks run is refused, not pushed', async () => {
   const f = fixture()
   try {
     const result = await applyHandback(input(f, {
-      runGates: async () => {
-        // The window a publish can lose the branch in: the gates take minutes,
+      checkTree: async () => {
+        // The window a publish can lose the branch in: the checks take minutes,
         // and somebody else pushes in the meantime.
         compete(f, 'raced')
         return PASSING()
@@ -246,63 +261,47 @@ test('a branch that moves while the gates run is refused, not pushed', async () 
   }
 })
 
-test('what a gate leaves behind is not what gets pushed', async () => {
+test('what a check leaves behind is not what gets pushed', async () => {
   const f = fixture()
   try {
-    let gated = ''
+    let checked = ''
     const result = await applyHandback(input(f, {
-      runGates: async (tree: string) => {
-        gated = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: tree, encoding: 'utf8' }).stdout.trim()
-        // The gates run the plugin's own code: `npm install` creates
+      checkTree: async (tree: string) => {
+        checked = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: tree, encoding: 'utf8' }).stdout.trim()
+        // The checks run the plugin's own code: `npm install` creates
         // `node_modules` and can rewrite a lockfile, and a script of the user's
         // can commit. None of it is the change under review.
         const git = (args: string[]): void => {
           const out = spawnSync('git', ['-c', 'safe.directory=*', '-c', 'commit.gpgsign=false', ...args], { cwd: tree, encoding: 'utf8' })
           assert.equal(out.status, 0, out.stderr)
         }
-        writeFileSync(join(tree, 'gate-fix.js'), 'export const fixed = true\n')
+        writeFileSync(join(tree, 'check-fix.js'), 'export const fixed = true\n')
         mkdirSync(join(tree, 'node_modules', 'left-pad'), { recursive: true })
         writeFileSync(join(tree, 'node_modules', 'left-pad', 'index.js'), 'module.exports = 1\n')
         git(['add', '-A'])
-        git(['commit', '-m', 'the gate committed its own fix'])
+        git(['commit', '-m', 'the check committed its own fix'])
         return PASSING()
       },
     }))
-    // The commit was taken before the gates ran and the push names it, so what
-    // reached the branch is the tree that was verified — nothing the gates wrote.
+    // The commit was taken before the checks ran and the push names it, so what
+    // reached the branch is the tree that was verified — nothing the checks wrote.
     assert.equal(result.ok, true, result.ok ? '' : result.detail)
-    assert.equal(result.ok && result.commit, gated)
+    assert.equal(result.ok && result.commit, checked)
     const shown = spawnSync('git', ['-C', f.bare, 'show', `${f.branch}:index.js`], { encoding: 'utf8' }).stdout
     assert.match(shown, /tried = "scratch"/)
     const tree = spawnSync('git', ['-C', f.bare, 'ls-tree', '--name-only', f.branch], { encoding: 'utf8' }).stdout
-    assert.doesNotMatch(tree, /gate-fix\.js/)
+    assert.doesNotMatch(tree, /check-fix\.js/)
     assert.doesNotMatch(tree, /node_modules/)
   } finally {
     f.cleanup()
   }
 })
 
-test('a gate that reports no layer at all cannot land a publish', async () => {
-  const f = fixture()
-  try {
-    const result = await applyHandback(input(f, {
-      runGates: async () => ({ ok: true, steps: [], detail: '' }),
-    }))
-    assert.equal(result.ok, false)
-    assert.equal(result.ok ? '' : result.stage, 'gates')
-    assert.match(result.ok ? '' : result.detail, /returned no layer verdict/)
-    const log = spawnSync('git', ['-C', f.bare, 'log', '--format=%s', f.branch], { encoding: 'utf8' }).stdout
-    assert.doesNotMatch(log, /publish/)
-  } finally {
-    f.cleanup()
-  }
-})
-
-test('a revision the target cannot spell safely is refused', async () => {
+test('a revision the deploy service cannot spell safely is refused', async () => {
   const f = fixture()
   try {
     // A NUL cannot be passed to a process at all; a newline forges a comment;
-    // a backtick would let the target author the account of what happened.
+    // a backtick would let the deploy service author the account of what happened.
     for (const revision of ['rev\u0000nul', 'rev\nbreak', 'rev` @here **landed**', 'x'.repeat(500)]) {
       const result = await applyHandback(input(f, { revision }))
       assert.equal(result.ok, false, `revision ${JSON.stringify(revision.slice(0, 20))} was accepted`)
@@ -348,11 +347,11 @@ test('two publishes in one checkout do not destroy each other', async () => {
     const [a, b] = await Promise.all([
       applyHandback(input(f, {
         revision: 'rev-a',
-        runGates: async (tree: string) => {
+        checkTree: async (tree: string) => {
           firstTree = tree
           // Long enough for the other publish to run its own worktree setup.
           await new Promise(resolve => { setTimeout(resolve, 300) })
-          assert.equal(existsSync(tree), true, "the gate's tree was deleted by the other publish")
+          assert.equal(existsSync(tree), true, "the checked tree was deleted by the other publish")
           return PASSING()
         },
       })),
@@ -371,11 +370,11 @@ test('two publishes in one checkout do not destroy each other', async () => {
   }
 })
 
-test('a branch name or commit a target chose is refused before it reaches git', async () => {
+test('a branch name or commit a deploy service chose is refused before it reaches git', async () => {
   assert.equal(invalidPublishTarget({ branch: 'dsh-migrate/0.1.6', headSha: 'a'.repeat(40), revision: 'r' }), undefined)
   assert.match(invalidPublishTarget({ branch: '--force', headSha: 'a'.repeat(40), revision: 'r' }) ?? '', /not a branch name/)
   assert.match(invalidPublishTarget({ branch: 'a..b', headSha: 'a'.repeat(40), revision: 'r' }) ?? '', /not a branch name/)
-  assert.match(invalidPublishTarget({ branch: 'main', headSha: 'HEAD~1', revision: 'r' }) ?? '', /not a commit/)
+  assert.match(invalidPublishTarget({ branch: 'main', headSha: 'HEAD~1', revision: 'r' }) ?? '', /not a full commit hash/)
   assert.match(invalidPublishTarget({ branch: 'main', headSha: 'a'.repeat(40), revision: 'r\nx' }) ?? '', /commit message/)
 
   const f = fixture()
@@ -386,59 +385,6 @@ test('a branch name or commit a target chose is refused before it reaches git', 
   } finally {
     f.cleanup()
   }
-})
-
-test('the gate runner refuses on mechanical, on boot, and on a blocking suite', async () => {
-  const config = parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } })
-  const runner = createGateRunner({
-    config,
-    dshTag: 'dsh-v0.1.6',
-    dshCache: join(tmpdir(), 'dsh-gates-cache'),
-    log: () => {},
-    mechanical: () => ({ ok: false, errors: 'tests failed: 3' }),
-  })
-  const refused = await runner('/tmp/tree')
-  assert.equal(refused.ok, false)
-  assert.equal(refused.refusedBy, 'mechanical')
-  assert.match(renderGateReport(refused), /mechanical`: fail/)
-
-  const boot = createGateRunner({
-    config,
-    dshTag: 'dsh-v0.1.6',
-    dshCache: join(tmpdir(), 'dsh-gates-cache'),
-    log: () => {},
-    mechanical: () => ({ ok: true }),
-    boot: async () => ({ outcome: 'fail', signature: 'load: throws', detail: 'stack' }),
-  })
-  const bootRefused = await boot('/tmp/tree')
-  assert.equal(bootRefused.refusedBy, 'boot')
-
-  // An advisory suite reports its verdict without refusing.
-  const advisory = createGateRunner({
-    config,
-    dshTag: 'dsh-v0.1.6',
-    dshCache: join(tmpdir(), 'dsh-gates-cache'),
-    log: () => {},
-    mechanical: () => ({ ok: true }),
-    boot: async () => ({ outcome: 'pass', signature: 'loaded', detail: '' }),
-    e2e: () => ({ ok: false, layer: 'e2e', signature: 'e2e: 1 failed', detail: 'one test failed' }),
-  })
-  const advisoryReport = await advisory('/tmp/tree')
-  assert.equal(advisoryReport.ok, true)
-  assert.match(renderGateReport(advisoryReport), /e2e`: fail/)
-
-  const blocking = createGateRunner({
-    config: parseConfig({ e2e: { gate: 'blocking' } }),
-    dshTag: 'dsh-v0.1.6',
-    dshCache: join(tmpdir(), 'dsh-gates-cache'),
-    log: () => {},
-    mechanical: () => ({ ok: true }),
-    boot: async () => ({ outcome: 'pass', signature: 'loaded', detail: '' }),
-    e2e: () => ({ ok: false, layer: 'e2e', signature: 'e2e: 1 failed', detail: 'one test failed' }),
-  })
-  const blockingReport = await blocking('/tmp/tree')
-  assert.equal(blockingReport.ok, false)
-  assert.equal(blockingReport.refusedBy, 'e2e')
 })
 
 test('the commit a publish makes is identifiable by its revision', () => {
@@ -460,26 +406,32 @@ test('the fixture is a pull request branch plus a scratch diff on top of it', ()
   }
 })
 
-/** A target that freezes a revision, serves it as a diff, and reports a preview. */
-function publishTarget(f: ReturnType<typeof fixture>, options: { freeze?: unknown; diff?: string } = {}): {
+/** The pull request as GitHub answers it, with the head this Action pushes to. */
+function pullRequest(f: ReturnType<typeof fixture>, overrides: { state?: string; ref?: string; repo?: string } = {}): Response {
+  return new Response(JSON.stringify({
+    number: 12,
+    state: overrides.state ?? 'open',
+    merged: overrides.state === 'merged',
+    html_url: 'https://github.com/me/plugin/pull/12',
+    title: 'migrate',
+    body: '',
+    head: { ref: overrides.ref ?? f.branch, sha: f.headSha, repo: { full_name: overrides.repo ?? 'me/plugin' } },
+  }), { status: 200 })
+}
+
+/** A deploy service that freezes a revision, serves it as a diff, and reports a preview; and the GitHub API. */
+function deployService(f: ReturnType<typeof fixture>, options: { freeze?: unknown; diff?: string } = {}): {
   fetchImpl: typeof fetch
   calls: string[]
+  headers: Headers[]
 } {
   const calls: string[] = []
+  const headers: Headers[] = []
   const fetchImpl: typeof fetch = async (input, init) => {
     const url = String(input)
     calls.push(`${init?.method ?? 'GET'} ${url}`)
-    if (url.startsWith('https://api.github.com/repos/me/plugin/pulls/12')) {
-      return new Response(JSON.stringify({
-        number: 12,
-        state: 'open',
-        merged: false,
-        html_url: 'https://github.com/me/plugin/pull/12',
-        title: 'migrate',
-        body: '',
-        head: { ref: f.branch, sha: f.headSha },
-      }), { status: 200 })
-    }
+    headers.push(new Headers(init?.headers))
+    if (url.startsWith('https://api.github.com/repos/me/plugin/pulls/12')) return pullRequest(f)
     if (url.includes('/scratch')) {
       return new Response(options.diff ?? JSON.stringify({ diff: f.diff.text }), {
         status: 200,
@@ -489,13 +441,52 @@ function publishTarget(f: ReturnType<typeof fixture>, options: { freeze?: unknow
     if (url.includes('/previews/')) {
       return new Response(JSON.stringify(options.freeze ?? {
         revision: 'rev-1',
-        baseSha: f.headSha,
         headSha: f.headSha,
       }), { status: 200 })
     }
     return new Response('{}', { status: 404 })
   }
-  return { fetchImpl, calls }
+  return { fetchImpl, calls, headers }
+}
+
+/** What `runCommand` is given for a `publish` on pull request #12 of `me/plugin`. */
+function publishInput(
+  f: ReturnType<typeof fixture>,
+  fetchImpl: typeof fetch,
+  overrides: Partial<CommandRunInput> = {},
+): CommandRunInput {
+  const parsed = parseCommand('/dsh-migrate publish')
+  if (!parsed.ok) throw new Error(parsed.reason)
+  return {
+    command: parsed.command,
+    config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
+    env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret' },
+    workdir: f.work,
+    repository: { owner: 'me', name: 'plugin' },
+    github: new GitHubClient('ghs_read', {}, fetchImpl),
+    issueNumber: 12,
+    commentId: '42',
+    log: () => {},
+    status: () => ({ migrations: [] }),
+    report: async () => { throw new Error('a publish delivers no report') },
+    reportDryRun: async () => [],
+    checkTree: async () => await PASSING(),
+    treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
+    fetchImpl,
+    ...overrides,
+  }
+}
+
+/** Record the bodies the deploy service receives at `publish-result`. */
+function recordResults(fetchImpl: typeof fetch): { fetchImpl: typeof fetch; bodies: string[] } {
+  const bodies: string[] = []
+  return {
+    bodies,
+    fetchImpl: async (input, init) => {
+      if (String(input).endsWith('/publish-result')) bodies.push(typeof init?.body === 'string' ? init.body : '')
+      return await fetchImpl(input, init)
+    },
+  }
 }
 
 async function runPublish(
@@ -503,51 +494,36 @@ async function runPublish(
   overrides: {
     freeze?: unknown
     diff?: string
-    gates?: HandbackInput['runGates']
-    env?: NodeJS.ProcessEnv
+    checkTree?: CommandRunInput['checkTree']
   } = {},
-): Promise<{ outcome: Awaited<ReturnType<typeof runCommand>>; calls: string[] }> {
-  const { fetchImpl, calls } = publishTarget(f, {
+): Promise<{ outcome: Awaited<ReturnType<typeof runCommand>>; calls: string[]; headers: Headers[] }> {
+  const { fetchImpl, calls, headers } = deployService(f, {
     ...(overrides.freeze === undefined ? {} : { freeze: overrides.freeze }),
     ...(overrides.diff === undefined ? {} : { diff: overrides.diff }),
   })
-  const parsed = parseCommand('/dsh-migrate publish')
-  const outcome = await runCommand({
-    command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-    config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-    env: {
-      DSH_MIGRATE_DEPLOY_TOKEN: 'secret',
-      GITHUB_TOKEN: 'ghs_read',
-      GITHUB_REPOSITORY: 'me/plugin',
-      ...overrides.env,
-    },
-    workdir: f.work,
-    pullRequest: 12,
-    commentId: '42',
-    log: () => {},
-    gates: overrides.gates ?? PASSING,
-    treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-    fetchImpl,
-  })
-  return { outcome, calls }
+  const outcome = await runCommand(publishInput(f, fetchImpl, {
+    ...(overrides.checkTree === undefined ? {} : { checkTree: overrides.checkTree }),
+  }))
+  return { outcome, calls, headers }
 }
 
-test('publish freezes, fetches, applies, gates, and pushes through the Action', async () => {
+test('publish freezes, fetches, applies, checks, and pushes through the Action', async () => {
   const f = fixture()
   try {
     const before = spawnSync('git', ['-C', f.bare, 'rev-parse', f.branch], { encoding: 'utf8' }).stdout.trim()
-    const { outcome, calls } = await runPublish(f)
+    const { outcome, calls, headers } = await runPublish(f)
     assert.equal(outcome.ok, true, outcome.reply)
     assert.match(outcome.reply, /`publish` landed\./)
     assert.match(outcome.reply, /`mechanical`: pass/)
-    // The effectful success is handed back to be recorded, like any other verb.
-    assert.equal(outcome.record?.verb, 'publish')
 
     // Everything that can refuse is read first — the pull request, so the branch
-    // is known — and only then is the target asked to freeze a revision.
+    // is known — and only then is the deploy service asked to freeze a revision.
     assert.match(calls[0] ?? '', /^GET https:\/\/api\.github\.com\/repos\/me\/plugin\/pulls\/12/)
     assert.match(calls[1] ?? '', /^POST https:\/\/deploy\.test\/previews\//)
     assert.match(calls[2] ?? '', /GET https:\/\/deploy\.test\/previews\/.+\/scratch\?revision=rev-1/)
+    // The freeze carries the key of this comment, so a second delivery of it is
+    // the same command to the deploy service.
+    assert.equal(headers[1]?.get('Idempotency-Key'), commandKey('me/plugin', 12, 'publish', '42'))
 
     const after = spawnSync('git', ['-C', f.bare, 'rev-parse', f.branch], { encoding: 'utf8' }).stdout.trim()
     assert.notEqual(after, before)
@@ -558,13 +534,12 @@ test('publish freezes, fetches, applies, gates, and pushes through the Action', 
   }
 })
 
-test('a target that only acknowledges the request is told what it owes', async () => {
+test('a deploy service that only acknowledges the request is told what it owes', async () => {
   const f = fixture()
   try {
     const { outcome, calls } = await runPublish(f, { freeze: { ok: true } })
     assert.equal(outcome.ok, false)
     assert.match(outcome.reply, /acknowledged the request without freezing a revision/)
-    assert.match(outcome.reply, /the-publish-hand-back/)
     // Nothing was fetched and nothing reached the branch: there was no revision.
     assert.equal(calls.filter(call => call.includes('/scratch')).length, 0)
     assert.equal(spawnSync('git', ['-C', f.bare, 'log', '--oneline', f.branch], { encoding: 'utf8' }).stdout.trim().split('\n').length, 2)
@@ -596,33 +571,29 @@ test('a patch served as a plain body is applied just as a JSON one is', async ()
   }
 })
 
-test('a publish without a GitHub token refuses instead of guessing the branch', async () => {
+test('a publish that cannot read the pull request refuses instead of guessing the branch', async () => {
   const f = fixture()
   try {
-    const { outcome } = await runPublish(f, { env: { GITHUB_TOKEN: '' } })
+    const { fetchImpl, calls } = deployService(f)
+    // No GitHub client: the invocation has no token to read the pull request with.
+    const outcome = await runCommand(publishInput(f, fetchImpl, { github: undefined }))
     assert.equal(outcome.ok, false)
-    assert.match(outcome.reply, /`GITHUB_TOKEN` is not set/)
+    assert.match(outcome.reply, /cannot check a tree or read the pull request/)
+    assert.deepEqual(calls, [], 'nothing was asked')
   } finally {
     f.cleanup()
   }
 })
 
-test('a failing gate refuses the publish and leaves the branch alone', async () => {
+test('a failing check refuses the publish and leaves the branch alone', async () => {
   const f = fixture()
   try {
     const before = spawnSync('git', ['-C', f.bare, 'rev-parse', f.branch], { encoding: 'utf8' }).stdout.trim()
-    const { outcome } = await runPublish(f, {
-      gates: async () => ({
-        ok: false,
-        steps: [{ layer: 'boot', ok: false, detail: 'the plugin throws on load' }],
-        refusedBy: 'boot',
-        detail: 'the plugin does not load',
-      }),
-    })
+    const { outcome } = await runPublish(f, { checkTree: BOOT_FAILS })
     assert.equal(outcome.ok, false)
-    assert.match(outcome.reply, /`publish` was refused:\*\* the gates refused it/)
+    assert.match(outcome.reply, /`publish` was refused at the checks stage\.\*\* Nothing reached/)
+    assert.match(outcome.reply, /the plugin does not load/)
     assert.match(outcome.reply, /`boot`: fail/)
-    assert.equal(outcome.record, undefined, 'a refused publish is not recorded, so it stays retryable')
     const after = spawnSync('git', ['-C', f.bare, 'rev-parse', f.branch], { encoding: 'utf8' }).stdout.trim()
     assert.equal(after, before)
   } finally {
@@ -630,130 +601,29 @@ test('a failing gate refuses the publish and leaves the branch alone', async () 
   }
 })
 
-test('a publish this invocation cannot verify refuses instead of pushing ungated', async () => {
+test('a publish this invocation cannot check refuses instead of pushing unchecked', async () => {
   const f = fixture()
   try {
-    const { fetchImpl } = publishTarget(f)
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      fetchImpl,
-    })
+    const { fetchImpl } = deployService(f)
+    const outcome = await runCommand(publishInput(f, fetchImpl, { checkTree: undefined }))
     assert.equal(outcome.ok, false)
-    assert.match(outcome.reply, /cannot run the gate stack/)
+    assert.match(outcome.reply, /a change reaches the branch only after the checks/)
   } finally {
     f.cleanup()
   }
 })
 
-test('a publish that cannot gate never asks the target to freeze anything', async () => {
+test('a publish that cannot check never asks the deploy service to freeze anything', async () => {
   const f = fixture()
   try {
-    const { fetchImpl, calls } = publishTarget(f)
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      fetchImpl,
-    })
+    const { fetchImpl, calls } = deployService(f)
+    const outcome = await runCommand(publishInput(f, fetchImpl, { checkTree: undefined }))
     assert.equal(outcome.ok, false)
-    assert.match(outcome.reply, /cannot run the gate stack/)
-    assert.deepEqual(calls, [], 'the target was asked nothing')
+    assert.match(outcome.reply, /cannot check a tree/)
+    assert.deepEqual(calls, [], 'the deploy service was asked nothing')
   } finally {
     f.cleanup()
   }
-})
-
-test('a blocking suite this invocation cannot run refuses instead of passing quietly', async () => {
-  const config = parseConfig({ e2e: { gate: 'blocking' } })
-  const runner = createGateRunner({
-    config,
-    dshTag: 'dsh-v0.1.6',
-    dshCache: join(tmpdir(), 'dsh-gates-cache'),
-    log: () => {},
-    mechanical: () => ({ ok: true }),
-    boot: async () => ({ outcome: 'pass', signature: 'loaded', detail: '' }),
-    // No `e2e` port: this invocation cannot run the suite the user made blocking.
-  })
-  const report = await runner('/tmp/tree')
-  assert.equal(report.ok, false)
-  assert.equal(report.refusedBy, 'e2e')
-  assert.match(report.detail, /cannot be verified/)
-  assert.match(renderGateReport(report), /e2e`: skipped \(no end-to-end runner in this invocation\)/)
-})
-
-test('a layer that throws is a refusal, never a pass', async () => {
-  const config = parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } })
-  const mechanical = createGateRunner({
-    config,
-    dshTag: 'dsh-v0.1.6',
-    dshCache: join(tmpdir(), 'dsh-gates-cache'),
-    log: () => {},
-    mechanical: () => { throw new Error('the install command is missing') },
-  })
-  const first = await mechanical('/tmp/tree')
-  assert.equal(first.ok, false)
-  assert.equal(first.refusedBy, 'mechanical')
-  assert.match(first.detail, /could not run: the install command is missing/)
-
-  const boot = createGateRunner({
-    config,
-    dshTag: 'dsh-v0.1.6',
-    dshCache: join(tmpdir(), 'dsh-gates-cache'),
-    log: () => {},
-    mechanical: () => ({ ok: true }),
-    boot: async () => { throw new Error('npm registry unreachable') },
-  })
-  const second = await boot('/tmp/tree')
-  assert.equal(second.refusedBy, 'boot')
-  assert.match(second.detail, /could not run: npm registry unreachable/)
-})
-
-test('the tag is resolved once per gate run, and a failure to resolve refuses the whole stack', async () => {
-  const config = parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } })
-  let resolved = 0
-  const runner = createGateRunner({
-    config,
-    dshCache: join(tmpdir(), 'dsh-gates-cache'),
-    log: () => {},
-    dshTag: async () => {
-      resolved += 1
-      throw new Error('no dsh-v* tag found')
-    },
-    // The mechanical layer is injected, so nothing needs the tag at all.
-    mechanical: () => ({ ok: true }),
-    boot: async () => ({ outcome: 'pass', signature: 'loaded', detail: '' }),
-  })
-  // A resolver that fails is the whole stack's problem, and the report says so
-  // rather than blaming the layer that happened to call it first.
-  const refusedByTag = await runner('/tmp/tree')
-  assert.equal(refusedByTag.ok, false)
-  assert.match(refusedByTag.detail, /harness version to verify against could not be resolved/)
-  assert.equal(resolved, 1)
-
-  // A resolver that answers is used once, and named in the report.
-  const answered = createGateRunner({
-    config,
-    dshCache: join(tmpdir(), 'dsh-gates-cache'),
-    log: () => {},
-    dshTag: async () => 'dsh-v0.1.6',
-    mechanical: () => ({ ok: true, checks: 1 }),
-    boot: async () => ({ outcome: 'pass', signature: 'loaded', detail: '' }),
-  })
-  const report = await answered('/tmp/tree')
-  assert.equal(report.ok, true)
-  assert.equal(report.tag, 'dsh-v0.1.6')
 })
 
 test('a similar subject on the branch never makes a publish a no-op', async () => {
@@ -812,38 +682,19 @@ test('a reverted publish is not reported as already landed', async () => {
 test('a pull request whose head lives in a fork is refused, not pushed to the wrong branch', async () => {
   const f = fixture()
   try {
-    const { fetchImpl } = publishTarget(f)
+    const { fetchImpl, calls } = deployService(f)
     const forked: typeof fetch = async (input, init) => {
-      const url = String(input)
-      if (url.startsWith('https://api.github.com/repos/me/plugin/pulls/12')) {
-        return new Response(JSON.stringify({
-          number: 12,
-          state: 'open',
-          merged: false,
-          html_url: 'https://github.com/me/plugin/pull/12',
-          title: 'from a fork',
-          body: '',
-          head: { ref: 'patch-1', sha: f.headSha, repo: { full_name: 'stranger/plugin' } },
-        }), { status: 200 })
+      if (String(input).startsWith('https://api.github.com/repos/me/plugin/pulls/12')) {
+        return pullRequest(f, { ref: 'patch-1', repo: 'stranger/plugin' })
       }
       return await fetchImpl(input, init)
     }
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      gates: PASSING,
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl: forked,
-    })
+    const outcome = await runCommand(publishInput(f, forked))
     assert.equal(outcome.ok, false)
-    assert.match(outcome.reply, /has its head in `stranger\/plugin`/)
+    assert.match(outcome.reply, /lives in another repository/)
     assert.match(outcome.reply, /does not write to a fork/)
+    // Refused before anything was frozen.
+    assert.equal(calls.filter(call => call.includes('/previews/')).length, 0)
   } finally {
     f.cleanup()
   }
@@ -875,102 +726,41 @@ test('a leftover worktree registration does not break the next publish', async (
   }
 })
 
-test('the gate runner refuses a boot probe that timed out, and a stack that ran nothing', async () => {
-  const config = parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } })
-  const timedOut = createGateRunner({
-    config,
-    dshTag: 'dsh-v0.1.6',
-    dshCache: join(tmpdir(), 'dsh-gates-cache'),
-    log: () => {},
-    mechanical: () => ({ ok: true, checks: 2 }),
-    boot: async () => ({ outcome: 'timeout', signature: 'timeout: boot did not finish', detail: 'the host never printed ready' }),
-  })
-  const hung = await timedOut('/tmp/tree')
-  // A probe that never finished says nothing about the plugin, and counting it
-  // as loaded is how a hung boot would reach a branch.
-  assert.equal(hung.ok, false)
-  assert.equal(hung.refusedBy, 'boot')
-  assert.match(hung.detail, /never observed to load/)
-  assert.match(renderGateReport(hung), /boot`: fail/)
-
-  const unchecked = createGateRunner({
-    config: parseConfig({ verify: { boot: { enabled: false } }, e2e: { enabled: false } }),
-    dshTag: 'dsh-v0.1.6',
-    dshCache: join(tmpdir(), 'dsh-gates-cache'),
-    log: () => {},
-    // A plugin with no declared build, typecheck or test command: the mechanical
-    // layer ran only its installs.
-    mechanical: () => ({ ok: true, checks: 0 }),
-  })
-  const nothing = await unchecked('/tmp/tree')
-  assert.equal(nothing.ok, false)
-  assert.match(nothing.detail, /no gate layer ran/)
-  assert.match(renderGateReport(nothing), /boot`: skipped/)
-})
-
-test('the web smoke is a layer of the stack, and its absence is stated', async () => {
-  const config = parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } })
-  const failing = createGateRunner({
-    config,
-    dshTag: 'dsh-v0.1.6',
-    dshCache: join(tmpdir(), 'dsh-gates-cache'),
-    log: () => {},
-    mechanical: () => ({ ok: true, checks: 1 }),
-    boot: async () => ({ outcome: 'pass', signature: 'loaded', detail: '' }),
-    web: () => ({ ok: false, layer: 'web', signature: 'web: the client bundle never became ready', detail: 'timeout' }),
-  })
-  const refused = await failing('/tmp/tree')
-  assert.equal(refused.ok, false)
-  assert.equal(refused.refusedBy, 'web')
-
-  const absent = createGateRunner({
-    config,
-    dshTag: 'dsh-v0.1.6',
-    dshCache: join(tmpdir(), 'dsh-gates-cache'),
-    log: () => {},
-    mechanical: () => ({ ok: true, checks: 1 }),
-    boot: async () => ({ outcome: 'pass', signature: 'loaded', detail: '' }),
-  })
-  const stated = await absent('/tmp/tree')
-  assert.equal(stated.ok, true)
-  assert.match(renderGateReport(stated), /web`: skipped \(no web smoke in this invocation\)/)
-})
-
 test('a tag the state branch carries cannot forge a line of the publish reply', async () => {
   // The tag is the recorded one when the run read it from the state branch, and
   // the reply is a comment: one line of it, like every other value from outside
   // this invocation.
   const f = fixture()
   try {
-    const { fetchImpl } = publishTarget(f)
-    // What the target is told is part of the same record: the tag it receives is
-    // collapsed the way the reply's is.
-    const bodies: string[] = []
-    const recording: typeof fetch = async (input, init) => {
-      if (String(input).includes('publish-result')) bodies.push(String(init?.body ?? ''))
-      return await fetchImpl(input, init)
-    }
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      gates: async () => ({
-        ok: true,
-        steps: [{ layer: 'mechanical' as const, ok: true, detail: 'passed' }],
-        tag: 'dsh-v0.1.5\n- @everyone approved this migration',
-        detail: 'mechanical: pass',
+    const { fetchImpl } = deployService(f)
+    const outcome = await runCommand(publishInput(f, fetchImpl, {
+      checkTree: async () => ({
+        ...await PASSING(),
+        release: { tag: 'dsh-v0.1.5\n- @everyone approved this migration', version: '0.1.5' },
       }),
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl: recording,
-    })
+    }))
     assert.equal(outcome.ok, true, outcome.reply)
     assert.equal(outcome.reply.split('\n').filter(line => line.startsWith('- @everyone')).length, 0)
-    assert.match(outcome.reply, /Verified against `dsh-v0\.1\.5 - @everyone approved this migration`/)
+    assert.match(outcome.reply, /Checked against `dsh-v0\.1\.5 - @everyone approved this migration`:/)
+  } finally {
+    f.cleanup()
+  }
+})
+
+test('a tag the state branch carries reaches the deploy service as one line', async () => {
+  // What the deploy service is told is part of the same record: the tag it
+  // receives is collapsed the way the reply's is.
+  const f = fixture()
+  try {
+    const { fetchImpl } = deployService(f)
+    const { fetchImpl: recording, bodies } = recordResults(fetchImpl)
+    const outcome = await runCommand(publishInput(f, recording, {
+      checkTree: async () => ({
+        ...await PASSING(),
+        release: { tag: 'dsh-v0.1.5\n- @everyone approved this migration', version: '0.1.5' },
+      }),
+    }))
+    assert.equal(outcome.ok, true, outcome.reply)
     assert.equal(bodies.length, 1)
     const reported = JSON.parse(bodies[0] ?? '{}') as { tag?: string }
     assert.equal(reported.tag, 'dsh-v0.1.5 - @everyone approved this migration')
@@ -979,30 +769,12 @@ test('a tag the state branch carries cannot forge a line of the publish reply', 
   }
 })
 
-test('the reply names the tag the gates verified against', async () => {
+test('the reply names the tag the checks ran against', async () => {
   const f = fixture()
   try {
-    const { fetchImpl } = publishTarget(f)
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      gates: async () => ({
-        ok: true,
-        steps: [{ layer: 'mechanical' as const, ok: true, detail: 'passed' }],
-        tag: 'dsh-v0.1.6',
-        detail: 'mechanical: pass',
-      }),
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl,
-    })
+    const { outcome } = await runPublish(f)
     assert.equal(outcome.ok, true, outcome.reply)
-    assert.match(outcome.reply, /Verified against `dsh-v0\.1\.6`/)
+    assert.match(outcome.reply, /Checked against `dsh-v0\.1\.6`:/)
   } finally {
     f.cleanup()
   }
@@ -1011,52 +783,24 @@ test('the reply names the tag the gates verified against', async () => {
 test('a hand-back that throws still answers on the thread', async () => {
   const f = fixture()
   try {
-    const { fetchImpl } = publishTarget(f)
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      // A gate that throws where the runner cannot catch it (it is the runner).
-      gates: () => { throw new Error('the gate runner itself exploded') },
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl,
+    const { outcome } = await runPublish(f, {
+      // A tree check that throws: the checks could not run at all.
+      checkTree: () => { throw new Error('the check runner itself exploded') },
     })
     assert.equal(outcome.ok, false)
-    assert.match(outcome.reply, /the gate runner itself exploded/)
+    assert.match(outcome.reply, /refused at the error stage/)
+    assert.match(outcome.reply, /the check runner itself exploded/)
   } finally {
     f.cleanup()
   }
 })
 
-test('the target is told how the publish ended, including which gate refused', async () => {
+test('the deploy service is told how the publish ended, including what each check said', async () => {
   const f = fixture()
   try {
-    const { fetchImpl, calls } = publishTarget(f)
-    const bodies: string[] = []
-    const recording: typeof fetch = async (input, init) => {
-      if (String(input).endsWith('/publish-result')) {
-        bodies.push(typeof init?.body === 'string' ? init.body : '')
-      }
-      return await fetchImpl(input, init)
-    }
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      gates: PASSING,
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl: recording,
-    })
+    const { fetchImpl, calls, headers } = deployService(f)
+    const { fetchImpl: recording, bodies } = recordResults(fetchImpl)
+    const outcome = await runCommand(publishInput(f, recording))
     assert.equal(outcome.ok, true, outcome.reply)
     assert.equal(bodies.length, 1)
     const reported = JSON.parse(bodies[0] ?? '{}') as Record<string, unknown>
@@ -1064,10 +808,13 @@ test('the target is told how the publish ended, including which gate refused', a
     assert.equal(reported.revision, 'rev-1')
     assert.equal(reported.branch, f.branch)
     assert.match(String(reported.commit), /^[0-9a-f]{7,40}$/)
-    assert.deepEqual(reported.gates, [{ layer: 'mechanical', ok: true, detail: 'passed' }])
+    assert.equal(reported.tag, 'dsh-v0.1.6')
+    assert.deepEqual(reported.checks, [{ check: 'mechanical', outcome: 'pass' }])
     // The call is on the preview path, and it carries no idempotency key: it is
     // a report about a request, not a request.
-    assert.match(calls.filter(call => call.includes('publish-result'))[0] ?? '', /POST https:\/\/deploy\.test\/previews\/.+\/publish-result/)
+    const index = calls.findIndex(call => call.includes('publish-result'))
+    assert.match(calls[index] ?? '', /POST https:\/\/deploy\.test\/previews\/.+\/publish-result/)
+    assert.equal(headers[index]?.get('Idempotency-Key'), null)
   } finally {
     f.cleanup()
   }
@@ -1076,105 +823,55 @@ test('the target is told how the publish ended, including which gate refused', a
 test('a refused publish is reported with the stage that refused it', async () => {
   const f = fixture()
   try {
-    const { fetchImpl } = publishTarget(f)
-    const bodies: string[] = []
-    const recording: typeof fetch = async (input, init) => {
-      if (String(input).endsWith('/publish-result')) {
-        bodies.push(typeof init?.body === 'string' ? init.body : '')
-      }
-      return await fetchImpl(input, init)
-    }
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      gates: async () => ({
-        ok: false,
-        steps: [{ layer: 'boot' as const, ok: false, detail: 'the plugin throws on load' }],
-        refusedBy: 'boot' as const,
-        detail: 'the plugin does not load',
-      }),
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl: recording,
-    })
+    const { fetchImpl } = deployService(f)
+    const { fetchImpl: recording, bodies } = recordResults(fetchImpl)
+    const outcome = await runCommand(publishInput(f, recording, { checkTree: BOOT_FAILS }))
     assert.equal(outcome.ok, false)
     assert.equal(bodies.length, 1)
     const reported = JSON.parse(bodies[0] ?? '{}') as Record<string, unknown>
     assert.equal(reported.outcome, 'refused')
-    assert.equal(reported.stage, 'gates')
+    assert.equal(reported.stage, 'checks')
     assert.equal(reported.commit, undefined)
+    assert.deepEqual(reported.checks, [{ check: 'boot', outcome: 'fail' }])
   } finally {
     f.cleanup()
   }
 })
 
-test('a target that cannot be told does not fail the publish', async () => {
+test('a deploy service that cannot be told does not fail the publish', async () => {
   const f = fixture()
   try {
-    const { fetchImpl } = publishTarget(f)
+    const { fetchImpl } = deployService(f)
     const refusing: typeof fetch = async (input, init) => {
       if (String(input).endsWith('/publish-result')) return new Response('nope', { status: 404 })
       return await fetchImpl(input, init)
     }
     const lines: string[] = []
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: (message: string) => lines.push(message),
-      gates: PASSING,
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl: refusing,
-    })
+    const outcome = await runCommand(publishInput(f, refusing, { log: (message: string) => lines.push(message) }))
     // The change landed; the missing endpoint is a line in the log.
     assert.equal(outcome.ok, true, outcome.reply)
-    assert.match(lines.join('\n'), /the target was not told how it ended/)
+    assert.match(lines.join('\n'), /the deploy service was not told how it ended/)
   } finally {
     f.cleanup()
   }
 })
 
-test('a hand-back that stops with an error says so on the thread and at the target', async () => {
+test('a hand-back that stops with an error says so on the thread and at the deploy service', async () => {
   const f = fixture()
   try {
-    const { fetchImpl } = publishTarget(f)
-    const bodies: string[] = []
-    const recording: typeof fetch = async (input, init) => {
-      if (String(input).endsWith('/publish-result')) {
-        bodies.push(typeof init?.body === 'string' ? init.body : '')
-      }
-      return await fetchImpl(input, init)
-    }
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      gates: () => { throw new Error('the gate runner exploded') },
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl: recording,
-    })
+    const { fetchImpl } = deployService(f)
+    const { fetchImpl: recording, bodies } = recordResults(fetchImpl)
+    const outcome = await runCommand(publishInput(f, recording, {
+      checkTree: () => { throw new Error('the check runner exploded') },
+    }))
     assert.equal(outcome.ok, false)
-    assert.match(outcome.reply, /the gate runner exploded/)
+    assert.match(outcome.reply, /the check runner exploded/)
     // The preview is not left waiting for an outcome that will never come.
     assert.equal(bodies.length, 1)
     const reported = JSON.parse(bodies[0] ?? '{}') as Record<string, unknown>
     assert.equal(reported.outcome, 'refused')
     assert.equal(reported.stage, 'error')
-    assert.match(String(reported.detail), /the gate runner exploded/)
+    assert.match(String(reported.detail), /the check runner exploded/)
   } finally {
     f.cleanup()
   }
@@ -1195,21 +892,19 @@ test('a git that cannot even start is a refusal with its own reason', async () =
   }
 })
 
-test('the preview state parser reads what a target sends and nothing else', async () => {
+test('the preview state parser reads what a deploy service sends and nothing else', async () => {
   const { parsePreviewState, parseFrozenRevision } = await import('../../src/deploy/client.ts')
   assert.deepEqual(parsePreviewState(undefined), {})
   assert.deepEqual(parsePreviewState('running'), {})
   assert.deepEqual(parsePreviewState([{ state: 'running' }]), {})
-  assert.deepEqual(parsePreviewState({ state: 'running', url: 'https://x.test', safe_url: 'https://x.test/safe' }), {
-    state: 'running',
+  assert.deepEqual(parsePreviewState({ state: 'failed', url: 'https://x.test', safeUrl: 'https://x.test/safe', detail: 'boot check failed', extendedDays: 7 }), {
+    state: 'failed',
     url: 'https://x.test',
     safeUrl: 'https://x.test/safe',
+    detail: 'boot check failed',
   })
-  assert.deepEqual(parsePreviewState({ status: 'stopped' }), { state: 'stopped' })
-  // A number where a string belongs is ignored rather than coerced.
-  assert.deepEqual(parsePreviewState({ extendedDays: '7' }), {})
-  assert.deepEqual(parsePreviewState({ extendedDays: 7 }), { extendedDays: 7 })
-  assert.deepEqual(parsePreviewState({ headSha: '', revision: '' }), {})
+  // A number where a string belongs is dropped rather than coerced, and so is whitespace.
+  assert.deepEqual(parsePreviewState({ state: 7, headSha: ' ' }), {})
   // A publish answer without a revision is an acknowledgement, not a hand-back.
   assert.equal(parseFrozenRevision({ ok: true }), undefined)
   assert.equal(parseFrozenRevision('rev'), undefined)
@@ -1293,27 +988,13 @@ test('a checkout URL with a port, and a host that only looks like GitHub', async
   }
 })
 
-test('the CLI drives a publish end to end: freeze, diff, gates, push, report', async () => {
+test('the CLI drives a publish end to end: freeze, diff, checks, push, report, reply', async () => {
   const { spawn } = await import('node:child_process')
   const { createServer } = await import('node:http')
   const f = fixture()
-  // The tree a publish gates is the pull request branch, so the fixture plugin
-  // has to be on it — and the frozen head is then that branch's tip.
-  writeFileSync(join(f.work, 'cordis.patch.yml'), '[]\n')
-  writeFileSync(join(f.work, 'package.json'), JSON.stringify({
-    name: 'fixture-plugin',
-    version: '1.0.0',
-    scripts: { test: 'echo ok' },
-    dsh: { bundle: { patch: 'cordis.patch.yml' } },
-  }))
-  f.git(['checkout', f.branch])
-  f.git(['add', '-A'])
-  f.git(['commit', '-m', 'the plugin on the branch'])
-  f.git(['push', 'origin', f.branch])
-  const headSha = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: f.work, encoding: 'utf8' }).stdout.trim()
-  f.git(['checkout', 'master'])
   const calls: string[] = []
   const reported: string[] = []
+  const replies: string[] = []
   const server = createServer((request, response) => {
     calls.push(`${request.method ?? ''} ${request.url ?? ''}`)
     const url = request.url ?? ''
@@ -1325,7 +1006,18 @@ test('the CLI drives a publish end to end: freeze, diff, gates, push, report', a
     request.on('data', chunk => { body += String(chunk) })
     request.on('end', () => {
       if (url.startsWith('/repos/me/plugin/pulls/12')) {
-        json({ number: 12, state: 'open', merged: false, html_url: 'https://github.com/me/plugin/pull/12', title: 'migrate', body: '', head: { ref: f.branch, sha: headSha, repo: { full_name: 'me/plugin' } } })
+        json({ number: 12, state: 'open', merged: false, html_url: 'https://github.com/me/plugin/pull/12', title: 'migrate', body: '', head: { ref: f.branch, sha: f.headSha, repo: { full_name: 'me/plugin' } } })
+        return
+      }
+      if (url.startsWith('/repos/me/plugin/issues/12/comments')) {
+        if (request.method === 'POST') {
+          replies.push((JSON.parse(body) as { body: string }).body)
+          json({ id: replies.length })
+          return
+        }
+        // The comments already on the thread, which is how a redelivery finds
+        // the reply it already posted.
+        json(replies.map(reply => ({ body: reply })))
         return
       }
       if (url.includes('/scratch')) {
@@ -1338,7 +1030,7 @@ test('the CLI drives a publish end to end: freeze, diff, gates, push, report', a
         return
       }
       if (url.includes('/previews/')) {
-        json({ revision: 'rev-cli', baseSha: headSha, headSha })
+        json({ revision: 'rev-cli', baseSha: f.headSha, headSha: f.headSha })
         return
       }
       json({})
@@ -1349,59 +1041,67 @@ test('the CLI drives a publish end to end: freeze, diff, gates, push, report', a
   const port = typeof address === 'object' && address !== null ? address.port : 0
 
   try {
-    // A plugin the mechanical layer can actually run: one cheap check and no
-    // dependencies, so the gate is the real one and the run stays offline.
+    // A check the mechanical check can actually run: one cheap command against
+    // the applied tree and no dependencies, so the check is the real one and the
+    // run stays offline.
+    mkdirSync(join(f.work, '.github'), { recursive: true })
     writeFileSync(
-      join(f.work, '.dsh-migrate.yml'),
+      join(f.work, '.github', 'dsh-migrate.yml'),
       [
-        // Pinned, so the gate stack resolves the harness without a release lookup.
-        'dshVersion: 0.1.6',
+        // Pinned, so the checks resolve the release without a lookup.
+        'target: 0.1.6',
+        'tests:',
+        '  commands:',
+        '    - grep -q scratch index.js',
         'deploy:',
         '  enabled: true',
         `  endpoint: http://127.0.0.1:${String(port)}`,
-        'verify:',
+        'checks:',
         '  boot:',
         '    enabled: false',
         '  web:',
         '    enabled: false',
-        'e2e:',
-        '  enabled: false',
+        '  e2e:',
+        '    enabled: false',
         '',
       ].join('\n'),
     )
     f.git(['add', '-A'])
     f.git(['commit', '-m', 'fixture'])
 
-    const child = spawn(process.execPath, [
-      'dist/src/cli.js', 'command',
-      '--workdir', f.work,
-      '--config', '.dsh-migrate.yml',
-      '--comment-body', '/dsh-migrate publish',
-      '--comment-id', '77',
-      '--comment-author', 'me',
-      '--comment-author-association', 'OWNER',
-      '--issue-number', '12',
-      '--pull-request', '12',
-    ], {
-      cwd: process.cwd(),
-      env: {
-        PATH: process.env.PATH ?? '',
-        HOME: process.env.HOME ?? '',
-        DSH_MIGRATE_DEPLOY_TOKEN: 'secret',
-        GITHUB_TOKEN: 'ghs_read',
-        GITHUB_REPOSITORY: 'me/plugin',
-        // The GitHub API the CLI talks to is the stub above.
-        GITHUB_API_URL: `http://127.0.0.1:${String(port)}`,
-      },
-    })
-    let stdout = ''
-    let stderr = ''
-    child.stdout.on('data', chunk => { stdout += String(chunk) })
-    child.stderr.on('data', chunk => { stderr += String(chunk) })
-    const status = await new Promise<number | null>(resolve => { child.on('close', code => { resolve(code) }) })
-    assert.equal(status, 0, stderr)
-    assert.match(stdout, /`publish` landed\./)
-    assert.match(stdout, /`mechanical`: pass/)
+    const comment = async (): Promise<{ status: number | null; stdout: string; stderr: string }> => {
+      const child = spawn(process.execPath, [
+        'dist/src/cli.js', 'comment',
+        '--workdir', f.work,
+        '--body', '/dsh-migrate publish',
+        '--comment-id', '77',
+        '--author', 'me',
+        '--association', 'OWNER',
+        '--issue', '12',
+      ], {
+        cwd: process.cwd(),
+        env: {
+          PATH: process.env.PATH ?? '',
+          HOME: process.env.HOME ?? '',
+          DSH_MIGRATE_DEPLOY_TOKEN: 'secret',
+          GITHUB_TOKEN: 'ghs_read',
+          GITHUB_REPOSITORY: 'me/plugin',
+          // The GitHub API the CLI talks to is the stub above.
+          GITHUB_API_URL: `http://127.0.0.1:${String(port)}`,
+        },
+      })
+      let stdout = ''
+      let stderr = ''
+      child.stdout.on('data', chunk => { stdout += String(chunk) })
+      child.stderr.on('data', chunk => { stderr += String(chunk) })
+      const status = await new Promise<number | null>(resolve => { child.on('close', code => { resolve(code) }) })
+      return { status, stdout, stderr }
+    }
+
+    const first = await comment()
+    assert.equal(first.status, 0, first.stderr)
+    assert.match(first.stdout, /`publish` landed\./)
+    assert.match(first.stdout, /`mechanical`: pass/)
 
     // The order is the contract: freeze, then the diff, then the report — and the
     // reply on the thread comes last, from the CLI.
@@ -1413,42 +1113,35 @@ test('the CLI drives a publish end to end: freeze, diff, gates, push, report', a
     const outcome = JSON.parse(reported[0] ?? '{}') as Record<string, unknown>
     assert.equal(outcome.outcome, 'published')
     assert.equal(outcome.revision, 'rev-cli')
+    assert.deepEqual(outcome.checks, [{ check: 'mechanical', outcome: 'pass' }])
+    assert.equal(replies.length, 1)
+    assert.match(replies[0] ?? '', /^<!-- dsh-migrate:reply-to=77 -->\n/)
+    assert.match(replies[0] ?? '', /`publish` landed\./)
 
     const shown = spawnSync('git', ['-C', f.bare, 'show', `${f.branch}:index.js`], { encoding: 'utf8' }).stdout
     assert.match(shown, /tried = "scratch"/)
-    // And the command was recorded, so its redelivery is a repeat.
-    const branch = spawnSync('git', ['-C', f.bare, 'show', 'dsh-migrate/state:seen.json'], { encoding: 'utf8' })
-    if (branch.status === 0) assert.match(branch.stdout, /publish:comment=77/)
+
+    // The same comment delivered again: the revision is already on the branch,
+    // and the thread already carries the reply, so nothing is posted twice.
+    const second = await comment()
+    assert.equal(second.status, 0, second.stderr)
+    assert.match(second.stdout, /`publish` already landed\./)
+    assert.match(second.stdout, /a reply to comment 77 already exists/)
+    assert.equal(replies.length, 1)
   } finally {
     await new Promise<void>(resolve => { server.close(() => { resolve() }) })
     f.cleanup()
   }
 })
 
-test('a refusal after the freeze still tells the target, so the preview is not left waiting', async () => {
+test('a refusal after the freeze still tells the deploy service, so the preview is not left waiting', async () => {
   const f = fixture()
   try {
-    // The target freezes a revision and then serves an empty diff: the Action
-    // cannot apply it, and the preview has to hear that rather than wait.
-    const { fetchImpl } = publishTarget(f, { diff: '' })
-    const bodies: string[] = []
-    const recording: typeof fetch = async (input, init) => {
-      if (String(input).endsWith('/publish-result')) bodies.push(typeof init?.body === 'string' ? init.body : '')
-      return await fetchImpl(input, init)
-    }
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      gates: PASSING,
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl: recording,
-    })
+    // The deploy service freezes a revision and then serves an empty diff: the
+    // Action cannot apply it, and the preview has to hear that rather than wait.
+    const { fetchImpl } = deployService(f, { diff: '' })
+    const { fetchImpl: recording, bodies } = recordResults(fetchImpl)
+    const outcome = await runCommand(publishInput(f, recording))
     assert.equal(outcome.ok, false)
     assert.match(outcome.reply, /empty diff/)
     assert.equal(bodies.length, 1)
@@ -1460,32 +1153,16 @@ test('a refusal after the freeze still tells the target, so the preview is not l
   }
 })
 
-test('a revision the target cannot spell is refused and reported, not logged raw', async () => {
+test('a revision the deploy service cannot spell is refused and reported, not logged raw', async () => {
   const f = fixture()
   try {
-    const { fetchImpl } = publishTarget(f, { freeze: { revision: 'rev\nbreak', headSha: f.headSha } })
-    const bodies: string[] = []
-    const recording: typeof fetch = async (input, init) => {
-      if (String(input).endsWith('/publish-result')) bodies.push(typeof init?.body === 'string' ? init.body : '')
-      return await fetchImpl(input, init)
-    }
+    const { fetchImpl } = deployService(f, { freeze: { revision: 'rev\nbreak', headSha: f.headSha } })
+    const { fetchImpl: recording, bodies } = recordResults(fetchImpl)
     const lines: string[] = []
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: (message: string) => lines.push(message),
-      gates: PASSING,
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl: recording,
-    })
+    const outcome = await runCommand(publishInput(f, recording, { log: (message: string) => lines.push(message) }))
     assert.equal(outcome.ok, false)
     assert.match(outcome.reply, /cannot be used in a commit message or a report/)
-    // The revision is never echoed, so it cannot forge a log or live-view line.
+    // The revision is never echoed, so it cannot forge a log or log-stream line.
     assert.doesNotMatch(lines.join('\n'), /rev\nbreak/)
     assert.equal(lines.filter(line => line.includes('frozen revision')).length, 0)
     assert.equal(bodies.length, 1)
@@ -1498,34 +1175,12 @@ test('a publish on a pull request that is not open is refused', async () => {
   const f = fixture()
   try {
     for (const state of ['merged', 'closed']) {
-      const { fetchImpl } = publishTarget(f)
+      const { fetchImpl } = deployService(f)
       const stub: typeof fetch = async (input, init) => {
-        if (String(input).startsWith('https://api.github.com/repos/me/plugin/pulls/12')) {
-          return new Response(JSON.stringify({
-            number: 12,
-            state,
-            merged: state === 'merged',
-            html_url: 'https://github.com/me/plugin/pull/12',
-            title: 'migrate',
-            body: '',
-            head: { ref: f.branch, sha: f.headSha, repo: { full_name: 'me/plugin' } },
-          }), { status: 200 })
-        }
+        if (String(input).startsWith('https://api.github.com/repos/me/plugin/pulls/12')) return pullRequest(f, { state })
         return await fetchImpl(input, init)
       }
-      const parsed = parseCommand('/dsh-migrate publish')
-      const outcome = await runCommand({
-        command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-        config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-        env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-        workdir: f.work,
-        pullRequest: 12,
-        commentId: '42',
-        log: () => {},
-        gates: PASSING,
-        treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-        fetchImpl: stub,
-      })
+      const outcome = await runCommand(publishInput(f, stub))
       assert.equal(outcome.ok, false, `${state} was accepted`)
       assert.match(outcome.reply, new RegExp(`pull request #12 is ${state}`))
     }
@@ -1534,7 +1189,7 @@ test('a publish on a pull request that is not open is refused', async () => {
   }
 })
 
-test('a view URL a target chose is linked or dropped, never republished as-is', async () => {
+test('a view URL a deploy service chose is linked or dropped, never republished as-is', async () => {
   const { externalUrl } = await import('../../src/render/text.ts')
   assert.equal(externalUrl('https://deploy.test/view/abc'), 'https://deploy.test/view/abc')
   // A markdown link target must not be able to end the link early, and what ends
@@ -1560,51 +1215,40 @@ test('a view URL a target chose is linked or dropped, never republished as-is', 
   assert.equal(externalUrl('https://deploy.test/x\nMIGRATE_EOF\nstatus=compatible'), 'https://deploy.test/x%20MIGRATE_EOF%20status=compatible')
 
   // The run is left without a page rather than with somebody else's link.
-  const { openLiveView } = await import('../../src/deploy/live.ts')
+  const { openLogStream } = await import('../../src/deploy/log-stream.ts')
   const logs: string[] = []
-  const view = await openLiveView({
+  const stream = await openLogStream({
     config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
     env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret' },
-    workdir: process.cwd(),
+    repository: 'me/plugin',
     runId: 'r',
     log: (message: string) => logs.push(message),
     fetchImpl: async () => new Response(JSON.stringify({ url: 'https://user:pw@deploy.test/view' }), { status: 200 }),
   })
-  assert.equal(view.url, undefined)
-  assert.match(logs.join('\n'), /will not link to/)
+  assert.equal(stream.url, undefined)
+  assert.doesNotMatch(logs.join('\n'), /user:pw/)
 })
 
-test('a gate detail in the report is one bounded line', async () => {
+test("a check's output never reaches the deploy service report", async () => {
   const f = fixture()
   try {
-    const { fetchImpl } = publishTarget(f)
-    const bodies: string[] = []
-    const recording: typeof fetch = async (input, init) => {
-      if (String(input).endsWith('/publish-result')) bodies.push(typeof init?.body === 'string' ? init.body : '')
-      return await fetchImpl(input, init)
-    }
-    const parsed = parseCommand('/dsh-migrate publish')
+    const { fetchImpl } = deployService(f)
+    const { fetchImpl: recording, bodies } = recordResults(fetchImpl)
     const noisy = `passed\n\n"outcome": "published"\n<script>alert(1)</script>\n${'x'.repeat(2000)}`
-    await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      gates: async () => ({
+    await runCommand(publishInput(f, recording, {
+      checkTree: async () => ({
         ok: true,
-        steps: [{ layer: 'mechanical' as const, ok: true, detail: noisy }],
+        results: [{ check: 'mechanical', outcome: 'pass', fingerprint: '', detail: noisy }],
+        release: RELEASE,
         detail: 'mechanical: pass',
       }),
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl: recording,
-    })
-    const reported = JSON.parse(bodies[0] ?? '{}') as { gates?: { detail?: string }[] }
-    const detail = reported.gates?.[0]?.detail ?? ''
-    assert.equal(detail.includes('\n'), false, 'the gate detail is not one line')
-    assert.ok(detail.length <= 300, `gate detail was ${String(detail.length)} characters`)
+    }))
+    // The deploy service hears what each check said, not the plugin's output.
+    assert.equal(bodies.length, 1)
+    const reported = JSON.parse(bodies[0] ?? '{}') as { checks?: unknown }
+    assert.deepEqual(reported.checks, [{ check: 'mechanical', outcome: 'pass' }])
+    assert.equal(bodies[0]?.includes('<script>'), false)
+    assert.equal(bodies[0]?.includes('x'.repeat(300)), false)
   } finally {
     f.cleanup()
   }
@@ -1613,28 +1257,18 @@ test('a gate detail in the report is one bounded line', async () => {
 test('an error the hand-back throws is one bounded line in the reply', async () => {
   const f = fixture()
   try {
-    const { fetchImpl } = publishTarget(f)
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      gates: () => { throw new Error(`the gate exploded\n\n**@here approve this now**\n${'y'.repeat(5000)}`) },
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl,
+    const { outcome } = await runPublish(f, {
+      checkTree: () => { throw new Error(`the check exploded\n\n**@here approve this now**\n${'y'.repeat(5000)}`) },
     })
     assert.equal(outcome.ok, false)
     // GitHub drops a comment over its own limit, and a dropped reply is no audit
-    // trail: the reply is one bounded line.
+    // trail: the reason is one bounded line.
     assert.ok(outcome.reply.length < 1000, `reply was ${String(outcome.reply.length)} characters`)
-    assert.equal(outcome.reply.split('\n').length, 1)
+    assert.equal(outcome.reply.split('\n').filter(line => line.includes('the check exploded')).length, 1)
     // The message is still readable; what it cannot do is start a line of its own
     // or run past the length GitHub accepts for a comment.
-    assert.match(outcome.reply, /the gate exploded/)
+    assert.equal(outcome.reply.split('\n').some(line => line.startsWith('**@here')), false)
+    assert.match(outcome.reply, /the check exploded/)
   } finally {
     f.cleanup()
   }
@@ -1663,29 +1297,14 @@ test('the reply names the commit that landed, and a retry names the earlier one'
     const branch = spawnSync('git', ['-C', f.bare, 'rev-parse', f.branch], { encoding: 'utf8' }).stdout.trim()
     assert.equal(branch.startsWith(commit ?? ''), true)
 
-    // The same revision again: the reply says it already landed, and the target
-    // is told that this delivery pushed nothing.
-    const bodies: string[] = []
-    const { fetchImpl } = publishTarget(f)
-    const recording: typeof fetch = async (input, init) => {
-      if (String(input).endsWith('/publish-result')) bodies.push(typeof init?.body === 'string' ? init.body : '')
-      return await fetchImpl(input, init)
-    }
-    const parsed = parseCommand('/dsh-migrate publish')
-    const again = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      gates: PASSING,
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl: recording,
-    })
+    // The same revision again: the reply says it already landed, and the deploy
+    // service is told that this delivery pushed nothing.
+    const { fetchImpl } = deployService(f)
+    const { fetchImpl: recording, bodies } = recordResults(fetchImpl)
+    const again = await runCommand(publishInput(f, recording))
     assert.equal(again.ok, true, again.reply)
     assert.match(again.reply, /already landed/)
+    assert.match(again.reply, new RegExp(`as \`${commit ?? 'none'}\``))
     const reported = JSON.parse(bodies[0] ?? '{}') as Record<string, unknown>
     assert.equal(reported.alreadyPublished, true)
   } finally {
@@ -1693,60 +1312,21 @@ test('the reply names the commit that landed, and a retry names the earlier one'
   }
 })
 
-test('a refused gate says why, in one bounded line', async () => {
-  const config = parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } })
-  const runner = createGateRunner({
-    config,
-    dshTag: 'dsh-v0.1.6',
-    dshCache: join(tmpdir(), 'dsh-gates-cache'),
-    log: () => {},
-    // The plugin's own output is somebody else's text: the first line of it is
-    // the answer, and the rest of it does not reach the reply.
-    mechanical: () => ({
-      ok: false,
-      checks: 1,
-      errors: 'error: typecheck failed\n\n**@here approve this now**\n' + 'x'.repeat(4000),
-    }),
-  })
-  const report = await runner('/tmp/tree')
-  assert.equal(report.ok, false)
-  assert.match(report.detail, /the plugin's own test command failed: error: typecheck failed/)
-  assert.ok(report.detail.length <= 300, `detail was ${String(report.detail.length)} characters`)
-  assert.equal(report.detail.includes('\n'), false)
-  assert.doesNotMatch(report.detail, /@here/)
-})
-
-test('a revision the target cannot serve back says what to do about it', async () => {
+test('a revision the deploy service cannot serve back is refused and reported at the remote stage', async () => {
   const f = fixture()
   try {
-    const { fetchImpl } = publishTarget(f)
+    const { fetchImpl } = deployService(f)
     const pruned: typeof fetch = async (input, init) => {
       if (String(input).includes('/scratch')) return new Response('pruned', { status: 410 })
       return await fetchImpl(input, init)
     }
-    const bodies: string[] = []
-    const recording: typeof fetch = async (input, init) => {
-      if (String(input).endsWith('/publish-result')) bodies.push(typeof init?.body === 'string' ? init.body : '')
-      return await pruned(input, init)
-    }
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      gates: PASSING,
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl: recording,
-    })
+    const { fetchImpl: recording, bodies } = recordResults(pruned)
+    const outcome = await runCommand(publishInput(f, recording))
     assert.equal(outcome.ok, false)
-    assert.match(outcome.reply, /could not serve back the revision it froze/)
-    assert.match(outcome.reply, /Publishing again freezes a new one/)
-    // The freeze happened, so the target hears the outcome — and it hears that
-    // *it* could not serve the revision back, not that the diff would not apply.
+    assert.match(outcome.reply, /could not serve the revision it froze/)
+    assert.match(outcome.reply, /answered 410/)
+    // The freeze happened, so the deploy service hears the outcome — and it hears
+    // that *it* could not serve the revision back, not that the diff would not apply.
     assert.equal(bodies.length, 1)
     const reported = JSON.parse(bodies[0] ?? '{}') as { outcome: string; stage?: string }
     assert.equal(reported.outcome, 'refused')
@@ -1756,19 +1336,19 @@ test('a revision the target cannot serve back says what to do about it', async (
   }
 })
 
-test('an empty diff and a missing diff field say different things', async () => {
+test('an empty diff and an answer without a diff field are refused, each with its own reason', async () => {
   const f = fixture()
   try {
     const empty = await runPublish(f, { diff: JSON.stringify({ diff: '   ' }) })
     assert.equal(empty.outcome.ok, false)
     assert.match(empty.outcome.reply, /served the frozen revision as an empty diff/)
-    assert.match(empty.outcome.reply, /is served as a unified diff/)
 
+    const before = spawnSync('git', ['-C', f.bare, 'rev-parse', f.branch], { encoding: 'utf8' }).stdout.trim()
     const missing = await runPublish(f, { diff: JSON.stringify({ files: ['index.js'] }) })
     assert.equal(missing.outcome.ok, false)
-    // The reply is posted as a comment inside a code-free sentence, so the field
-    // name is written without backticks there.
-    assert.match(missing.outcome.reply, /JSON without a diff field/)
+    assert.match(missing.outcome.reply, /answered the frozen revision as JSON without a `?diff`? field/)
+    const after = spawnSync('git', ['-C', f.bare, 'rev-parse', f.branch], { encoding: 'utf8' }).stdout.trim()
+    assert.equal(after, before)
   } finally {
     f.cleanup()
   }
@@ -1776,8 +1356,8 @@ test('an empty diff and a missing diff field say different things', async () => 
 
 test('an answer that stops early is refused, never applied in part', async () => {
   const { deployRequest } = await import('../../src/deploy/client.ts')
-  // A target that promises a body and then dies mid-answer: what arrived is part
-  // of a patch, and a partial patch applies cleanly to the file it covers.
+  // A deploy service that promises a body and then dies mid-answer: what arrived
+  // is part of a patch, and a partial patch applies cleanly to the file it covers.
   const stream = new ReadableStream({
     start(controller) {
       controller.enqueue(new TextEncoder().encode('diff --git a/one.js b/one.js\n+export const one = 1\n'))
@@ -1785,7 +1365,7 @@ test('an answer that stops early is refused, never applied in part', async () =>
     },
   })
   const half = await deployRequest({
-    target: { endpoint: 'https://deploy.test', token: 's' },
+    service: { endpoint: 'https://deploy.test', token: 's' },
     method: 'GET',
     path: '/previews/me%2Fplugin/12/scratch?revision=r1',
     answer: 'any',
@@ -1797,33 +1377,19 @@ test('an answer that stops early is refused, never applied in part', async () =>
   // And the same answer at the boundary that decides what is published.
   const f = fixture()
   try {
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      gates: PASSING,
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl: async (input) => {
-        const url = String(input)
-        if (url.startsWith('https://api.github.com/repos/me/plugin/pulls/12')) {
-          return new Response(JSON.stringify({ number: 12, state: 'open', merged: false, html_url: '', title: 'm', body: '', head: { ref: f.branch, sha: f.headSha, repo: { full_name: 'me/plugin' } } }), { status: 200 })
-        }
-        if (url.includes('/scratch')) {
-          return new Response(new ReadableStream({
-            start(controller) {
-              controller.enqueue(new TextEncoder().encode(f.diff.text.split('\n').slice(0, 3).join('\n')))
-              controller.error(new Error('the socket died'))
-            },
-          }), { status: 200 })
-        }
-        return new Response(JSON.stringify({ revision: 'r1', baseSha: f.headSha, headSha: f.headSha }), { status: 200 })
-      },
-    })
+    const outcome = await runCommand(publishInput(f, async (input) => {
+      const url = String(input)
+      if (url.startsWith('https://api.github.com/repos/me/plugin/pulls/12')) return pullRequest(f)
+      if (url.includes('/scratch')) {
+        return new Response(new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(f.diff.text.split('\n').slice(0, 3).join('\n')))
+            controller.error(new Error('the socket died'))
+          },
+        }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ revision: 'r1', baseSha: f.headSha, headSha: f.headSha }), { status: 200 })
+    }))
     assert.equal(outcome.ok, false)
     const log = spawnSync('git', ['-C', f.bare, 'log', '--format=%s', f.branch], { encoding: 'utf8' }).stdout
     assert.doesNotMatch(log, /publish/)
@@ -1875,14 +1441,14 @@ test('a path that looks like pathspec magic is still a path', async () => {
   }
 })
 
-test('a gate cannot retarget where the verified commit goes', async () => {
+test('a check cannot retarget where the verified commit goes', async () => {
   const f = fixture()
   try {
     const elsewhere = mkdtempSync(join(tmpdir(), 'dsh-handback-elsewhere-'))
     spawnSync('git', ['init', '--bare', elsewhere], { encoding: 'utf8' })
     const result = await applyHandback(input(f, {
-      runGates: async () => {
-        // The gates run the plugin's own code in a worktree that shares the
+      checkTree: async () => {
+        // The checks run the plugin's own code in a worktree that shares the
         // checkout's git config.
         f.git(['remote', 'set-url', 'origin', elsewhere])
         return PASSING()
@@ -1901,7 +1467,7 @@ test('a gate cannot retarget where the verified commit goes', async () => {
   }
 })
 
-test('a gate that retargets only the push is caught too', async () => {
+test('a check that retargets only the push is caught too', async () => {
   // `git push origin` reads the push URL, which `remote.origin.pushurl` and
   // `url.<base>.pushInsteadOf` both change while a fetch of the same remote stays
   // where it was: a comparison of the fetch URL sees nothing move, and the
@@ -1912,7 +1478,7 @@ test('a gate that retargets only the push is caught too', async () => {
       const elsewhere = mkdtempSync(join(tmpdir(), 'dsh-handback-elsewhere-'))
       spawnSync('git', ['init', '--bare', elsewhere], { encoding: 'utf8' })
       const result = await applyHandback(input(f, {
-        runGates: async () => {
+        checkTree: async () => {
           if (retarget === 'pushurl') f.git(['config', 'remote.origin.pushurl', elsewhere])
           else f.git(['config', `url.${elsewhere}.pushInsteadOf`, f.bare])
           return PASSING()
@@ -1977,9 +1543,9 @@ function publishWorktree(work: string, treeBase: string): string {
   return tree ?? ''
 }
 
-test('a gate that writes the worktree-local push URL is caught where the push runs', async () => {
+test('a check that writes the worktree-local push URL is caught where the push runs', async () => {
   // `extensions.worktreeConfig` gives a worktree a configuration of its own, and
-  // the gates run in the worktree: a comparison read from the checkout would
+  // the checks run in the worktree: a comparison read from the checkout would
   // compare a URL nothing is about to push with. Both shapes are refused — a
   // destination that is not the fetched remote, and a repository that is not this
   // one — and each has to be caught where the push will run.
@@ -1994,7 +1560,7 @@ test('a gate that writes the worktree-local push URL is caught where the push ru
       try {
         const treeBase = join(f.work, '.dsh-migrate', 'publish-tree')
         const result = await applyHandback(input(f, {
-          runGates: async () => {
+          checkTree: async () => {
             f.git(['config', 'extensions.worktreeConfig', 'true'])
             const tree = publishWorktree(f.work, treeBase)
             const set = spawnSync(
@@ -2024,7 +1590,7 @@ test('a gate that writes the worktree-local push URL is caught where the push ru
 })
 
 test('a push URL set before the run that is not the fetched remote is refused', async () => {
-  // Nothing changes during the gates here, so only a comparison of what is
+  // Nothing changes during the checks here, so only a comparison of what is
   // fetched against what is pushed can see it: the commit would land in a
   // repository that is not the branch the reply names.
   const f = fixture()
@@ -2032,23 +1598,23 @@ test('a push URL set before the run that is not the fetched remote is refused', 
     const elsewhere = mkdtempSync(join(tmpdir(), 'dsh-handback-preset-'))
     spawnSync('git', ['init', '--bare', elsewhere], { encoding: 'utf8' })
     f.git(['config', 'remote.origin.pushurl', elsewhere])
-    let gatesRun = 0
+    let checksRun = 0
     const logged: string[] = []
     const result = await applyHandback(input(f, {
       log: (message: string) => logged.push(message),
-      runGates: async () => {
-        gatesRun += 1
+      checkTree: async () => {
+        checksRun += 1
         return PASSING()
       },
     }))
     assert.equal(result.ok, false)
     assert.equal(result.ok ? '' : result.stage, 'remote')
     assert.match(result.ok ? '' : result.detail, /pushes to/)
-    // Refused before the fetch and before the gate stack is spent: the push
+    // Refused before the fetch and before the checks are spent: the push
     // destination is a fact about the checkout, and nothing about it needs the
     // remote or the suite. Without the earliest check the fetch happens first and
     // the refusal arrives from the worktree instead.
-    assert.equal(gatesRun, 0)
+    assert.equal(checksRun, 0)
     assert.equal(logged.some(line => line.includes('publish: fetching')), false)
     const other = spawnSync('git', ['-C', elsewhere, 'for-each-ref', '--format=%(refname)'], { encoding: 'utf8' }).stdout.trim()
     assert.equal(other, '')
@@ -2105,42 +1671,15 @@ test('a remote URL is read as a location, or not at all', async () => {
 test('a head branch that is not a branch name refuses before the freeze', async () => {
   const f = fixture()
   try {
-    const { fetchImpl } = publishTarget(f)
-    const calls: string[] = []
-    const recording: typeof fetch = async (input, init) => {
-      calls.push(String(input))
+    const { fetchImpl, calls } = deployService(f)
+    const stub: typeof fetch = async (input, init) => {
+      if (String(input).startsWith('https://api.github.com/repos/me/plugin/pulls/12')) return pullRequest(f, { ref: '_underscore' })
       return await fetchImpl(input, init)
     }
-    const stub: typeof fetch = async (input, init) => {
-      if (String(input).startsWith('https://api.github.com/repos/me/plugin/pulls/12')) {
-        return new Response(JSON.stringify({
-          number: 12,
-          state: 'open',
-          merged: false,
-          html_url: '',
-          title: 'm',
-          body: '',
-          head: { ref: '_underscore', sha: f.headSha, repo: { full_name: 'me/plugin' } },
-        }), { status: 200 })
-      }
-      return await recording(input, init)
-    }
-    const parsed = parseCommand('/dsh-migrate publish')
-    const outcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      gates: PASSING,
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl: stub,
-    })
+    const outcome = await runCommand(publishInput(f, stub))
     assert.equal(outcome.ok, false)
     assert.match(outcome.reply, /is not a branch name this Action will push to/)
-    // Nothing was frozen: a refusal costs the target nothing.
+    // Nothing was frozen: a refusal costs the deploy service nothing.
     assert.equal(calls.filter(call => call.includes('/previews/')).length, 0)
   } finally {
     f.cleanup()
@@ -2150,7 +1689,7 @@ test('a head branch that is not a branch name refuses before the freeze', async 
 test('a diff that changes nothing says so, and the branch keeps its head', async () => {
   const f = fixture()
   try {
-    // A target can freeze a revision whose content is already at the pull
+    // A deploy service can freeze a revision whose content is already at the pull
     // request head: the diff applies and stages nothing.
     const noop = [
       'diff --git a/index.js b/index.js',
@@ -2173,68 +1712,7 @@ test('a diff that changes nothing says so, and the branch keeps its head', async
   }
 })
 
-test('a skipped layer is not a verdict, and one resolver run is one harness', async () => {
-  const config = parseConfig({
-    deploy: { enabled: true, endpoint: 'https://deploy.test' },
-    verify: { boot: { enabled: false } },
-    e2e: { enabled: true, gate: 'advisory' },
-  })
-  let resolved = 0
-  const runner = createGateRunner({
-    config,
-    dshCache: join(tmpdir(), 'dsh-gates-cache'),
-    log: () => {},
-    dshTag: async () => {
-      resolved += 1
-      return 'dsh-v0.1.6'
-    },
-    // The plugin declares no check, and every layer that could look skips:
-    // nothing looked at this tree, so it cannot be called verified.
-    mechanical: () => ({ ok: true, checks: 0 }),
-    web: () => ({ ok: true, layer: 'web', signature: 'web: no client surface', detail: '', skipped: 'the plugin declares no dsh.client surface' }),
-    e2e: () => ({ ok: true, layer: 'e2e', signature: 'e2e: no suite yet', detail: '', skipped: 'no suite branch yet' }),
-  })
-  const report = await runner('/tmp/tree')
-  assert.equal(report.ok, false)
-  assert.match(report.detail, /no gate layer ran/)
-  // One run resolves the harness once, whatever the layers do.
-  assert.equal(resolved, 1)
-  assert.equal(report.tag, undefined)
-})
-
-test('the default layers verify against the harness the run resolved once', async () => {
-  // The memo is only observable when a layer resolves the tag for itself, so the
-  // mechanical layer is the shipped one here: an empty tree runs no command, and
-  // it still reads the version it would pin a plugin's peers to.
-  const tree = mkdtempSync(join(tmpdir(), 'dsh-gates-default-'))
-  try {
-    const config = parseConfig({
-      verify: { boot: { enabled: false }, web: { enabled: false } },
-      e2e: { enabled: false },
-    })
-    let resolved = 0
-    const runner = createGateRunner({
-      config,
-      dshCache: join(tmpdir(), 'dsh-gates-cache'),
-      log: () => {},
-      dshTag: async () => {
-        resolved += 1
-        return 'dsh-v0.1.9'
-      },
-    })
-    const report = await runner(tree)
-    // The shipped mechanical layer refused the tree, and it read the harness the
-    // run had already resolved rather than resolving a second one.
-    assert.equal(report.ok, false)
-    assert.equal(report.refusedBy, 'mechanical')
-    assert.equal(resolved, 1)
-    assert.equal(report.tag, 'dsh-v0.1.9')
-  } finally {
-    rmSync(tree, { recursive: true, force: true })
-  }
-})
-
-test('a control character in a value from a target cannot rewrite a line', async () => {
+test('a control character in a value from a deploy service cannot rewrite a line', async () => {
   const { inline } = await import('../../src/render/text.ts')
   // `\s` does not cover these: an ANSI sequence erases and rewrites the line a
   // human reads in a log, and a NUL is not text at all.
@@ -2267,7 +1745,7 @@ test('a control character in a value from a target cannot rewrite a line', async
   // The same rule at the client, so a log line cannot be rewritten either.
   const { deployRequest } = await import('../../src/deploy/client.ts')
   const answer = await deployRequest({
-    target: { endpoint: 'https://deploy.test', token: 's' },
+    service: { endpoint: 'https://deploy.test', token: 's' },
     method: 'POST',
     path: '/previews/me%2Fplugin/12',
     fetchImpl: async () => new Response('\u001b[2K\rboom\nsecond line', { status: 500 }),
@@ -2292,7 +1770,7 @@ test('a commit that lists no paths is not a publish that is already there', asyn
     const result = await applyHandback(input(f, { revision: 'rev-empty', headSha: head }))
     // The branch has moved past the fixture's head, so this refuses — what
     // matters is that it is not reported as already published, and that the
-    // gate stack was not skipped on the strength of an empty path list.
+    // checks were not skipped on the strength of an empty path list.
     assert.notEqual(result.ok ? result.alreadyPublished : undefined, true)
     assert.doesNotMatch(result.ok ? '' : result.detail, /already on/)
   } finally {
@@ -2339,7 +1817,7 @@ test('a revision that conflicts with the head says which side to rebuild', async
       '+export const migrated = "scratch"',
       '',
     ].join('\n')
-    const result = await applyHandback(input(f, { revision: 'rev-conflict', headSha: f.headSha, diff, baseSha: baseCommit }))
+    const result = await applyHandback(input(f, { revision: 'rev-conflict', headSha: f.headSha, diff }))
     assert.equal(result.ok, false)
     assert.equal(result.ok ? '' : result.stage, 'base')
     assert.match(result.ok ? '' : result.detail, /conflicts with .*rebuild scratch onto the current head/)
@@ -2351,56 +1829,34 @@ test('a revision that conflicts with the head says which side to rebuild', async
   }
 })
 
-test('a publish that published nothing is reported as a repeat, not as work', async () => {
+test('a publish that published nothing says so, not that it did the work', async () => {
   const f = fixture()
   try {
     const first = await runPublish(f)
     assert.equal(first.outcome.ok, true, first.outcome.reply)
     // The first publish did the work.
-    assert.notEqual(first.outcome.repeat, true)
-    assert.notEqual(first.outcome.record, undefined)
+    assert.match(first.outcome.reply, /`publish` landed\./)
+    assert.doesNotMatch(first.outcome.reply, /already/)
 
     // The same revision again: the branch already has it, so this delivery did
-    // nothing, and a workflow reading the outputs can tell.
-    const { fetchImpl } = publishTarget(f)
-    const parsed = parseCommand('/dsh-migrate publish')
-    const again = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '42',
-      log: () => {},
-      gates: PASSING,
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl,
-    })
+    // nothing, and the reply says so.
+    const { fetchImpl } = deployService(f)
+    const again = await runCommand(publishInput(f, fetchImpl))
     assert.equal(again.ok, true, again.reply)
-    assert.match(again.reply, /already landed/)
-    assert.equal(again.repeat, true)
+    assert.match(again.reply, /`publish` already landed\./)
+    // Nothing was checked again, so the reply names no check.
+    assert.doesNotMatch(again.reply, /Checked against/)
 
-    // A target that replays the freeze is the same answer: nothing was done by
-    // this delivery.
-    const { fetchImpl: plain } = publishTarget(f)
+    // A deploy service that replays the freeze for another comment is the same
+    // answer: nothing was done by this delivery.
+    const { fetchImpl: plain } = deployService(f)
     const replayed: typeof fetch = async (input, init) =>
       (String(input).includes('/previews/') && !String(input).includes('/scratch') && !String(input).endsWith('/publish-result') && (init?.method ?? 'GET') === 'POST'
         ? new Response(JSON.stringify({ revision: 'rev-1', baseSha: f.headSha, headSha: f.headSha }), { status: 200, headers: { 'Idempotency-Replayed': 'True' } })
         : await plain(input, init))
-    const replayedOutcome = await runCommand({
-      command: parsed.ok ? parsed.command : (() => { throw new Error('parse') })() as never,
-      config: parseConfig({ deploy: { enabled: true, endpoint: 'https://deploy.test' } }),
-      env: { DSH_MIGRATE_DEPLOY_TOKEN: 'secret', GITHUB_TOKEN: 'ghs_read', GITHUB_REPOSITORY: 'me/plugin' },
-      workdir: f.work,
-      pullRequest: 12,
-      commentId: '43',
-      log: () => {},
-      gates: PASSING,
-      treeDir: join(f.work, '.dsh-migrate', 'publish-tree'),
-      fetchImpl: replayed,
-    })
+    const replayedOutcome = await runCommand(publishInput(f, replayed, { commentId: '43' }))
     assert.equal(replayedOutcome.ok, true, replayedOutcome.reply)
-    assert.equal(replayedOutcome.repeat, true)
+    assert.match(replayedOutcome.reply, /`publish` already landed\./)
   } finally {
     f.cleanup()
   }
@@ -2474,17 +1930,17 @@ test('a publish with two push URLs is refused, and a trailing slash is not a mir
     // named as the first push URL and the second one is the extra destination.
     both.git(['config', 'remote.origin.pushurl', both.bare])
     both.git(['config', '--add', 'remote.origin.pushurl', elsewhere])
-    let gatesRun = 0
+    let checksRun = 0
     const result = await applyHandback(input(both, {
-      runGates: async () => {
-        gatesRun += 1
+      checkTree: async () => {
+        checksRun += 1
         return PASSING()
       },
     }))
     assert.equal(result.ok, false)
     assert.equal(result.ok ? '' : result.stage, 'remote')
     assert.match(result.ok ? '' : result.detail, /more than one push URL/)
-    assert.equal(gatesRun, 0)
+    assert.equal(checksRun, 0)
     const other = spawnSync('git', ['-C', elsewhere, 'for-each-ref', '--format=%(refname)'], { encoding: 'utf8' }).stdout.trim()
     assert.equal(other, '')
     rmSync(elsewhere, { recursive: true, force: true })
@@ -2515,10 +1971,10 @@ test('a push that reaches a different port or the git protocol is refused', asyn
     try {
       f.git(['remote', 'set-url', 'origin', 'https://github.com/me/plugin.git'])
       f.git(['config', 'remote.origin.pushurl', written])
-      let gatesRun = 0
+      let checksRun = 0
       const result = await applyHandback(input(f, {
-        runGates: async () => {
-          gatesRun += 1
+        checkTree: async () => {
+          checksRun += 1
           return PASSING()
         },
       }))
@@ -2526,7 +1982,7 @@ test('a push that reaches a different port or the git protocol is refused', asyn
       assert.equal(result.ok ? '' : result.stage, 'remote')
       assert.match(result.ok ? '' : result.detail, expected)
       // Refused before anything reaches the wrong service.
-      assert.equal(gatesRun, 0)
+      assert.equal(checksRun, 0)
     } finally {
       f.cleanup()
     }

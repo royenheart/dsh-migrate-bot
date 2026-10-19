@@ -1,0 +1,51 @@
+name: bench-records
+
+# Builds the benchmark report from the records on the bench/records branch and
+# the consumers' state branches, and publishes it to GitHub Pages. The build
+# refuses a record that does not validate against the metric library of main,
+# so a change to that library is checked against every stored record. Records
+# are pushed by hand and the run is requested after the push; the daily run
+# keeps the Field page current.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bench-records
+  cancel-in-progress: true
+
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: bench/records
+          path: .bench/records
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run site -- --field
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .bench/site
+      - id: deploy
+        uses: actions/deploy-pages@v4

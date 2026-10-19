@@ -1,0 +1,482 @@
+/**
+ * The benchmark: run a subject on the upstream suite through Harbor and write a
+ * record, compare two records, or validate a records tree.
+ *
+ *   npm run bench -- run --subject pipeline [--attempts 3] [--tasks M1-host-migration,H2-baseline-trap]
+ *   npm run bench -- resume <job directory>
+ *   npm run bench -- compare <base record id> <head record id>
+ *   npm run bench -- validate [records dir]
+ *   npm run bench -- publish [records dir]
+ *
+ * docs/operations/benchmark.md is the procedure; docs/design/evaluation.md the
+ * design. Records are written to the `bench/records` worktree at `.bench/records`
+ * and leave the machine only when the maintainer pushes that branch.
+ */
+
+import { execFileSync, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir, type, release } from 'node:os'
+import { dirname, join, relative } from 'node:path'
+import { isDeepStrictEqual, parseArgs } from 'node:util'
+import { z } from 'zod'
+import { attemptOf, finished, readTrial } from '../src/evaluation/harbor.ts'
+import { compare, computeMetrics } from '../src/evaluation/metrics.ts'
+import { recordSchema, RECORD_SCHEMA, SUBJECTS, type Attempt, type BenchmarkRecord, type SubjectId, type TaskEntry } from '../src/evaluation/record.ts'
+import { UPGRADE_SKILLS } from '../src/skills/upgrade.ts'
+import { REPO_ROOT } from './repo.ts'
+import { botSnapshot, checkSnapshot, storeSnapshot } from './snapshot.ts'
+
+const SKILLS_DIR = join(REPO_ROOT, 'vendor', 'dsh-plugin-upgrade-skill')
+/**
+ * The suites a run draws its tasks from: the upgrade skill's, at the commit the
+ * submodule pins, and this repository's own, identified by the git tree of its
+ * directory, which survives an amended or rebased commit.
+ */
+const SUITES = {
+  'upgrade-skill': { repository: 'oh-my-dsh/dsh-plugin-upgrade-skill', tasks: join(SKILLS_DIR, 'benchmark', 'tasks') },
+  'spans': { repository: 'royenheart/dsh-migrate-bot', tasks: join(REPO_ROOT, 'bench', 'tasks') },
+} as const
+type SuiteId = keyof typeof SUITES
+/** The subjects that run no model: the reference solution, and nothing at all. */
+const KEYLESS: ReadonlySet<SubjectId> = new Set(['oracle', 'nop'])
+const RECORDS_DIR = join(REPO_ROOT, '.bench', 'records')
+const AGENT = 'tools.harbor.dsh_agent:DshAgent'
+/** The host of the model API the agent sessions call, which a task's agent network policy must let through. */
+const MODEL_API_HOST = 'api.deepseek.com'
+/** The files of a trial a record keeps, relative to the trial directory. */
+const AGENT_FILES = ['agent/proposed.diff', 'agent/agent.log', 'agent/report.log', 'agent/events.jsonl', 'agent/status.json', 'agent/cards.json']
+
+const git = (args: string[], cwd = REPO_ROOT): string => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+const recordPath = (records: string, id: string): string => join(records, 'records', id, 'record.json')
+/** A path as one shell word, so a printed command can be pasted back. */
+const shellWord = (path: string): string => /^[\w@%+=:,./-]+$/.test(path) ? path : `'${path.replaceAll("'", "'\\''")}'`
+/** The command that continues a run, naming its records directory when it is not the default. */
+const resumeCommand = (jobDir: string, records: string): string => `npm run bench -- resume ${shellWord(jobDir)}${records === RECORDS_DIR ? '' : ` --records ${shellWord(records)}`}`
+
+function readRecord(path: string): BenchmarkRecord {
+  return recordSchema.parse(JSON.parse(readFileSync(path, 'utf8')))
+}
+
+/** The tasks of the suite, read with Python's own TOML parser, as Harbor reads them. */
+function suiteTasks(python: string, tasksDir: string): Array<{ id: string; name: string; networkMode: string; agentNetwork: boolean; agentTimeoutSec: number; shipsDsh: boolean; verifierEnv: string[] }> {
+  const read = 'import json, sys, tomllib\nprint(json.dumps([tomllib.load(open(path, "rb")) for path in sys.argv[1:]]))'
+  const ids = readdirSync(tasksDir).filter(id => existsSync(join(tasksDir, id, 'task.toml'))).sort()
+  const configs = JSON.parse(execFileSync(python, ['-c', read, ...ids.map(id => join(tasksDir, id, 'task.toml'))], { encoding: 'utf8' })) as Array<{ task?: { name?: string }; agent?: { timeout_sec?: number; network_mode?: string }; environment?: { network_mode?: string }; verifier?: { env?: Record<string, string> } }>
+  return ids.map((id, index) => {
+    const config = configs[index] ?? {}
+    const dockerfile = join(tasksDir, id, 'environment', 'Dockerfile')
+    return {
+      id,
+      name: config.task?.name ?? id,
+      networkMode: config.environment?.network_mode ?? 'public',
+      agentNetwork: (config.agent?.network_mode ?? config.environment?.network_mode ?? 'public') !== 'no-network',
+      agentTimeoutSec: config.agent?.timeout_sec ?? 0,
+      shipsDsh: existsSync(dockerfile) && readFileSync(dockerfile, 'utf8').includes('@deepseek-ai/dsh@'),
+      // Harbor fills `${NAME}` in the verifier's environment from the shell, and refuses the whole job when one is unset.
+      verifierEnv: Object.values(config.verifier?.env ?? {}).flatMap(value => [...value.matchAll(/\$\{(\w+)\}/g)].map(match => match[1] ?? '')),
+    }
+  })
+}
+
+/** The version of a suite: the submodule's commit, or the tree of this repository's suite directory. */
+function suiteVersion(suite: SuiteId): string {
+  if (suite === 'upgrade-skill') return git(['rev-parse', 'HEAD'], SKILLS_DIR)
+  if (git(['status', '--porcelain', '--', relative(REPO_ROOT, SUITES.spans.tasks)]) !== '') throw new Error('bench/tasks has uncommitted changes; a record must name the tasks it ran')
+  return git(['rev-parse', `HEAD:${relative(REPO_ROOT, SUITES.spans.tasks)}`])
+}
+
+/**
+ * Tasks the environment can judge: every attempt of the newest oracle record of
+ * this suite version scored 1.0, and, when a nop record exists, doing nothing
+ * did not, since such a task cannot tell a migration from none.
+ */
+function feasibleTasks(records: string, suiteId: SuiteId, version: string): Set<string> {
+  const repository = SUITES[suiteId].repository
+  const dir = join(records, 'records')
+  const newest = (subject: SubjectId): BenchmarkRecord | undefined => (existsSync(dir) ? readdirSync(dir) : [])
+    .filter(id => existsSync(recordPath(records, id)))
+    .map(id => readRecord(recordPath(records, id)))
+    .filter(record => record.subject.id === subject && record.suite.repository === repository && record.suite.commit === version)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .at(-1)
+  const oracle = newest('oracle')
+  if (oracle === undefined) throw new Error(`no oracle record of ${repository} at ${version}; run \`npm run bench -- run --subject oracle --suite ${suiteId}${records === RECORDS_DIR ? '' : ` --records ${shellWord(records)}`}\` first`)
+  const failed = new Set(oracle.attempts.filter(attempt => attempt.reward !== 1).map(attempt => attempt.task))
+  for (const attempt of newest('nop')?.attempts ?? []) if (attempt.reward === 1) failed.add(attempt.task)
+  return new Set(oracle.suite.tasks.filter(task => !failed.has(task.id) && oracle.attempts.some(attempt => attempt.task === task.id)).map(task => task.id))
+}
+
+/** Which build served the model, asked once with a one-token request; a failed probe is logged and omitted. */
+async function probe(model: string, apiKey: string): Promise<BenchmarkRecord['model']['before']> {
+  try {
+    const response = await fetch(`https://${MODEL_API_HOST}/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 }),
+      signal: AbortSignal.timeout(30_000),
+    })
+    const body = await response.json() as { model?: string; system_fingerprint?: string }
+    if (!response.ok || body.model === undefined) throw new Error(`HTTP ${String(response.status)}`)
+    return { at: new Date().toISOString(), servedModel: body.model, ...(body.system_fingerprint === undefined ? {} : { fingerprint: body.system_fingerprint }) }
+  } catch (error) {
+    console.error(`model probe failed: ${(error as Error).message}`)
+    return undefined
+  }
+}
+
+function sha256(path: string): string {
+  return createHash('sha256').update(readFileSync(path)).digest('hex')
+}
+
+function filesUnder(dir: string): string[] {
+  if (!existsSync(dir)) return []
+  return readdirSync(dir, { recursive: true, encoding: 'utf8' }).filter(path => statSync(join(dir, path)).isFile())
+}
+
+/** Copy the kept files of a trial into the record and describe them. */
+function keepArtifacts(trialDir: string, recordDir: string, trial: string): Attempt['artifacts'] {
+  const kept = [...AGENT_FILES, ...filesUnder(join(trialDir, 'verifier')).map(path => join('verifier', path))]
+  const artifacts: Attempt['artifacts'] = {}
+  for (const name of kept) {
+    const source = join(trialDir, name)
+    if (!existsSync(source)) continue
+    const path = join('attempts', trial, name)
+    mkdirSync(dirname(join(recordDir, path)), { recursive: true })
+    copyFileSync(source, join(recordDir, path))
+    artifacts[name] = { path, sha256: sha256(source), bytes: statSync(source).size }
+  }
+  return artifacts
+}
+
+async function run(argv: string[]): Promise<number> {
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      'subject': { type: 'string' },
+      'suite': { type: 'string', default: 'upgrade-skill' },
+      'attempts': { type: 'string', default: '3' },
+      'tasks': { type: 'string' },
+      'concurrency': { type: 'string', default: '1' },
+      'agent-timeout-multiplier': { type: 'string', default: '1' },
+      // Harbor allows a setup 360 s; installing the agent runtime and, for a pipeline, Playwright with
+      // Chromium takes longer when several trials set up at once, and a setup timeout scores nothing.
+      'agent-setup-timeout-multiplier': { type: 'string', default: '4' },
+      'model': { type: 'string', default: 'deepseek-official/deepseek-v4-flash' },
+      'harbor': { type: 'string', default: process.env.HARBOR_BIN ?? 'harbor' },
+      'records': { type: 'string', default: RECORDS_DIR },
+      'allow-dirty': { type: 'boolean', default: false },
+    },
+  })
+  const subject = SUBJECTS.find(id => id === values.subject)
+  if (subject === undefined) throw new Error(`--subject must be one of ${SUBJECTS.join(', ')}`)
+  const records = values.records
+  if (!existsSync(records)) throw new Error(`no records worktree at ${records}; docs/operations/benchmark.md sets it up`)
+  if (!(values.suite in SUITES)) throw new Error(`--suite must be one of ${Object.keys(SUITES).join(', ')}`)
+  const suiteId = values.suite as SuiteId
+  const tasksDir = SUITES[suiteId].tasks
+  if (!existsSync(join(SKILLS_DIR, 'skills'))) throw new Error('the upgrade skill is missing: git submodule update --init vendor/dsh-plugin-upgrade-skill')
+  const dirty = git(['status', '--porcelain', '--untracked-files=no']) !== ''
+  if (dirty && !values['allow-dirty']) throw new Error('the working tree has changes; commit them, or pass --allow-dirty and the record says so')
+  const apiKey = process.env.DEEPSEEK_API_KEY ?? ''
+  if (!KEYLESS.has(subject) && apiKey === '') throw new Error('DEEPSEEK_API_KEY is not set')
+
+  const attempts = Number(values.attempts)
+  const concurrency = Number(values.concurrency)
+  const multiplier = Number(values['agent-timeout-multiplier'])
+  const [provider = '', model = ''] = values.model.split('/')
+  const producer = {
+    commit: git(['rev-parse', 'HEAD']),
+    version: (JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as { version: string }).version,
+    dirty,
+    message: git(['log', '-1', '--format=%s']),
+    snapshot: storeSnapshot(records, await botSnapshot()),
+  }
+  const suiteCommit = suiteVersion(suiteId)
+  const python = join(dirname(values.harbor), 'python3')
+  const selected = values.tasks?.split(',').map(id => id.trim())
+  const feasible = KEYLESS.has(subject) ? undefined : feasibleTasks(records, suiteId, suiteCommit)
+  const suite = suiteTasks(existsSync(python) ? python : 'python3', tasksDir)
+  const tasks: TaskEntry[] = suite
+    .filter(task => selected === undefined || selected.includes(task.id))
+    .map(task => {
+      const unset = task.verifierEnv.filter(name => (process.env[name] ?? '') === '')
+      const pipeline = subject.startsWith('pipeline')
+      const note = pipeline && !task.shipsDsh
+        ? 'The task installs no dsh release for the pipeline to target.'
+        : pipeline && !task.agentNetwork ? 'The agent runs without network, and a pipeline installs the releases it checks.'
+        : unset.length > 0 ? `The verifier needs ${unset.join(', ')}, which this run does not set.` : undefined
+      return {
+        id: task.id,
+        family: task.id[0] ?? '',
+        networkMode: task.networkMode,
+        agentTimeoutSec: task.agentTimeoutSec,
+        applicable: (!pipeline || (task.id[0] !== 'S' && task.shipsDsh && task.agentNetwork)) && unset.length === 0,
+        feasible: feasible === undefined || feasible.has(task.id),
+        ...(note === undefined ? {} : { note }),
+      }
+    })
+  /** Harbor names a trial's task by its `task.toml` name; a record by its directory. */
+  const idOf = new Map(suite.map(task => [task.name, task.id]))
+  const runnable = tasks.filter(task => task.applicable && task.feasible)
+  if (runnable.length === 0) throw new Error('no selected task is applicable and feasible')
+
+  const createdAt = new Date().toISOString().replace(/\.\d+Z$/, 'Z')
+  const id = `${producer.commit.slice(0, 12)}__${suiteCommit.slice(0, 12)}__${subject}__${createdAt.replace(/[-:]/g, '')}`
+  const jobs = mkdtempSync(join(tmpdir(), 'dsh-migrate-bench-'))
+  const harborArgs = ['run', '-p', tasksDir, '-o', jobs, '--job-name', id, '-k', String(attempts), '-n', String(concurrency), '--agent-timeout-multiplier', String(multiplier), '--agent-setup-timeout-multiplier', values['agent-setup-timeout-multiplier']]
+  for (const task of runnable) harborArgs.push('-i', task.id)
+  // Harbor asks before it hands the shell's variables to a verifier; a run that set them for the report judge has answered.
+  if (runnable.some(task => suite.find(entry => entry.id === task.id)?.verifierEnv.length)) harborArgs.push('--yes')
+  // A suite whose verifiers read the report judge's variables names the judge in each record, whichever of its tasks ran,
+  // when the run sets every one of them: without one, none of those tasks is applicable.
+  const judgeVariables = [...new Set(suite.flatMap(entry => entry.verifierEnv.filter(name => name.startsWith('REPORT_JUDGE_'))))]
+  const judged = judgeVariables.length > 0 && judgeVariables.every(name => (process.env[name] ?? '') !== '')
+  if (KEYLESS.has(subject)) {
+    harborArgs.push('-a', subject)
+  } else {
+    const packed = execFileSync('npm', ['pack', '--silent', '--pack-destination', jobs], { cwd: REPO_ROOT, encoding: 'utf8' }).trim().split('\n').at(-1) ?? ''
+    harborArgs.push('-a', AGENT, '-m', values.model, '--ak', `subject=${subject}`, '--ak', `bot_tarball=${join(jobs, packed)}`)
+    // A task whose agent runs without network still lets the agent reach its model, as the suite's own runs allow theirs; a public task ignores it.
+    harborArgs.push('--allow-agent-host', MODEL_API_HOST)
+  }
+
+  const before = KEYLESS.has(subject) ? undefined : await probe(model, apiKey)
+  const plan: RunPlan = {
+    id,
+    createdAt,
+    producer,
+    subject,
+    attempts,
+    agentTimeoutMultiplier: multiplier,
+    concurrency,
+    model: { provider, model, ...(before === undefined ? {} : { before }) },
+    suite: {
+      repository: SUITES[suiteId].repository,
+      commit: suiteCommit,
+      tasks,
+      ...(judged ? { judge: { baseUrl: process.env.REPORT_JUDGE_BASE_URL ?? '', model: process.env.REPORT_JUDGE_MODEL ?? '' } } : {}),
+    },
+    skillsCommit: git(['rev-parse', 'HEAD'], SKILLS_DIR),
+    names: Object.fromEntries(idOf),
+  }
+  const jobDir = join(jobs, id)
+  writeFileSync(planPath(jobDir), `${JSON.stringify(plan, null, 2)}\n`)
+  console.log(`harbor ${harborArgs.join(' ')}`)
+  console.log(`an interrupted run continues with: ${resumeCommand(jobDir, records)}`)
+  return harborThenRecord(plan, jobDir, values.harbor, harborArgs, records, apiKey)
+}
+
+/**
+ * What a run decided before Harbor started, written beside the job directory
+ * so `resume` can continue an interrupted run into the same record.
+ */
+const runPlanSchema = z.strictObject({
+  id: z.string(),
+  createdAt: z.string(),
+  producer: recordSchema.shape.producer,
+  subject: z.enum(SUBJECTS),
+  attempts: z.number().int().min(1),
+  agentTimeoutMultiplier: z.number().positive(),
+  concurrency: z.number().int().min(1),
+  model: z.strictObject({ provider: z.string(), model: z.string(), before: recordSchema.shape.model.shape.before }),
+  suite: z.strictObject({ repository: z.string(), commit: z.string(), tasks: recordSchema.shape.suite.shape.tasks, judge: recordSchema.shape.suite.shape.judge }),
+  /** The upgrade-skill commit a `+skills` subject loads, whichever suite the tasks come from. */
+  skillsCommit: z.string(),
+  /** Harbor names a trial's task by its `task.toml` name; a record by its directory. */
+  names: z.record(z.string(), z.string()),
+})
+type RunPlan = z.infer<typeof runPlanSchema>
+
+const planPath = (jobDir: string): string => `${jobDir}.plan.json`
+
+/** Run Harbor (a new job or a resumed one), then, when every planned trial has finished, write the record of them. */
+async function harborThenRecord(plan: RunPlan, jobDir: string, harborBin: string, harborArgs: string[], records: string, apiKey: string): Promise<number> {
+  const harbor = spawnSync(harborBin, harborArgs, { cwd: REPO_ROOT, stdio: 'inherit', env: { ...process.env, PYTHONPATH: REPO_ROOT } })
+  if (harbor.error !== undefined) throw harbor.error
+  if (!existsSync(jobDir)) throw new Error(`harbor exited ${String(harbor.status)} without a job directory`)
+
+  const { subject, attempts } = plan
+  const tasks = plan.suite.tasks
+  const trials = readdirSync(jobDir).filter(name => existsSync(join(jobDir, name, 'result.json')) && statSync(join(jobDir, name)).isDirectory())
+    .map(name => ({ dir: join(jobDir, name), result: readTrial(join(jobDir, name)) }))
+    .filter(trial => finished(trial.result))
+    .sort((a, b) => (a.result.started_at ?? '').localeCompare(b.result.started_at ?? ''))
+  // A record is written once, so only when every trial the run planned has finished.
+  const recordDir = join(records, 'records', plan.id)
+  const expected = tasks.filter(task => task.applicable && task.feasible).length * attempts
+  if (trials.length < expected) {
+    console.error(`harbor exited ${String(harbor.status)} with ${String(expected - trials.length)} of ${String(expected)} trials unfinished; no record is written. Continue with: ${resumeCommand(jobDir, records)}`)
+    return 1
+  }
+  const after = KEYLESS.has(plan.subject) ? undefined : await probe(plan.model.model, apiKey)
+
+  const counter = new Map<string, number>()
+  const recorded: Attempt[] = trials.map(({ dir, result }) => {
+    const parsed = attemptOf(result)
+    const task = plan.names[parsed.task] ?? parsed.task
+    const attempt = (counter.get(task) ?? 0) + 1
+    counter.set(task, attempt)
+    return { ...parsed, task, attempt, artifacts: keepArtifacts(dir, recordDir, parsed.trial) }
+  })
+
+  const agentRuntime = (JSON.parse(readFileSync(join(REPO_ROOT, 'container', 'agent-runtime', 'package.json'), 'utf8')) as { dependencies: Record<string, string> }).dependencies['@deepseek-ai/dsh'] ?? ''
+  const record: BenchmarkRecord = recordSchema.parse({
+    schema: RECORD_SCHEMA,
+    id: plan.id,
+    createdAt: plan.createdAt,
+    producer: plan.producer,
+    subject: {
+      id: subject,
+      agentRuntime: KEYLESS.has(subject) ? 'none' : agentRuntime,
+      ...(subject.endsWith('+skills') ? { skills: { commit: plan.skillsCommit, names: [...UPGRADE_SKILLS] } } : {}),
+      attempts,
+      agentTimeoutMultiplier: plan.agentTimeoutMultiplier,
+    },
+    suite: { repository: plan.suite.repository, commit: plan.suite.commit, tasks, ...(plan.suite.judge === undefined ? {} : { judge: plan.suite.judge }) },
+    model: KEYLESS.has(subject) ? { provider: 'none', model: 'none' } : { ...plan.model, ...(after === undefined ? {} : { after }) },
+    environment: {
+      harbor: execFileSync(harborBin, ['--version'], { encoding: 'utf8' }).trim(),
+      docker: execFileSync('docker', ['version', '--format', '{{.Server.Version}}'], { encoding: 'utf8' }).trim(),
+      os: `${type()} ${release()}`,
+      concurrency: plan.concurrency,
+    },
+    attempts: recorded,
+    metrics: computeMetrics({ tasks, attempts: recorded, k: attempts }),
+  })
+  mkdirSync(recordDir, { recursive: true })
+  writeFileSync(join(recordDir, 'record.json'), `${JSON.stringify(record, null, 2)}\n`)
+  console.log(`wrote ${relative(REPO_ROOT, join(recordDir, 'record.json'))}`)
+  for (const [metric, value] of Object.entries(record.metrics.values)) console.log(`  ${metric}: ${value === null ? '—' : String(value)}`)
+  // An oracle or a nop run exists to say which tasks this environment can judge.
+  const infeasible = (subject === 'oracle' ? tasks.filter(task => recorded.some(attempt => attempt.task === task.id && attempt.reward !== 1))
+    : subject === 'nop' ? tasks.filter(task => recorded.some(attempt => attempt.task === task.id && attempt.reward === 1)) : []).map(task => task.id)
+  if (infeasible.length > 0) console.error(`${subject === 'oracle' ? 'the reference solution did not score 1.0' : 'doing nothing scored 1.0'} here, so these tasks are infeasible: ${infeasible.join(', ')}`)
+  return infeasible.length === 0 ? 0 : 1
+}
+
+/**
+ * Continue an interrupted run: Harbor resumes the job, keeping the trials that
+ * finished, and the record is written as the original run would have written it.
+ */
+async function resume(argv: string[]): Promise<number> {
+  const { positionals, values } = parseArgs({
+    args: argv,
+    allowPositionals: true,
+    options: {
+      harbor: { type: 'string', default: process.env.HARBOR_BIN ?? 'harbor' },
+      records: { type: 'string', default: RECORDS_DIR },
+    },
+  })
+  const jobDir = positionals[0]
+  if (jobDir === undefined || !existsSync(planPath(jobDir))) throw new Error('resume needs the job directory a run printed, with its plan beside it')
+  const plan = runPlanSchema.parse(JSON.parse(readFileSync(planPath(jobDir), 'utf8')))
+  // A record is never rewritten, so a job whose record exists has nothing left to resume, whatever is checked out.
+  const written = recordPath(values.records, plan.id)
+  if (existsSync(written)) {
+    console.log(`${relative(REPO_ROOT, written)} is already written; nothing to resume`)
+    return 0
+  }
+  // The record names one producer commit; trials from different code would mix two subjects.
+  if (git(['rev-parse', 'HEAD']) !== plan.producer.commit) throw new Error(`the run was started at ${plan.producer.commit}; check that commit out to resume it`)
+  const apiKey = process.env.DEEPSEEK_API_KEY ?? ''
+  if (!KEYLESS.has(plan.subject) && apiKey === '') throw new Error('DEEPSEEK_API_KEY is not set')
+  // The record names the run's report judge, and a remaining trial that a judge grades is graded by the one in the shell: they must be one.
+  const judge = plan.suite.judge
+  if (judge !== undefined && (process.env.REPORT_JUDGE_MODEL !== judge.model || (process.env.REPORT_JUDGE_BASE_URL ?? '') !== judge.baseUrl || (process.env.REPORT_JUDGE_API_KEY ?? '') === '')) {
+    throw new Error(`the run's report judge is ${judge.model} at ${judge.baseUrl}; set the same REPORT_JUDGE_* to resume it`)
+  }
+  return harborThenRecord(plan, jobDir, values.harbor, ['job', 'resume', '-p', jobDir], values.records, apiKey)
+}
+
+function compareRecords(argv: string[]): number {
+  const { positionals, values } = parseArgs({ args: argv, allowPositionals: true, options: { records: { type: 'string', default: RECORDS_DIR } } })
+  const [baseId, headId] = positionals
+  if (baseId === undefined || headId === undefined) throw new Error('compare needs a base and a head record id')
+  const [base, head] = [baseId, headId].map(id => readRecord(recordPath(values.records, id))) as [BenchmarkRecord, BenchmarkRecord]
+  const input = (record: BenchmarkRecord): Parameters<typeof compare>[0] => ({ tasks: record.suite.tasks, attempts: record.attempts, k: record.subject.attempts })
+  console.log(`${base.subject.id} @ ${base.producer.commit.slice(0, 12)} → ${head.subject.id} @ ${head.producer.commit.slice(0, 12)}`)
+  if (base.suite.commit !== head.suite.commit) console.log(`suite commits differ: ${base.suite.commit.slice(0, 12)} → ${head.suite.commit.slice(0, 12)}; only tasks in both are paired`)
+  const judge = (record: BenchmarkRecord): string => record.suite.judge === undefined ? 'none' : `${record.suite.judge.model} at ${record.suite.judge.baseUrl}`
+  if (!isDeepStrictEqual(base.suite.judge, head.suite.judge)) console.log(`report judges differ: ${judge(base)} → ${judge(head)}; scores of the reports they graded do not compare`)
+  let regressed = false
+  for (const row of compare(input(base), input(head))) {
+    const interval = row.interval === undefined ? '' : ` [${row.interval.join(', ')}]`
+    console.log(`  ${row.metric}: ${row.delta === null ? '—' : String(row.delta)}${interval} over ${String(row.tasks)} tasks: ${row.verdict}`)
+    regressed ||= row.verdict === 'regression'
+  }
+  return regressed ? 1 : 0
+}
+
+/** Every record parses, its metrics recompute to the stored values, and its artifacts match their hashes. */
+export function validateRecords(records: string): string[] {
+  const problems: string[] = []
+  const dir = join(records, 'records')
+  for (const id of existsSync(dir) ? readdirSync(dir).sort() : []) {
+    const path = recordPath(records, id)
+    let record: BenchmarkRecord
+    try {
+      record = readRecord(path)
+    } catch (error) {
+      problems.push(`${id}: ${(error as Error).message}`)
+      continue
+    }
+    if (record.id !== id) problems.push(`${id}: the record names itself ${record.id}`)
+    problems.push(...checkSnapshot(records, record.producer.snapshot).map(problem => `${id}: ${problem}`))
+    const metrics = computeMetrics({ tasks: record.suite.tasks, attempts: record.attempts, k: record.subject.attempts })
+    if (!isDeepStrictEqual(metrics, record.metrics)) problems.push(`${id}: the stored metrics differ from the metrics its attempts compute to`)
+    for (const attempt of record.attempts) {
+      for (const artifact of Object.values(attempt.artifacts)) {
+        const file = join(records, 'records', id, artifact.path)
+        if (!existsSync(file) || sha256(file) !== artifact.sha256) problems.push(`${id}: ${artifact.path} is missing or changed`)
+      }
+    }
+  }
+  return problems
+}
+
+/**
+ * Commit the new records and snapshots in the records worktree. Pushing them
+ * publishes them, so that is left to the maintainer, and printed.
+ */
+function publish(argv: string[]): number {
+  const records = argv[0] ?? RECORDS_DIR
+  const problems = validateRecords(records)
+  for (const problem of problems) console.error(problem)
+  if (problems.length > 0) return 1
+  git(['add', 'records', 'snapshots'], records)
+  const added = git(['diff', '--cached', '--name-only', '--diff-filter=A'], records).split('\n').filter(path => path.endsWith('/record.json'))
+  if (git(['diff', '--cached', '--name-only'], records) === '') {
+    console.log('nothing to publish')
+    return 0
+  }
+  const lines = added.map((path) => {
+    const record = readRecord(join(records, path))
+    return `- ${record.id}: ${record.subject.id}, meanReward ${String(record.metrics.values.meanReward)} over ${String(record.metrics.values.eligibleTasks)} task(s) at "${record.producer.message}"`
+  })
+  git(['commit', '--quiet', '-m', `chore(bench): record ${String(added.length)} run(s)`, '-m', lines.join('\n')], records)
+  console.log(`committed in ${records}:\n${lines.join('\n')}\npublish with:\n  git -C ${shellWord(records)} push origin bench/records\n  gh workflow run bench-records.yml`)
+  return 0
+}
+
+async function main(): Promise<number> {
+  const [command, ...rest] = process.argv.slice(2)
+  if (command === 'run') return run(rest)
+  if (command === 'resume') return resume(rest)
+  if (command === 'publish') return publish(rest)
+  if (command === 'compare') return compareRecords(rest)
+  if (command === 'validate') {
+    const problems = validateRecords(rest[0] ?? RECORDS_DIR)
+    for (const problem of problems) console.error(problem)
+    return problems.length === 0 ? 0 : 1
+  }
+  console.error('usage: npm run bench -- run|resume|compare|validate|publish …')
+  return 2
+}
+
+if (process.argv[1] === import.meta.filename) {
+  main().then((code) => { process.exitCode = code }, (error: unknown) => {
+    console.error((error as Error).message)
+    process.exitCode = 1
+  })
+}

@@ -1,6 +1,6 @@
 # AGENTS.md — the documentation standard
 
-Rules for the documents in this repository. [docs/index.md](index.md) is the index they are looked up through; [../AGENTS.md](../AGENTS.md) carries the standing orders for code and commits.
+Rules for the documents in this repository. [docs/index.md](index.md) is the index they are looked up through, [glossary.md](glossary.md) defines their terms, and [../AGENTS.md](../AGENTS.md) holds the rules for code and commits.
 
 ## The tier taxonomy: one home per fact
 
@@ -8,18 +8,17 @@ Each fact has exactly one home — the tier whose job it is. Everywhere else, li
 
 | Tier | Job | Does not belong there |
 |---|---|---|
-| [../README.md](../README.md) | The product: what the Action does, and how to consume it | Design rationale, benchmark methodology, open work, and the exhaustive configuration table, which [installation.md](installation.md) owns |
-| [../AGENTS.md](../AGENTS.md) | Standing orders an agent needs in context every session, one to three lines each | Worked examples, war stories, anything restated from a linked home |
+| [../README.md](../README.md) | The product: what the Action does, and where a consumer and a contributor start | Design rationale, benchmark methodology, open work, the installation steps, which [operations/](operations/install.md) owns, and the configuration table, which [reference/](reference/configuration.md) owns |
+| [../AGENTS.md](../AGENTS.md) | Rules an agent needs in context every session, one to three lines each | Worked examples, incident narratives, anything restated from a linked home |
+| [glossary.md](glossary.md) | Every project term, once | Procedures, rationale |
 | [index.md](index.md) | The lookup table: subject → owning document → owning section | Any fact of its own; every row points somewhere else |
-| [installation.md](installation.md) | Installing the Action, every configuration key and its default, the feedback channels, the deploy target and the commands a comment can drive, and the checklist an agent follows when configuring it | Design rationale, which belongs in `design/`; a contract a third party must implement, which belongs in the design document that describes it |
-| [design/](design/e2e-migration-pipeline.md) | Reference for a designed mechanism: how it works, why it is ordered that way, what it guarantees | Measured results, procedures, current task state |
-| [upstream-benchmark.md](upstream-benchmark.md) | What a benchmark run applies, what it measures, and what the exercise found | The numbers themselves — those live in `reports/` |
-| [plans/README.md](plans/README.md) | Open work and deliberate non-goals, each with its owning document | Design of the work itself, which belongs in `design/` |
-| [../reports/README.md](../reports/README.md) | The record format every run writes, and what consumes it | Analysis of what the numbers mean |
-| [official-discussion-auto-post.md](official-discussion-auto-post.md) | A designed-but-not-shipped capability and the conditions for revisiting it | Procedures that ship today |
+| [reference/](reference/workflow.md) | Generated: the configuration keys, the workflow statechart, the comment commands, the benchmark metrics and records | Hand edits; change the source the page names |
+| [design/](design/workflow.md) | How a mechanism works, why it is shaped that way, what it guarantees; how the Action is evaluated | Measured results, procedures, current task state |
+| [operations/](operations/install.md) | Procedures: installing the Action, releasing it, running the benchmark | Design rationale |
+| [postmortems/](postmortems/2026-09-29-agent-runtime-drift.md) | What broke, why, and what changed | Rules, which link their reasoning instead |
 | [../CHANGELOG.md](../CHANGELOG.md) | Generated release history | Hand-written entries |
 
-Placement in one line: current behaviour → README; installation and configuration → `installation.md`; a rule → AGENTS.md; how a mechanism works → `design/`; how it is measured → the benchmark document; what it scored → `reports/`; what is next → `plans/`.
+Placement in one line: current behaviour → README; configuration, workflow, commands, metrics and the record format → `reference/`, generated; installing, releasing and benchmarking → `operations/`; a rule → AGENTS.md; how a mechanism works and how it is evaluated → `design/`; what it scored → the records on `bench/records`.
 
 ## The index is computed, not trusted
 
@@ -30,10 +29,10 @@ Rows keep a fixed shape because the gate reads them: one topic, one backticked r
 ## Writing rules
 
 - **Present tense, current state.** Describe the mechanism as it is now. A change story belongs in a commit, a release entry, or the relevant design document's rationale — never in a rule.
-- **One physical line per paragraph.** Use the editor's soft wrap. Tables, lists, and code blocks keep their formatting.
+- **One physical line per paragraph.** Use the editor's soft wrap. Tables, lists, and code blocks keep their formatting. The `md-wrap` gate checks `README.md`, `AGENTS.md` and `docs/`.
 - **Link with relative Markdown paths, never bare filenames.** `scripts/verify-md-links.ts` rejects a missing target and a `#fragment` that names no heading in the target, so a cross-reference cannot rot silently.
 - **State a rule, not the incident that produced it.** A rule is short and self-contained, and links the document that owns the reasoning; the reasoning is not restated beside it.
-- **Say what is, not what should be.** Proposals live in `plans/` or `design/`, marked as such. A reference document that hedges with "should" is either a plan that has not moved yet or a rule nobody enforces.
-- **Prefer an exact noun to a metaphor.** Name the file, the script, the gate, or the field. A word like "gate" or "surface" that could mean three things is not a name.
+- **Say what is, not what should be.** A document describes what the code does now; a change that is not made yet lives in an issue or a pull request, not in a document.
+- **Prefer an exact noun to a metaphor.** Name the file, the script, the check, or the field, with the term [the glossary](glossary.md) gives it. The `terms` gate rejects the words the glossary replaces outside code spans.
 - **Every generated region says so.** A region produced by a script is marked and its generator is named in the surrounding text, so the next reader edits the source rather than the output.
 - **Budget attention.** A document states its own subject at the detail its position warrants and describes its children only by purpose, linking down for depth. If a section restates a linked document, delete the section.

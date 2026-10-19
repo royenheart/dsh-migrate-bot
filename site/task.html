@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Task · dsh-migrate benchmark</title>
+<link rel="stylesheet" href="assets/site.css">
+<script src="https://cdn.jsdelivr.net/npm/vega@5.30.0/build/vega.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-lite@5.21.0/build/vega-lite.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-embed@6.26.0/build/vega-embed.min.js"></script>
+</head>
+<body>
+<main>
+  <h1>One task across records</h1>
+  <div class="controls"><label>Subject <select id="subject"></select></label><label>Task <select id="task"></select></label></div>
+  <div id="chart"></div>
+  <table id="attempts"></table>
+</main>
+<script type="module" src="assets/task.js"></script>
+</body>
+</html>

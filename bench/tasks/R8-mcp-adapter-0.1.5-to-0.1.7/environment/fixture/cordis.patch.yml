@@ -1,0 +1,8 @@
+# Bundle patch for dsh-mcp-adapter: inserts the Adapter's host row into the
+# profile tree. `dsh plugin --profile web add <this repo>` appends this bundle
+# to dsh.profile.bundles automatically. The client roster entry is discovered
+# from package.json's dsh.client block by the clientModules scan — no row here.
+
+- insert:
+    - id: mcp-adapter
+      name: "@auggieteo/dsh-mcp-adapter"

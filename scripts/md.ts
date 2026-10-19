@@ -57,6 +57,27 @@ function fencedLines(source: string): boolean[] {
   return inside
 }
 
+/** One line of prose: outside fences and the frontmatter, with code spans and link targets removed. */
+export interface ProseLine {
+  line: number
+  text: string
+}
+
+/**
+ * The prose of a document, line by line. Code spans and fenced blocks hold
+ * identifiers and samples, not prose, and a link keeps only its label.
+ * @param source - the document's full text.
+ * @returns every line outside fences and the frontmatter, in order.
+ */
+export function proseLines(source: string): ProseLine[] {
+  const fenced = fencedLines(source)
+  const lines = source.split('\n')
+  const frontmatter = lines[0] === '---' ? lines.indexOf('---', 1) : -1
+  return lines.flatMap((raw, index) => fenced[index] === true || index <= frontmatter
+    ? []
+    : [{ line: index + 1, text: raw.replace(/`[^`]*`/g, ' ').replace(/!?\[([^\]]*)\]\([^()]*\)/g, '$1') }])
+}
+
 /**
  * Remove inline Markdown syntax from a fragment of text, keeping its words.
  *

@@ -32,28 +32,27 @@ function officialLinks(body: string): string[] {
 }
 
 /**
- * Read one `report.md` per subdirectory of `.dsh-migrate/patch-reports/`.
+ * One patch report: it is a draft unless it links an existing official thread.
+ * @param slug - the report's directory name.
+ * @param text - the report's markdown.
  */
+export function parsePatchReport(slug: string, text: string): PatchReport | undefined {
+  const body = text.trim()
+  if (body === '') return undefined
+  const links = officialLinks(body)
+  return { slug, title: firstHeading(body, slug), body, kind: links.length > 0 ? 'existing' : 'draft', links }
+}
+
+/** Read one `report.md` per subdirectory of `.dsh-migrate/patch-reports/`. */
 export function collectPatchReports(workdir: string): PatchReport[] {
   const root = patchReportsRoot(workdir)
   if (!existsSync(root)) return []
-  const slugs = readdirSync(root).sort()
   const reports: PatchReport[] = []
-  for (const slug of slugs) {
-    const dir = join(root, slug)
-    if (!statSync(dir).isDirectory()) continue
-    const file = join(dir, PATCH_REPORT_FILE)
-    if (!existsSync(file)) continue
-    const body = readFileSync(file, 'utf8').trim()
-    if (body === '') continue
-    const links = officialLinks(body)
-    reports.push({
-      slug,
-      title: firstHeading(body, slug),
-      body,
-      kind: links.length > 0 ? 'existing' : 'draft',
-      links,
-    })
+  for (const slug of readdirSync(root).sort()) {
+    const file = join(root, slug, PATCH_REPORT_FILE)
+    if (!statSync(join(root, slug)).isDirectory() || !existsSync(file)) continue
+    const report = parsePatchReport(slug, readFileSync(file, 'utf8'))
+    if (report !== undefined) reports.push(report)
   }
   return reports
 }
@@ -61,29 +60,25 @@ export function collectPatchReports(workdir: string): PatchReport[] {
 export function formatPatchReportComment(input: {
   reports: readonly PatchReport[]
   pullRequestUrl?: string | undefined
-  language: 'en' | 'zh'
 }): string[] {
   if (input.reports.length === 0 && input.pullRequestUrl === undefined) return []
-  const zh = input.language === 'zh'
   const lines: string[] = []
   // A URL is rendered as one only when it is one: a comment line is not a place
   // to republish a credential or a link that was not named.
   const pullRequestUrl = input.pullRequestUrl === undefined ? undefined : externalUrl(input.pullRequestUrl, 300)
   if (pullRequestUrl !== undefined) {
-    lines.push(zh ? `配套 PR：${pullRequestUrl}` : `Companion PR: ${pullRequestUrl}`)
+    lines.push(`Companion PR: ${pullRequestUrl}`)
     lines.push('')
   }
   if (input.reports.length === 0) {
     return [lines.join('\n').trim()]
   }
-  lines.push(zh ? '## 补丁报告总表' : '## Patch report index')
+  lines.push('## Patch report index')
   lines.push('')
-  lines.push(zh ? '| 补丁 | 类型 | 链接 |' : '| Patch | Kind | Links |')
+  lines.push('| Patch | Kind | Links |')
   lines.push('| --- | --- | --- |')
   for (const report of input.reports) {
-    const kind = report.kind === 'existing'
-      ? (zh ? '已有讨论' : 'existing')
-      : (zh ? '讨论草稿' : 'draft')
+    const kind = report.kind
     // Every one of these is text the migration wrote into the repository it read.
     const links = report.links.length === 0 ? '—' : report.links.map(link => inline(link, 200)).join('<br>')
     lines.push(`| \`${inline(report.slug, 60)}\` | ${kind} | ${links} |`)

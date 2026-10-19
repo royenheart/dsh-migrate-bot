@@ -1,0 +1,14 @@
+# R5: dsh-router, 0.1.2-rc.1 → 0.1.5-rc.1
+
+| | |
+|---|---|
+| Plugin | `dsh-router-core`, a model routing gateway with a browser panel |
+| Repository | https://github.com/CARVIN94/dsh-router (MIT; `environment/fixture/LICENSE`) |
+| Fixture | `965931c34a34`, the parent of the migration, with the author's later path fix to `scripts/check-css.mjs` (from `3c75cab`) |
+| Reference solution | `f0cb93b35c24`, "migrate to DSH 0.1.5-rc.1 cohort", as `solution/migration.patch` |
+| Span | peer ranges `^0.1.2-rc.1`, devDependency `@deepseek-ai/dsh-llm` pinned to `0.1.2-rc.1` → 0.1.5-rc.1 |
+| `--before` | `2026-09-10T09:54:39Z`, the migration commit (0.1.5-rc.1 was published at 03:12Z, 0.1.5-rc.2 at 14:46Z the same day) |
+
+The plugin's peer ranges `^0.1.2-rc.1` (`dsh-llm`, `dsh-client-locale`, `dsh-client-ui-slots`) do not admit 0.1.5-rc.1, because a caret range admits prereleases of 0.1.2 only. Nothing else breaks: with the dsh packages at 0.1.5-rc.1 the fixture's code still typechecks, passes its tests, builds and boots, so `nop` fails only `contract` (0.85) and the oracle scores 1.0. The author raised the peer ranges to `^0.1.5-rc.1` and the `dsh-llm` devDependency to `0.1.5-rc.1`, updated `pnpm-lock.yaml`, exempted the eight 0.1.5-rc.1 packages from pnpm's `minimumReleaseAge` in `pnpm-workspace.yaml` (they were hours old at the time), and changed the README badge. In `src/llm/adapter.ts` the author made `resolveModel` declare `inputModalities: ['text']`, so that the runtime turns image blocks into placeholder text instead of the adapter dropping them without notice, and rewrote the comment on `wireMessages` to describe the system prompt arriving as a system-role message in loop-built requests, which the function already handled. The image projection rule (`inputModalities` present and without `image`) is the same in `@deepseek-ai/dsh-llm` 0.1.2-rc.1, so that declaration fixes a bug the plugin already had rather than a change the release requires; it is kept in the reference solution because it is part of the migration commit. The next commit, `b0cbe81`, only bumps the version, and `c84fd66` four days later adds image input as a new feature, so the migration commit alone is the reference solution.
+
+The task has no hidden tests: the migration commit changed no test file. The fixture is the whole `git archive` of the parent (the repository commits no build output, `lib/` being ignored, and no agent notes or changelog), with one change: `scripts/check-css.mjs`, the first step of `build`, read `router.css` from the author's checkout (`/Users/carvin/Desktop/dsh-plugins/dsh-router/...`), so `build` failed on any other machine for the oracle and `nop` alike. The fixture carries the author's own fix from `3c75cab` (2026-09-25), which resolves the path from the script's location; the reference solution does not touch that file. The patch is the whole migration commit; nothing was excluded.

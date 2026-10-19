@@ -1,0 +1,149 @@
+# The reusable workflow consumers call. It owns the triggers' jobs, the secret
+# mapping, and the concurrency group, so a consumer's workflow is only the
+# triggers and one `uses:` line (examples/workflow.yml).
+#
+# Its jobs run the Action of this workflow's own release, named by version
+# (commitizen bumps it): the major tag a consumer pins moves to a release whose
+# workflow and Action agree, and a prerelease, which moves no major tag, runs
+# its own Action too.
+
+name: dsh-migrate
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: Override the configured target release
+        type: string
+        required: false
+        default: ''
+      force:
+        description: Migrate even when the target release was already processed, unless its proposal is still open
+        type: boolean
+        required: false
+        default: false
+      config:
+        description: The configuration file, relative to the repository root
+        type: string
+        required: false
+        default: .github/dsh-migrate.yml
+    # The Action's outputs, from whichever job the event ran.
+    outputs:
+      status:
+        description: compatible, proposed, unpublished, failed, error, skipped, or the state an event left the migration in
+        value: ${{ jobs.migrate.outputs.status || jobs.pull-request-closed.outputs.status || jobs.comment.outputs.status }}
+      target_tag:
+        description: The target release tag
+        value: ${{ jobs.migrate.outputs.target_tag || jobs.pull-request-closed.outputs.target_tag || jobs.comment.outputs.target_tag }}
+      verified_tag:
+        description: The newest verified release tag
+        value: ${{ jobs.migrate.outputs.verified_tag || jobs.pull-request-closed.outputs.verified_tag || jobs.comment.outputs.verified_tag }}
+      pull_request_url:
+        description: The proposal pull request, when there is one
+        value: ${{ jobs.migrate.outputs.pull_request_url || jobs.pull-request-closed.outputs.pull_request_url || jobs.comment.outputs.pull_request_url }}
+      log_stream_url:
+        description: The run log stream, when a deploy service serves one
+        value: ${{ jobs.migrate.outputs.log_stream_url }}
+      command_reply:
+        description: The reply a comment command posted
+        value: ${{ jobs.comment.outputs.command_reply }}
+
+env:
+  DEEPSEEK_API_KEY_DSH_MIGRATE_BOT: ${{ secrets.DEEPSEEK_API_KEY_DSH_MIGRATE_BOT }}
+  GITHUB_TOKEN: ${{ github.token }}
+  DSH_MIGRATE_REPORT_UPGRADE_SKILL_TOKEN: ${{ secrets.DSH_MIGRATE_REPORT_UPGRADE_SKILL_TOKEN }}
+  DSH_MIGRATE_REPORT_BOT_TOKEN: ${{ secrets.DSH_MIGRATE_REPORT_BOT_TOKEN }}
+  DSH_MIGRATE_REPORT_HARNESS_TOKEN: ${{ secrets.DSH_MIGRATE_REPORT_HARNESS_TOKEN }}
+  DSH_MIGRATE_DEPLOY_TOKEN: ${{ secrets.DSH_MIGRATE_DEPLOY_TOKEN }}
+
+jobs:
+  migrate:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    concurrency:
+      group: dsh-migrate-${{ github.repository }}
+      cancel-in-progress: false
+    outputs:
+      status: ${{ steps.action.outputs.status }}
+      target_tag: ${{ steps.action.outputs.target_tag }}
+      verified_tag: ${{ steps.action.outputs.verified_tag }}
+      pull_request_url: ${{ steps.action.outputs.pull_request_url }}
+      log_stream_url: ${{ steps.action.outputs.log_stream_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: action
+        uses: royenheart/dsh-migrate-bot@v1.0.0-rc.1
+        with:
+          command: run
+          config: ${{ inputs.config }}
+          target: ${{ inputs.target }}
+          force: ${{ inputs.force }}
+
+  # Only the proposal's own closes are queued: a job queued behind a running one
+  # cancels the job already waiting in the concurrency group.
+  pull-request-closed:
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.action == 'closed'
+      && github.event.pull_request.head.ref == 'dsh-migrate/proposal'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: read
+    concurrency:
+      group: dsh-migrate-${{ github.repository }}
+      cancel-in-progress: false
+    outputs:
+      status: ${{ steps.action.outputs.status }}
+      target_tag: ${{ steps.action.outputs.target_tag }}
+      verified_tag: ${{ steps.action.outputs.verified_tag }}
+      pull_request_url: ${{ steps.action.outputs.pull_request_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: action
+        uses: royenheart/dsh-migrate-bot@v1.0.0-rc.1
+        with:
+          command: pull-request-closed
+          config: ${{ inputs.config }}
+          pull_request: ${{ github.event.pull_request.number }}
+          merged: ${{ github.event.pull_request.merged }}
+
+  # Only the commenters a command admits are queued, for the same reason.
+  comment:
+    if: >-
+      github.event_name == 'issue_comment'
+      && contains(github.event.comment.body, '/dsh-migrate')
+      && github.event.comment.user.type != 'Bot'
+      && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    concurrency:
+      group: dsh-migrate-${{ github.repository }}
+      cancel-in-progress: false
+    outputs:
+      status: ${{ steps.action.outputs.status }}
+      target_tag: ${{ steps.action.outputs.target_tag }}
+      verified_tag: ${{ steps.action.outputs.verified_tag }}
+      pull_request_url: ${{ steps.action.outputs.pull_request_url }}
+      command_reply: ${{ steps.action.outputs.command_reply }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: action
+        uses: royenheart/dsh-migrate-bot@v1.0.0-rc.1
+        with:
+          command: comment
+          config: ${{ inputs.config }}
+          comment_body: ${{ github.event.comment.body }}
+          comment_id: ${{ github.event.comment.id }}
+          comment_author: ${{ github.event.comment.user.login }}
+          comment_author_association: ${{ github.event.comment.author_association }}
+          issue_number: ${{ github.event.issue.number }}

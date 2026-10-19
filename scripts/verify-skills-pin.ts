@@ -44,12 +44,12 @@ export function dockerfileCommit(): string | undefined {
 
 /**
  * Check that the image pin and the submodule pin are the same commit.
+ * @param gitlink - the submodule commit; a parameter so a test can feed a mismatch.
+ * @param pinned - the commit the Dockerfile pins.
  * @returns one entry per defect.
  */
-export function verifySkillsPin(): { violations: PinViolation[] } {
+export function verifySkillsPin(gitlink: string | undefined = submoduleCommit(), pinned: string | undefined = dockerfileCommit()): { violations: PinViolation[] } {
   const violations: PinViolation[] = []
-  const gitlink = submoduleCommit()
-  const pinned = dockerfileCommit()
   if (gitlink === undefined) {
     violations.push({ detail: `no gitlink for ${SUBMODULE_PATH}; run: git submodule update --init ${SUBMODULE_PATH}` })
   }

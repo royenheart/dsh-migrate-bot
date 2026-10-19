@@ -1,0 +1,1609 @@
+diff --git a/README.md b/README.md
+index b71774f..39d04c7 100644
+--- a/README.md
++++ b/README.md
+@@ -5,8 +5,7 @@
+ <p align="center">
+   <a href="https://www.npmjs.com/package/dsh-router-core"><img src="https://img.shields.io/npm/v/dsh-router-core?style=flat-square&logo=npm&label=npm" alt="npm version"></a>
+   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-10b981?style=flat-square" alt="MIT license"></a>
+-  <a href="https://www.npmjs.com/package/@deepseek-ai/dsh?activeTab=versions"><img alt="DSH 0.1.5" src="https://img.shields.io/badge/DSH-0.1.5-4d6bfe?style=flat-square" /></a>
+-  <a href="https://www.npmjs.com/package/@deepseek-ai/dsh?activeTab=versions"><img alt="DSH 0.1.7-alpha.2 支持" src="https://img.shields.io/badge/DSH-0.1.7--alpha.2-e400dd?style=flat-square" /></a>
++  <a href="https://www.npmjs.com/package/@deepseek-ai/dsh?activeTab=versions"><img alt="DSH 0.2.0" src="https://img.shields.io/badge/DSH-0.2.0-4d6bfe?style=flat-square" /></a>
+   <a href="#agent-team-支持"><img alt="Agent Team" src="https://img.shields.io/badge/Agent%20Team-%E2%9C%93-10b981?style=flat-square" /></a>
+ </p>
+ 
+@@ -33,7 +32,8 @@ dsh-router 按**会话身份**亲和选号:同会话固定落同一个连接(前
+ 
+ ## 快速安装
+ 
+-需要 **DSH `0.1.5-rc.1` 及以上**(支持 `dsh plugin` profile 插件机制)、Node.js `>= 20`,以及 `web` profile。
++需要 **DSH `0.2.0` 及以上**、Node.js `>= 20`,以及 `web` profile。0.1.x 宿主不再支持(设置注册、
++tool 消息形态都已按 0.2.0 单面实现)。
+ 
+ ```bash
+ dsh plugin --profile web add dsh-router-core
+@@ -98,9 +98,9 @@ team 测试就是多个会话交错发请求。dsh-router 原生适配这个场
+ > **加连接**或**限制 team 并发成员数 ≤ 连接数**。详见
+ > [`docs/pool-sticky-block.md`](docs/pool-sticky-block.md) §11。
+ >
+-> 版本适配:「路由」徽章只在 **DSH ≥ 0.1.7** 出现(0.1.5 的对应座位渲染位置
+-> 不同);0.1.5 与 0.1.7 的兼容差异(设置注册、tool 消息形态)统一按宿主版本号
+-> 判定。
++> 版本适配:插件按 **DSH 0.2.0 单面**实现(0.1.5/0.1.7 的兼容分叉已删除)。跑在
++> 低于 0.2.0 的宿主上仍会加载,但会在宿主日志里打一条警告 —— 那些症状与「插件坏了」
++> 无法区分,所以宁可出声。
+ 
+ ## 面板(设置 → 路由)
+ 
+@@ -346,7 +346,7 @@ curl -X POST http://localhost:3080/v1/chat/completions \
+   │    │    ├─ SupplierDetail    供应商详情:链接池 + 加链接 + 可用模型 + 模型测试
+   │    │    ├─ CombosTab / EndpointTab
+   │    │    └─ ExtTab → ExtDetail  扩展列表(只列已启用)与详情(优先渲染扩展自带的面板)
+-  │    └─ LastHitDock       「路由」徽章(composer.dock 座位,≥0.1.7;按会话显示最近命中)
++  │    └─ LastHitDock       「路由」徽章(composer.dock 座位;按会话显示最近命中)
+   ├─ 设置 → 插件(官方 plugins.detail.section 座位)
+   │    ├─ (原生「包含的组件」)  core patch 里声明的行:core 本体 + 内置供应商 + 内置扩展
+   │    │                        宿主管的开关,关一行 = loader 不 import 它
+@@ -359,7 +359,7 @@ curl -X POST http://localhost:3080/v1/chat/completions \
+                  │    └─ RouterAdapter(src/llm/adapter.ts)  OpenAI SSE → DSH StreamChunk
+                  │         (usage 经 toTokenUsage 转 DSH 契约,见 docs/suppliers.md)
+                  │         (带 x-dsh-router-session 头:宿主 sessionId → 会话亲和)
+-                 ├─ host-version(src/host-version.ts)  按宿主版本号适配 0.1.5 / 0.1.7
++                 ├─ host-version(src/host-version.ts)  报宿主版本 + 守 0.2.0 版本地板(低于则告警)
+                  ├─ KeysStore(src/keys.ts)              密钥库 + requireApiKey
+                  └─ Router(路由器) → suppliers[]
+                       ├─ OpenCodeSupplier(lib/suppliers/opencode/index.js) 无账号直连(Zen 免费档,需 CLI 握手)
+@@ -404,8 +404,7 @@ curl -X POST http://localhost:3080/v1/chat/completions \
+ 
+ ## 前提
+ 
+-- **DSH 版本**:`0.1.5-rc.1` 及以上;插件内部按宿主版本号自动适配 0.1.5 / 0.1.7
+-  差异(设置注册方式、tool 消息形态、底部徽章);「路由」徽章需 **≥ 0.1.7**;
++- **DSH 版本**:`0.2.0` 及以上(单面支持;低于此版本会在宿主日志里告警);
+ - 凭证由 dsh-router 核心统一管(SQLite 库 `<dataDir>/auths/credentials.sqlite`);
+ - 供应商接入与开发见 [`docs/suppliers.md`](docs/suppliers.md);
+ - 重启 DSH 后 `/v1/*` 即生效;面板管理账号、模型与密钥。
+diff --git a/package.json b/package.json
+index b2987f6..488a0e1 100644
+--- a/package.json
++++ b/package.json
+@@ -99,12 +99,12 @@
+     "@deepseek-ai/schemastery": "^3.18.4"
+   },
+   "peerDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.2",
+-    "@deepseek-ai/dsh-client-locale": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-llm": "^0.1.5-rc.2",
+-    "@deepseek-ai/dsh-settings": "^0.1.5-rc.2",
++    "@deepseek-ai/cordis": "^4.0.4",
++    "@deepseek-ai/dsh-client-locale": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-ui-primitives": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-llm": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-settings": "^0.2.0-rc.1",
+     "cordis": "^4.0.0-rc.7",
+     "react": "^18.2.0",
+     "react-dom": "^18.2.0"
+@@ -124,6 +124,8 @@
+     }
+   },
+   "devDependencies": {
++    "@deepseek-ai/cordis": "4.0.4",
++    "@deepseek-ai/dsh-llm": "0.2.0-rc.1",
+     "@types/node": "^26.6.2",
+     "@types/react": "~19.3.0",
+     "@types/react-dom": "~19.3.0",
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index d550c5c..d3fa341 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -8,28 +8,28 @@ importers:
+ 
+   .:
+     dependencies:
+-      '@deepseek-ai/cordis':
+-        specifier: ^4.0.2
+-        version: 4.0.2
+       '@deepseek-ai/dsh-client-locale':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++        specifier: ^0.2.0-rc.1
++        version: 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
+       '@deepseek-ai/dsh-client-ui-primitives':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.3(@deepseek-ai/cordis@4.0.2)
++        specifier: ^0.2.0-rc.1
++        version: 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
+       '@deepseek-ai/dsh-client-ui-slots':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-llm':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)
++        specifier: ^0.2.0-rc.1
++        version: 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
+       '@deepseek-ai/dsh-settings':
+-        specifier: ^0.1.5-rc.2
+-        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/schemastery@3.18.4)
++        specifier: ^0.2.0-rc.1
++        version: 0.2.0-rc.1(456d43703961be9dc43c6eb97f678f5f)
+       '@deepseek-ai/schemastery':
+         specifier: ^3.18.4
+         version: 3.18.4
+     devDependencies:
++      '@deepseek-ai/cordis':
++        specifier: 4.0.4
++        version: 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-llm':
++        specifier: 0.2.0-rc.1
++        version: 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
+       '@types/node':
+         specifier: ^26.6.2
+         version: 26.6.2
+@@ -56,19 +56,40 @@ importers:
+         version: 7.0.2
+       vite:
+         specifier: 8.3.0
+-        version: 8.3.0(@types/node@26.6.2)
++        version: 8.3.0(@types/node@26.6.2)(yaml@2.9.1)
+       vite-plugin-css-injected-by-js:
+         specifier: ^5.0.2
+-        version: 5.0.2(vite@8.3.0(@types/node@26.6.2))
++        version: 5.0.2(vite@8.3.0(@types/node@26.6.2)(yaml@2.9.1))
+ 
+ packages:
+ 
+-  '@deepseek-ai/cordis@4.0.2':
+-    resolution: {integrity: sha512-asOnXP1TzFSFQlHb1iegDZp0z/8WD1c7YNrwJR/Tx2bzNuMXfcekE/I67Iv6SQXeLB4csxqCngzQKANP7gdw0g==}
++  '@deepseek-ai/cordis-plugin-group@1.0.4':
++    resolution: {integrity: sha512-/7tuY5pMQetHava4v6QUeOa4CwZA+mleNvbIoj+iqEmzkYUtlXbLqhzJIcbnDa/Hxgr1jaCwROrI77nuLyeCFg==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
++
++  '@deepseek-ai/cordis-plugin-include@1.0.9':
++    resolution: {integrity: sha512-Xmekm7u5Kpeym6nABL4T1/Mg6aQYFZxsipB0WycmCctvX1DqAv8nCFwRmg2XMx/f7EbZgNEbXQwJfabcMu8zxQ==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
++
++  '@deepseek-ai/cordis-plugin-loader@1.0.5':
++    resolution: {integrity: sha512-200huL2ttWcjyeYllvPYn+qMR7I89qy8MhZasbHltPzB/KMrSfsyoCYKdCGc5KqPGj5iJugcmibQzjINMO9I+Q==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      node-addon-require-builtin: ^0.1.6
++    peerDependenciesMeta:
++      node-addon-require-builtin:
++        optional: true
++
++  '@deepseek-ai/cordis@4.0.4':
++    resolution: {integrity: sha512-obgyxqWAmFn3Re8kvsuUnyW+ihrz6eJCnJO4fh1cQzDtmPYz/zzVeUkH9R94I0OwSVOocK67Kgakm04j/oQXzg==}
+     hasBin: true
+     peerDependencies:
+-      '@deepseek-ai/cordis-plugin-include': ^1.0.7
+-      '@deepseek-ai/cordis-plugin-loader': ^1.0.3
++      '@deepseek-ai/cordis-plugin-include': ~1.0.9
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
+     peerDependenciesMeta:
+       '@deepseek-ai/cordis-plugin-include':
+         optional: true
+@@ -78,85 +99,135 @@ packages:
+   '@deepseek-ai/cosmokit@1.8.5':
+     resolution: {integrity: sha512-LXsrlem9z8dq4sLflj2yuCuYX7KqhdzF5hZly3eZyuTo8d6oDSOXuEgC5DbQWKW+lksm6zmOutQLsP/ma6wR6A==}
+ 
+-  '@deepseek-ai/dsh-brand@0.1.5-rc.2':
+-    resolution: {integrity: sha512-/+3TzQRYT4M8NINZ9OrsL5VWNyQSXof8mFLx3txiosWA7Bt0H6UcxUdKGXVwj6gCXhsQ74mzEHm2ucsflG0mYA==}
++  '@deepseek-ai/dsh-app-boot@0.2.0-rc.1':
++    resolution: {integrity: sha512-iHUYI+Tc3FlaYay0aLg4LsmZELi8wNWd6DSYrd46enUv0SWgm3qXVFLZivlcKqKWxcjuuvL5JxNemxGiMRIWxQ==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/cordis-plugin-group': ~1.0.4
++      '@deepseek-ai/cordis-plugin-include': ~1.0.9
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
++      '@deepseek-ai/dsh-home-paths': 0.2.0-rc.1
++      '@deepseek-ai/dsh-launch-environment': 0.2.0-rc.1
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.1
++
++  '@deepseek-ai/dsh-atomic-write@0.2.0-rc.1':
++    resolution: {integrity: sha512-xfqotH4A560oEQl+EzvyAJFjhiFF68ywiM/LuSuMQ2xvqLnaX50tJV/WCCBfVguM+4x/hObI0jz4oLDBs0d2Kg==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-brand@0.2.0-rc.1':
++    resolution: {integrity: sha512-TPeMaUt/Xev0X2TfIf6pSVVGiWAbFHy+VWCIW+w8UkC0yH1ep9302JQOBqhUgefAM4s/3W1R8lra/PMbFhjx2w==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-client-locale@0.2.0-rc.1':
++    resolution: {integrity: sha512-4LNz28WCad8v3quEeuSTXOTHb6YHrMGkjIq73W+6+6zkEBbbmpfiz4FJ3MW9iE72DXLR9/IyUHNBpf6N/CVZ4Q==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-client-locale@0.1.5-rc.2':
+-    resolution: {integrity: sha512-kv56ki/WQWagsHt94wJAPzsiKnxa8KlmM33bZGgl2SgF4atlQ3iRCdkwJ3fQARXF4Ocnfutivoj5fu5usks1Sw==}
++  '@deepseek-ai/dsh-client-ui-primitives@0.2.0-rc.1':
++    resolution: {integrity: sha512-1CCpyIh5PJljyXS9zQP8ib6JAg2p6PELh+iZhD3VBjQC5ZZ5i/zdgNGVOGr6Uu+sUpU7BkjYPvUkhy7AZQJWYA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-client-ui-primitives@0.1.5-rc.3':
+-    resolution: {integrity: sha512-PnPSAppguOfDdtGRVLOtVynoZml3676GO/tveRuaA+tKhXog/35+JIpPewe7QQ+jwbxl+S/p66R6P19az3Cglw==}
++  '@deepseek-ai/dsh-client-ui-slots@0.2.0-rc.1':
++    resolution: {integrity: sha512-GrQbf1KN9NGa63ZBocAKAA2W5aahRCOAQVYQoW2OLIvg5h2e1j30dqMx+nptni59YUvg0DmmLj6ggUXvFpzCQA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-client-ui-slots@0.1.5-rc.2':
+-    resolution: {integrity: sha512-uUKIHBcNzWmJFtTlPkgn7hprsE5uU8lJf8Fw7jKwUouZWIwGnLdxuunrm1LOZWr7G+b4UfjVwD4LV12rhF/WLg==}
++  '@deepseek-ai/dsh-config-editor@0.2.0-rc.1':
++    resolution: {integrity: sha512-BGzv0pUgPELrWO073NrL0JbnjE1cXoUvaZIbG6Q9V0kZp46mg1BITtBvbD+p/pIu+SdbKwGeP1YxRyfdHG6ZKg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/cordis-plugin-include': ~1.0.9
++      '@deepseek-ai/cordis-plugin-loader': ~1.0.5
++      '@deepseek-ai/dsh-app-boot': 0.2.0-rc.1
++      '@deepseek-ai/dsh-hmr': 0.2.0-rc.1
++    peerDependenciesMeta:
++      '@deepseek-ai/dsh-hmr':
++        optional: true
+ 
+-  '@deepseek-ai/dsh-invariants@0.1.5-rc.2':
+-    resolution: {integrity: sha512-oUxttB2yjAgkk47AiXOCxk9GwnfGvIEGsQfnMD7fukwIdD3KLJObU7+nz63tbFN80rjwMI8rg+p9QBQ10KU5+g==}
++  '@deepseek-ai/dsh-home-paths@0.2.0-rc.1':
++    resolution: {integrity: sha512-QWHegbfNY4J7qZgBdiWshhhcF6fgybua6XKUaMIhxj4J+mqR9KEQOJ7hRjOOg8Yub3nGbBTyqpH10C44EGGroA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-llm@0.1.5-rc.1':
+-    resolution: {integrity: sha512-KPKJFTNLjURphuF4NlS8DRK94CUYL/dKB8Hzg/22jtxAFO2paX3ifL0vhdPq9xPbcyplaF7LYlf0+3+pXFTnTg==}
++  '@deepseek-ai/dsh-invariants@0.2.0-rc.1':
++    resolution: {integrity: sha512-sEeO6sRPGxgHChQsiU/V3LvelbVaLt7kb4WHVQqljZGgoAv3VZK0rzSlQaGfTCYJrThcoJ/a9mCT9pcZEZ3aDg==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-llm@0.1.5-rc.2':
+-    resolution: {integrity: sha512-Z7BVsBkK24SE4EItQeow8PHms/9GP0DSTi337vTAa/RY7tNg2Snz3INcXUj6CPZfvntQr1in9op9wLI+rfNsqA==}
++  '@deepseek-ai/dsh-launch-environment@0.2.0-rc.1':
++    resolution: {integrity: sha512-ADTbIFhcVnFSYmycI4Ln4q9GGv5YS+MRg0ahCbn0+rDLcYyx4TT9B9Xyiz856YRRPpYRbYwQqZ+o14kCDpicQA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-scope@0.1.5-rc.2':
+-    resolution: {integrity: sha512-JwItISje52iVIjlGMNayRVMZrvZU/0i3Gr0s+coND5nBp5lS+pOj9Zf1RQzA5cWjHYCWKmDuQc+m6zGlwmtAeQ==}
++  '@deepseek-ai/dsh-llm@0.2.0-rc.1':
++    resolution: {integrity: sha512-F5ZlBG8z8o5PfEWeEF/PN9t/A1N/oEErvqmpqE4J8f9mJR85DvBdV+rjDs7OjAbMJsJ8INjkbroruG5NNKDg5A==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-session@0.1.5-rc.2':
+-    resolution: {integrity: sha512-y+klWiGAWR4m4cc4ylurA0cW63673B4N8cr2ANMimweDZAfxL4XVBC7WiD/5DT2DtIhYmVZhz/niyS/WbniUTA==}
++  '@deepseek-ai/dsh-package-manifest@0.2.0-rc.1':
++    resolution: {integrity: sha512-topsRB2Pr2pfyQgqIkcEnS0mjDWZUDS+inb7/FREv0UaxkB0ezIiQuSJVJk5PQ3KMyuMSz2oNH/URlKOGw35Sw==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-scope': ^0.1.5-rc.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-settings@0.1.5-rc.2':
+-    resolution: {integrity: sha512-LI2Y6GkEs9ALMW+7S9jHPeEZDXHtG5X6cix1HdJ1rRxTEO5427QlYhMiz45rk7hqZ8ca2O4XFMW8IWXFZQLxmw==}
++  '@deepseek-ai/dsh-scope@0.2.0-rc.1':
++    resolution: {integrity: sha512-D1JeWIz40A62/nJIi7HwLsddmuDwdcxV9Lbx5IgBveWDZHGqPIP0/CPJ4o6XWr+C1qI/GBtdMkN2Z3F20Rlt7w==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
+-      '@deepseek-ai/dsh-brand': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-invariants': ^0.1.5-rc.2
+-      '@deepseek-ai/dsh-session': ^0.1.5-rc.2
+-      '@deepseek-ai/schemastery': ^3.18.2
+-
+-  '@deepseek-ai/dsh-timeout@0.1.5-rc.2':
+-    resolution: {integrity: sha512-FgfaAw8Zt5X4Y6Ljh833B8Hy7h96FeR+yjNKI3iSyZSqREqOBgvDGXFfQlSu6V3Buvw/cbI/CJUQJvfRBKXOiA==}
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.1
++
++  '@deepseek-ai/dsh-session@0.2.0-rc.1':
++    resolution: {integrity: sha512-KUDCUk8kmiJCwvV3gDbkUSpkyoGHdg36nIhKsEh6iBoYDuIQCuvX2htiVRXCm099XZO6rCBVInmm1193UoPYcA==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.1
+ 
+-  '@deepseek-ai/dsh-typert-protocol@0.1.5-rc.2':
+-    resolution: {integrity: sha512-zP8J20rBXa1AFjKL2i83JBeQcePZx8yal3pNojj4t7CCokMcoFMUbr50woa6fY1tRJ7qHxgypO3rH8Q6YWgmiA==}
++  '@deepseek-ai/dsh-settings@0.2.0-rc.1':
++    resolution: {integrity: sha512-kC7Cq6Ls6of8J9qY0/8oehLbf9AV62QVA9dL0YPOnvdvgaNJaRbLtXxwr+I36rjDVmOfUkqvW4nxBIjJmPSY/g==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.1
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.1
++      '@deepseek-ai/dsh-session': 0.2.0-rc.1
++      '@deepseek-ai/schemastery': ~3.18.4
++
++  '@deepseek-ai/dsh-system-prompt@0.2.0-rc.1':
++    resolution: {integrity: sha512-AZC0HBWaiopkVcJXh/WEzyyF19+/yBPnbuLrZoD7h+UJYF8iG8tlDabauWfMw+dvgoYe9hIiTV2EcFRv4AgJhw==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.1
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.1
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.1
+ 
+-  '@deepseek-ai/dsh-util-crypto@0.1.5-rc.2':
+-    resolution: {integrity: sha512-JR0aJEUL35RE8FVT89wMZMbPwMrbkjNcy+gE9pq70d/m2Zxw3a0iNer+BAxPAKYPbmy0xDDXReTwXiecKVy4sQ==}
++  '@deepseek-ai/dsh-timeout@0.2.0-rc.1':
++    resolution: {integrity: sha512-SQpvDLIPU0EJP1lbphfuEkLrvnX+CE9u9ym1+L5z/8dYe9BCPbhgjQoRvDnyzKZqFyoXVvZFdqdAADlc6DX7Ig==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+-  '@deepseek-ai/dsh-util-values@0.1.5-rc.2':
+-    resolution: {integrity: sha512-Cr0TkM6dFAD+Iy4sNXH/afJVMHwJXoOztivj+RflkYoACsOq+Ix0vdHn36hwW7mayU8OK3ZKIZUQ6BPo1fHvUg==}
++  '@deepseek-ai/dsh-typert-protocol@0.2.0-rc.1':
++    resolution: {integrity: sha512-MhpeimGP6E3MqSESLm32OmPgx5aNUG7yCJCgcIFw7XBWhQmKB9fU3CWuUxxbWZeC7eWkdJ93AG2ww/Qu6QWW9A==}
+     peerDependencies:
+-      '@deepseek-ai/cordis': ^4.0.2
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-util-crypto@0.2.0-rc.1':
++    resolution: {integrity: sha512-BLBQVRGBlzhNprSpREiMDi1JwX0X8jKdEPWiVRKBnttlG9d33j1pLsaiH9HHLY/D10lXX/NagGia/Zz9mW4FBA==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
++
++  '@deepseek-ai/dsh-util-values@0.2.0-rc.1':
++    resolution: {integrity: sha512-Eh1HH0LFvztBwU2xotdfW5oCwLlWGjK2ygCC5+PnC3tkSDh9gvVQpEf0ezK+Kk6vpLz117V7VPehhR1+gs90+Q==}
++    peerDependencies:
++      '@deepseek-ai/cordis': ~4.0.4
+ 
+   '@deepseek-ai/schemastery@3.18.4':
+     resolution: {integrity: sha512-SSXO6tYuyrIqKVbmOnIq0s+riUywYzouFMcnBluHF9n4KMo2G8HvEzhCYj6pj2617/glOjbJuVInJ9hfONsjkg==}
+ 
++  '@eslint-community/regexpp@4.12.2':
++    resolution: {integrity: sha512-EriSTlt5OC9/7SXkRSCAhfSxxoSUgBm33OH+IkwbdpgoqsSsUg7y3uh+IICI/Qg4BBWr3U2i39RpmycbxMq4ew==}
++    engines: {node: ^12.0.0 || ^14.0.0 || >=16.0.0}
++
+   '@oxc-project/types@0.150.0':
+     resolution: {integrity: sha512-rDS5/31E9HfPl/CIzGrn0DOlvBbXFseQ5URJ9sYMfstbKLD/c6Gm9vmRzRGDdAXyOIL4zmO37lc9RIwYqVruZw==}
+ 
+@@ -531,6 +602,12 @@ packages:
+   '@yuku-toolchain/types@0.10.2':
+     resolution: {integrity: sha512-sSeo4SSSToiS+sSD+bwn/s94EEcaLJ7tG5LCp8gFYC1G5VzxzX7fqB6m9RU1yMD8KTpu6zdU/I1NlQf8hVBJ9Q==}
+ 
++  ajv@8.20.0:
++    resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
++
++  argparse@2.0.1:
++    resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
++
+   cac@7.0.0:
+     resolution: {integrity: sha512-tixWYgm5ZoOD+3g6UTea91eow5z6AAHaho3g0V9CNSNb45gM8SmflpAc+GRd1InC4AqN/07Unrgp56Y94N9hJQ==}
+     engines: {node: '>=20.19.0'}
+@@ -573,6 +650,12 @@ packages:
+     resolution: {integrity: sha512-AnfC1ATldl49/cvZdLPDjBfrRNwbDO05aibiOtzQu3qtlbJtomNLhF30HEtn/7iBz50dlMECqATo3fG0LrdEgw==}
+     engines: {node: '>=14'}
+ 
++  fast-deep-equal@3.1.3:
++    resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
++
++  fast-uri@3.1.8:
++    resolution: {integrity: sha512-GZMtZUTNRpOVIECoXwLNZS5xUGE+mVNbTB8h/7Rwh2TFWcBQiPzTgyZi05BF9UMZKkLJv8XBRJTlU7zg8+ZfMg==}
++
+   fdir@6.5.0:
+     resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
+     engines: {node: '>=12.0.0'}
+@@ -598,6 +681,13 @@ packages:
+     resolution: {integrity: sha512-vXoV9PjKHEednCUu01e98TkImxy67e3BJXbTIOmIq4Hyzw3IAwYRcuPkfeTzJzwyyts4kjuA73x+pWJLc4f86A==}
+     engines: {node: ^22.18.0 || >=24.0.0}
+ 
++  js-yaml@4.3.2:
++    resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
++    hasBin: true
++
++  json-schema-traverse@1.0.0:
++    resolution: {integrity: sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==}
++
+   lightningcss-android-arm64@1.33.0:
+     resolution: {integrity: sha512-gEpRTalKdosp4Bb8qWtc2iOgE5SeIHlpS1up9bFq2wAyYhl1UdTObYiHe98zEM9SQvSoqQZ1IQD0JNpg3Ml5pg==}
+     engines: {node: '>= 12.0.0'}
+@@ -677,6 +767,58 @@ packages:
+     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
+     hasBin: true
+ 
++  node-addon-native-custom-loader@0.1.6:
++    resolution: {integrity: sha512-QaW7d8lTcGCXrpNVyFDtID3vrpa7vFdpcY9pql2/9FGFSe7tcSnhQOKZX+1aOWq+pB1d2ZwNnKAdQI5nD9wAXA==}
++    engines: {node: '>=20'}
++
++  node-addon-require-builtin-darwin-arm64@0.1.6:
++    resolution: {integrity: sha512-KpaAh0mDcIScoJs7gD/mjXREcENJ023/DgWW3GrlLXFVzCE6bK6wFrTFpNfnkxZZP8yWsEWOg1o5T+uQ7olgTQ==}
++    engines: {node: '>=20'}
++    cpu: [arm64]
++    os: [darwin]
++
++  node-addon-require-builtin-darwin-x64@0.1.6:
++    resolution: {integrity: sha512-lh9o5rCvmkH8MZgBBmhyKzJRc1M1hJzgXLTFzB6iomRXNH9P1DKjN2nAJLmvGrdTij47Wcch1JVnlV5AG0cRCQ==}
++    engines: {node: '>=20'}
++    cpu: [x64]
++    os: [darwin]
++
++  node-addon-require-builtin-linux-arm64-gnu@0.1.6:
++    resolution: {integrity: sha512-DrQA3aS1LBn4NgrewbZkzSAWdSSRPD/fYO5AkQfvriQ/TQD3E2adB012sZ5eac6p9TAcTjUIYhk395AYVxo4Zw==}
++    engines: {node: '>=20'}
++    cpu: [arm64]
++    os: [linux]
++    libc: [glibc]
++
++  node-addon-require-builtin-linux-x64-gnu@0.1.6:
++    resolution: {integrity: sha512-8wCxrFlB2Ld5DhxIm2P+nNFnQ0wjzDE5sXF68EUhLH0X+z313B07TUQFMBKCOkyhZIIBh590dBmhHCuA43No2A==}
++    engines: {node: '>=20'}
++    cpu: [x64]
++    os: [linux]
++    libc: [glibc]
++
++  node-addon-require-builtin-win32-arm64-msvc@0.1.6:
++    resolution: {integrity: sha512-NET6DiLnKrK2DHuO4NNN+zJz0CFas+RwpJlGY0d3A3A3tc5dJQqZXgw8DzLOn4cSTAQCaDq6+LbPyYX7jE2F3Q==}
++    engines: {node: '>=20'}
++    cpu: [arm64]
++    os: [win32]
++
++  node-addon-require-builtin-win32-ia32-msvc@0.1.6:
++    resolution: {integrity: sha512-oj4G51r81kJ3E2t5KknKhBNb8TmTWzc/t9x7jkBF9JeRd+1a0kr99mVJVYwJNxq9d3jpt7dgBdI8mxaomuXOEQ==}
++    engines: {node: '>=20 <23'}
++    cpu: [ia32]
++    os: [win32]
++
++  node-addon-require-builtin-win32-x64-msvc@0.1.6:
++    resolution: {integrity: sha512-ZQ+6thVzQBOFamW7s3t2YqHsw99EEPBNH1uAjvCx4QfnjFJTsu6I/H3prpN8i6cSt6gjnQtArfWc2LXN2ufcJQ==}
++    engines: {node: '>=20'}
++    cpu: [x64]
++    os: [win32]
++
++  node-addon-require-builtin@0.1.6:
++    resolution: {integrity: sha512-P9ZGMDkloktirLJSggfpxsJ9jog5FItE1Omxpj50UBn3LhD6TS6/yx0jEBXsCGK3P9EtW1EpQVA1QL5gb11GaQ==}
++    engines: {node: '>=20'}
++
+   obug@2.2.1:
+     resolution: {integrity: sha512-XrsrhT5sybtKI6wakr2SPOlGZWWYbUXZ7a0jT8/QOeAPau+1X/bSegNe5YR75oJmEZQbKningirmGOEJCIk61Q==}
+     engines: {node: '>=12.20.0'}
+@@ -708,9 +850,17 @@ packages:
+     resolution: {integrity: sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==}
+     engines: {node: '>=0.10.0'}
+ 
++  require-from-string@2.0.2:
++    resolution: {integrity: sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw==}
++    engines: {node: '>=0.10.0'}
++
+   resolve-pkg-maps@1.0.0:
+     resolution: {integrity: sha512-seS2Tj26TBVOC2NIc2rOe2y2ZO7efxITtLZcGSOnHHNOQ7CkiUBfw0Iw2ck6xkIhPwLhKNLS8BO+hEpngQlqzw==}
+ 
++  resolve.exports@2.0.3:
++    resolution: {integrity: sha512-OcXjMsGdhL4XnbShKpAcSqPMzQoYkYyhbEaeSko47MjRP9NfEQMhZkXL1DoFlt9LWQn4YttrdnV6X2OiyzBi+A==}
++    engines: {node: '>=10'}
++
+   rolldown-plugin-dts@0.28.6:
+     resolution: {integrity: sha512-qKrFtBfRfR2hP233m7Ic9zf3wv6MSYdZghWKMdEO6dRYZGlNfINJAa1P5ZVvyHh3mrcd7IJQvIY8L9vnm+v5rQ==}
+     engines: {node: ^22.18.0 || ^24.11.0 || >=26.0.0}
+@@ -741,6 +891,11 @@ packages:
+   scheduler@0.28.0:
+     resolution: {integrity: sha512-juorfCmIkIw8tT+p5BXSm6PJjQF/ycEYmKyzURCIt/RaZIhL+PulbQ9Yu2z1HdOJDdqDTlxA1+xKBmHXJsczAw==}
+ 
++  semver@7.8.5:
++    resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
++    engines: {node: '>=10'}
++    hasBin: true
++
+   source-map-js@1.2.1:
+     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
+     engines: {node: '>=0.10.0'}
+@@ -854,6 +1009,11 @@ packages:
+       yaml:
+         optional: true
+ 
++  yaml@2.9.1:
++    resolution: {integrity: sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==}
++    engines: {node: '>= 14.6'}
++    hasBin: true
++
+   yuku-ast@0.10.2:
+     resolution: {integrity: sha512-UnG9mA6giglCvSErft2/40TVFX750Sj1xgwddPLpG7J7rlr/P1wPADg9G2RK+d/1tNLtRVoLdMMOMVBB9561TQ==}
+ 
+@@ -868,100 +1028,178 @@ packages:
+ 
+ snapshots:
+ 
+-  '@deepseek-ai/cordis@4.0.2':
++  '@deepseek-ai/cordis-plugin-group@1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.6)
++
++  '@deepseek-ai/cordis-plugin-include@1.0.9(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.6)
++      '@deepseek-ai/cosmokit': 1.8.5
++      js-yaml: 4.3.2
++    optional: true
++
++  '@deepseek-ai/cordis-plugin-loader@1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.6)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/cosmokit': 1.8.5
++      '@deepseek-ai/schemastery': 3.18.4
++    optionalDependencies:
++      node-addon-require-builtin: 0.1.6
++    optional: true
++
++  '@deepseek-ai/cordis@4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)':
+     dependencies:
+       '@deepseek-ai/cosmokit': 1.8.5
+       '@standard-schema/spec': 1.1.0
++    optionalDependencies:
++      '@deepseek-ai/cordis-plugin-include': 1.0.9(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.6)
+ 
+   '@deepseek-ai/cosmokit@1.8.5': {}
+ 
+-  '@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-app-boot@0.2.0-rc.1(@deepseek-ai/cordis-plugin-group@1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-home-paths@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-launch-environment@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-system-prompt@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/cordis-plugin-group': 1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/cordis-plugin-include': 1.0.9(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.6)
++      '@deepseek-ai/dsh-atomic-write': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-home-paths': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-launch-environment': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-package-manifest': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)))
++      '@eslint-community/regexpp': 4.12.2
++      ajv: 8.20.0
++      js-yaml: 4.3.2
++      node-addon-require-builtin: 0.1.6
++      resolve.exports: 2.0.3
++      semver: 7.8.5
++
++  '@deepseek-ai/dsh-atomic-write@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++
++  '@deepseek-ai/dsh-brand@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+ 
+-  '@deepseek-ai/dsh-client-locale@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-client-locale@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+       '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/dsh-client-ui-primitives@0.1.5-rc.3(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-client-ui-primitives@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+ 
+-  '@deepseek-ai/dsh-client-ui-slots@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-client-ui-slots@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+ 
+-  '@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-config-editor@0.2.0-rc.1(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-app-boot@0.2.0-rc.1(@deepseek-ai/cordis-plugin-group@1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-home-paths@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-launch-environment@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-system-prompt@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)))))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/schemastery': 3.18.4
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/cordis-plugin-include': 1.0.9(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.6)
++      '@deepseek-ai/dsh-app-boot': 0.2.0-rc.1(@deepseek-ai/cordis-plugin-group@1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-home-paths@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-launch-environment@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-system-prompt@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))))
++      '@deepseek-ai/dsh-atomic-write': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++      js-yaml: 4.3.2
++      yaml: 2.9.1
++
++  '@deepseek-ai/dsh-home-paths@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+ 
+-  '@deepseek-ai/dsh-llm@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-timeout': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-typert-protocol': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-crypto': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+       '@deepseek-ai/schemastery': 3.18.4
+-      zod: 4.6.5
+ 
+-  '@deepseek-ai/dsh-llm@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-launch-environment@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++
++  '@deepseek-ai/dsh-llm@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-timeout': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-typert-protocol': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-crypto': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-timeout': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-typert-protocol': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-util-crypto': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
+       '@deepseek-ai/schemastery': 3.18.4
+       zod: 4.6.5
+ 
+-  '@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))':
++  '@deepseek-ai/dsh-package-manifest@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+ 
+-  '@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))':
++  '@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-llm': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-scope': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/dsh-settings@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-session@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/schemastery@3.18.4)':
++  '@deepseek-ai/dsh-session@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
+-      '@deepseek-ai/dsh-brand': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-invariants': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+-      '@deepseek-ai/dsh-session': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)))
+-      '@deepseek-ai/dsh-util-values': 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++
++  '@deepseek-ai/dsh-settings@0.2.0-rc.1(456d43703961be9dc43c6eb97f678f5f)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/cordis-plugin-loader': 1.0.5(@deepseek-ai/cordis@4.0.4)(node-addon-require-builtin@0.1.6)
++      '@deepseek-ai/cosmokit': 1.8.5
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-config-editor': 0.2.0-rc.1(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-app-boot@0.2.0-rc.1(@deepseek-ai/cordis-plugin-group@1.0.4(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-home-paths@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-launch-environment@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-system-prompt@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)))))
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-session': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)))
++      '@deepseek-ai/dsh-util-values': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
+       '@deepseek-ai/schemastery': 3.18.4
++      yaml: 2.9.1
++    transitivePeerDependencies:
++      - '@deepseek-ai/cordis-plugin-include'
++      - '@deepseek-ai/dsh-app-boot'
++      - '@deepseek-ai/dsh-hmr'
++      - node-addon-require-builtin
+ 
+-  '@deepseek-ai/dsh-timeout@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-system-prompt@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-scope@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)))':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-invariants': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-llm': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
++      '@deepseek-ai/dsh-scope': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4))
++      '@deepseek-ai/schemastery': 3.18.4
+ 
+-  '@deepseek-ai/dsh-typert-protocol@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-timeout@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+ 
+-  '@deepseek-ai/dsh-util-crypto@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-typert-protocol@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++      '@deepseek-ai/dsh-brand': 0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)
+ 
+-  '@deepseek-ai/dsh-util-values@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)':
++  '@deepseek-ai/dsh-util-crypto@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)':
+     dependencies:
+-      '@deepseek-ai/cordis': 4.0.2
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
++
++  '@deepseek-ai/dsh-util-values@0.2.0-rc.1(@deepseek-ai/cordis@4.0.4)':
++    dependencies:
++      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+ 
+   '@deepseek-ai/schemastery@3.18.4':
+     dependencies:
+       '@deepseek-ai/cosmokit': 1.8.5
+       '@standard-schema/spec': 1.1.0
+ 
++  '@eslint-community/regexpp@4.12.2': {}
++
+   '@oxc-project/types@0.150.0': {}
+ 
+   '@quansync/fs@1.1.0':
+@@ -1163,6 +1401,16 @@ snapshots:
+ 
+   '@yuku-toolchain/types@0.10.2': {}
+ 
++  ajv@8.20.0:
++    dependencies:
++      fast-deep-equal: 3.1.3
++      fast-uri: 3.1.8
++      json-schema-traverse: 1.0.0
++      require-from-string: 2.0.2
++
++  argparse@2.0.1:
++    optional: true
++
+   cac@7.0.0: {}
+ 
+   cordis@4.0.0-rc.10:
+@@ -1182,6 +1430,10 @@ snapshots:
+ 
+   empathic@2.1.0: {}
+ 
++  fast-deep-equal@3.1.3: {}
++
++  fast-uri@3.1.8: {}
++
+   fdir@6.5.0(picomatch@4.0.7):
+     optionalDependencies:
+       picomatch: 4.0.7
+@@ -1197,6 +1449,13 @@ snapshots:
+ 
+   import-without-cache@0.4.1: {}
+ 
++  js-yaml@4.3.2:
++    dependencies:
++      argparse: 2.0.1
++    optional: true
++
++  json-schema-traverse@1.0.0: {}
++
+   lightningcss-android-arm64@1.33.0:
+     optional: true
+ 
+@@ -1248,6 +1507,57 @@ snapshots:
+ 
+   nanoid@3.3.19: {}
+ 
++  node-addon-native-custom-loader@0.1.6:
++    optional: true
++
++  node-addon-require-builtin-darwin-arm64@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optional: true
++
++  node-addon-require-builtin-darwin-x64@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optional: true
++
++  node-addon-require-builtin-linux-arm64-gnu@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optional: true
++
++  node-addon-require-builtin-linux-x64-gnu@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optional: true
++
++  node-addon-require-builtin-win32-arm64-msvc@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optional: true
++
++  node-addon-require-builtin-win32-ia32-msvc@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optional: true
++
++  node-addon-require-builtin-win32-x64-msvc@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optional: true
++
++  node-addon-require-builtin@0.1.6:
++    dependencies:
++      node-addon-native-custom-loader: 0.1.6
++    optionalDependencies:
++      node-addon-require-builtin-darwin-arm64: 0.1.6
++      node-addon-require-builtin-darwin-x64: 0.1.6
++      node-addon-require-builtin-linux-arm64-gnu: 0.1.6
++      node-addon-require-builtin-linux-x64-gnu: 0.1.6
++      node-addon-require-builtin-win32-arm64-msvc: 0.1.6
++      node-addon-require-builtin-win32-ia32-msvc: 0.1.6
++      node-addon-require-builtin-win32-x64-msvc: 0.1.6
++    optional: true
++
+   obug@2.2.1: {}
+ 
+   obug@3.0.0: {}
+@@ -1271,8 +1581,12 @@ snapshots:
+ 
+   react@19.3.0: {}
+ 
++  require-from-string@2.0.2: {}
++
+   resolve-pkg-maps@1.0.0: {}
+ 
++  resolve.exports@2.0.3: {}
++
+   rolldown-plugin-dts@0.28.6(rolldown@1.2.9)(typescript@7.0.2):
+     dependencies:
+       dts-resolver: 3.0.0
+@@ -1310,6 +1624,8 @@ snapshots:
+ 
+   scheduler@0.28.0: {}
+ 
++  semver@7.8.5: {}
++
+   source-map-js@1.2.1: {}
+ 
+   tinyexec@1.3.1: {}
+@@ -1378,11 +1694,11 @@ snapshots:
+ 
+   verkit@0.4.1: {}
+ 
+-  vite-plugin-css-injected-by-js@5.0.2(vite@8.3.0(@types/node@26.6.2)):
++  vite-plugin-css-injected-by-js@5.0.2(vite@8.3.0(@types/node@26.6.2)(yaml@2.9.1)):
+     dependencies:
+-      vite: 8.3.0(@types/node@26.6.2)
++      vite: 8.3.0(@types/node@26.6.2)(yaml@2.9.1)
+ 
+-  vite@8.3.0(@types/node@26.6.2):
++  vite@8.3.0(@types/node@26.6.2)(yaml@2.9.1):
+     dependencies:
+       lightningcss: 1.33.0
+       picomatch: 4.0.7
+@@ -1392,6 +1708,10 @@ snapshots:
+     optionalDependencies:
+       '@types/node': 26.6.2
+       fsevents: 2.3.3
++      yaml: 2.9.1
++
++  yaml@2.9.1:
++    optional: true
+ 
+   yuku-ast@0.10.2:
+     dependencies:
+diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
+index ad047d9..5989bdb 100644
+--- a/pnpm-workspace.yaml
++++ b/pnpm-workspace.yaml
+@@ -3,13 +3,25 @@ minimumReleaseAgeExclude:
+   - rolldown-plugin-dts@0.28.5
+   - tinyexec@1.3.1
+   - tsdown@0.23.0
+-  - '@deepseek-ai/dsh-brand@0.1.5-rc.1'
+-  - '@deepseek-ai/dsh-client-locale@0.1.5-rc.1 || 0.1.7-alpha.2'
+-  - '@deepseek-ai/dsh-client-ui-slots@0.1.5-rc.1 || 0.1.7-alpha.2'
+-  - '@deepseek-ai/dsh-llm@0.1.5-rc.1'
+-  - '@deepseek-ai/dsh-timeout@0.1.5-rc.1'
+-  - '@deepseek-ai/dsh-typert-protocol@0.1.5-rc.1'
+-  - '@deepseek-ai/dsh-util-crypto@0.1.5-rc.1'
+-  - '@deepseek-ai/dsh-util-values@0.1.5-rc.1'
++  - '@deepseek-ai/dsh-brand@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-client-locale@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-client-ui-slots@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-llm@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-timeout@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-typert-protocol@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-util-crypto@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-util-values@0.2.0-rc.1'
+   - '@deepseek-ai/cosmokit@1.8.5'
+   - '@deepseek-ai/schemastery@3.18.4'
++  - '@deepseek-ai/dsh-app-boot@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-atomic-write@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-client-ui-primitives@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-config-editor@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-home-paths@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-invariants@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-launch-environment@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-package-manifest@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-scope@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-session@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-settings@0.2.0-rc.1'
++  - '@deepseek-ai/dsh-system-prompt@0.2.0-rc.1'
+diff --git a/src/client/index.tsx b/src/client/index.tsx
+index 4c9aebb..281dee3 100644
+--- a/src/client/index.tsx
++++ b/src/client/index.tsx
+@@ -48,15 +48,11 @@ interface Ctx {
+  * （kind: list, scope: session —— 即宿主 composer 卡片底部操作行
+  * `.uV2eYG_dock` 里、原生上下文环旁边的位置）。
+  * scope 为 session 时宿主给组件注入 `sessionId`，据此按**当前会话**取命中。
+- *
+- * **仅宿主 >= 0.1.7 才挂**：composer.dock 这个座位在 0.1.5 也在，但渲染在
+- * InputBar 之后的独立块（位置不对），只有 0.1.7 才放进底部操作行。座位名相同
+- * 没法靠契约区分，故先问核心 `/router/api/health` 的 `lastHitDock` 支持位。
+- * @returns 清理函数；不支持或宿主无 slots 时为空操作
++ * @returns 清理函数；宿主没给 slots 时为空操作
+  */
+-function mountLastHitDock(ctx: Ctx, supported: boolean): () => void {
++function mountLastHitDock(ctx: Ctx): () => void {
+   const slots = ctx.slots
+-  if (slots === undefined || !supported) return () => {}
++  if (slots === undefined) return () => {}
+   return slots.inject('conversation.composer.dock', () => slots.register({
+     name: 'conversation.composer.dock',
+     id: 'dsh-router-last-hit',
+@@ -64,21 +60,6 @@ function mountLastHitDock(ctx: Ctx, supported: boolean): () => void {
+   }, LastHitDock))
+ }
+ 
+-/**
+- * 问核心是否支持「最近命中」徽章（宿主 >= 0.1.7）。
+- * 网络/解析失败一律当**不支持**——宁可不显示，也不在 0.1.5 上摆错位置。
+- */
+-async function fetchLastHitDockSupport(): Promise<boolean> {
+-  try {
+-    const res = await fetch(`${ROUTER_API_BASE}/health`)
+-    if (!res.ok) return false
+-    const body = (await res.json()) as { lastHitDock?: unknown }
+-    return body.lastHitDock === true
+-  } catch {
+-    return false
+-  }
+-}
+-
+ /** 挂载「设置 → 路由」页；拿不到 slots 时返回 undefined 表示跳过。 */
+ function mountSettingsSection(ctx: Ctx): (() => void) | undefined {
+   const slots = ctx.slots
+@@ -131,12 +112,10 @@ function registerExtTestPanel(ctx: Ctx): void {
+ 
+ export function apply(ctx: Ctx): void {
+   // 「最近命中」徽章：走官方 conversation.composer.dock（scope: session → 组件
+-  // props 注入 sessionId，按当前会话取命中）。**仅宿主 >= 0.1.7 才挂**——
+-  // composer.dock 在 0.1.5 渲染位置不对，先问核心拿支持位，避免摆错位置。
+-  // 查询是异步的，拿到结果（无论成败）再决定注册与否。
+-  void fetchLastHitDockSupport().then((supported) => {
+-    ctx.effect(() => mountLastHitDock(ctx, supported), 'dsh-router: last-hit dock')
+-  })
++  // props 注入 sessionId，按当前会话取命中）。0.2.0 起这个座位无条件可用 ——
++  // 0.1.5 那个「渲染位置不对」的老宿主已不支持，所以不再问核心拿支持位，
++  // 启动期也就不用多一次 /health 往返。
++  ctx.effect(() => mountLastHitDock(ctx), 'dsh-router: last-hit dock')
+   const disposeSettings = mountSettingsSection(ctx)
+   if (disposeSettings === undefined) {
+     // 老宿主（无 slots）：回退到侧边栏入口 + 中心栏面板
+diff --git a/src/host-version.test.ts b/src/host-version.test.ts
+index 5b81302..085ec33 100644
+--- a/src/host-version.test.ts
++++ b/src/host-version.test.ts
+@@ -1,9 +1,12 @@
+ /**
+- * 宿主版本探测测试 —— 锁死「最近命中徽章仅在 >= 0.1.7 出现」这条判定。
++ * 宿主版本探测测试 —— 锁死那条**版本地板**（>= 0.2.0）。
+  *
+- * 起因：`conversation.composer.dock` 座位在 0.1.5 也在，但渲染在 InputBar 之后
+- * 的独立块（位置不对）；只有 0.1.7 才放进底部操作行。座位名相同没法靠契约区分，
+- * 只能按宿主版本号判定——本测试就是这条判据的唯一守卫。
++ * 这条判据现在只有一个用途：**在老宿主上出声**。兼容分叉（三处 `>= 0.1.7`）随
++ * 0.2.0 单面编写一起删掉了，所以本测试守的是「低于地板会被判为不支持 → apply 时
++ * 打警告」这条报警链，而不是某个功能开关。
++ *
++ * 地板抬到 0.2.0 的那一刻，0.1.7 从「支持」翻成「不支持」——这条断言就是那次
++ * 翻面的记录：谁想再加回 0.1.x 兼容，本测试会先红。
+  */
+ import test from 'node:test'
+ import assert from 'node:assert/strict'
+@@ -11,7 +14,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+ import { tmpdir } from 'node:os'
+ import { join } from 'node:path'
+ import { pathToFileURL } from 'node:url'
+-import { detectHostVersion, isHost017Plus, supportsLastHitDock } from './host-version.ts'
++import { detectHostVersion, isHostSupported } from './host-version.ts'
+ 
+ /** 造一个「装了指定版本 dsh」的临时 profile，返回它的 file: URL。 */
+ function profileWithDsh(version: string | null): string {
+@@ -25,37 +28,27 @@ function profileWithDsh(version: string | null): string {
+ }
+ 
+ test('读得到版本：detectHostVersion 返回 profile 里装的 dsh 版本', () => {
+-  assert.equal(detectHostVersion(profileWithDsh('0.1.5-rc.3')), '0.1.5-rc.3')
+-  assert.equal(detectHostVersion(profileWithDsh('0.1.7-alpha.2')), '0.1.7-alpha.2')
++  assert.equal(detectHostVersion(profileWithDsh('0.1.7-rc.2')), '0.1.7-rc.2')
++  assert.equal(detectHostVersion(profileWithDsh('0.2.0-rc.1')), '0.2.0-rc.1')
+ })
+ 
+-test('支持位：>= 0.1.7 才为真（预发布标识忽略，按前导数字比）', () => {
+-  assert.equal(supportsLastHitDock(profileWithDsh('0.1.7-alpha.2')), true)
+-  assert.equal(supportsLastHitDock(profileWithDsh('0.1.7')), true)
+-  assert.equal(supportsLastHitDock(profileWithDsh('0.2.0')), true)
+-  assert.equal(supportsLastHitDock(profileWithDsh('1.0.0')), true)
+-  // 低于 0.1.7 → 不挂（0.1.5 位置不对，宁可不显示）
+-  assert.equal(supportsLastHitDock(profileWithDsh('0.1.5-rc.3')), false)
+-  assert.equal(supportsLastHitDock(profileWithDsh('0.1.6-alpha.2')), false)
+-  assert.equal(supportsLastHitDock(profileWithDsh('0.1.4')), false)
++test('地板：>= 0.2.0 才算支持（预发布标识忽略，按前导数字比）', () => {
++  for (const v of ['0.2.0-rc.1', '0.2.0', '0.2.1', '1.0.0']) {
++    assert.equal(isHostSupported(profileWithDsh(v)), true, v)
++  }
+ })
+ 
+-test('isHost017Plus 与徽章支持位同源（三处兼容分叉共用一个判据）', () => {
+-  for (const v of ['0.1.7-alpha.2', '0.1.7', '0.2.0', '1.0.0']) {
+-    assert.equal(isHost017Plus(profileWithDsh(v)), true, v)
+-    assert.equal(supportsLastHitDock(profileWithDsh(v)), true, v)
+-  }
+-  for (const v of ['0.1.5-rc.3', '0.1.6-alpha.2', '0.1.4']) {
+-    assert.equal(isHost017Plus(profileWithDsh(v)), false, v)
+-    assert.equal(supportsLastHitDock(profileWithDsh(v)), false, v)
++test('地板之下（0.1.5/0.1.6/0.1.7）判为不支持 —— 会打警告而不是静默走错路径', () => {
++  for (const v of ['0.1.5-rc.3', '0.1.6-alpha.2', '0.1.7-rc.2', '0.1.4']) {
++    assert.equal(isHostSupported(profileWithDsh(v)), false, v)
+   }
+ })
+ 
+-test('读不到版本 → 一律当不支持（不抛、宁可不显示）', () => {
++test('读不到版本 → 判为不支持（无法确认也值得说一声），且不抛', () => {
+   assert.equal(detectHostVersion(profileWithDsh(null)), undefined)
+-  assert.equal(supportsLastHitDock(profileWithDsh(null)), false)
++  assert.equal(isHostSupported(profileWithDsh(null)), false)
+   // 垃圾版本号
+-  assert.equal(supportsLastHitDock(profileWithDsh('not-a-version')), false)
++  assert.equal(isHostSupported(profileWithDsh('not-a-version')), false)
+   // baseUrl 缺失（冷启动/单测）→ 回落 ~/.dsh/profiles/web，不抛
+-  assert.doesNotThrow(() => supportsLastHitDock(undefined))
++  assert.doesNotThrow(() => isHostSupported(undefined))
+ })
+diff --git a/src/host-version.ts b/src/host-version.ts
+index bf9ec9c..92d3247 100644
+--- a/src/host-version.ts
++++ b/src/host-version.ts
+@@ -1,37 +1,46 @@
+ /**
+- * 宿主 DSH 版本探测 —— **0.1.5 / 0.1.7 兼容分叉的唯一判据来源**。
++ * 宿主 DSH 版本探测 —— 现在只剩两件事：**报版本**（日志 + `/router/api/health`）与
++ * **守版本地板**。
+  *
+- * 原先三处兼容都靠「能力检测」（看方法/属性在不在），语义上是同一个问题
+- * ——「这是 0.1.7 还是更老」——却各检各的、还容易误判（插件自己 node_modules
+- * 里的依赖版本与宿主实际加载的版本并不一致：实测插件解析到 schemastery 3.18.4，
+- * profile 里却是 3.18.3、全局是 3.18.2）。所以统一改成**读宿主版本号**判定：
++ * ## 为什么不再有兼容分叉
+  *
+- *   1. 「最近命中」徽章：composer.dock 在 0.1.5 渲染位置不对 → >= 0.1.7 才挂。
+- *   2. 设置命名空间：0.1.5 用 `settings.installSection` 注册；0.1.7 改由导出的
+- *      Config 驱动（无此方法）→ 按版本走对应注册路径。
+- *   3. adapter 的 tool-result 消息形态：0.1.5/0.1.6 = user 里的 'tool-result'
+- *      块；0.1.7+ = 独立 role:'tool' 消息。
++ * 原来这里有三处 `>= 0.1.7` 的分叉（设置卡片注册路径、「最近命中」徽章座位、adapter
++ * 的工具结果消息形态），彼此独立判断、还容易误判。本插件现已按 **0.2.0 单面**编写，
++ * 三处的旧分支全部删除：
++ *
++ *   1. 设置卡片：0.1.5 走 `settings.installSection`，0.1.7+ 走导出的 volatile Config。
++ *      0.2.0 只有后者 → installSection 分支删除。
++ *   2. 「最近命中」徽章：0.1.5 渲染在 InputBar 之后的独立块（位置不对），0.1.7+ 才在
++ *      composer 底部操作行。0.2.0 起无条件挂载，不再问支持位。
++ *   3. adapter 工具结果形态：旧的「user 内嵌 tool-result 块」0.1.7 起退役；0.2.0 的
++ *      v3→v4 会话迁移还主动拒绝该包装，所以它到不了 adapter → 分支删除。
++ *
++ * ## 为什么仍要读版本
++ *
++ * 因为**跑在老宿主上必须出声**。删掉分叉不等于「老宿主也能跑」：0.1.x 上本插件会
++ * 静默走错路径（卡片不出、徽章错位、工具结果丢失），而用户看到的现象与「插件坏了」
++ * 无法区分。所以这里只保留一个判据 `isHostSupported`（>= 0.2.0），仅用于 apply 时
++ * 打一条醒目的警告 —— 不是兼容，是可诊断。
+  *
+  * 读法：宿主把 profile 目录挂在 `ctx.baseUrl`（见 data-dir.ts）。本插件跑在宿主
+  * 进程内，`require.resolve('@deepseek-ai/dsh/package.json', { paths: [profile] })`
+- * 会沿 profile 的 node_modules 向上解析到全局安装根（实测命中 bun 全局目录）。
+- * 拿不到就回落直接拼路径，再不行就返回 undefined（按「不支持/老版本」处理，不抛）。
++ * 会沿 profile 的 node_modules 向上解析到全局安装根。拿不到就回落直接拼路径，再不行
++ * 返回 undefined（按「无法确认」处理，不抛）。
+  *
+- * 注意：**只能在 `apply(ctx)` 里用**（那时才有 baseUrl）。模块顶层（如 Config 导出）
+- * 解析到的是插件自己的依赖，不能代表宿主——那处保留能力检测，见 index.ts 注释。
++ * 注意：**只能在 `apply(ctx)` 里用**（那时才有 baseUrl）。模块顶层解析到的是插件自己
++ * 的依赖，不能代表宿主。
+  */
+ import { readFileSync } from 'node:fs'
+ import { createRequire } from 'node:module'
+ import { join } from 'node:path'
+ import { profileDirOf } from './data-dir.ts'
+ 
+-/** 各兼容分叉的版本门槛。 */
+-/** composer.dock 徽章 / 独立 role:'tool' 消息形态：0.1.7 起。 */
+-const V0_1_7: readonly number[] = [0, 1, 7]
++/** 版本地板：低于此版本的宿主本插件不再兼容（0.1.5/0.1.6/0.1.7 全部落此下）。 */
++const V0_2_0: readonly number[] = [0, 2, 0]
+ 
+ /**
+  * 解析并比较 semver（只取前导数字段，预发布标识忽略）。
+- * `0.1.7-alpha.2` → [0,1,7]，`0.1.5-rc.3` → [0,1,5]。
++ * `0.2.0-rc.1` → [0,2,0]，`0.1.7-alpha.2` → [0,1,7]。
+  * 返回负数/0/正数，语义同 `<`/`==`/`>`。
+  */
+ function compareVersion(a: readonly number[], b: readonly number[]): number {
+@@ -43,7 +52,7 @@ function compareVersion(a: readonly number[], b: readonly number[]): number {
+   return 0
+ }
+ 
+-/** `0.1.7-alpha.2` → [0,1,7]；解析失败返回 null。 */
++/** `0.2.0-rc.1` → [0,2,0]；解析失败返回 null。 */
+ function parseVersion(raw: string): number[] | null {
+   const m = /^(\d+)(?:\.(\d+))?(?:\.(\d+))?/.exec(raw.trim())
+   if (m === null) return null
+@@ -53,11 +62,11 @@ function parseVersion(raw: string): number[] | null {
+ /**
+  * 探测 profile 里安装的 DSH 宿主版本。
+  * @param baseUrl 宿主注入的 profile 锚点（`ctx.baseUrl`）
+- * @returns 形如 `0.1.7-alpha.2`；读不到返回 undefined（调用方按「不支持」处理）
++ * @returns 形如 `0.2.0-rc.1`；读不到返回 undefined
+  */
+ export function detectHostVersion(baseUrl?: string): string | undefined {
+   const profile = profileDirOf(baseUrl)
+-  // 先走模块解析（能沿 node_modules 向上找到全局安装根），再回落直接拼路径。
++  // 先走模块解析（能沿 node_modules 向上找到全局安装根），再回落直接路径。
+   const candidates: string[] = []
+   try {
+     candidates.push(createRequire(join(profile, 'noop.js')).resolve('@deepseek-ai/dsh/package.json'))
+@@ -76,26 +85,17 @@ export function detectHostVersion(baseUrl?: string): string | undefined {
+   return undefined
+ }
+ 
+-/** 宿主版本是否 >= 门槛。读不到版本 → false（按老版本处理）。 */
+-function atLeast(baseUrl: string | undefined, min: readonly number[]): boolean {
++/**
++ * 宿主是否在本插件支持的地板之上（>= 0.2.0）。
++ *
++ * **只用于报警，不用于分流** —— 低于地板时插件照常加载，但要在日志里说清「这台宿主
++ * 不再兼容、会出现什么症状」，把静默的错变成可查的错。读不到版本 → false（当作
++ * 「无法确认」，同样值得说一句）。
++ */
++export function isHostSupported(baseUrl?: string): boolean {
+   const v = detectHostVersion(baseUrl)
+   if (v === undefined) return false
+   const parsed = parseVersion(v)
+   if (parsed === null) return false
+-  return compareVersion(parsed, min) >= 0
+-}
+-
+-/**
+- * 宿主是否 >= 0.1.7。三处兼容分叉共用这一个判据：
+- *   - 「最近命中」徽章（composer.dock 位置正确）
+- *   - 设置命名空间（Config 驱动而非 installSection）
+- *   - adapter 的独立 role:'tool' 消息形态
+- */
+-export function isHost017Plus(baseUrl?: string): boolean {
+-  return atLeast(baseUrl, V0_1_7)
+-}
+-
+-/** 「最近命中」徽章是否可用（= 宿主 >= 0.1.7）。 */
+-export function supportsLastHitDock(baseUrl?: string): boolean {
+-  return isHost017Plus(baseUrl)
++  return compareVersion(parsed, V0_2_0) >= 0
+ }
+diff --git a/src/index.ts b/src/index.ts
+index f64ea84..7889baf 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -44,7 +44,7 @@ import { SupplierConfigStore } from './supplier-config.ts'
+ import { CredentialStore } from './credential-store.ts'
+ import { dataDirOf, profileDirOf } from './data-dir.ts'
+ import { loopbackBaseURL } from './host-base-url.ts'
+-import { detectHostVersion, isHost017Plus, supportsLastHitDock } from './host-version.ts'
++import { detectHostVersion, isHostSupported } from './host-version.ts'
+ import { ExtStore } from './ext/store.ts'
+ import type { ExtInfo, ExtStoreService, RouterExt, RouterExtService } from './ext/contract.ts'
+ 
+@@ -58,28 +58,25 @@ export const name = 'dsh-router-core'
+ export const inject = ['webServer', 'llm']
+ 
+ /**
+- * `Config` 导出：让 Router 卡片进 0.1.7 的设置镜像。
++ * `Config` 导出：让 Router 卡片进设置-模型的镜像（0.2.0 的收录链是「插件导出的
++ * Config + 配置树行 id」）。
+  *
+- * **这处刻意保留能力检测，不用宿主版本号** —— 与另两处兼容点（installSection /
+- * adapter 消息形态）不同。原因（已实测）：这是**模块顶层导出**，loader 一 import
+- * 就求值；而 schemastery 是本插件的**普通依赖**（`^3.18.4`，见 package.json），
+- * 解析到的是**插件自己 node_modules 里那一份**，跟宿主实际加载的版本无关
+- * （实测：插件解析到 3.18.4，而 profile 里是 3.18.3、全局是 3.18.2）。既然这里
+- * 拿不到宿主版本，就只剩「这份 Schema 实例到底有没有 `.volatile`」这个真问题 ——
+- * 能力检测恰好就是**对**的判据。
++ * **这处保留能力检测，不看宿主版本号** —— 因为它是**模块顶层导出**，loader 一 import
++ * 就求值，那时还没有 `ctx.baseUrl`；而 schemastery 是本插件的**普通依赖**，解析到的
++ * 是插件自己 node_modules 里那一份，跟宿主实际加载的版本无关。既然这里拿不到宿主
++ * 版本，就只剩「这份 Schema 实例到底有没有 `.volatile`」这个真问题 —— 能力检测
++ * 恰好就是**对**的判据。
+  *
+- * 定位说明（非兼容分叉）：`.volatile()` 是 schemastery 3.18.4 才有的原型方法；
+- * 老版本上直写 `Schema.object({}).volatile()` 会 `.volatile` 为 undefined →
+- * 抛 TypeError → **整个插件加载失败**（不只是卡片，是 dsh-router 完全挂掉）。
+- *   - 有 volatile：走 volatile，空 object 不被 volatileForm 过滤 → 卡片进镜像；
+- *   - 无 volatile：回落普通空 schema，不抛；此时宿主必是 0.1.5，本就靠
+- *     installSection 出卡片（见下方按版本分流的注册），这个 Config 无副作用。
++ * 为什么要 `.volatile()`：空 object 会被 volatileForm 过滤掉，顶层标 volatile 才能让
++ * 卡片进镜像。`.volatile()` 是 schemastery 3.18.4 才有的原型方法，直写
++ * `Schema.object({}).volatile()` 在没有它的版本上会抛 TypeError → **整个插件加载
++ * 失败**。所以：无 volatile 就回落普通空 schema（不抛，代价是卡片不出现，并有日志）。
+  */
+ const emptySchema = Schema.object({})
+ const hasVolatile = typeof (emptySchema as { volatile?: unknown }).volatile === 'function'
+ 
+ /**
+- * 0.1.7 的设置镜像只认「插件导出的 Config + 配置树行 id」这条收录链，且空 object
++ * 设置镜像只认「插件导出的 Config + 配置树行 id」这条收录链，且空 object
+  * 会被 volatileForm 过滤掉 —— 顶层 `.volatile()` 才能让 Router 卡片出现在设置-模型。
+  * Router 的真配置在自己的 state.json（路由系统面板），这里故意不暴露任何字段。
+  */
+@@ -132,29 +129,6 @@ interface Llm {
+   registerAdapter: (providers: readonly string[], adapter: unknown) => () => void
+ }
+ 
+-/**
+- * 设置服务（`ctx.settings`，dsh-settings）的最小切面。0.1.5 用 `installSection`
+- * 注册命名空间；0.1.7 已移除该方法、改由插件导出的 Config 驱动 —— 故声明为可选，
+- * 调用处做能力检测（不是版本分支）。dsh-settings 是宿主注入的 peer service，不深绑类型。
+- */
+-interface SettingsServiceFace {
+-  installSection?: (
+-    owner: CordisContext,
+-    ns: string,
+-    schema: unknown,
+-    entry: unknown,
+-    hooks: { setSource: (current: () => unknown) => void; onChange: () => void },
+-  ) => void
+-}
+-
+-/**
+- * cordis Context 的最小切面。`installSection(owner)` 只会对 owner 调
+- * `ctx.effect(...)` 并在卸载时读 `fiber.state`，所以这里只声明 `effect`。
+- */
+-interface CordisContext {
+-  effect: (fn: () => () => void, label?: string) => unknown
+-}
+-
+ function writeJson(res: ServerResponse, status: number, body: unknown): void {
+   const payload = JSON.stringify(body)
+   res.writeHead(status, {
+@@ -205,12 +179,18 @@ export function apply(rawContext: unknown): void {
+   const dataDir = dataDirOf(ctx.baseUrl)
+   const stateFile = join(dataDir, 'state.json')
+   log(`data dir: ${dataDir}`)
+-  // 宿主版本探测：三处 0.1.5/0.1.7 兼容分叉共用这一个判据（徽章 / 设置命名空间 /
+-  // adapter 的 tool-result 消息形态）。探测失败按老版本处理，不影响其它功能。
++  // 宿主版本：只用于**报版本**与**守地板**（不再是兼容分叉的判据，见 host-version.ts）。
++  // 低于 0.2.0 的宿主上本插件会静默走错路径，所以这里必须出声，把「插件坏了」和
++  // 「宿主太老」区分开 —— 否则用户只能对着症状猜。
+   const hostVersion = detectHostVersion(ctx.baseUrl)
+-  const host017Plus = isHost017Plus(ctx.baseUrl)
+-  const lastHitDock = supportsLastHitDock(ctx.baseUrl)
+-  log(`host version: ${hostVersion ?? '未知'} (>=0.1.7: ${host017Plus ? 'yes' : 'no'}, last-hit dock: ${lastHitDock ? 'on' : 'off'})`)
++  const hostSupported = isHostSupported(ctx.baseUrl)
++  log(`host version: ${hostVersion ?? '未知'} (>=0.2.0: ${hostSupported ? 'yes' : 'no'})`)
++  if (!hostSupported) {
++    ctx.logger.warn(
++      `[dsh-router] 宿主版本 ${hostVersion ?? '未知'} 低于本插件支持的 0.2.0 —— 插件仍会加载，` +
++      '但设置卡片、「最近命中」徽章与工具结果转发会走错路径。请把宿主升到 0.2.0 及以上。',
++    )
++  }
+   const store = new SupplierConfigStore(stateFile)
+   const credentials = new CredentialStore(join(dataDir, 'auths'))
+   const router = new Router(stateFile, store, log)
+@@ -403,10 +383,11 @@ export function apply(rawContext: unknown): void {
+     const { suppliers } = router.status()
+     writeJson(res, 200, {
+       ok: true,
+-      // 宿主版本 + 徽章支持位：客户端据此决定是否挂「最近命中」控件
+-      // （composer.dock 在 0.1.5 渲染位置不对，只有 >= 0.1.7 才挂）。
++      // 宿主版本（客户端/排障用）。`lastHitDock` 是给 0.1.5→0.1.7 那个位置差异留的
++      // 能力位，0.2.0 起恒为 true —— 保留字段形状是为了不打断已有读取方，客户端
++      // 已不再依赖它做分支（见 client/index.tsx）。
+       hostVersion: hostVersion ?? '',
+-      lastHitDock: lastHitDock,
++      lastHitDock: true,
+       suppliers: suppliers.map((s) => {
+         const loaded = loadedSuppliers.find((l) => l.supplier.id === s.id)
+         return {
+@@ -720,32 +701,9 @@ export function apply(rawContext: unknown): void {
+       // Router 的配置（组合/密钥/签到）存在 core 自己的 state.json，走插件自己的
+       // 「路由系统」面板；设置-模型 这边必须让 settingsNs 在设置镜像里能解析出来
+       // （见 dsh-client-ui-settings-models 的 configurable 过滤），否则卡片不出现。
+-      // 按宿主版本分流（不再靠 installSection 能力检测）：
+-      //   0.1.7+：镜像行来自顶部导出的 volatile Config（ns = 行 id），无需注册；
+-      //   0.1.5 ：镜像行来自 settings.installSection。
+-      // 空 schema = 卡片是入口/占位（该布局下不可提交），真正的配置在路由系统面板。
+-      const routerSettingsSchema = Schema.object({})
+-      if (isHost017Plus(ctx.baseUrl)) {
+-        log(`settings section driven by exported Config (${settingsNs})`)
+-      } else {
+-        ctx.inject(['settings'], (sctx: unknown) => {
+-          const settings = (sctx as { settings?: SettingsServiceFace }).settings
+-          if (settings === undefined) {
+-            log('settings service absent — skip Router settings-section registration')
+-            return
+-          }
+-          if (settings.installSection === undefined) {
+-            // 版本说该走 installSection 但它不在（异常宿主）：只记日志，不抛。
+-            log(`settings.installSection absent despite 0.1.5 host (${settingsNs})`)
+-            return
+-          }
+-          settings.installSection(rawContext as CordisContext, settingsNs, routerSettingsSchema, {}, {
+-            setSource: () => {},
+-            onChange: () => {},
+-          })
+-          log(`Router settings section registered (${settingsNs})`)
+-        })
+-      }
++      // 0.2.0 的镜像行来自**顶部导出的 Config**（空 object + `.volatile()`，ns = 行 id），
++      // 这里无需任何注册动作 —— 0.1.5 那条 `settings.installSection` 路径已随兼容分叉删除。
++      log(`settings section driven by exported Config (${settingsNs})`)
+       // adapter：模型目录自动带出组合；对话转发到本插件 /v1（组合路由在 /v1 内完成）。
+       // 带上组合的上下文窗口：没有它 dsh 的自动压缩算不出阈值、会静默关闭。
+       // 图片序列化需要读附件字节：把 ctx.attachments 传给 adapter（dsh-attachment
+diff --git a/src/llm/adapter.test.ts b/src/llm/adapter.test.ts
+index 62d5bbf..beaf90f 100644
+--- a/src/llm/adapter.test.ts
++++ b/src/llm/adapter.test.ts
+@@ -473,17 +473,17 @@ test('wire：reasoningEffort 为 none/off 时删字段，且无请求时不硬
+ test('wire：空工具结果发空串，不伪造 (no output) 字面量', async () => {
+   // 模型会以为工具真打印了那句话 —— 对「bash 无输出」是误导。
+   const body = await captureBody({
+-    messages: [{ role: 'user', content: [{ type: 'tool-result', toolCallId: 'c1', content: [] }] }],
++    messages: [{ role: 'tool', toolCallId: 'c1', content: [] }],
+   })
+   const tool = (body.messages as Array<{ role: string; content: string }>).find((m) => m.role === 'tool')
+   assert.equal(tool?.content, '', '空结果就该是空串')
+ })
+ 
+-// 0.1.7+ 消息模型：tool 结果是**独立 role:"tool" 消息**、toolCallId 挂消息级，
+-// ContentBlockMap 已无 'tool-result' 块。必须原样发 role:"tool"，否则工具结果被
++// 0.2.0 消息模型：tool 结果是**独立 role:"tool" 消息**、toolCallId 挂消息级，
++// ContentBlockMap 里**没有** 'tool-result' 块。必须原样发 role:"tool"，否则工具结果被
+ // 序列化成 role:"user"、夹在 assistant(tool_calls) 与 tool 之间，上游判定失配 → 400
+-// code=11148。下面几条锁死新分支；老的 'tool-result' 块路径（≤0.1.6）仍有各自的用例。
+-test('wire：0.1.7+ 独立 role:"tool" 消息序列化为 role:"tool"，正确带 tool_call_id', async () => {
++// code=11148。
++test('wire：独立 role:"tool" 消息序列化为 role:"tool"，正确带 tool_call_id', async () => {
+   const body = await captureBody({
+     messages: [
+       { role: 'assistant', content: [{ type: 'text', text: '' }, { type: 'tool-call', id: 'c1', name: 'bash', arguments: '{}' }] },
+@@ -492,13 +492,13 @@ test('wire：0.1.7+ 独立 role:"tool" 消息序列化为 role:"tool"，正确
+   })
+   const messages = body.messages as Array<{ role: string; tool_call_id?: string; content: unknown }>
+   const tool = messages.find((m) => m.role === 'tool')
+-  assert.ok(tool, '0.1.7 tool 消息必须原样发 role:"tool"')
++  assert.ok(tool, 'tool 消息必须原样发 role:"tool"')
+   assert.equal(tool.tool_call_id, 'c1', 'tool_call_id 取自消息级 toolCallId')
+   assert.equal(tool.content, 'out', '纯文本重组为字符串')
+   assert.equal(messages.filter((m) => m.role === 'user').length, 0, '不容许被误序列化成 user 消息')
+ })
+ 
+-test('wire：0.1.7+ 独立 role:"tool" 消息不带图时不在其后插 user(图)', async () => {
++test('wire：独立 role:"tool" 消息不带图时不在其后插 user(图)', async () => {
+   // 图片才攒批补 user(图)；纯文本 tool 后面绝不能冒出 user，配对接续必须完整。
+   const body = await captureBody({
+     messages: [
+@@ -516,7 +516,7 @@ test('wire：0.1.7+ 独立 role:"tool" 消息不带图时不在其后插 user(
+   }
+ })
+ 
+-test('wire：0.1.7+ 空 tool 结果发空串（不伪造字面量）', async () => {
++test('wire：空 tool 结果发空串（不伪造字面量）', async () => {
+   const body = await captureBody({
+     messages: [{ role: 'tool', toolCallId: 'c2', content: [] }],
+   })
+@@ -524,34 +524,11 @@ test('wire：0.1.7+ 空 tool 结果发空串（不伪造字面量）', async ()
+   assert.equal(tool?.content, '', '空结果该是空串')
+ })
+ 
+-/**
+- * tool 结果的两种形态**都必须序列化成 role:'tool'**，且分派只看消息形状、与宿主版本无关。
+- *
+- * 背景（实测）：同一宿主内两种形态都合法 —— 0.1.7 loop-built 走新形态
+- * （独立 role:'tool' 消息），而老会话历史经 session-format 迁移/重放时仍是旧形态
+- * （user 消息里的 'tool-result' 块）。所以 adapter 不能按版本号判形态对错，
+- * 只能按形状分派；这条锁死两种形状在**同一份 adapter**下产物一致。
+- */
+-test('wire：tool-result 新/旧两种形态都序列化为 role:"tool"（按形状分派，与版本无关）', async () => {
+-  const newShapeMsgs = [
+-    { role: 'assistant', content: [{ type: 'text', text: '' }, { type: 'tool-call', id: 'c1', name: 'bash', arguments: '{}' }] },
+-    { role: 'tool', toolCallId: 'c1', content: [{ type: 'text', text: 'out' }] },
+-  ]
+-  const oldShapeMsgs = [
+-    { role: 'assistant', content: [{ type: 'text', text: '' }, { type: 'tool-call', id: 'c1', name: 'bash', arguments: '{}' }] },
+-    { role: 'user', content: [{ type: 'tool-result', toolCallId: 'c1', content: [{ type: 'text', text: 'out' }] }] },
+-  ]
+-  // 新形态：原样发 role:'tool'
+-  const n = await captureBody({ messages: newShapeMsgs })
+-  const nt = (n.messages as Array<{ role: string; tool_call_id?: string }>).find((m) => m.role === 'tool')
+-  assert.ok(nt, '新形态应发 role:"tool"')
+-  assert.equal(nt.tool_call_id, 'c1')
+-  // 旧形态：由 'tool-result' 块转出 role:'tool'（同样带 tool_call_id）
+-  const o = await captureBody({ messages: oldShapeMsgs })
+-  const ot = (o.messages as Array<{ role: string; tool_call_id?: string }>).find((m) => m.role === 'tool')
+-  assert.ok(ot, '旧形态也应转出 role:"tool"')
+-  assert.equal(ot.tool_call_id, 'c1')
+-})
++// 这里曾有一条「tool-result 新/旧两种形态都序列化成 role:tool」的用例，随 0.1.x
++// 兼容一起删除：0.2.0 的 ContentBlockMap 里已无 'tool-result' 块，且 v3→v4 会话迁移
++// 主动拒绝该包装（老会话要么被迁移展开、要么拒绝打开），这条形态到不了 adapter。
++// 剩下的新形态已由上面「独立 role:"tool" 消息…」那条锁死。删它的理由与事实出处见
++// src/llm/adapter.ts 的对应注释与 src/host-version.ts。
+ 
+ /**
+  * 为什么要有这一条：只不发 `block-end` **并不能**拦住残缺调用。
+@@ -878,8 +855,8 @@ test('wire：一步两个 read_image（每条一个 user 消息，同现场）
+           { type: 'tool-call', id: 'c2', name: 'read_image', arguments: '{}' },
+         ],
+       },
+-      { role: 'user', content: [{ type: 'tool-result', toolCallId: 'c1', content: [{ type: 'text', text: 'tree_assembly.png' }, { type: 'image', attachment: ref }] }] },
+-      { role: 'user', content: [{ type: 'tool-result', toolCallId: 'c2', content: [{ type: 'text', text: 'tree_part.png' }, { type: 'image', attachment: ref }] }] },
++      { role: 'tool', toolCallId: 'c1', content: [{ type: 'text', text: 'tree_assembly.png' }, { type: 'image', attachment: ref }] },
++      { role: 'tool', toolCallId: 'c2', content: [{ type: 'text', text: 'tree_part.png' }, { type: 'image', attachment: ref }] },
+     ],
+   }, fakeAttachments())
+   const messages = body.messages as Array<{ role: string; tool_call_id?: string; tool_calls?: Array<{ id: string }>; content: unknown }>
+@@ -905,7 +882,7 @@ test('wire：一步两个 read_image（每条一个 user 消息，同现场）
+ })
+ 
+ /**
+- * 为什么要有这一组：`read_image` 的结果是**带图的 tool-result**。适配器曾把
++ * 为什么要有这一组：`read_image` 的结果是**带图的 tool 消息**。适配器曾把
+  * 图片和文本一起提成一条 `user` 消息、排在 `tool` 消息**之前**，于是 wire 里
+  * 出现 `assistant(tool_calls) → user(image) → tool`。上游判定 tool_call 与
+  * tool_result 失配，回 400 网关码 11148「tool calls and tool results do not
+@@ -946,17 +923,17 @@ function assertToolPairingIntact(messages: Array<{ role: string; tool_call_id?:
+   }
+ }
+ 
+-test('wire：纯文本 tool-result 不因图片逻辑改变顺序（tool 紧跟 assistant）', async () => {
++test('wire：纯文本 tool 消息不因图片逻辑改变顺序（tool 紧跟 assistant）', async () => {
+   const body = await captureBodyWith({
+     messages: [
+       { role: 'user', content: [{ type: 'text', text: '跑一下' }] },
+       { role: 'assistant', content: [{ type: 'tool-call', id: 'c1', name: 'bash', arguments: '{}' }] },
+-      { role: 'user', content: [{ type: 'tool-result', toolCallId: 'c1', content: [{ type: 'text', text: 'out' }] }] },
++      { role: 'tool', toolCallId: 'c1', content: [{ type: 'text', text: 'out' }] },
+     ],
+   }, fakeAttachments())
+   const messages = body.messages as Array<{ role: string; tool_call_id?: string; tool_calls?: Array<{ id: string }> }>
+   assertToolPairingIntact(messages)
+-  assert.deepEqual(messages.map((m) => m.role), ['user', 'assistant', 'tool'], '纯文本 tool 结果仍紧跟 assistant')
++  assert.deepEqual(messages.map((m) => m.role), ['user', 'assistant', 'tool'], '纯文本 tool 消息仍紧跟 assistant')
+ })
+ 
+ /* ---------------- 流空闲超时：上游停摆不能永久挂住（issue #6） ---------------- */
+diff --git a/src/llm/adapter.ts b/src/llm/adapter.ts
+index 166c6a4..3c23d00 100644
+--- a/src/llm/adapter.ts
++++ b/src/llm/adapter.ts
+@@ -123,11 +123,10 @@ export interface RouterAdapterSource {
+  * base64）。图片字节经 `resolveAttachments` 读取；读不到时回退为稳定的占位文本，
+  * **绝不静默丢图**（丢图 = 模型看到一条没有图的消息却毫无提示）。
+  *
+- * 工具结果双模型兼容：0.1.5/0.1.6 里 tool result 是 user 消息里的 'tool-result' 块
+- * （旧路径）；0.1.7+ 改成了独立 role:'tool' 消息、toolCallId 挂消息级（新分支）。
+- * 两者在 wire 上统一序列化为 role:'tool'，产物一致。见主循环里的 role==='tool' 分支。
++ * 工具结果只有一种形态：独立 `role:'tool'` 消息、toolCallId 挂消息级，wire 上原样
++ * 发 `role:'tool'`。见主循环里的 `role === 'tool'` 分支。
+  */
+-/** tool-result 里图片挂到 user 消息时用的说明文字（与官方适配器一致）。 */
++/** tool 消息里的图片挂到 user 消息时用的说明文字（与官方适配器一致）。 */
+ const TOOL_RESULT_IMAGE_TEXT = 'Tool result images'
+ 
+ /**
+@@ -144,7 +143,7 @@ const STREAM_IDLE_TIMEOUT_MS = 300_000
+ async function wireMessages(options: GenerateOptions, system: string | undefined, attachments: RouterAttachmentStore | undefined, log?: (msg: string) => void): Promise<Array<Record<string, unknown>>> {
+   const out: Array<Record<string, unknown>> = []
+   /**
+-   * 攒着「tool-result 里带出来的图片」，等这一串 tool 消息**发完**再合并成一条
++   * 攒着「tool 消息里带出来的图片」，等这一串 tool 消息**发完**再合并成一条
+    * user 消息补在后面。
+    *
+    * 为什么必须跨消息攒、而不是各消息各发一条：harness 把**每个 tool 结果放
+@@ -188,14 +187,13 @@ async function wireMessages(options: GenerateOptions, system: string | undefined
+       })
+       continue
+     }
+-    // tool 结果的消息形态：**同一宿主内两种形态都合法**，按消息实际形状分派。
+-    //   新形态：独立 role:'tool' 消息、toolCallId 挂消息级（0.1.7 loop-built）；
+-    //   旧形态：user 消息里的 'tool-result' 块（0.1.5/0.1.6，以及 0.1.7 下经
+-    //           session-format 迁移/重放的老会话历史——实测 0.1.7 仍会出现）。
+-    // 所以**不能**用宿主版本号判断形态对错（0.1.7-alpha.2 也是 0.1.7，同样会出现
+-    // 旧形态）——形状才是事实，按形状分派这一份 adapter 就同时吃两版。
+-    const isToolRoleMessage = (message.role as string) === 'tool'
+-    if (isToolRoleMessage) {
++    // tool 结果：0.2.0 起**只有一种形态** —— 独立 role:'tool' 消息、toolCallId 挂消息级。
++    // 旧的「user 消息内嵌 'tool-result' 块」（0.1.5/0.1.6 时代，0.1.7 起退役）**不再
++    // 支持**：0.2.0 的 v3→v4 会话迁移主动拒绝 tool-result 包装
++    // （`must not contain a released tool-result wrapper`），老会话要么被迁移展开成
++    // tool 消息、要么直接拒绝打开 —— 这条形态到不了 adapter（见 host-version.ts 的
++    // 版本地板）。
++    if ((message.role as string) === 'tool') {
+       // tool 消息必须紧跟 assistant(tool_calls)：中间插进任何 user 消息，上游都会判定
+       // tool_call 与 tool_result 失配 → codebuddy 直接 400 网关码 11148（bad_request
+       // 按核心设计不罚账号，面板上看不到异常，易误判成额度/风控）。
+@@ -214,35 +212,11 @@ async function wireMessages(options: GenerateOptions, system: string | undefined
+       pendingToolImages.push(...imageParts)
+       continue
+     }
+-    // user / tool-result
+-    const toolResults = message.content.filter((b) => b.type === 'tool-result')
+-    // 这条消息自己的（非 tool-result 的）user 部分：文本 + 图片。
+-    const ownParts = await contentParts(
+-      message.content.filter((b) => b.type !== 'tool-result'),
+-      attachments,
+-      options.signal,
+-      log,
+-    )
+-    // 有实质 user 内容（或压根没有 tool 结果）就先发这条 user 消息；
+-    // 只有 tool 结果的「纯工具」消息不发空 user，图片留到 pending 里合并。
+-    if (ownParts.length > 0 || toolResults.length === 0) {
+-      flushToolImages()
+-      out.push({ role: 'user', content: compactUserContent(ownParts) })
+-    }
+-    for (const result of toolResults) {
+-      // **tool 消息必须紧跟 assistant(tool_calls)**：中间插进任何 user 消息，
+-      // 上游都会判定 tool_call 与 tool_result 失配 —— codebuddy 直接 400 网关码
+-      // 11148「tool calls and tool results do not match」。
+-      // 图片不能放进 tool 消息（实测模型会把两张不同的图认成同一张），
+-      // 也不能插在两条 tool 之间（同样 400），所以先攒起来、发完整串再补一条 user。
+-      const parts = await contentParts(result.content, attachments, options.signal, log)
+-      const imageParts = parts.filter((p) => p.type !== 'text')
+-      const text = parts.filter((p) => p.type === 'text').map((p) => (p as { text?: string }).text ?? '').join('')
+-      // 空结果就发空串，不要替换成 '(no output)' 之类的字面量 —— 模型会
+-      // 以为工具真的打印了那句话（9router 也是补 content: ""）。
+-      out.push({ role: 'tool', tool_call_id: result.toolCallId, content: text })
+-      pendingToolImages.push(...imageParts)
+-    }
++    // user：文本 + 图片。**即使内容为空也照发** —— 这条 user 消息在历史里存在过，
++    // 悄悄省掉等于让模型看到一段断掉的话轮。
++    const userParts = await contentParts(message.content, attachments, options.signal, log)
++    flushToolImages()
++    out.push({ role: 'user', content: compactUserContent(userParts) })
+   }
+   flushToolImages()
+   return out
+@@ -262,7 +236,7 @@ function compactUserContent(parts: Array<Record<string, unknown>>): string | Arr
+ }
+ 
+ /**
+- * 一块 DSH user/tool-result 内容序列化成 OpenAI content parts（text + image_url）。
++ * 一条 DSH 消息的内容块序列化成 OpenAI content parts（text + image_url）。
+  * 纯文本时返回空数组（上层走紧凑字符串路径）。图片转 base64 data URI；
+  * attachments 缺失或读取失败时回退稳定占位文本（绝不静默丢图）。
+  */
+@@ -284,10 +258,9 @@ async function contentParts(
+       parts.push(...(await imageParts(ref, attachments, signal, log)))
+       continue
+     }
+-    if (block.type === 'tool-result') {
+-      parts.push(...(await contentParts((block as unknown as { content: ReadonlyArray<{ type: string }> }).content, attachments, signal, log)))
+-    }
+-    // 其它块（reasoning/tool-call）不属于 user content，忽略
++    // 其它块（reasoning/tool-call/tool-addition/tool-removal/file）不属于发给上游的
++    // user/tool 内容，忽略。0.1.x 的 'tool-result' 块曾在这里递归展开，随 0.2.0
++    // 单面编写一并删除（该块在 0.2.0 的 ContentBlockMap 里已不存在，见主循环注释）。
+   }
+   return parts
+ }

@@ -24,9 +24,22 @@ test('collects @deepseek-ai/dsh-* names from peer, dev, and runtime deps', () =>
   ])
 })
 
+test('a package the release did not publish is not installed', () => {
+  const registry: Record<string, string[]> = { '@deepseek-ai/dsh-client-runtime': ['0.1.1-rc.2'], '@deepseek-ai/dsh-agent': ['0.1.7-alpha.1'] }
+  const specs = dshPeerSpecs({ peerDependencies: { '@deepseek-ai/dsh-client-runtime': '>=0.1.1-rc.2 <0.2.0-0', '@deepseek-ai/dsh-agent': '^0.1.7-alpha.1' } }, '0.1.7-alpha.1', name => registry[name])
+  assert.deepEqual(specs, ['@deepseek-ai/dsh-agent@0.1.7-alpha.1'])
+})
+
 test('returns no specs when the package names no dsh packages', () => {
   assert.deepEqual(dshPeerSpecs({ peerDependencies: { react: '^18' } }, '0.1.1-rc.2'), [])
   assert.equal(pinDshPeersCommand([]), undefined)
+})
+
+test('the pin resolves as the release was published', () => {
+  assert.equal(
+    pinDshPeersCommand(['@deepseek-ai/dsh-tools@0.1.2-alpha.2'], '2026-08-12T10:00:00.000Z'),
+    'npm install --no-save --before=2026-08-12T10:00:00.000Z @deepseek-ai/dsh-tools@0.1.2-alpha.2',
+  )
 })
 
 test('pin command uses --no-save', () => {

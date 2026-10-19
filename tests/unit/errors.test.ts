@@ -1,7 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { extractMechanicalErrors } from '../../src/mechanical/errors.ts'
-import { assembleFixPrompt } from '../../src/prompts/migrate/index.ts'
+import { errorSummary, extractMechanicalErrors } from '../../src/mechanical/errors.ts'
 
 test('keeps error lines and drops passing noise', () => {
   const excerpt = extractMechanicalErrors([
@@ -14,47 +13,17 @@ test('keeps error lines and drops passing noise', () => {
   assert.doesNotMatch(excerpt, /All tests passed/)
 })
 
-test('fix prompt includes A+B, errors only, and prior C reports', () => {
-  const prompt = assembleFixPrompt({
-    template: 'FIX',
-    reportA: 'verdict: shrink',
-    reportB: 'use official slot',
-    errors: 'error: keyed slot missing key',
-    priorFixes: ['touched client.js'],
-  })
-  assert.match(prompt, /verdict: shrink/)
-  assert.match(prompt, /use official slot/)
-  assert.match(prompt, /keyed slot missing key/)
-  assert.match(prompt, /### C1/)
-  assert.doesNotMatch(prompt, /full test log/)
-})
-
-test('fix prompt can append a harness checkout note', () => {
-  const prompt = assembleFixPrompt({
-    template: 'FIX',
-    reportA: 'A',
-    reportB: 'B',
-    errors: 'error: x',
-    priorFixes: [],
-    harness: { path: '/tmp/harness', tag: 'dsh-v0.1.1-rc.2' },
-  })
-  assert.match(prompt, /\/tmp\/harness/)
-  assert.match(prompt, /dsh-v0\.1\.1-rc\.2/)
-  assert.match(prompt, /README/)
-  assert.match(prompt, /official extension points/)
-  assert.match(prompt, /patches\/ directory/)
-  assert.match(prompt, /\.dsh-migrate\/patch-reports\//)
-  assert.match(prompt, /deepseek-ai\/deepseek-harness/)
-  assert.match(prompt, /\[Feature request\]/)
-})
-
-test('first fix has no prior C reports', () => {
-  const prompt = assembleFixPrompt({
-    template: 'FIX',
-    reportA: 'A',
-    reportB: 'B',
-    errors: 'error: x',
-    priorFixes: [],
-  })
-  assert.match(prompt, /this is C1/)
+test('npm errors are kept, and the summary names the packages in conflict rather than a warning', () => {
+  // Shape of npm 11's output for the un-migrated dsh-router fixture.
+  const output = [
+    'npm warn ERESOLVE overriding peer dependency',
+    'npm error code ERESOLVE',
+    'npm error ERESOLVE unable to resolve dependency tree',
+    'npm error',
+    'npm error While resolving: dsh-router-core@0.4.2',
+    'npm error Found: @deepseek-ai/schemastery@3.18.4',
+  ].join('\n')
+  const errors = extractMechanicalErrors(output)
+  assert.doesNotMatch(errors, /npm warn/)
+  assert.equal(errorSummary(errors), 'npm error ERESOLVE unable to resolve dependency tree | npm error While resolving: dsh-router-core@0.4.2 | npm error Found: @deepseek-ai/schemastery@3.18.4')
 })

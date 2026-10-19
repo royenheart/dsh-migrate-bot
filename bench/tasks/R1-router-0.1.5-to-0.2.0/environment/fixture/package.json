@@ -1,0 +1,141 @@
+{
+  "name": "dsh-router-core",
+  "version": "0.4.2",
+  "description": "DSH plugin: a simplified 9router (AI routing gateway). Adds a 路由系统 (Routing System) sidebar entry beside 记忆系统; the panel shows suppliers, account pool, combos, and endpoint/API keys.",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CARVIN94/dsh-router.git"
+  },
+  "homepage": "https://github.com/CARVIN94/dsh-router#readme",
+  "bugs": {
+    "url": "https://github.com/CARVIN94/dsh-router/issues"
+  },
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./suppliers/opencode": {
+      "types": "./lib/types/suppliers/opencode/index.d.ts",
+      "default": "./lib/suppliers/opencode/index.js"
+    },
+    "./suppliers/opencode/package.json": "./lib/suppliers/opencode/package.json",
+    "./suppliers/opencode/locale/*.json": "./lib/suppliers/opencode/locale/*.json",
+    "./suppliers/openrouter": {
+      "types": "./lib/types/suppliers/openrouter/index.d.ts",
+      "default": "./lib/suppliers/openrouter/index.js"
+    },
+    "./suppliers/openrouter/package.json": "./lib/suppliers/openrouter/package.json",
+    "./suppliers/openrouter/locale/*.json": "./lib/suppliers/openrouter/locale/*.json",
+    "./suppliers/nvidia": {
+      "types": "./lib/types/suppliers/nvidia/index.d.ts",
+      "default": "./lib/suppliers/nvidia/index.js"
+    },
+    "./suppliers/nvidia/package.json": "./lib/suppliers/nvidia/package.json",
+    "./suppliers/nvidia/locale/*.json": "./lib/suppliers/nvidia/locale/*.json",
+    "./ext-test": {
+      "types": "./lib/types/ext-test/index.d.ts",
+      "default": "./lib/ext-test/index.js"
+    },
+    "./ext-test/package.json": "./lib/ext-test/package.json",
+    "./ext-test/locale/*.json": "./lib/ext-test/locale/*.json",
+    "./client": "./lib/client.js",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "react",
+        "react-dom",
+        "cordis",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ],
+      "platform": "web"
+    }
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "lib/client-registry.js",
+    "lib/*.js",
+    "lib/suppliers/*/index.js",
+    "lib/suppliers/*/package.json",
+    "lib/suppliers/*/locale/*.json",
+    "lib/ext-test/index.js",
+    "lib/ext-test/package.json",
+    "lib/ext-test/locale/*.json",
+    "lib/types/**/*.d.ts",
+    "src",
+    "cordis.patch.yml",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/check-css.mjs && node scripts/check-publish.mjs --source && rm -rf lib && tsc -p tsconfig.build.json && tsdown && node scripts/copy-row-meta.mjs && npm run build:client && node scripts/check-publish.mjs",
+    "build:client": "DSH_CLIENT_ID=dsh-router-core DSH_CLIENT_FILE=client.js vite build -c client/vite.config.ts && DSH_CLIENT_ID=dsh-external/dsh-router DSH_CLIENT_FILE=client-registry.js vite build -c client/vite.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "bundle": "tsdown",
+    "watch": "tsdown --watch",
+    "check:css": "node scripts/check-css.mjs",
+    "check:publish": "node scripts/check-publish.mjs --pack",
+    "prepublishOnly": "npm run build && node scripts/check-publish.mjs --pack"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.4"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-client-locale": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-llm": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-settings": "^0.1.5-rc.2",
+    "cordis": "^4.0.0-rc.7",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "peerDependenciesMeta": {
+    "cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-locale": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-slots": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-primitives": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@types/react": "~19.3.0",
+    "@types/react-dom": "~19.3.0",
+    "cordis": "4.0.0-rc.10",
+    "react": "^19.3.0",
+    "react-dom": "19.3.0",
+    "tsdown": "^0.23.0",
+    "typescript": "^7.0.2",
+    "vite": "8.3.0",
+    "vite-plugin-css-injected-by-js": "^5.0.2"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org"
+  }
+}
