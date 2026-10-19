@@ -76,7 +76,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: action
-        uses: royenheart/dsh-migrate-bot@v1.0.0-rc.1
+        uses: royenheart/dsh-migrate-bot@v1.0.0-rc.2
         with:
           command: run
           config: ${{ inputs.config }}
@@ -107,7 +107,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: action
-        uses: royenheart/dsh-migrate-bot@v1.0.0-rc.1
+        uses: royenheart/dsh-migrate-bot@v1.0.0-rc.2
         with:
           command: pull-request-closed
           config: ${{ inputs.config }}
@@ -138,7 +138,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: action
-        uses: royenheart/dsh-migrate-bot@v1.0.0-rc.1
+        uses: royenheart/dsh-migrate-bot@v1.0.0-rc.2
         with:
           command: comment
           config: ${{ inputs.config }}

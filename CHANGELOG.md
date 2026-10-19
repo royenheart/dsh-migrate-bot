@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/).
 Entries are generated from the commit history by [Commitizen](https://commitizen-tools.github.io/commitizen/); do not edit them by hand.
 
+## v1.0.0-rc.2 (2026-10-19)
+
+### Fix
+
+- **deploy-service**: cut containers off the whole link-local range
+- **proposal**: push the default branch's workflows with the proposal
+- **deploy**: send the run log stream from a worker thread
+- **bench**: keep no session token in a record's outputs
+
+### Docs
+
+- say what the manual run's release and rerun inputs mean
+
 ## v1.0.0-rc.1 (2026-10-19)
 
 ### BREAKING CHANGE
