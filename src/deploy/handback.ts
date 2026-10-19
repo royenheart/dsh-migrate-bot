@@ -23,7 +23,8 @@ import type { TreeCheckReport } from '../activities/check-tree.ts'
 import { BOT_EMAIL, BOT_NAME } from '../git/run.ts'
 import { inline } from '../render/text.ts'
 
-const GIT_SAFE = ['-c', 'safe.directory=*', '-c', 'commit.gpgsign=false'] as const
+// As src/git/run.ts runs git: no detached maintenance in a worktree that is removed after the push.
+const GIT_SAFE = ['-c', 'safe.directory=*', '-c', 'commit.gpgsign=false', '-c', 'maintenance.auto=false'] as const
 
 export interface HandbackInput {
   /** The consumer's checkout, which is where the worktree is added from. */

@@ -18,7 +18,8 @@ export type GitRunner = (args: readonly string[], cwd?: string) => SpawnSyncRetu
 export const DEFAULT_CHECKOUT_TIMEOUT_MS = 10 * 60_000
 
 function gitWithTimeout(args: readonly string[], cwd: string | undefined, timeoutMs: number): SpawnSyncReturns<string> {
-  return spawnSync('git', ['-c', 'safe.directory=*', ...args], {
+  // No detached maintenance, as in src/git/run.ts: the checkout is removed with the run.
+  return spawnSync('git', ['-c', 'safe.directory=*', '-c', 'maintenance.auto=false', ...args], {
     cwd,
     encoding: 'utf8',
     timeout: timeoutMs,

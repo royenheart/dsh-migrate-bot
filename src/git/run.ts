@@ -4,11 +4,14 @@ import { spawnSync, type SpawnSyncReturns } from 'node:child_process'
  * The one way this Action runs git.
  *
  * `safe.directory=*` because the checkout belongs to another user inside the
- * container, and `commit.gpgsign=false` because a commit made here is never
- * signed with a consumer's key.
+ * container, `commit.gpgsign=false` because a commit made here is never
+ * signed with a consumer's key, and `maintenance.auto=false` because a job's
+ * repositories end with the job: from git 2.54 a commit, a fetch or a push
+ * starts a detached repack, which would still be writing into a tree the
+ * Action removes or copies.
  */
 
-const SAFE = ['-c', 'safe.directory=*', '-c', 'commit.gpgsign=false'] as const
+const SAFE = ['-c', 'safe.directory=*', '-c', 'commit.gpgsign=false', '-c', 'maintenance.auto=false'] as const
 
 /** The identity of every commit this Action makes. */
 export const BOT_NAME = 'dsh-migrate[bot]'
