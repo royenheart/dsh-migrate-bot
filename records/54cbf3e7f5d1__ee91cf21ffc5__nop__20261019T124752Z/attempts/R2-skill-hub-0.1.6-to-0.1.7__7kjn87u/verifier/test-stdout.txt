@@ -1,0 +1,33 @@
+FAIL contract: does not admit 0.1.7-alpha.1: peerDependencies @deepseek-ai/dsh-client-connection@>=0.1.6-alpha.2 <0.2.0-0, peerDependencies @deepseek-ai/dsh-client-locale@>=0.1.6-alpha.2 <0.2.0-0, peerDependencies @deepseek-ai/dsh-client-runtime@>=0.1.6-alpha.2 <0.2.0-0, peerDependencies @deepseek-ai/dsh-client-store@>=0.1.6-alpha.2 <0.2.0-0, peerDependencies @deepseek-ai/dsh-client-ui-input-trigger@>=0.1.6-alpha.2 <0.2.0-0, peerDependencies @deepseek-ai/dsh-client-ui-settings@>=0.1.6-alpha.2 <0.2.0-0, peerDependencies @deepseek-ai/dsh-client-ui-slots@>=0.1.6-alpha.2 <0.2.0-0, peerDependencies @deepseek-ai/dsh-host-webserver@>=0.1.6-alpha.2 <0.2.0-0, peerDependencies @deepseek-ai/dsh-session@>=0.1.6-alpha.2 <0.2.0-0, peerDependencies @deepseek-ai/dsh-session-query@>=0.1.6-alpha.2 <0.2.0-0, peerDependencies @deepseek-ai/dsh-settings@>=0.1.6-alpha.2 <0.2.0-0, peerDependencies @deepseek-ai/dsh-skill@>=0.1.6-alpha.2 <0.2.0-0, peerDependencies @deepseek-ai/dsh-system-prompt@>=0.1.6-alpha.2 <0.2.0-0, devDependencies @deepseek-ai/dsh-client-connection@^0.1.6-alpha.2, devDependencies @deepseek-ai/dsh-client-locale@^0.1.6-alpha.2, devDependencies @deepseek-ai/dsh-client-store@^0.1.6-alpha.2, devDependencies @deepseek-ai/dsh-client-ui-input-trigger@^0.1.6-alpha.2, devDependencies @deepseek-ai/dsh-client-ui-plugin-manager@^0.1.6-alpha.2, devDependencies @deepseek-ai/dsh-client-ui-settings@^0.1.6-alpha.2, devDependencies @deepseek-ai/dsh-client-ui-settings-plugins@^0.1.6-alpha.2, devDependencies @deepseek-ai/dsh-client-ui-slots@^0.1.6-alpha.2, devDependencies @deepseek-ai/dsh-host-webserver@^0.1.6-alpha.2, devDependencies @deepseek-ai/dsh-session@^0.1.6-alpha.2, devDependencies @deepseek-ai/dsh-session-query@^0.1.6-alpha.2, devDependencies @deepseek-ai/dsh-settings@^0.1.6-alpha.2, devDependencies @deepseek-ai/dsh-skill@^0.1.6-alpha.2, devDependencies @deepseek-ai/dsh-system-prompt@^0.1.6-alpha.2
+install failed:
+npm error code ERESOLVE
+npm error ERESOLVE could not resolve
+npm error
+npm error While resolving: dsh-skill-hub@0.3.14
+npm error Found: @deepseek-ai/dsh-client-connection@0.1.6-alpha.2
+npm error node_modules/@deepseek-ai/dsh-client-connection
+npm error   dev @deepseek-ai/dsh-client-connection@"0.1.7-alpha.1" from the root project
+npm error
+npm error Could not resolve dependency:
+npm error dev @deepseek-ai/dsh-client-connection@"0.1.7-alpha.1" from the root project
+npm error
+npm error Conflicting peer dependency: @deepseek-ai/dsh-scope@0.1.7-alpha.1
+npm error node_modules/@deepseek-ai/dsh-scope
+npm error   peer @deepseek-ai/dsh-scope@"^0.1.7-alpha.1" from @deepseek-ai/dsh-client-connection@0.1.7-alpha.1
+npm error   node_modules/@deepseek-ai/dsh-client-connection
+npm error     dev @deepseek-ai/dsh-client-connection@"0.1.7-alpha.1" from the root project
+npm error
+npm error Fix the upstream dependency conflict, or retry this command with --force or --legacy-peer-deps to accept an incorrect (and potentially broken) dependency resolution.
+npm error
+npm error
+npm error For a full report see:
+npm error /root/.npm/_logs/2026-10-19T12_48_59_412Z-eresolve-report.txt
+npm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-19T12_48_59_412Z-debug-0.log
+
+FAIL typecheck: install failed
+FAIL test: install failed
+FAIL build: install failed
+FAIL boot: dsh: warning: 1 entry did not activate
+  skill-hub (dsh-skill-hub): failed to import
+  dsh web: http://127.0.0.1:33017/?token=<redacted>
+{"score":0,"max":100,"checks":{"contract":0,"typecheck":0,"test":0,"build":0,"boot":0}}

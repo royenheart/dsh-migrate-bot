@@ -1,0 +1,393 @@
+{
+  "schema": 3,
+  "id": "54cbf3e7f5d1__ee91cf21ffc5__oracle__20261019T122747Z",
+  "createdAt": "2026-10-19T12:27:47Z",
+  "producer": {
+    "commit": "54cbf3e7f5d1a6ff3468ae462daa866891810643",
+    "version": "1.0.0-rc.1",
+    "dirty": false,
+    "message": "Merge pull request #2 from royenheart/fix/bench-artifact-redaction",
+    "snapshot": "46b11774626e4c9f"
+  },
+  "subject": {
+    "id": "oracle",
+    "agentRuntime": "none",
+    "attempts": 1,
+    "agentTimeoutMultiplier": 1
+  },
+  "suite": {
+    "repository": "royenheart/dsh-migrate-bot",
+    "commit": "ee91cf21ffc5df659e762adcf8cb41bc6d6d1716",
+    "tasks": [
+      {
+        "id": "R1-router-0.1.5-to-0.2.0",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R2-skill-hub-0.1.6-to-0.1.7",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R3-better-display-0.1.7-rc1-to-rc2",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R4-skill-hub-0.2.0-to-0.2.1-control",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R5-router-0.1.2-to-0.1.5",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R6-skill-hub-0.1.6-alpha1-to-alpha2",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R7-inbox-0.1.5-to-0.2.0",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      },
+      {
+        "id": "R8-mcp-adapter-0.1.5-to-0.1.7",
+        "family": "R",
+        "networkMode": "public",
+        "agentTimeoutSec": 1800,
+        "applicable": true,
+        "feasible": true
+      }
+    ]
+  },
+  "model": {
+    "provider": "none",
+    "model": "none"
+  },
+  "environment": {
+    "harbor": "0.24.0",
+    "docker": "29.6.1",
+    "os": "Linux 6.12.101+deb13-cloud-amd64",
+    "concurrency": 2
+  },
+  "attempts": [
+    {
+      "task": "R1-router-0.1.5-to-0.2.0",
+      "attempt": 1,
+      "trial": "R1-router-0.1.5-to-0.2.0__G8e9GS5",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 41.8,
+        "totalSec": 586.5
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__G8e9GS5/verifier/judge.log",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__G8e9GS5/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R1-router-0.1.5-to-0.2.0__G8e9GS5/verifier/test-stdout.txt",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        }
+      }
+    },
+    {
+      "task": "R2-skill-hub-0.1.6-to-0.1.7",
+      "attempt": 1,
+      "trial": "R2-skill-hub-0.1.6-to-0.1.7__GebYMFN",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 19.4,
+        "totalSec": 584.7
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__GebYMFN/verifier/judge.log",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__GebYMFN/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R2-skill-hub-0.1.6-to-0.1.7__GebYMFN/verifier/test-stdout.txt",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        }
+      }
+    },
+    {
+      "task": "R3-better-display-0.1.7-rc1-to-rc2",
+      "attempt": 1,
+      "trial": "R3-better-display-0.1.7-rc1-to-r__YcUBUj3",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 35.2,
+        "totalSec": 177.3
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__YcUBUj3/verifier/judge.log",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__YcUBUj3/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R3-better-display-0.1.7-rc1-to-r__YcUBUj3/verifier/test-stdout.txt",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        }
+      }
+    },
+    {
+      "task": "R4-skill-hub-0.2.0-to-0.2.1-control",
+      "attempt": 1,
+      "trial": "R4-skill-hub-0.2.0-to-0.2.1-cont__2FjJZcZ",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 19.5,
+        "totalSec": 160.6
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__2FjJZcZ/verifier/judge.log",
+          "sha256": "c534b506ea8cd587d8254d55e092c285eaa2a6ed5fe62bafdef4b5cff12c9534",
+          "bytes": 179
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__2FjJZcZ/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R4-skill-hub-0.2.0-to-0.2.1-cont__2FjJZcZ/verifier/test-stdout.txt",
+          "sha256": "c534b506ea8cd587d8254d55e092c285eaa2a6ed5fe62bafdef4b5cff12c9534",
+          "bytes": 179
+        }
+      }
+    },
+    {
+      "task": "R5-router-0.1.2-to-0.1.5",
+      "attempt": 1,
+      "trial": "R5-router-0.1.2-to-0.1.5__CAm2bFF",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 39.8,
+        "totalSec": 147
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R5-router-0.1.2-to-0.1.5__CAm2bFF/verifier/judge.log",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R5-router-0.1.2-to-0.1.5__CAm2bFF/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R5-router-0.1.2-to-0.1.5__CAm2bFF/verifier/test-stdout.txt",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        }
+      }
+    },
+    {
+      "task": "R6-skill-hub-0.1.6-alpha1-to-alpha2",
+      "attempt": 1,
+      "trial": "R6-skill-hub-0.1.6-alpha1-to-alp__2hetqnv",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 18.6,
+        "totalSec": 129.1
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R6-skill-hub-0.1.6-alpha1-to-alp__2hetqnv/verifier/judge.log",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R6-skill-hub-0.1.6-alpha1-to-alp__2hetqnv/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R6-skill-hub-0.1.6-alpha1-to-alp__2hetqnv/verifier/test-stdout.txt",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        }
+      }
+    },
+    {
+      "task": "R7-inbox-0.1.5-to-0.2.0",
+      "attempt": 1,
+      "trial": "R7-inbox-0.1.5-to-0.2.0__uygvrYd",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.3,
+        "verifierSec": 96.6,
+        "totalSec": 304.8
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R7-inbox-0.1.5-to-0.2.0__uygvrYd/verifier/judge.log",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R7-inbox-0.1.5-to-0.2.0__uygvrYd/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R7-inbox-0.1.5-to-0.2.0__uygvrYd/verifier/test-stdout.txt",
+          "sha256": "0d049c48b2586c64836a5a5ead8023b2bee7b4297eb17c50f8861678fa9a7b84",
+          "bytes": 150
+        }
+      }
+    },
+    {
+      "task": "R8-mcp-adapter-0.1.5-to-0.1.7",
+      "attempt": 1,
+      "trial": "R8-mcp-adapter-0.1.5-to-0.1.7__N7cxTcV",
+      "outcome": "scored",
+      "reward": 1,
+      "rewards": {
+        "reward": 1
+      },
+      "durations": {
+        "agentSec": 0.2,
+        "verifierSec": 56.8,
+        "totalSec": 261.4
+      },
+      "artifacts": {
+        "verifier/judge.log": {
+          "path": "attempts/R8-mcp-adapter-0.1.5-to-0.1.7__N7cxTcV/verifier/judge.log",
+          "sha256": "4d657ee01b01acf9c402b40bafe305bef1c7cffe263ca689bc0f79b63667c0b6",
+          "bytes": 121
+        },
+        "verifier/reward.txt": {
+          "path": "attempts/R8-mcp-adapter-0.1.5-to-0.1.7__N7cxTcV/verifier/reward.txt",
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+          "bytes": 2
+        },
+        "verifier/test-stdout.txt": {
+          "path": "attempts/R8-mcp-adapter-0.1.5-to-0.1.7__N7cxTcV/verifier/test-stdout.txt",
+          "sha256": "4d657ee01b01acf9c402b40bafe305bef1c7cffe263ca689bc0f79b63667c0b6",
+          "bytes": 121
+        }
+      }
+    }
+  ],
+  "metrics": {
+    "formula": "v1",
+    "values": {
+      "meanReward": 1,
+      "passRate@1.0": 1,
+      "passRate@0.7": 1,
+      "passAtK": 1,
+      "meanReward.S": null,
+      "meanReward.M": null,
+      "meanReward.H": null,
+      "passHatK": 1,
+      "fragility": 0,
+      "dispersion": null,
+      "unstableTaskShare": 0,
+      "inputTokens": null,
+      "outputTokens": null,
+      "cacheHitRatio": null,
+      "costPerAttempt": null,
+      "costPerSuccess": null,
+      "agentSecP50": 0.3,
+      "agentSecP90": 0.3,
+      "timeoutRate": 0,
+      "infrastructureRate": 0,
+      "eligibleTasks": 8,
+      "infeasibleTasks": 0
+    },
+    "intervals": {
+      "meanReward": [
+        1,
+        1
+      ],
+      "passRate@1.0": [
+        1,
+        1
+      ]
+    }
+  }
+}

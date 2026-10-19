@@ -1,0 +1,16 @@
+FAIL contract: does not admit 0.1.7-rc.2: peerDependencies @deepseek-ai/dsh-settings@^0.1.1-rc.2 || ^0.1.2-rc.1 || ^0.1.5-rc.1, devDependencies @deepseek-ai/dsh-settings@0.1.1-rc.2
+FAIL test: ℹ pass 146
+  ℹ fail 1
+  ℹ cancelled 0
+  ℹ skipped 0
+  ℹ todo 0
+  ℹ duration_ms 4413.722003
+  
+  ✖ failing tests:
+  
+  test at test/settings.test.js:1:1
+  ✖ test/settings.test.js (131.667866ms)
+    'test failed'
+PASS build
+PASS boot
+{"score":44,"max":100,"checks":{"contract":0,"test":0,"build":1,"boot":1}}
