@@ -15,7 +15,7 @@ write_files:
   - path: /etc/systemd/system/docker.service.d/metadata.conf
     content: |
       [Service]
-      ExecStartPost=/usr/sbin/iptables -I DOCKER-USER -d 169.254.169.254/32 -j DROP
+      ExecStartPost=/usr/sbin/iptables -I DOCKER-USER -d 169.254.0.0/16 -j DROP
   - path: /opt/dsh-deploy/env
     permissions: "0600"
     content: |
