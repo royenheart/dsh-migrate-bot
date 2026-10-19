@@ -165,6 +165,8 @@ function failingSuite(): { tree: string; deps: { cacheDir: string; runDir: strin
   }
   const bare = join(root, 'origin.git')
   git(['init', '--bare', bare], root)
+  // No detached maintenance in a fixture (git 2.54 starts it after a push, a fetch or a commit): its repack writes temporary files into objects/ that a local clone copies and that removing the repository races.
+  git(['config', 'maintenance.auto', 'false'], bare)
   const suite = join(root, 'suite')
   mkdirSync(suite)
   git(['init'], suite)

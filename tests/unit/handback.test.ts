@@ -40,6 +40,8 @@ function fixture(): {
     assert.equal(result.status, 0, `${args.join(' ')}\n${result.stderr}`)
   }
   spawnSync('git', ['init', '--bare', bare], { encoding: 'utf8' })
+  // No detached maintenance in a fixture (git 2.54 starts it after a push, a fetch or a commit): its repack writes temporary files into objects/ that a local clone copies and that removing the repository races.
+  spawnSync('git', ['-C', bare, 'config', 'maintenance.auto', 'false'], { encoding: 'utf8' })
   git(['init'])
   git(['config', 'user.name', 'test'])
   git(['config', 'user.email', 'test@example.test'])

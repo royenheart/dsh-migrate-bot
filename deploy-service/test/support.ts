@@ -205,6 +205,8 @@ export function pluginRepository(): { origin: string; head: string; root: string
     return result.stdout.trim()
   }
   git(['init', '--quiet', '--bare', origin], root)
+  // No detached maintenance in a fixture (git 2.54 starts it after a push, a fetch or a commit): its repack writes temporary files into objects/ that a local clone copies and that removing the repository races.
+  git(['config', 'maintenance.auto', 'false'], origin)
   git(['init', '--quiet', work], root)
   writeFileSync(join(work, 'package.json'), '{"name":"@acme/plugin","version":"1.0.0","type":"module"}\n')
   writeFileSync(join(work, 'index.js'), 'export const apply = () => {}\n')

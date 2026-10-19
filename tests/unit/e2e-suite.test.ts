@@ -84,6 +84,7 @@ test('with a remote, the suite branch is pushed there and read from there', () =
   try {
     const bare = join(root, 'origin.git')
     git(['init', '--quiet', '--bare', bare], root)
+    git(['config', 'maintenance.auto', 'false'], bare)
     git(['remote', 'add', 'origin', bare], tree)
     const draft = join(root, 'draft')
     suite(draft)

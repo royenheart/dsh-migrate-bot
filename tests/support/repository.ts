@@ -18,12 +18,14 @@ export function checkout(files: Record<string, string> = { 'package.json': '{"na
   const remote = join(root, 'remote.git')
   const work = join(root, 'work')
   const git = (args: string[], cwd = work): string => {
-    const result = spawnSync('git', ['-c', 'commit.gpgsign=false', '-c', 'user.name=test', '-c', 'user.email=test@example.test', ...args], { cwd, encoding: 'utf8' })
+    const result = spawnSync('git', ['-c', 'commit.gpgsign=false', '-c', 'maintenance.auto=false', '-c', 'user.name=test', '-c', 'user.email=test@example.test', ...args], { cwd, encoding: 'utf8' })
     if (result.status !== 0) throw new Error(`git ${args.join(' ')}: ${result.stderr}`)
     return result.stdout.trim()
   }
   git(['init', '--quiet', '--bare', '--initial-branch=main', remote], root)
-  git(['clone', '--quiet', remote, work], root)
+  // No detached maintenance in a fixture (git 2.54 starts it after a push, a fetch or a commit): its repack writes temporary files into objects/ that a local clone copies and that removing the repository races.
+  git(['config', 'maintenance.auto', 'false'], remote)
+  git(['clone', '--quiet', '--config', 'maintenance.auto=false', remote, work], root)
   for (const [name, content] of Object.entries(files)) writeFileSync(join(work, name), content)
   git(['add', '-A'])
   git(['commit', '--quiet', '-m', 'init'])
@@ -36,7 +38,7 @@ export function checkout(files: Record<string, string> = { 'package.json': '{"na
     clone: () => {
       clones += 1
       const path = join(root, `clone-${String(clones)}`)
-      git(['clone', '--quiet', remote, path], root)
+      git(['clone', '--quiet', '--config', 'maintenance.auto=false', remote, path], root)
       return path
     },
     cleanup: () => { rmSync(root, { recursive: true, force: true }) },
