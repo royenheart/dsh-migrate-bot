@@ -217,3 +217,29 @@ ${wrapFenced(excerpt, 'diff')}
 ${truncated ? `\n${more}\n` : ''}
 </details>`
 }
+
+/** How much of the left-out workflow diff a proposal shows; the rest is in the run's checkout only. */
+const WORKFLOW_DIFF = 12_000
+
+/**
+ * The proposal section for the workflow changes it leaves out: a token without
+ * the `workflows` permission cannot push them, so a maintainer commits them.
+ */
+export function formatLeftOutWorkflows(diff: string): string {
+  const trimmed = diff.trim()
+  const list = parseDiffPaths(trimmed).map(file => `- ${inlineCode(file)}`).join('\n')
+  const truncated = trimmed.length > WORKFLOW_DIFF
+  return `## Workflow changes left out
+
+The migration changed these workflow files. The Action's token cannot push a workflow change, so this proposal keeps the default branch's version of \`.github/workflows/\`. A maintainer must commit these changes:
+
+${list}
+
+<details>
+<summary>Left-out changes</summary>
+
+${wrapFenced(neutralizeEmbedHtml(excerptDiff(trimmed, WORKFLOW_DIFF)), 'diff')}
+${truncated ? '\n_Truncated._\n' : ''}
+</details>
+`
+}

@@ -1,8 +1,11 @@
+import { rmSync } from 'node:fs'
+import { join } from 'node:path'
 import { z } from 'zod'
 import { BOT_EMAIL, botEnv, gitOut } from '../git/run.ts'
 import { stageChanges } from '../git/worktree.ts'
 import { slugOf, type GitHubClient, type Repository } from '../github/client.ts'
 import { formatOfficialDiscussionInvite } from '../github/discussions.ts'
+import { formatLeftOutWorkflows } from '../github/issue-format.ts'
 import { collectPatchReports, formatPatchReportComment } from '../github/patch-reports.ts'
 import { PROPOSAL_MARKER, type ProposalDocuments } from '../github/templates.ts'
 import type { MigrationContext } from '../workflow/machine.ts'
@@ -16,9 +19,17 @@ import type { MigrationEvent, Proposal } from '../workflow/model.ts'
  * inherited ones or the open ones carrying the proposal marker, and the
  * patch-report comments carry a marker per migration. A job that is cancelled
  * after an effect and retried therefore repeats none.
+ *
+ * The branch carries the default branch's `.github/workflows/`, as it is when
+ * the proposal is pushed. GitHub refuses a push by a token without the
+ * `workflows` permission when the branch's workflow files differ from the
+ * default branch's, and the default branch can change them while the
+ * migration runs. A workflow change the migration made itself is left out the
+ * same way, and the proposal says so.
  */
 
 export const PROPOSAL_BRANCH = 'dsh-migrate/proposal'
+const WORKFLOWS = '.github/workflows'
 
 const issueSchema = z.object({
   number: z.number(),
@@ -43,14 +54,17 @@ export interface ProposalDeps {
 export async function publishProposal(
   deps: ProposalDeps,
   context: MigrationContext,
-  documents: ProposalDocuments,
+  rendered: ProposalDocuments,
 ): Promise<{ event: MigrationEvent; files: Map<string, string> }> {
   const repo = slugOf(deps.repository)
   const { workdir } = deps
 
   gitOut(['checkout', '-B', PROPOSAL_BRANCH], { cwd: workdir })
   stageChanges(workdir)
-  gitOut(['commit', '--quiet', '-m', documents.title], { cwd: workdir, env: botEnv() })
+  const leftOut = alignWorkflows(workdir, deps.defaultBranch)
+  const note = leftOut === '' ? '' : `\n${formatLeftOutWorkflows(leftOut)}`
+  const documents = { ...rendered, issue: `${rendered.issue}${note}`, pullRequest: `${rendered.pullRequest}${note}` }
+  gitOut(['commit', '--quiet', '--allow-empty', '-m', documents.title], { cwd: workdir, env: botEnv() })
   const headSha = gitOut(['rev-parse', 'HEAD'], { cwd: workdir })
   gitOut(['push', '--quiet', '--force', 'origin', `HEAD:refs/heads/${PROPOSAL_BRANCH}`], { cwd: workdir })
 
@@ -92,6 +106,22 @@ export async function publishProposal(
   }
   const files = new Map(reports.map(report => [`patch-reports/${report.slug}.md`, report.body]))
   return { event: { type: 'proposal.published', proposal }, files }
+}
+
+/**
+ * Stage the default branch's `.github/workflows/` in place of the tree's.
+ * @returns the staged diff of the workflow changes this drops, empty when none.
+ */
+function alignWorkflows(workdir: string, defaultBranch: string): string {
+  const leftOut = gitOut(['diff', '--cached', 'HEAD', '--', WORKFLOWS], { cwd: workdir })
+  gitOut(['fetch', '--quiet', 'origin', `refs/heads/${defaultBranch}`], { cwd: workdir })
+  const base = gitOut(['rev-parse', 'FETCH_HEAD^{commit}'], { cwd: workdir })
+  gitOut(['rm', '-r', '-q', '--cached', '--ignore-unmatch', '--', WORKFLOWS], { cwd: workdir })
+  rmSync(join(workdir, WORKFLOWS), { recursive: true, force: true })
+  if (gitOut(['ls-tree', '--name-only', base, '--', WORKFLOWS], { cwd: workdir }) !== '') {
+    gitOut(['checkout', base, '--', WORKFLOWS], { cwd: workdir })
+  }
+  return leftOut
 }
 
 const pullStateSchema = z.object({ state: z.string(), merged: z.boolean().optional() })
