@@ -13,12 +13,12 @@ on:
   workflow_call:
     inputs:
       target:
-        description: Override the configured target release
+        description: "The dsh release to migrate the plugins to: latest, a version such as 0.2.1-rc.2, or a dsh-v* tag; empty uses the target in the configuration"
         type: string
         required: false
         default: ''
       force:
-        description: Migrate even when the target release was already processed, unless its proposal is still open
+        description: Migrate again to a dsh release this repository was already migrated to, which is skipped otherwise; never while that release's proposal pull request is open
         type: boolean
         required: false
         default: false
