@@ -33,13 +33,15 @@ const MAX_OUTPUT = 64 * 1024 * 1024
 const TIMEOUT_MS = 10 * 60_000
 
 /**
- * Run git on a tree without a terminal, hooks or signing.
+ * Run git on a tree without a terminal, hooks, signing or detached
+ * maintenance: from git 2.54 a fetch or a commit starts a repack that would
+ * still be writing into a candidate the manager renames or removes.
  * @param tree - the git directory and the work tree.
  * @param args - the git arguments.
  * @param env - extra environment.
  */
 export async function git(tree: Tree, args: readonly string[], env: NodeJS.ProcessEnv = {}): Promise<GitResult> {
-  const result = await runProcess('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', `--git-dir=${tree.gitDir}`, `--work-tree=${tree.workTree}`, ...args], {
+  const result = await runProcess('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', '-c', 'maintenance.auto=false', `--git-dir=${tree.gitDir}`, `--work-tree=${tree.workTree}`, ...args], {
     cwd: tree.workTree,
     timeoutMs: TIMEOUT_MS,
     maxBytes: MAX_OUTPUT,
