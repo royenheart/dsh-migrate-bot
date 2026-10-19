@@ -18,11 +18,11 @@ inputs:
     required: false
     default: .github/dsh-migrate.yml
   target:
-    description: Override the configured target release (latest, a version, or a dsh-v* tag)
+    description: "The dsh release to migrate the plugins to: latest, a version such as 0.2.1-rc.2, or a dsh-v* tag; empty uses the target in the configuration"
     required: false
     default: ''
   force:
-    description: run only. Migrate even when the target release was already processed, unless its proposal is still open
+    description: run only. Migrate again to a dsh release this repository was already migrated to, which is skipped otherwise; never while that release's proposal pull request is open
     required: false
     default: 'false'
   skip_github:

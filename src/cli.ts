@@ -48,8 +48,9 @@ commands:
 options:
   --workdir DIR         the plugin checkout (default: the current directory)
   --config FILE         the configuration (default: .github/dsh-migrate.yml when it exists)
-  --target RELEASE      override the configured target release
-  --force               run even when the target release was already processed, unless its proposal is still open
+  --target RELEASE      the dsh release to migrate to, instead of the configured one
+  --force               migrate again to a dsh release already migrated to (skipped otherwise),
+                        never while that release's proposal is open
   --skip-github         do not call the GitHub API; what such a run still writes is in the README (Run it locally)
 `
 

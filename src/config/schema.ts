@@ -47,7 +47,7 @@ const reportChannelSchema = z.strictObject({
 
 export const configSchema = z.strictObject({
   target: z.string().min(1).default('latest')
-    .describe('Target release: `latest`, a version such as `0.2.0-rc.2`, or a `dsh-v*` tag.'),
+    .describe('The dsh release to migrate the plugins to: `latest`, a version such as `0.2.0-rc.2`, or a `dsh-v*` tag.'),
   review: z.strictObject({
     policy: z.enum(REVIEW_POLICIES).default('always')
       .describe('`always` runs the overlap and extension-point reviews; `when-checks-fail` skips them when the unmodified tree passes every check on the target release.'),
