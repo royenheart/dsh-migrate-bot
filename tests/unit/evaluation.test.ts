@@ -168,6 +168,15 @@ test('a record validates while its metrics and kept files are what its attempts 
     write(record)
     writeFileSync(join(dir, 'attempts', 'M1__x', 'agent', 'proposed.diff'), 'edited\n')
     assert.deepEqual(validateRecords(root), [`${id}: attempts/M1__x/agent/proposed.diff is missing or changed`])
+    // A kept output must not quote a session token.
+    writeFileSync(join(dir, 'attempts', 'M1__x', 'agent', 'proposed.diff'), diff)
+    const output = 'dsh web: http://127.0.0.1:4100/?token=f00d\n'
+    mkdirSync(join(dir, 'attempts', 'M1__x', 'verifier'), { recursive: true })
+    writeFileSync(join(dir, 'attempts', 'M1__x', 'verifier', 'test-stdout.txt'), output)
+    const first = attempts[0] as Attempt
+    const kept = { ...first.artifacts, 'verifier/test-stdout.txt': { path: 'attempts/M1__x/verifier/test-stdout.txt', sha256: createHash('sha256').update(output).digest('hex'), bytes: output.length } }
+    write({ ...record, attempts: [{ ...first, artifacts: kept }] })
+    assert.deepEqual(validateRecords(root), [`${id}: attempts/M1__x/verifier/test-stdout.txt keeps a session token`])
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

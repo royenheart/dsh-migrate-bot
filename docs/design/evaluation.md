@@ -77,7 +77,7 @@ What the metrics do not cover: whether a change is confined to what the migratio
 
 ## 6. Records
 
-A record is `records/<id>/record.json` on the `bench/records` branch, beside the files its attempts kept: `proposed.diff` (the fixture against its baseline commit), `agent.log`, for a pipeline `events.jsonl`, `status.json`, its card ledger `cards.json` and the report session's `report.log`, and the verifier's output. Each kept file carries its SHA-256. A record is written once, by the run that produced it, and never edited. It is written only when every trial the run planned has finished: a run that ends with trials unfinished, including trials Harbor stopped, writes none and is continued with `resume` ([procedure](../operations/benchmark.md#a-run)). A run that went wrong is rerun as a new record.
+A record is `records/<id>/record.json` on the `bench/records` branch, beside the files its attempts kept: `proposed.diff` (the fixture against its baseline commit), `agent.log`, for a pipeline `events.jsonl`, `status.json`, its card ledger `cards.json` and the report session's `report.log`, and the verifier's output. Each kept file carries its SHA-256. A log or a file of the verifier's output is kept with its session tokens redacted, as the Action redacts its own output, since a `dsh web` URL carries one. A record is written once, by the run that produced it, and never edited. It is written only when every trial the run planned has finished: a run that ends with trials unfinished, including trials Harbor stopped, writes none and is continued with `resume` ([procedure](../operations/benchmark.md#a-run)). A run that went wrong is rerun as a new record.
 
 The working tree must be clean, or the run passes `--allow-dirty` and the record says `producer.dirty`.
 
