@@ -32,20 +32,39 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
+      # No persisted credentials: the repository is public, and nothing here
+      # pushes, so `npm ci`'s lifecycle scripts find no token in .git/config.
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # Until the first records are pushed there is nothing to build.
+      - id: records
+        run: |
+          if git ls-remote --exit-code --heads origin bench/records > /dev/null; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::origin has no bench/records branch yet, so there is no report to publish"
+          fi
+      - if: steps.records.outputs.present == 'true'
+        uses: actions/checkout@v4
         with:
           ref: bench/records
           path: .bench/records
-      - uses: actions/setup-node@v4
+          persist-credentials: false
+      - if: steps.records.outputs.present == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: npm ci
-      - run: npm run site -- --field
+      - if: steps.records.outputs.present == 'true'
+        run: npm ci
+      - if: steps.records.outputs.present == 'true'
+        run: npm run site -- --field
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - uses: actions/upload-pages-artifact@v3
+      - if: steps.records.outputs.present == 'true'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: .bench/site
       - id: deploy
+        if: steps.records.outputs.present == 'true'
         uses: actions/deploy-pages@v4
