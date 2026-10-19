@@ -24,6 +24,7 @@ import { attemptOf, finished, readTrial } from '../src/evaluation/harbor.ts'
 import { compare, computeMetrics } from '../src/evaluation/metrics.ts'
 import { recordSchema, RECORD_SCHEMA, SUBJECTS, type Attempt, type BenchmarkRecord, type SubjectId, type TaskEntry } from '../src/evaluation/record.ts'
 import { UPGRADE_SKILLS } from '../src/skills/upgrade.ts'
+import { scrubWebOutput } from '../src/verify/web.ts'
 import { REPO_ROOT } from './repo.ts'
 import { botSnapshot, checkSnapshot, storeSnapshot } from './snapshot.ts'
 
@@ -135,6 +136,21 @@ function filesUnder(dir: string): string[] {
 }
 
 /** Copy the kept files of a trial into the record and describe them. */
+/**
+ * A kept file that a process printed, the verifier's files and the logs: it
+ * can quote a `dsh web` URL, whose session token a record must not keep.
+ */
+const isOutput = (name: string): boolean => name.startsWith('verifier/') || name.endsWith('.log')
+/** A session token not yet redacted (`scrubWebOutput`). */
+const LIVE_TOKEN = /[?&]token=(?!<redacted>)[^\s&"']+/i
+
+/**
+ * Copy what a record keeps of a trial into its directory: the agent's files and
+ * every file of the verifier, each with the hash and size of the copy it keeps.
+ * @param trialDir - Harbor's trial directory.
+ * @param recordDir - the record's directory.
+ * @param trial - the trial's name, its directory under `attempts/`.
+ */
 function keepArtifacts(trialDir: string, recordDir: string, trial: string): Attempt['artifacts'] {
   const kept = [...AGENT_FILES, ...filesUnder(join(trialDir, 'verifier')).map(path => join('verifier', path))]
   const artifacts: Attempt['artifacts'] = {}
@@ -142,9 +158,14 @@ function keepArtifacts(trialDir: string, recordDir: string, trial: string): Atte
     const source = join(trialDir, name)
     if (!existsSync(source)) continue
     const path = join('attempts', trial, name)
-    mkdirSync(dirname(join(recordDir, path)), { recursive: true })
-    copyFileSync(source, join(recordDir, path))
-    artifacts[name] = { path, sha256: sha256(source), bytes: statSync(source).size }
+    const target = join(recordDir, path)
+    mkdirSync(dirname(target), { recursive: true })
+    // An output is kept with its session tokens redacted, as the Action's own output is; a binary file (a NUL byte) as it is.
+    const bytes = readFileSync(source)
+    const text = isOutput(name) && !bytes.includes(0) ? bytes.toString('utf8') : undefined
+    if (text !== undefined && scrubWebOutput(text) !== text) writeFileSync(target, scrubWebOutput(text))
+    else copyFileSync(source, target)
+    artifacts[name] = { path, sha256: sha256(target), bytes: statSync(target).size }
   }
   return artifacts
 }
@@ -408,7 +429,7 @@ function compareRecords(argv: string[]): number {
   return regressed ? 1 : 0
 }
 
-/** Every record parses, its metrics recompute to the stored values, and its artifacts match their hashes. */
+/** Every record parses, its metrics recompute to the stored values, and its artifacts match their hashes and keep no session token. */
 export function validateRecords(records: string): string[] {
   const problems: string[] = []
   const dir = join(records, 'records')
@@ -426,9 +447,10 @@ export function validateRecords(records: string): string[] {
     const metrics = computeMetrics({ tasks: record.suite.tasks, attempts: record.attempts, k: record.subject.attempts })
     if (!isDeepStrictEqual(metrics, record.metrics)) problems.push(`${id}: the stored metrics differ from the metrics its attempts compute to`)
     for (const attempt of record.attempts) {
-      for (const artifact of Object.values(attempt.artifacts)) {
+      for (const [name, artifact] of Object.entries(attempt.artifacts)) {
         const file = join(records, 'records', id, artifact.path)
         if (!existsSync(file) || sha256(file) !== artifact.sha256) problems.push(`${id}: ${artifact.path} is missing or changed`)
+        else if (isOutput(name) && LIVE_TOKEN.test(readFileSync(file, 'utf8'))) problems.push(`${id}: ${artifact.path} keeps a session token`)
       }
     }
   }
