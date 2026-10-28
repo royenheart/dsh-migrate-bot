@@ -1,4 +1,5 @@
 import type { AgentConfig } from '../config/schema.ts'
+import type { SessionObservation } from '../observability/session.ts'
 import type { SessionProgress } from './session-status.ts'
 
 export type AgentKind = 'overlap' | 'extension-points' | 'repair' | 'e2e-authoring' | 'report'
@@ -13,6 +14,8 @@ export interface AgentRequest {
   usageLimit?: number | undefined
   /** Environment the session's tools see, such as the address of a running `dsh web`. */
   env?: Record<string, string> | undefined
+  /** Structured session events for the run manifest and Langfuse. */
+  onObservation?: ((observation: SessionObservation) => void) | undefined
 }
 
 export interface AgentResult {

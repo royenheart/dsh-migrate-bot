@@ -7,6 +7,7 @@ import { parseConfig } from '../../src/config/load.ts'
 import { FakeGitHub } from '../support/github.ts'
 import { contextOf, input, proposal, proposedEvents, settings } from '../support/migration.ts'
 import type { AgentRequest, AgentRunner } from '../../src/agents/types.ts'
+import { buildRunManifest, serializeManifest, sha256 } from '../../src/observability/manifest.ts'
 
 const ENV = { GITHUB_API_URL: 'https://api.test', DSH_MIGRATE_REPORT_BOT_TOKEN: 'bot-token', DSH_MIGRATE_REPORT_HARNESS_TOKEN: 'harness-token' }
 const OPEN = proposal(9)
@@ -41,7 +42,14 @@ function fixture(agentOutput: string) {
   return { github, deps, prompts, migration }
 }
 
-const REPORT = 'Findings.\n\n```json\n{"title":"The repair missed a renamed export","body":"## Run\\n…"}\n```\n'
+const REPORT = 'Findings.\n\n```json\n' + JSON.stringify({
+  title: 'The repair missed a renamed export',
+  findings: [
+    { stage: 'mechanical', severity: 'high', finding: 'The mechanical check missed a renamed export.', evidence: 'The maintainer renamed it by hand in index.js.', fix: 'Add the export to the unit test.', attribution: 'action' },
+    { stage: 'web check', severity: 'low', finding: 'The web check only waited for the ready line.', evidence: 'The role picker was never clicked.', fix: 'Assert the preset is registered.', attribution: 'pre-existing' },
+  ],
+  limits: ['The evidence did not carry the raw diff.'],
+}, null, 2) + '\n```\n'
 
 test('an analysis channel reasons over the merge and delivers one issue to its repository', async () => {
   const { github, deps, prompts, migration } = fixture(REPORT)
@@ -53,6 +61,14 @@ test('an analysis channel reasons over the merge and delivers one issue to its r
   assert.doesNotMatch(prompt, /bot noise/)
   assert.match(prompt, /\| `index\.js` \| modified \| 1 \| 1 \|/)
   assert.match(prompt, /Decision: keep/)
+  assert.match(prompt, /"findings"/)
+  assert.match(prompt, /Action version: `1\.0\.0-rc\.2`/)
+  assert.match(prompt, /Model: `deepseek-official\/deepseek-v4-flash`/)
+  const body = github.external[0]?.body ?? ''
+  assert.match(body, /## Findings/)
+  assert.match(body, /### 1\. \[high\] mechanical:/)
+  assert.match(body, /\*\*Attribution\.\*\* Pre-existing\./)
+  assert.doesNotMatch(body, /not a defect|not scored|not just/)
   assert.equal(prompts[0]?.kind, 'report')
 })
 
@@ -111,4 +127,72 @@ test('the payload is read from the last fenced block only', () => {
   assert.deepEqual(parsePayload(quoting, reportPayloadSchema), { ok: true, value: { title: 't', body: 'Steps:\n```ts\nfoo()\n```\nend' } })
   assert.equal(lastFencedBlock('no fence'), undefined)
   assert.equal(parsePayload('```json\n{"title":" ","body":"b"}\n```', reportPayloadSchema).ok, false)
+})
+
+test('the changed-file table survives an unreachable proposal head', async () => {
+  const { github, deps, prompts, migration } = fixture(REPORT)
+  const base = github.fetch
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const url = String(input)
+    if (url.includes('/compare/')) return new Response('{"message":"Not Found"}', { status: 404 })
+    if (url.includes(`/pulls/${String(OPEN.pullRequest.number)}/files`)) {
+      return new Response(JSON.stringify([{ filename: 'index.js', status: 'modified', additions: 2, deletions: 1 }]), { status: 200 })
+    }
+    return await base(input, init)
+  }
+  const outcome = await runReportChannel('migrate-bot', migration, {
+    ...deps,
+    github: new GitHubClient('workflow-token', ENV, fetchImpl),
+  }, 'deliver')
+  assert.equal(outcome.outcome, 'delivered', outcome.detail)
+  assert.match(prompts[0]?.prompt ?? '', /\| `index\.js` \| modified \| 2 \| 1 \|/)
+})
+
+test('the proposal check lines reach the rendered report', async () => {
+  const { github, deps, migration } = fixture(REPORT)
+  const pull = github.pulls.get(OPEN.pullRequest.number)
+  if (pull !== undefined) pull.body = '## Checks\n\n- Boot check: skipped\n- Web check: pass\n\n## Before merging\n\n- [ ] Merge\n'
+  const outcome = await runReportChannel('migrate-bot', migration, deps, 'deliver')
+  assert.equal(outcome.outcome, 'delivered', outcome.detail)
+  const body = github.external[0]?.body ?? ''
+  assert.match(body, /- Checks:\n  - Boot check: skipped\n  - Web check: pass/)
+})
+
+
+test('manifest metrics reach the report evidence and the delivered body', async () => {
+  const { deps, migration, prompts, github } = fixture(REPORT)
+  const manifest = buildRunManifest({
+    runId: '123-1',
+    migrationId: '0.2.0',
+    plugin: ['plugin'],
+    target: { tag: 'dsh-v0.2.0', version: '0.2.0' },
+    agent: { provider: 'deepseek-official', model: 'deepseek-v4-flash', thinking: 'enabled', reasoningEffort: 'max', upgradeSkills: true },
+    sessions: [{
+      kind: 'overlap',
+      name: 'overlap',
+      prompt: 'review',
+      promptSha256: sha256('review'),
+      startedAt: '2026-10-27T13:00:00.000Z',
+      endedAt: '2026-10-27T13:05:00.000Z',
+      outcome: 'completed',
+      usage: { inputTokens: 100, outputTokens: 20, cacheHitTokens: 30, usd: 0.01 },
+      progress: { turns: 3, steps: 7, elapsedSeconds: 300 },
+      toolCalls: 4,
+      observations: [],
+    }],
+    checks: [],
+    outcome: 'accepted',
+    startedAt: '2026-10-27T13:00:00.000Z',
+    endedAt: '2026-10-27T13:06:00.000Z',
+  })
+  const path = 'migrations/0.2.0/runs/123-1/manifest.json'
+  const files = {
+    list: (dir: string) => [...deps.files.list(dir), ...(dir === 'migrations/0.2.0/runs' ? [path] : [])],
+    readFile: (file: string) => file === path ? serializeManifest(manifest) : deps.files.readFile(file),
+  }
+  const outcome = await runReportChannel('migrate-bot', migration, { ...deps, files }, 'deliver')
+  assert.equal(outcome.outcome, 'delivered', outcome.detail)
+  assert.match(prompts[0]?.prompt ?? '', /Agent work: 1 run\(s\), 1 session\(s\), 3 turns, 7 steps, 4 tool calls/)
+  assert.match(prompts[0]?.prompt ?? '', /Agent cost: \$0\.010000/)
+  assert.match(github.external[0]?.body ?? '', /Agent work: 1 run/)
 })

@@ -14,8 +14,11 @@ description: Setting the Action up in a plugin repository, by hand or with a cod
    | `DEEPSEEK_API_KEY_DSH_MIGRATE_BOT` | Every migration: the agent sessions |
    | `DSH_MIGRATE_REPORT_UPGRADE_SKILL_TOKEN`, `DSH_MIGRATE_REPORT_BOT_TOKEN`, `DSH_MIGRATE_REPORT_HARNESS_TOKEN` | A built-in [report channel](#report-channels) that is enabled |
    | `DSH_MIGRATE_DEPLOY_TOKEN` | A [deploy service](#the-deploy-service) |
+   | `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | Optional: trace every migration session to Langfuse; all three are needed |
 
    The `secrets.apiKeyEnv`, `deploy.tokenEnv` and `reports.channels.<id>.tokenEnv` keys name the variable the Action reads, and a [report channel](#report-channels) of your own names its token in the last; a name not in the table needs [a copy of the reusable workflow](#a-copy-of-the-reusable-workflow).
+
+   The Langfuse variables are optional. With all three set, each migration session is exported as an OTLP trace to that host; a failed export is logged and never fails the migration. Without them the run still writes its manifest and prompt snapshots, and its report has no trace link. Langfuse receives prompt text and tool output, so enable it only on a host with the access policy the [deploy service](#the-deploy-service) uses.
 2. Copy [examples/workflow.yml](../../examples/workflow.yml) to `.github/workflows/dsh-migrate.yml`, set the cron, and pin the release as [releasing](release.md#what-a-consumer-pins) describes. The file chooses the triggers and calls the reusable workflow [`.github/workflows/migrate.yml`](../../.github/workflows/migrate.yml) of this repository, or [your copy of it](#a-copy-of-the-reusable-workflow), with `secrets: inherit`.
 3. Optionally copy [examples/dsh-migrate.yml](../../examples/dsh-migrate.yml) to `.github/dsh-migrate.yml`. Every key is optional and listed in the [configuration reference](../reference/configuration.md); an unknown or renamed key fails the run with a message that names the replacement.
 4. In Settings → Actions → General → Workflow permissions, enable **Allow GitHub Actions to create and approve pull requests**. Without it the workflow token pushes the proposal branch and opens the issue, and then gets HTTP 403 when it opens the pull request.

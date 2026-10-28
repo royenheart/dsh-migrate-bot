@@ -7,6 +7,8 @@ import { decideQuota } from '../quota/check.ts'
 import { isQuotaError } from '../quota/errors.ts'
 import { parseBlocker } from '../verify/blocker.ts'
 import { describeBaseline } from '../domain/outcome.ts'
+import { sha256 } from '../observability/manifest.ts'
+import type { SessionObservation, SessionObserver, SessionRecord } from '../observability/session.ts'
 import type { AgentRequest, AgentRunner } from '../agents/types.ts'
 import type { SessionProgress } from '../agents/session-status.ts'
 import type { MigrateConfig } from '../config/schema.ts'
@@ -48,6 +50,8 @@ export interface SessionDeps {
   lastFailure: () => string
   /** The upgrade skill's release files (`references/`), for the change cards. */
   cardsDir?: string | undefined
+  /** Collects this run's sessions for the manifest and Langfuse. */
+  observer?: SessionObserver | undefined
 }
 
 export class SessionRunner {
@@ -118,6 +122,8 @@ export class SessionRunner {
   async runOther(request: Pick<AgentRequest, 'kind' | 'prompt' | 'workdir' | 'env'>): Promise<{ usage?: SessionUsage | undefined } | { failure: string }> {
     const cap = await this.capReached()
     if (cap !== undefined) return { failure: `spend cap: ${cap}` }
+    const startedAt = new Date().toISOString()
+    const observations: SessionObservation[] = []
     try {
       const result = await this.deps.agent.run({
         ...request,
@@ -125,14 +131,49 @@ export class SessionRunner {
         apiKey: this.deps.apiKey,
         usageSoFar: this.spent,
         ...(this.deps.config.quota.limit === undefined ? {} : { usageLimit: this.deps.config.quota.limit }),
+        onObservation: observation => { observations.push(observation) },
       })
       const usage = usageOf(result.usage)
       this.spent += usage?.usd ?? 0
+      this.record({ kind: request.kind, name: request.kind, prompt: request.prompt, startedAt, outcome: 'completed', report: result.report, progress: result.usage, observations })
       return { usage }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
+      this.record({ kind: request.kind, name: request.kind, prompt: request.prompt, startedAt, outcome: isQuotaError(error) ? 'spend-cap' : 'failed', observations })
       return { failure: isQuotaError(error) ? `spend cap: ${detail}` : detail }
     }
+  }
+
+  private record(input: {
+    kind: string
+    name: string
+    prompt: string
+    startedAt: string
+    outcome: 'completed' | 'failed' | 'spend-cap'
+    report?: string | undefined
+    progress?: SessionProgress | undefined
+    observations: SessionObservation[]
+  }): void {
+    const observer = this.deps.observer
+    if (observer === undefined) return
+    const usage = usageOf(input.progress)
+    const record: SessionRecord = {
+      kind: input.kind,
+      name: input.name,
+      prompt: input.prompt,
+      promptSha256: sha256(input.prompt),
+      startedAt: input.startedAt,
+      endedAt: new Date().toISOString(),
+      outcome: input.outcome,
+      ...(input.report === undefined ? {} : { output: input.report }),
+      ...(usage === undefined ? {} : { usage }),
+      ...(input.progress === undefined
+        ? {}
+        : { progress: { turns: input.progress.turns, steps: input.progress.steps, elapsedSeconds: input.progress.elapsedSeconds } }),
+      toolCalls: input.observations.filter(observation => observation.type === 'tool-call').length,
+      observations: input.observations,
+    }
+    observer.record(record)
   }
 
   async run(
@@ -150,25 +191,30 @@ export class SessionRunner {
     this.deps.syncSkills(this.deps.config.agent.upgradeSkills)
     // The run directory holds the card ledger the session writes.
     mkdirSync(this.deps.runDir, { recursive: true })
+    const prompt = this.prompt(request, context)
+    const startedAt = new Date().toISOString()
+    const observations: SessionObservation[] = []
+    const name = request.kind === 'repair' ? `repair-${String(request.attempt)}` : request.kind
     let result
     try {
       result = await this.deps.agent.run({
         kind: request.kind,
-        prompt: this.prompt(request, context),
+        prompt,
         workdir: this.deps.workdir,
         agent: this.deps.config.agent,
         apiKey: this.deps.apiKey,
         usageSoFar: this.spent,
         ...(this.deps.config.quota.limit === undefined ? {} : { usageLimit: this.deps.config.quota.limit }),
+        onObservation: observation => { observations.push(observation) },
       })
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
+      this.record({ kind: request.kind, name, prompt, startedAt, outcome: isQuotaError(error) ? 'spend-cap' : 'failed', observations })
       return done(isQuotaError(error) ? 'spend-cap' : 'failed', detail)
     }
     const usage = usageOf(result.usage)
     this.spent += usage?.usd ?? 0
 
-    const name = request.kind === 'repair' ? `repair-${String(request.attempt)}` : request.kind
     this.reports.set(name, result.report)
     mkdirSync(join(this.deps.runDir, 'reports'), { recursive: true })
     writeFileSync(join(this.deps.runDir, 'reports', `${name}.md`), result.report)
@@ -176,6 +222,7 @@ export class SessionRunner {
     // The ledger as this session left it: what a maintainer and a merge report check the cards against.
     const ledger = ledgerPathOf(this.deps.runDir)
     if (existsSync(ledger)) files.set('cards.json', readFileSync(ledger, 'utf8'))
+    this.record({ kind: request.kind, name, prompt, startedAt, outcome: 'completed', report: result.report, progress: result.usage, observations })
 
     const blocker = request.kind === 'repair' ? parseBlocker(result.report) : undefined
     return done('completed', blocker?.declared === true ? `upstream blocker declared${blocker.valid ? '' : ` without ${blocker.missing.join(', ')}`}` : '', {

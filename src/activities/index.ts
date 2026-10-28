@@ -15,6 +15,7 @@ import type { GitHubClient, Repository } from '../github/client.ts'
 import type { QuotaQuery } from '../quota/types.ts'
 import type { MigrationFiles } from '../merge-reports/evidence.ts'
 import type { CheckName, CheckResult } from '../workflow/model.ts'
+import type { SessionObserver } from '../observability/session.ts'
 
 /**
  * The activities: the only code the engine calls that has effects. Each one
@@ -38,6 +39,8 @@ export interface ActivityDeps {
   runUrl?: string | undefined
   syncSkills: (enabled: boolean) => void
   log: (message: string) => void
+  /** Collects sessions and checks for the run manifest and Langfuse. */
+  observer?: SessionObserver | undefined
 }
 
 export function createActivities(deps: ActivityDeps): ActivityRunner {
@@ -60,6 +63,7 @@ export function createActivities(deps: ActivityDeps): ActivityRunner {
       log: deps.log,
       lastFailure: () => checks.lastFailure?.output ?? '',
       cardsDir,
+      ...(deps.observer === undefined ? {} : { observer: deps.observer }),
     })
     return sessions
   }
@@ -73,6 +77,7 @@ export function createActivities(deps: ActivityDeps): ActivityRunner {
         if (release === undefined) throw new Error('a source boot check was requested without a source release')
         const result = await checks.run(request, release)
         if (request.release === 'target') latest.set(request.check, result)
+        deps.observer?.recordCheck?.({ check: result.check, outcome: result.outcome })
         return { event: { type: 'check.done', result } }
       }
       case 'session': {
@@ -111,6 +116,7 @@ export function createActivities(deps: ActivityDeps): ActivityRunner {
           apiKey: deps.apiKey,
           workdir: deps.workdir,
           syncSkills: deps.syncSkills,
+          ...(deps.observer === undefined ? {} : { observer: deps.observer }),
         }
         const outcome = await runReportChannel(request.channel, { id: context.input.target.version, context }, reportDeps, 'deliver')
         return {

@@ -46,8 +46,38 @@ Rules for that block:
 - Every URL in \`existing\` must be one you were given. Never construct one.
 - Do not print anything after the block.`
 
+/** What the migrate-bot channel must print: findings as data, not a Markdown body. */
+export const MIGRATE_BOT_CONTRACT = `Print exactly one fenced \`\`\`json block as the last thing in your output, with this shape:
+
+{
+  "title": "<the issue title, one line, no markdown>",
+  "findings": [
+    {
+      "stage": "<the stage that should have caught it>",
+      "severity": "high" | "medium" | "low",
+      "finding": "<one sentence: what was missed, and what it cost>",
+      "evidence": "<the maintainer's edit or comment, with file paths or line numbers>",
+      "fix": "<the smallest change that would have caught it>",
+      "attribution": "action" | "pre-existing" | "upstream"
+    }
+  ],
+  "limits": ["<an unknown that changes confidence, one sentence>"]
+}
+
+Rules for that block:
+- Return one to five findings, ordered by cost. Return an empty \`findings\` array only when the migration was clean.
+- \`finding\` is one sentence. Start with the miss, not with the run or the evidence.
+- \`evidence\` quotes the maintainer's own words and names the file. Do not claim a diff hunk the evidence does not carry.
+- \`fix\` is the smallest change that would have caught it; do not propose a rewrite.
+- \`attribution\` is \`action\` unless the problem predates this migration (\`pre-existing\`) or belongs to the harness (\`upstream\`). It is a label, not a sentence.
+- \`limits\` holds at most three unknowns that change confidence. Omit it when there are none.
+- State what is. Do not write "not just X", "not X but Y", "not a defect", "not a finding", "not scored", or "rather than".
+- Do not write a Markdown body: the Action renders the body from these fields.
+- Do not print anything after the block.`
+
 /**
  * `upgrade-skill`: report what a real migration found wrong or missing in the
+
  * community upgrade skills, in the shape of that repository's bug template. It
  * delivers an issue only, because that project forbids generating cards or
  * claiming a corridor as a side effect of migrating somebody else's plugin.
@@ -89,22 +119,23 @@ const MIGRATE_BOT_PROMPT = `You are reviewing how the DSH migration bot (this Ac
 
 The maintainer merged the proposal pull request. That is an endorsement of the outcome, not proof that every step was right: they may have edited the branch before merging, they may have merged to stop the noise, and they may have left comments explaining what they had to fix by hand.
 
-Find the defects that cost the maintainer work, and attribute each one to the stage that should have caught it: the mechanical checks (\`typecheck\`, build, unit tests), the boot check, the web check, the end-to-end check, the overlap review, the extension-point review, or the repair attempts. If the migration went through cleanly and the maintainer changed nothing, say so in one line and report nothing else.
+Report the defects that cost the maintainer work. For each one, name the stage that owned the miss: the mechanical checks (\`typecheck\`, build, unit tests), the boot check, the web check, the end-to-end check, the overlap review, the extension-point review, or the repair attempts. If the migration went through cleanly and the maintainer changed nothing, return no findings and say so in the title.
 
-## What makes a finding actionable
+Write for a maintainer scanning the issue on a phone:
 
-- Name the stage that owned the miss, and say what it should have done instead.
-- Quote the maintainer's own edit or comment as the evidence, with the file path, and distinguish "the maintainer had to fix this" from "the maintainer preferred a different style".
-- Separate a defect in the Action from a defect in the plugin: a plugin that was already broken before this run, or a harness change that no plugin-side edit can absorb, is not an Action defect. Report it as an attribution, not a bug.
-- Prefer few, well-evidenced findings over a list. A report with one real defect and an honest "everything else was clean" is more useful than five speculative ones.`
+- Lead with the miss and its cost. The evidence and the fix follow.
+- A problem that predates the migration or belongs to the harness is still worth reporting when the Action could have caught it; label it \`pre-existing\` or \`upstream\` and move on.
+- Prefer one real defect over five speculative ones. An honest clean report is useful.`
 
 const MIGRATE_BOT_RULES = [
   'This channel opens an issue on the migration bot repository. It never opens a pull request and never edits the bot.',
-  'Write the body with these sections in this order: Run, What the maintainer changed, Findings, Suggested change, Unverified boundaries.',
-  'Run names the plugin, the `from` and `to` `dsh-v*` tags, the Action version if the evidence carries it, and the model configuration.',
-  'What the maintainer changed lists the exact paths and, where the evidence has it, the exact diff lines. If they changed nothing, write "nothing" and stop after Unverified boundaries.',
-  'Each finding states: the stage that owned the miss, the evidence, and the smallest change that would have caught it. Do not propose a rewrite.',
+  'The Action renders the body from your findings. Do not write the Run section, the changed-file table, or any other Markdown body.',
+  'Return one to five findings, ordered by cost. Use an empty array only when the migration was clean.',
+  'Each finding carries a one-sentence `finding`, the maintainer evidence, the smallest `fix`, and an `attribution` label.',
+  'Use `pre-existing` or `upstream` only when that changes who acts. Do not add a section for things that are not Action defects.',
+  'Put at most three unknowns in `limits`; omit the field when there are none.',
   'Never report a token count, a duration, or a reward that the evidence does not contain.',
+  'Do not use contrastive negation: no "not just", "not only", "not a defect", "not a finding", "not scored", or "rather than".',
 ]
 
 /**
@@ -133,7 +164,7 @@ const HARNESS_DISCUSSION_RULES = [
 
 const BUILTIN_PROMPTS: Record<string, { instructions: string; contract: string; rules: readonly string[] }> = {
   [UPGRADE_SKILL_CHANNEL]: { instructions: UPGRADE_SKILL_PROMPT, contract: REPORT_CONTRACT, rules: UPGRADE_SKILL_RULES },
-  [MIGRATE_BOT_CHANNEL]: { instructions: MIGRATE_BOT_PROMPT, contract: REPORT_CONTRACT, rules: MIGRATE_BOT_RULES },
+  [MIGRATE_BOT_CHANNEL]: { instructions: MIGRATE_BOT_PROMPT, contract: MIGRATE_BOT_CONTRACT, rules: MIGRATE_BOT_RULES },
   [HARNESS_DISCUSSION_CHANNEL]: { instructions: HARNESS_DISCUSSION_PROMPT, contract: DUPLICATE_CONTRACT, rules: HARNESS_DISCUSSION_RULES },
 }
 

@@ -34,6 +34,8 @@ test('the proposal names the release range, the attempts and every check', () =>
   assert.match(docs.issue, /End-to-end check: fail \(e2e: login spec\)/)
   assert.match(docs.pullRequest, /expected heading/)
   assert.match(docs.pullRequest, /actions\/runs\/1/)
+  assert.match(docs.pullRequest, /Merge with a merge commit/)
+  assert.match(docs.pullRequest, /wait for the migration report/)
 })
 
 test('the issue carries each review and repair report under its own heading', () => {

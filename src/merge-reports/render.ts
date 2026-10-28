@@ -1,4 +1,5 @@
-import type { Evidence } from './evidence.ts'
+import type { Evidence, RunMetrics } from './evidence.ts'
+import type { MigrateBotPayload } from './parse.ts'
 
 /**
  * Render the evidence a report session reasons over.
@@ -20,8 +21,12 @@ export function renderEvidence(evidence: Evidence, options: { includeCandidates:
     `- Pull request: #${String(evidence.pullRequest.number)} — ${evidence.pullRequest.title} (${evidence.pullRequest.url})`,
     `- Merged: ${evidence.pullRequest.merged ? `yes, at ${evidence.pullRequest.mergedAt ?? 'unknown'} by ${evidence.pullRequest.mergedBy ?? 'unknown'}` : 'no'}`,
     `- Companion issue: ${evidence.issueUrl}`,
+    `- Action version: ${evidence.actionVersion === undefined ? 'unknown' : `\`${evidence.actionVersion}\``}`,
+    `- Model: \`${evidence.model.provider}/${evidence.model.model}\` (thinking ${evidence.model.thinking}, effort ${evidence.model.reasoningEffort})`,
     ...evidence.warnings.map(warning => `- Warning recorded by the migration: ${warning}`),
   )
+
+  if (evidence.metrics !== undefined) section('Agent work', ...metricsLines(evidence.metrics))
 
   const changes = evidence.maintainerChanges
   section(
@@ -78,8 +83,81 @@ export function renderEvidence(evidence: Evidence, options: { includeCandidates:
   return lines.join('\n').trim()
 }
 
+function metricsLines(metrics: RunMetrics): string[] {
+  const cost = metrics.usd === undefined ? 'cost not recorded' : `$${metrics.usd.toFixed(6)}`
+  return [
+    `- Agent work: ${String(metrics.runs)} run(s), ${String(metrics.sessions)} session(s), ${String(metrics.turns)} turns, ${String(metrics.steps)} steps, ${String(metrics.toolCalls)} tool calls`,
+    `- Agent cost: ${cost} (input ${String(metrics.inputTokens)}, output ${String(metrics.outputTokens)}, cache hit ${String(metrics.cacheHitTokens)} tokens)`,
+    `- Agent time: ${String(metrics.elapsedSeconds)}s across sessions`,
+  ]
+}
+
 function truncate(text: string, limit = 20_000): string {
   const trimmed = text.trim()
   if (trimmed.length <= limit) return trimmed
   return `${trimmed.slice(0, limit)}\n\n… truncated by this Action (${String(trimmed.length - limit)} characters omitted).`
+}
+
+
+/**
+ * Render the migrate-bot report from structured findings.
+ *
+ * The model returns findings as data; this template owns the prose around them.
+ * That keeps the report readable and keeps defensive attributions out of it:
+ * `attribution` is a label, not a sentence that argues with a reader.
+ * @param evidence - what the report reasons over.
+ * @param report - the findings the session returned.
+ */
+export function renderMigrateBotReport(evidence: Evidence, report: MigrateBotPayload): { title: string; body: string } {
+  const lines: string[] = [
+    '## Run',
+    '',
+    `- Plugin: \`${evidence.plugin}\``,
+    `- Release range: ${evidence.from === undefined ? '(source release not recorded)' : `\`${evidence.from}\``} → \`${evidence.to}\``,
+    `- Pull request: #${String(evidence.pullRequest.number)} — ${evidence.pullRequest.title} (${evidence.pullRequest.url})`,
+    `- Merged: ${evidence.pullRequest.merged ? `yes, at ${evidence.pullRequest.mergedAt ?? 'unknown'} by ${evidence.pullRequest.mergedBy ?? 'unknown'}` : 'no'}`,
+    `- Action version: ${evidence.actionVersion === undefined ? 'unknown' : `\`${evidence.actionVersion}\``}`,
+    `- Model: \`${evidence.model.provider}/${evidence.model.model}\` (thinking ${evidence.model.thinking}, effort ${evidence.model.reasoningEffort})`,
+    ...(evidence.checks.length === 0 ? ['- Checks: none recorded in the proposal body'] : ['- Checks:', ...evidence.checks.map(check => `  - ${check}`)]),
+    ...(evidence.metrics === undefined ? [] : metricsLines(evidence.metrics)),
+    ...evidence.warnings.map(warning => `- Warning recorded by the migration: ${warning}`),
+    '',
+    '## What the maintainer changed',
+    '',
+  ]
+
+  if (!evidence.maintainerChanges.known) {
+    lines.push(`Not comparable: ${evidence.maintainerChanges.note}`)
+  } else if (evidence.maintainerChanges.files.length === 0) {
+    lines.push('Nothing: the branch is exactly as this Action pushed it.')
+  } else {
+    const table = [
+      '| File | Status | + | - |',
+      '| --- | --- | --- | --- |',
+      ...evidence.maintainerChanges.files.map(file => `| \`${file.filename}\` | ${file.status} | ${String(file.additions)} | ${String(file.deletions)} |`),
+    ]
+    if (table.length > 12) {
+      lines.push(`<details><summary>${String(evidence.maintainerChanges.files.length)} changed file(s)</summary>`, '', ...table, '', '</details>')
+    } else {
+      lines.push(...table)
+    }
+  }
+  lines.push('', '## Findings', '')
+
+  if (report.findings.length === 0) {
+    lines.push('No Action defect found: no check missed a defect that cost the maintainer work.', '')
+  }
+  report.findings.forEach((finding, index) => {
+    lines.push(`### ${String(index + 1)}. [${finding.severity}] ${finding.stage}: ${finding.finding}`, '')
+    lines.push(`**Evidence.** ${finding.evidence}`, '')
+    lines.push(`**Fix.** ${finding.fix}`, '')
+    if (finding.attribution !== 'action') {
+      lines.push(`**Attribution.** ${finding.attribution === 'pre-existing' ? 'Pre-existing.' : 'Upstream.'}`, '')
+    }
+  })
+
+  if (report.limits !== undefined && report.limits.length > 0) {
+    lines.push('## Limits', '', ...report.limits.map(limit => `- ${limit}`), '')
+  }
+  return { title: report.title, body: `${lines.join('\n').trim()}\n` }
 }

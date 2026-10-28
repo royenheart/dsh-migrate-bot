@@ -205,7 +205,68 @@ test('a deploy verb reaches the deploy service at the preview path for this pull
   assert.deepEqual(JSON.parse(calls[0]?.body ?? '{}'), { action: 'redeploy' })
 })
 
+test('a deploy verb on the proposal issue uses the proposal pull request number', async () => {
+  const projection = projectionOf({ '0.1.6': migrationLog({ version: '0.1.6', pullRequest: 13, issue: 12 }) })
+  const calls: string[] = []
+  const fetchImpl: typeof fetch = async (input) => {
+    calls.push(String(input))
+    return new Response('{}', { status: 200 })
+  }
+  const outcome = await run('/dsh-migrate destroy', {
+    config: DEPLOY,
+    env: TOKEN,
+    issueNumber: 12,
+    status: () => projection,
+    fetchImpl,
+  })
+  assert.equal(outcome.ok, true)
+  assert.match(calls[0] ?? '', /\/previews\/me%2Fplugin\/13$/)
+})
+
+test('status on the proposal issue asks about the proposal pull request', async () => {
+  const projection = projectionOf({ '0.1.6': migrationLog({ version: '0.1.6', pullRequest: 13, issue: 12 }) })
+  const calls: string[] = []
+  const fetchImpl: typeof fetch = async (input) => {
+    calls.push(String(input))
+    return new Response(JSON.stringify({ state: 'none' }), { status: 200 })
+  }
+  const outcome = await run('/dsh-migrate status', {
+    config: DEPLOY,
+    env: TOKEN,
+    issueNumber: 12,
+    status: () => projection,
+    fetchImpl,
+  })
+  assert.equal(outcome.ok, true)
+  assert.match(calls[0] ?? '', /\/previews\/me%2Fplugin\/13$/)
+})
+
+test('redeploy refuses a closed pull request before calling the deploy service', async () => {
+  const calls: string[] = []
+  const github = new GitHubClient('token', {}, async () => {
+    return new Response(JSON.stringify({
+      state: 'closed',
+      head: { ref: 'dsh-migrate/proposal', sha: 'a'.repeat(40), repo: { full_name: 'me/plugin' } },
+    }), { status: 200 })
+  })
+  const fetchImpl: typeof fetch = async (input) => {
+    calls.push(String(input))
+    return new Response('{}', { status: 200 })
+  }
+  const outcome = await run('/dsh-migrate redeploy', {
+    config: DEPLOY,
+    env: TOKEN,
+    issueNumber: 7,
+    github,
+    fetchImpl,
+  })
+  assert.equal(outcome.ok, false)
+  assert.match(outcome.reply, /closed/)
+  assert.deepEqual(calls, [])
+})
+
 test('each deploy verb carries a key that names the comment, so a redelivery is one command', async () => {
+
   assert.equal(commandKey('me/plugin', 7, 'destroy', '55'), 'me/plugin#7:destroy:comment=55')
   const seen: Array<{ method: string; key: string | null }> = []
   const fetchImpl: typeof fetch = async (_input, init) => {
@@ -412,9 +473,9 @@ test('extend asks for a number of days and names the ceiling', async () => {
   }
   const outcome = await run('/dsh-migrate extend', { config: DEPLOY, env: TOKEN, issueNumber: 7, fetchImpl })
   assert.equal(outcome.ok, true)
-  assert.deepEqual(JSON.parse(bodies[0] ?? '{}'), { action: 'extend', days: 7, maxTtlDays: 7 })
+  assert.deepEqual(JSON.parse(bodies[0] ?? '{}'), { action: 'extend', days: 14, maxTtlDays: 14 })
   // The reply says what was asked for, because the deploy service decides what it grants.
-  assert.match(outcome.reply, /asked for 7 day\(s\), with 7 as the ceiling/)
+  assert.match(outcome.reply, /asked for 14 day\(s\), with 14 as the ceiling/)
 })
 
 test('the configured extend window and ceiling travel with the request', async () => {
