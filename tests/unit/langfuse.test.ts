@@ -17,8 +17,8 @@ const agent: AgentConfig = {
 const session: SessionRecord = {
   kind: 'overlap',
   name: 'overlap',
-  prompt: 'review this plugin',
-  promptSha256: sha256('review this plugin'),
+  prompt: 'review this plugin sk-test-secret-value',
+  promptSha256: sha256('review this plugin sk-test-secret-value'),
   startedAt: '2026-10-27T13:00:00.000Z',
   endedAt: '2026-10-27T13:05:00.000Z',
   outcome: 'completed',
@@ -74,6 +74,8 @@ test('the exporter posts OTLP JSON with basic auth and the real-time header', as
   assert.equal((calls[0]?.init.headers as Record<string, string>).authorization, `Basic ${Buffer.from('pk-lf-test:sk-lf-test').toString('base64')}`)
   assert.equal((calls[0]?.init.headers as Record<string, string>)['x-langfuse-ingestion-version'], '4')
   assert.match(String(calls[0]?.init.body), /resourceSpans/)
+  assert.doesNotMatch(String(calls[0]?.init.body), /sk-test-secret-value/)
+  assert.match(String(calls[0]?.init.body), /sk-<redacted>/)
 })
 
 test('a failed export is reported, never thrown', async () => {

@@ -171,7 +171,13 @@ function engineFor(runtime: Runtime, recorder?: RunRecorder): InJobEngine {
     log,
     ...(recorder === undefined ? {} : { observer: recorder }),
   })
-  return new InJobEngine({ store: runtime.store, activities, run: runtime.runId, log })
+  return new InJobEngine({
+    store: runtime.store,
+    activities,
+    run: runtime.runId,
+    log,
+    onState(state) { stream?.publish(`dsh-migrate-state: ${state}`) },
+  })
 }
 
 function migrationInput(runtime: Runtime, target: MigrationInput['target'], verified: MigrationInput['target'] | undefined, proposal: MigrationInput['proposal']): MigrationInput {
@@ -413,8 +419,8 @@ async function postReply(github: GitHubClient, repository: Repository, issue: nu
 
 async function inspect(runtime: Runtime, options: Options): Promise<number> {
   try {
-    runtime.store.read()
-    const data = readInspectData(runtime.store, options.migration, runtime.workdir)
+    runtime.store.refresh()
+    const data = readInspectData(runtime.store, options.migration)
     const out = options.out ?? join(runtime.home, 'inspect')
     const path = writeInspectHtml(data, out)
     log(`inspect: ${data.migrationId}: ${String(data.runs.length)} run(s), ${String(data.runs.reduce((sum, run) => sum + run.manifest.sessions.length, 0))} session(s)`)

@@ -128,29 +128,32 @@ async function run(ctx, task, io) {
       for (const event of events) {
         const seq = typeof event.seq === 'number' ? event.seq : undefined
         if (seq === undefined || seq < traceCursor) continue
-        traceCursor = seq + 1
         const lines = traceOf.translateSessionEvent(event, traceState, {
           secrets: traceSecrets,
           maxChars: 2000,
           includeText: traceKind !== 'report',
           toolResults: traceLevel === 'full' ? 'full' : 'summary',
         })
+        if (lines.length === 0) {
+          traceCursor = seq + 1
+          continue
+        }
+        if (emitted + lines.length > 20) {
+          io.stderr.write(`${traceOf.encodeTraceLine('… further events omitted from this tick')}\n`)
+          return
+        }
         for (const line of lines) {
-          if (emitted >= 20) {
-            io.stderr.write(`${traceOf.encodeTraceLine('… further events omitted from this tick')}\n`)
-            traceCursor = events[events.length - 1].seq + 1
-            return
-          }
           io.stderr.write(`${traceOf.encodeTraceLine(line)}\n`)
           emitted += 1
         }
+        traceCursor = seq + 1
       }
     } catch {
       // A trace failure must never interrupt the session; the counter still runs.
     }
   }
   const emitObservations = (limit = 100) => {
-    if (observationOf === undefined || typeof observationOf.translateObservation !== 'function') return
+    if (observationOf === undefined || typeof observationOf.translateObservation !== 'function') return 0
     try {
       const events = agent.session.snapshotEvents()
       let emitted = 0
@@ -170,6 +173,7 @@ async function run(ctx, task, io) {
     } catch {
       // Observation is evidence; never interrupt the session for it.
     }
+    return emitted
   }
   const soFar = Number(process.env.DSH_MIGRATE_USAGE_SO_FAR || 0)
   const limit = Number(process.env.DSH_MIGRATE_USAGE_LIMIT || 0)
@@ -199,7 +203,9 @@ async function run(ctx, task, io) {
   await agent.whenIdle()
   clearInterval(timer)
   emitTrace()
-  for (let pass = 0; pass < 10; pass += 1) emitObservations(500)
+  for (let pass = 0; pass < 100; pass += 1) {
+    if (emitObservations(500) === 0) break
+  }
   await sessions.flush(agent.session)
   const finalProgress = progressOf(agent.session.snapshotEvents(), (Date.now() - startedAt) / 1000, {
     model: process.env.DSH_MIGRATE_MODEL || 'deepseek-v4-flash',

@@ -40,9 +40,10 @@ test('inspect reads a seeded state branch and writes the live evidence page', ()
     new StateStore(repo.work).write(undefined, new Map([
       ['migrations/0.2.0/runs/run-1/manifest.json', serializeManifest(manifest)],
       [`prompts/${promptSha}.md`, prompt],
+      ['migrations/0.3.0/events.jsonl', 'not json\n'],
     ]), 'seed evidence')
 
-    const run = spawnSync(process.execPath, [join(PACKAGE_ROOT, 'dist', 'src', 'cli.js'), 'inspect', '--workdir', repo.work], { cwd: repo.work, encoding: 'utf8' })
+    const run = spawnSync(process.execPath, [join(PACKAGE_ROOT, 'dist', 'src', 'cli.js'), 'inspect', '--workdir', repo.work, '--migration', '0.2.0'], { cwd: repo.work, encoding: 'utf8' })
     assert.equal(run.status, 0, run.stderr)
     const page = join(repo.work, '.dsh-migrate', 'inspect', 'index.html')
     assert.equal(existsSync(page), true)

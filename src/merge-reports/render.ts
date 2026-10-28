@@ -1,3 +1,4 @@
+import { inline } from '../render/text.ts'
 import type { Evidence, RunMetrics } from './evidence.ts'
 import type { MigrateBotPayload } from './parse.ts'
 
@@ -83,6 +84,16 @@ export function renderEvidence(evidence: Evidence, options: { includeCandidates:
   return lines.join('\n').trim()
 }
 
+function evaluationText(evaluation: NonNullable<Evidence['evaluation']>): string {
+  return [
+    evaluation.harborJob === undefined ? undefined : `Harbor job \`${inline(evaluation.harborJob, 200)}\``,
+    evaluation.trialId === undefined ? undefined : `trial \`${inline(evaluation.trialId, 200)}\``,
+    evaluation.record === undefined
+      ? undefined
+      : /^https?:\/\//i.test(evaluation.record) ? `[record](${evaluation.record})` : `record \`${inline(evaluation.record, 300)}\``,
+  ].filter((part): part is string => part !== undefined).join(' · ')
+}
+
 function metricsLines(metrics: RunMetrics): string[] {
   const cost = metrics.usd === undefined ? 'cost not recorded' : `$${metrics.usd.toFixed(6)}`
   return [
@@ -120,6 +131,9 @@ export function renderMigrateBotReport(evidence: Evidence, report: MigrateBotPay
     `- Model: \`${evidence.model.provider}/${evidence.model.model}\` (thinking ${evidence.model.thinking}, effort ${evidence.model.reasoningEffort})`,
     ...(evidence.checks.length === 0 ? ['- Checks: none recorded in the proposal body'] : ['- Checks:', ...evidence.checks.map(check => `  - ${check}`)]),
     ...(evidence.metrics === undefined ? [] : metricsLines(evidence.metrics)),
+    ...(evidence.evaluation === undefined || evaluationText(evidence.evaluation) === ''
+      ? []
+      : [`- Evaluation: ${evaluationText(evidence.evaluation)}`]),
     ...evidence.warnings.map(warning => `- Warning recorded by the migration: ${warning}`),
     '',
     '## What the maintainer changed',

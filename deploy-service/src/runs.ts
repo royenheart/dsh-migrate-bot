@@ -87,8 +87,12 @@ export class RunStore {
     const file = this.paths(runId).events
     if (!existsSync(file)) return []
     return readFileSync(file, 'utf8').split('\n').filter(line => line !== '').flatMap((line) => {
-      const parsed = eventSchema.safeParse(JSON.parse(line))
-      return parsed.success ? [parsed.data] : []
+      try {
+        const parsed = eventSchema.safeParse(JSON.parse(line))
+        return parsed.success ? [parsed.data] : []
+      } catch {
+        return []
+      }
     })
   }
 
@@ -161,6 +165,13 @@ export class RunStore {
       ? 'The run is in progress; this page reloads every five seconds.'
       : `The run ended at ${meta.finish.at}. The Action delivered ${String(meta.finish.events)} of ${String(meta.finish.attempted)} event(s); this service stored ${String(meta.stored)}.${meta.finish.complete ? '' : ' The record is incomplete.'}`
     const rows = events.map(event => `<tr><td>${String(event.seq)}</td><td>${escapeHtml(event.at)}</td><td><pre>${escapeHtml(event.message)}</pre></td></tr>`).join('\n')
+    const current = events
+      .flatMap(event => {
+        const match = /^dsh-migrate-state:\s*([a-z][A-Za-z0-9]*)\s*$/.exec(event.message)
+        return match?.[1] === undefined ? [] : [{ seq: event.seq, state: match[1] }]
+      })
+      .sort((left, right) => left.seq - right.seq)
+      .at(-1)?.state
     const body = [
       '<!doctype html>',
       '<html lang="en"><head><meta charset="utf-8">',
@@ -170,6 +181,7 @@ export class RunStore {
       '</head><body>',
       `<h1>${escapeHtml(meta.repository)}</h1>`,
       `<p>Run <code>${escapeHtml(meta.runId)}</code> (${escapeHtml(meta.kind)}), opened at ${escapeHtml(meta.openedAt)}. ${escapeHtml(sealed)}</p>`,
+      ...(current === undefined ? [] : [`<p>State: <code>${escapeHtml(current)}</code></p>`]),
       '<table><thead><tr><th>#</th><th>At</th><th>Message</th></tr></thead><tbody>',
       rows,
       '</tbody></table></body></html>',

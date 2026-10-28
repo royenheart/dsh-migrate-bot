@@ -56,7 +56,8 @@ export const runManifestSchema = z.object({
     id: z.literal('migrate'),
     hash: z.string().regex(/^[0-9a-f]{64}$/),
     adapter: z.literal('local'),
-    graph: z.string().optional(),
+    graph: z.string().min(1).optional(),
+    state: z.string().min(1).optional(),
   }),
   plugin: z.array(z.string().min(1)).min(1),
   source: z.object({ tag: z.string(), version: z.string() }).optional(),
@@ -86,6 +87,11 @@ export const runManifestSchema = z.object({
     cacheHitTokens: z.number().int().min(0),
     usd: z.number().min(0).optional(),
   }),
+  evaluation: z.object({
+    harborJob: z.string().min(1).optional(),
+    trialId: z.string().min(1).optional(),
+    record: z.string().min(1).optional(),
+  }).optional(),
   outcome: z.string().min(1),
   startedAt: z.iso.datetime(),
   endedAt: z.iso.datetime(),
@@ -112,6 +118,8 @@ export interface ManifestInput {
   endedAt: string
   traceId?: string | undefined
   traceExported?: boolean | undefined
+  state?: string | undefined
+  evaluation?: { harborJob?: string | undefined; trialId?: string | undefined; record?: string | undefined } | undefined
 }
 
 export function sha256(text: string): string {
@@ -181,7 +189,13 @@ export function buildRunManifest(input: ManifestInput): RunManifest {
     ...(input.runUrl === undefined ? {} : { runUrl: input.runUrl }),
     migrationId: input.migrationId,
     actionVersion: PACKAGE_VERSION ?? 'unknown',
-    workflow: { id: 'migrate', hash: workflowHash(), adapter: 'local', graph: workflowDiagram() },
+    workflow: {
+      id: 'migrate',
+      hash: workflowHash(),
+      adapter: 'local',
+      graph: workflowDiagram(),
+      ...(input.state === undefined ? {} : { state: input.state }),
+    },
     plugin: input.plugin,
     ...(input.source === undefined ? {} : { source: input.source }),
     target: input.target,
@@ -209,6 +223,7 @@ export function buildRunManifest(input: ManifestInput): RunManifest {
       cacheHitTokens: usage.reduce((sum, entry) => sum + entry.cacheHitTokens, 0),
       ...(usd.length === 0 ? {} : { usd: usd.reduce((sum, value) => sum + value, 0) }),
     },
+    ...(input.evaluation === undefined ? {} : { evaluation: input.evaluation }),
     outcome: input.outcome,
     startedAt: input.startedAt,
     endedAt: input.endedAt,

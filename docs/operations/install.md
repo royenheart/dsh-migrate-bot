@@ -15,6 +15,7 @@ description: Setting the Action up in a plugin repository, by hand or with a cod
    | `DSH_MIGRATE_REPORT_UPGRADE_SKILL_TOKEN`, `DSH_MIGRATE_REPORT_BOT_TOKEN`, `DSH_MIGRATE_REPORT_HARNESS_TOKEN` | A built-in [report channel](#report-channels) that is enabled |
    | `DSH_MIGRATE_DEPLOY_TOKEN` | A [deploy service](#the-deploy-service) |
    | `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | Optional: trace every migration session to Langfuse; all three are needed |
+   | `DSH_MIGRATE_HARBOR_JOB`, `DSH_MIGRATE_HARBOR_TRIAL`, `DSH_MIGRATE_HARBOR_RECORD` | Optional: link this run to a Harbor job, trial and record |
 
    The `secrets.apiKeyEnv`, `deploy.tokenEnv` and `reports.channels.<id>.tokenEnv` keys name the variable the Action reads, and a [report channel](#report-channels) of your own names its token in the last; a name not in the table needs [a copy of the reusable workflow](#a-copy-of-the-reusable-workflow).
 

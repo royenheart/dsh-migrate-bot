@@ -37,6 +37,8 @@ test('a manifest totals sessions and keeps prompt hashes, not prompt text', () =
     sessions: [session],
     checks: [{ check: 'mechanical', outcome: 'pass' }],
     outcome: 'accepted',
+    state: 'accepted',
+    evaluation: { harborJob: 'job-1', trialId: 'trial-1', record: 'https://example.test/record' },
     startedAt: '2026-10-27T13:00:00.000Z',
     endedAt: '2026-10-27T13:06:00.000Z',
   })
@@ -48,6 +50,8 @@ test('a manifest totals sessions and keeps prompt hashes, not prompt text', () =
   assert.equal(manifest.prompts.overlap?.path, `prompts/${sha256('review this plugin')}.md`)
   assert.equal(JSON.stringify(manifest).includes('review this plugin'), false)
   assert.equal(manifest.workflow.hash.length, 64)
+  assert.equal(manifest.workflow.state, 'accepted')
+  assert.equal(manifest.evaluation?.trialId, 'trial-1')
   assert.equal(runManifestSchema.safeParse(manifest).success, true)
   assert.equal(manifestPath('0.2.1-rc.2', '123-1'), 'migrations/0.2.1-rc.2/runs/123-1/manifest.json')
   assert.match(serializeManifest(manifest), /"totals"/)

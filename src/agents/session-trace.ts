@@ -88,7 +88,7 @@ export function traceSecrets(env: NodeJS.ProcessEnv): string[] {
   const secrets: string[] = []
   for (const [name, value] of Object.entries(env)) {
     if (value === undefined || value.length < 8) continue
-    if (!/(?:^|_)(?:API_KEY|TOKEN|SECRET|PASSWORD)$/i.test(name)) continue
+    if (!/(?:^|_)(?:API_KEY|KEY|TOKEN|SECRET|PASSWORD)$/i.test(name)) continue
     secrets.push(value)
   }
   return secrets

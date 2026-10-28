@@ -68,16 +68,21 @@ test('inspect data reads the runs and prompts the state branch stores', () => {
   try {
     mkdirSync(join(root, 'docs', 'reference'), { recursive: true })
     writeFileSync(join(root, 'docs', 'reference', 'workflow.md'), '# Workflow\n\n```mermaid\nstateDiagram-v2\n  [*] --> checking\n```\n')
-    const data = readInspectData(filesFor(), '0.2.0', root)
+    const data = readInspectData(filesFor(), '0.2.0')
     assert.equal(data.migrationId, '0.2.0')
     assert.equal(data.runs.length, 2)
     assert.equal(data.runs[0]?.prompts.overlap, prompt)
-    assert.match(data.graph ?? '', /stateDiagram-v2/)
+    assert.match(data.runs[0]?.manifest.workflow.graph ?? '', /stateDiagram-v2/)
     const html = renderInspectHtml(data)
     assert.match(html, /Migration/)
     assert.match(html, /123-1/)
     assert.match(html, /prompt diff/)
     assert.match(html, /stateDiagram-v2/)
+    assert.match(html, /graph-diff/)
+    assert.match(html, /run state/)
+    const module = /<script type="module">([\s\S]*?)<\/script>/.exec(html)?.[1]
+    assert.ok(module !== undefined)
+    assert.doesNotThrow(() => new Function(module))
     const path = writeInspectHtml(data, join(root, 'inspect'))
     assert.equal(path, join(root, 'inspect', 'index.html'))
   } finally {

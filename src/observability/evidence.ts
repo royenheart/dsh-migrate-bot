@@ -1,7 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { runManifestSchema, type RunManifest } from './manifest.ts'
-import { workflowDiagram } from '../workflow/graph.ts'
+import { runManifestSchema, sha256, type RunManifest } from './manifest.ts'
+import { compareReleases } from '../domain/release.ts'
 
 /**
  * Read the live-run evidence a state branch holds. This is the shared reader
@@ -24,8 +22,8 @@ export interface RunEvidence {
 export interface InspectData {
   migrationId: string
   runs: RunEvidence[]
-  /** The statechart Mermaid block, when the checkout carries the generated reference. */
-  graph?: string | undefined
+  /** Runs that exist but could not be read, and prompt mismatches. */
+  warnings: string[]
 }
 
 export function migrationIds(files: MigrationFiles): string[] {
@@ -34,47 +32,71 @@ export function migrationIds(files: MigrationFiles): string[] {
       const parts = path.split('/')
       return parts.length >= 2 && parts[0] === 'migrations' && parts[1] !== undefined ? [parts[1]] : []
     })
-  return [...new Set(ids)].sort()
+  return [...new Set(ids)].sort((left, right) => {
+    try {
+      return compareReleases({ tag: left, version: left }, { tag: right, version: right })
+    } catch {
+      return left.localeCompare(right)
+    }
+  })
 }
 
-export function readRunEvidence(files: MigrationFiles, migrationId: string): RunEvidence[] {
+export function readRunEvidence(files: MigrationFiles, migrationId: string, warnings: string[] = []): RunEvidence[] {
   const runs: RunEvidence[] = []
   for (const path of files.list(`migrations/${migrationId}/runs`).sort()) {
     if (!path.endsWith('/manifest.json')) continue
     const text = files.readFile(path)
-    if (text === undefined) continue
+    if (text === undefined) {
+      warnings.push(`${path}: unreadable`)
+      continue
+    }
     let manifest: RunManifest
     try {
       manifest = runManifestSchema.parse(JSON.parse(text))
-    } catch {
+    } catch (error) {
+      warnings.push(`${path}: ${error instanceof Error ? error.message : String(error)}`)
       continue
     }
-    const prompts: Record<string, string> = {}
+    const prompts: Record<string, string> = Object.create(null) as Record<string, string>
     for (const session of manifest.sessions) {
+      const expected = `prompts/${session.promptSha256}.md`
+      const legacyPath = `prompts/${session.name}.md`
+      if (session.promptPath !== expected && session.promptPath !== legacyPath) {
+        warnings.push(`${path}: prompt path ${session.promptPath} is not ${expected}`)
+        continue
+      }
       const prompt = files.readFile(session.promptPath)
-      if (prompt !== undefined) prompts[session.name] = prompt
+      if (prompt === undefined) {
+        warnings.push(`${path}: missing prompt ${session.promptPath}`)
+        continue
+      }
+      const legacy = prompt.endsWith('\n') ? sha256(prompt.slice(0, -1)) : undefined
+      if (sha256(prompt) !== session.promptSha256 && legacy !== session.promptSha256) {
+        warnings.push(`${path}: prompt ${session.promptPath} does not match its hash`)
+        continue
+      }
+      if (session.name in prompts && prompts[session.name] !== prompt) {
+        warnings.push(`${path}: session ${session.name} has more than one prompt`)
+        continue
+      }
+      prompts[session.name] = prompt
     }
     runs.push({ runId: manifest.runId, manifest, prompts })
   }
   return runs.sort((left, right) => left.manifest.startedAt.localeCompare(right.manifest.startedAt))
 }
 
-/** The statechart graph in the generated workflow reference, when this checkout has one. */
-export function workflowGraph(root = process.cwd()): string | undefined {
-  const path = join(root, 'docs', 'reference', 'workflow.md')
-  if (!existsSync(path)) return undefined
-  const text = readFileSync(path, 'utf8')
-  return /```mermaid\n([\s\S]*?)```/.exec(text)?.[1]?.trim()
-}
-
-export function readInspectData(files: MigrationFiles, migrationId?: string | undefined, root = process.cwd()): InspectData {
+export function readInspectData(files: MigrationFiles, migrationId?: string | undefined): InspectData {
   const ids = migrationIds(files)
   if (ids.length === 0) throw new Error('the state branch holds no migration')
   const id = migrationId ?? ids.at(-1)
   if (id === undefined) throw new Error('the state branch holds no migration')
   if (!ids.includes(id)) throw new Error(`migration \`${id}\` is not on the state branch; known: ${ids.join(', ')}`)
-  const runs = readRunEvidence(files, id)
-  if (runs.length === 0) throw new Error(`migration \`${id}\` has no run manifest; only runs after this feature was deployed record one`)
-  const graph = workflowGraph(root) ?? workflowDiagram()
-  return { migrationId: id, runs, graph }
+  const warnings: string[] = []
+  const runs = readRunEvidence(files, id, warnings)
+  if (runs.length === 0) {
+    const detail = warnings.length === 0 ? '' : `; ${String(warnings.length)} manifest(s) exist but do not parse: ${warnings.slice(0, 3).join('; ')}`
+    throw new Error(`migration \`${id}\` has no usable run manifest${detail}`)
+  }
+  return { migrationId: id, runs, warnings }
 }

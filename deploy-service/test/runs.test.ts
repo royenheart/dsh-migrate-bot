@@ -9,7 +9,7 @@ test('a run is opened, receives events, and is sealed by finish', async () => {
     assert.equal(opened.status, 201)
     assert.deepEqual(await opened.json(), { url: 'http://127.0.0.1:1/view/42-1' })
     for (const seq of [1, 2, 3]) {
-      const sent = await service.call('POST', '/runs/42-1/events', { body: { seq, at: '2026-10-10T00:00:00Z', message: seq === 2 ? '<script>alert(1)</script>' : `line ${String(seq)}` } })
+      const sent = await service.call('POST', '/runs/42-1/events', { body: { seq, at: '2026-10-10T00:00:00Z', message: seq === 2 ? '<script>alert(1)</script>' : seq === 3 ? 'dsh-migrate-state: awaitingMerge' : `line ${String(seq)}` } })
       assert.equal(sent.status, 202)
     }
     const finished = await service.call('POST', '/runs/42-1/finish', { body: { events: 3, attempted: 4, complete: false } })
@@ -26,6 +26,8 @@ test('a run is opened, receives events, and is sealed by finish', async () => {
     assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/)
     assert.doesNotMatch(html, /<script>/)
     assert.match(html, /delivered 3 of 4 event\(s\); this service stored 3\. The record is incomplete\./)
+    assert.match(html, /<p>State: <code>awaitingMerge<\/code><\/p>/)
+    assert.doesNotMatch(html, /<p>State: <code><img/)
   } finally {
     await service.close()
   }
@@ -63,5 +65,21 @@ test('the run page needs the token unless PUBLIC_VIEWS is set', async () => {
     assert.equal((await open.call('POST', '/runs', { token: null, body: { runId: 'r2', repository: 'acme/plugin', kind: 'migration' } })).status, 401)
   } finally {
     await open.close()
+  }
+})
+
+test('the latest valid state wins and a spoofed state is not shown', async () => {
+  const service = await startService()
+  try {
+    assert.equal((await service.call('POST', '/runs', { body: { runId: 'state-1', repository: 'acme/plugin', kind: 'migration' } })).status, 201)
+    assert.equal((await service.call('POST', '/runs/state-1/events', { body: { seq: 1, at: 'x', message: 'dsh-migrate-state: checking' } })).status, 202)
+    assert.equal((await service.call('POST', '/runs/state-1/events', { body: { seq: 3, at: 'x', message: 'dsh-migrate-state: awaitingMerge' } })).status, 202)
+    assert.equal((await service.call('POST', '/runs/state-1/events', { body: { seq: 2, at: 'x', message: 'dsh-migrate-state: <img src=x onerror=alert(1)>' } })).status, 202)
+    assert.equal((await service.call('POST', '/runs/state-1/finish', { body: { events: 3, attempted: 3, complete: true } })).status, 200)
+    const html = await (await service.call('GET', '/view/state-1')).text()
+    assert.match(html, /<p>State: <code>awaitingMerge<\/code><\/p>/)
+    assert.doesNotMatch(html, /<img src=x/)
+  } finally {
+    await service.close()
   }
 })

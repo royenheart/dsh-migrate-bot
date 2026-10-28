@@ -1,7 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { redactSecrets, traceSecrets } from '../agents/session-trace.ts'
 import { LangfuseExporter, langfuseSettings, traceIdFor } from './langfuse.ts'
-import { buildRunManifest, manifestPath, serializeManifest, type RunManifest } from './manifest.ts'
+import { buildRunManifest, manifestPath, serializeManifest, sha256, type RunManifest } from './manifest.ts'
 import type { ManifestCheck, SessionObserver, SessionRecord } from './session.ts'
 import type { StateStore } from '../state/store.ts'
 import type { MigrationView } from '../workflow/projection.ts'
@@ -19,6 +20,7 @@ export interface RunRecorderOptions {
   agent: AgentConfig
   startedAt: string
   langfuse?: LangfuseExporter | undefined
+  evaluation?: { harborJob?: string | undefined; trialId?: string | undefined; record?: string | undefined } | undefined
   log?: ((message: string) => void) | undefined
 }
 
@@ -31,6 +33,7 @@ export class RunRecorder implements SessionObserver {
   private readonly agent: AgentConfig
   private readonly startedAt: string
   private readonly langfuse: LangfuseExporter | undefined
+  private readonly evaluation: RunRecorderOptions['evaluation']
   private readonly log: ((message: string) => void) | undefined
 
   constructor(options: RunRecorderOptions) {
@@ -40,11 +43,16 @@ export class RunRecorder implements SessionObserver {
     this.agent = options.agent
     this.startedAt = options.startedAt
     this.langfuse = options.langfuse
+    this.evaluation = options.evaluation
     this.log = options.log
   }
 
   record(session: SessionRecord): void {
-    this.sessions.push(session)
+    // The state branch is a durable copy: known credentials are removed before
+    // the prompt text and its hash leave the job. Langfuse applies its own
+    // redaction independently at the egress.
+    const prompt = redactSecrets(session.prompt, traceSecrets(process.env))
+    this.sessions.push({ ...session, prompt, promptSha256: sha256(prompt) })
   }
 
   recordCheck(check: ManifestCheck): void {
@@ -56,11 +64,57 @@ export class RunRecorder implements SessionObserver {
     mkdirSync(join(runDir, 'prompts'), { recursive: true })
     mkdirSync(join(runDir, 'observations'), { recursive: true })
     for (const session of this.sessions) {
-      writeFileSync(join(runDir, 'prompts', `${session.promptSha256}.md`), `${session.prompt}\n`)
+      writeFileSync(join(runDir, 'prompts', `${session.promptSha256}.md`), session.prompt)
       writeFileSync(
         join(runDir, 'observations', `${session.name}.jsonl`),
         session.observations.map(observation => `${JSON.stringify(observation)}\n`).join(''),
       )
+    }
+  }
+
+  private manifest(input: {
+    migrationId: string
+    view: MigrationView
+    traceId?: string | undefined
+    traceExported?: boolean | undefined
+  }): RunManifest {
+    const source = input.view.context.input.source?.release
+    return buildRunManifest({
+      runId: this.runId,
+      ...(this.runUrl === undefined ? {} : { runUrl: this.runUrl }),
+      migrationId: input.migrationId,
+      plugin: this.plugin,
+      ...(source === undefined ? {} : { source }),
+      target: input.view.target,
+      agent: this.agent,
+      sessions: this.sessions,
+      checks: this.checks,
+      outcome: input.view.state,
+      state: input.view.state,
+      ...(this.evaluation === undefined ? {} : { evaluation: this.evaluation }),
+      startedAt: this.startedAt,
+      endedAt: new Date().toISOString(),
+      ...(input.traceId === undefined ? {} : { traceId: input.traceId }),
+      ...(input.traceExported === undefined ? {} : { traceExported: input.traceExported }),
+    })
+  }
+
+  private changes(manifest: RunManifest, migrationId: string): Map<string, string> {
+    const changes = new Map<string, string>([[manifestPath(migrationId, this.runId), serializeManifest(manifest)]])
+    for (const session of this.sessions) changes.set(`prompts/${session.promptSha256}.md`, session.prompt)
+    return changes
+  }
+
+  /** Write to the state branch, retrying once on a conflict with a fresh tip. */
+  private writeState(store: StateStore, migrationId: string, manifest: RunManifest): void {
+    try {
+      let written = store.write(store.refresh(), this.changes(manifest, migrationId), `dsh-migrate: ${migrationId} manifest ${this.runId}`)
+      if (!written.ok) {
+        written = store.write(store.refresh(), this.changes(manifest, migrationId), `dsh-migrate: ${migrationId} manifest ${this.runId}`)
+      }
+      if (!written.ok) this.log?.(`manifest: state branch write failed (${written.reason}): ${written.detail}`)
+    } catch (error) {
+      this.log?.(`manifest: state branch write failed: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
@@ -70,58 +124,26 @@ export class RunRecorder implements SessionObserver {
     runDir: string
     view: MigrationView
   }): Promise<RunManifest> {
-    const target = input.view.target
-    const source = input.view.context.input.source?.release
-    const traceId = this.langfuse?.traceId(this.runId)
-    let manifest = buildRunManifest({
-      runId: this.runId,
-      ...(this.runUrl === undefined ? {} : { runUrl: this.runUrl }),
-      migrationId: input.migrationId,
-      plugin: this.plugin,
-      ...(source === undefined ? {} : { source }),
-      target,
-      agent: this.agent,
-      sessions: this.sessions,
-      checks: this.checks,
-      outcome: input.view.state,
-      startedAt: this.startedAt,
-      endedAt: new Date().toISOString(),
-      ...(traceId === undefined ? {} : { traceId }),
-    })
+    const traceId = this.langfuse?.traceId(this.runId, this.plugin.join(','))
+    let manifest = this.manifest({ migrationId: input.migrationId, view: input.view, ...(traceId === undefined ? {} : { traceId }) })
 
     this.writeEvidence(input.runDir)
+    // Write the manifest before the network call: a hung or failed export must
+    // not cost the run its evidence.
+    writeFileSync(join(input.runDir, 'manifest.json'), serializeManifest(manifest))
+    if (input.store !== undefined) this.writeState(input.store, input.migrationId, manifest)
+
     if (this.langfuse !== undefined) {
       const result = await this.langfuse.export(manifest, this.sessions)
-      manifest = buildRunManifest({
-        runId: this.runId,
-        ...(this.runUrl === undefined ? {} : { runUrl: this.runUrl }),
+      manifest = this.manifest({
         migrationId: input.migrationId,
-        plugin: this.plugin,
-        ...(source === undefined ? {} : { source }),
-        target,
-        agent: this.agent,
-        sessions: this.sessions,
-        checks: this.checks,
-        outcome: input.view.state,
-        startedAt: this.startedAt,
-        endedAt: new Date().toISOString(),
-        traceId,
+        view: input.view,
+        ...(traceId === undefined ? {} : { traceId }),
         traceExported: result.exported,
       })
+      writeFileSync(join(input.runDir, 'manifest.json'), serializeManifest(manifest))
+      if (input.store !== undefined) this.writeState(input.store, input.migrationId, manifest)
       if (!result.exported) this.log?.(`langfuse: trace ${traceIdFor(this.runId)} was not exported: ${result.detail ?? 'unknown error'}`)
-    }
-
-    writeFileSync(join(input.runDir, 'manifest.json'), serializeManifest(manifest))
-    if (input.store !== undefined) {
-      try {
-        const snapshot = input.store.read()
-        const changes = new Map<string, string>([[manifestPath(input.migrationId, this.runId), serializeManifest(manifest)]])
-        for (const session of this.sessions) changes.set(`prompts/${session.promptSha256}.md`, `${session.prompt}\n`)
-        const written = input.store.write(snapshot.tip, changes, `dsh-migrate: ${input.migrationId} manifest ${this.runId}`)
-        if (!written.ok) this.log?.(`manifest: state branch write failed (${written.reason}): ${written.detail}`)
-      } catch (error) {
-        this.log?.(`manifest: state branch write failed: ${error instanceof Error ? error.message : String(error)}`)
-      }
     }
     return manifest
   }
@@ -138,6 +160,7 @@ export function recorderFor(input: {
 }): RunRecorder {
   const settings = langfuseSettings(input.env)
   const langfuse = settings === undefined ? undefined : new LangfuseExporter(settings)
+  const evaluation = evaluationFromEnv(input.env)
   if (settings !== undefined) input.log?.('langfuse: tracing this run')
   return new RunRecorder({
     runId: input.runId,
@@ -146,6 +169,24 @@ export function recorderFor(input: {
     agent: input.agent,
     startedAt: new Date().toISOString(),
     ...(langfuse === undefined ? {} : { langfuse }),
+    ...(evaluation === undefined ? {} : { evaluation }),
     ...(input.log === undefined ? {} : { log: input.log }),
   })
+}
+
+function evaluationFromEnv(env: NodeJS.ProcessEnv): RunRecorderOptions['evaluation'] {
+  const value = (name: string): string | undefined => {
+    const found = env[name]
+    return found === undefined || found === '' ? undefined : found
+  }
+  const harborJob = value('DSH_MIGRATE_HARBOR_JOB')?.trim()
+  const trialId = value('DSH_MIGRATE_HARBOR_TRIAL')?.trim()
+  const rawRecord = value('DSH_MIGRATE_HARBOR_RECORD')?.trim()
+  const record = rawRecord === undefined || /^https?:\/\//i.test(rawRecord) || /^[A-Za-z0-9._/-]+$/.test(rawRecord) ? rawRecord : undefined
+  if (harborJob === undefined && trialId === undefined && record === undefined) return undefined
+  return {
+    ...(harborJob === undefined ? {} : { harborJob }),
+    ...(trialId === undefined ? {} : { trialId }),
+    ...(record === undefined ? {} : { record }),
+  }
 }

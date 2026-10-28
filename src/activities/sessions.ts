@@ -119,7 +119,7 @@ export class SessionRunner {
    * A session outside the reviews and repairs, the end-to-end authoring, held
    * to the same spend cap and counted in what this migration spent.
    */
-  async runOther(request: Pick<AgentRequest, 'kind' | 'prompt' | 'workdir' | 'env'>): Promise<{ usage?: SessionUsage | undefined } | { failure: string }> {
+  async runOther(request: Pick<AgentRequest, 'kind' | 'name' | 'prompt' | 'workdir' | 'env'>): Promise<{ usage?: SessionUsage | undefined } | { failure: string }> {
     const cap = await this.capReached()
     if (cap !== undefined) return { failure: `spend cap: ${cap}` }
     const startedAt = new Date().toISOString()
@@ -135,11 +135,11 @@ export class SessionRunner {
       })
       const usage = usageOf(result.usage)
       this.spent += usage?.usd ?? 0
-      this.record({ kind: request.kind, name: request.kind, prompt: request.prompt, startedAt, outcome: 'completed', report: result.report, progress: result.usage, observations })
+      this.record({ kind: request.kind, name: request.name ?? request.kind, prompt: request.prompt, startedAt, outcome: 'completed', report: result.report, progress: result.usage, observations })
       return { usage }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
-      this.record({ kind: request.kind, name: request.kind, prompt: request.prompt, startedAt, outcome: isQuotaError(error) ? 'spend-cap' : 'failed', observations })
+      this.record({ kind: request.kind, name: request.name ?? request.kind, prompt: request.prompt, startedAt, outcome: isQuotaError(error) ? 'spend-cap' : 'failed', observations })
       return { failure: isQuotaError(error) ? `spend cap: ${detail}` : detail }
     }
   }

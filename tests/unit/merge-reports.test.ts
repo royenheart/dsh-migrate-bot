@@ -182,6 +182,7 @@ test('manifest metrics reach the report evidence and the delivered body', async 
     }],
     checks: [],
     outcome: 'accepted',
+    evaluation: { harborJob: 'job-1', trialId: 'trial-1', record: 'https://example.test/record' },
     startedAt: '2026-10-27T13:00:00.000Z',
     endedAt: '2026-10-27T13:06:00.000Z',
   })

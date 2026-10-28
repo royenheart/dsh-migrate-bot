@@ -21,7 +21,7 @@ export interface E2EDeps {
   workdir: string
   config: MigrateConfig
   /** Run the authoring session under the migration's spend cap. */
-  session: (request: Pick<AgentRequest, 'kind' | 'prompt' | 'workdir' | 'env'>) => Promise<{ usage?: SessionUsage | undefined } | { failure: string }>
+  session: (request: Pick<AgentRequest, 'kind' | 'name' | 'prompt' | 'workdir' | 'env'>) => Promise<{ usage?: SessionUsage | undefined } | { failure: string }>
   runDir: string
   /** The dsh binary of a release, or why it could not be installed. */
   install: (release: Release) => { bin: string } | { failure: string }
@@ -35,11 +35,12 @@ export const suiteDirOf = (runDir: string): string => join(runDir, 'e2e-suite')
  * the tree. The session works in the suite; whatever it leaves in the served
  * tree is put back, so the tree is what the migration made of it.
  */
-async function authorSuite(deps: E2EDeps, release: Release, existing: boolean, url: string): Promise<{ usage?: SessionUsage | undefined } | { failure: string }> {
+async function authorSuite(deps: E2EDeps, release: Release, existing: boolean, url: string, name: string): Promise<{ usage?: SessionUsage | undefined } | { failure: string }> {
   const tree = snapshotTree(deps.workdir)
   try {
     return await deps.session({
       kind: 'e2e-authoring',
+      name,
       prompt: renderAuthoringBrief({ suiteDir: suiteDirOf(deps.runDir), plugins: pluginNames(deps.workdir), release: release.tag, existing }),
       // The session works in the suite; the plugins it tests are served, not edited.
       workdir: suiteDirOf(deps.runDir),
@@ -72,7 +73,7 @@ export async function characterize(deps: E2EDeps, context: MigrationContext): Pr
   try {
     if (!existing) {
       mkdirSync(suiteDir, { recursive: true })
-      const authored = await authorSuite(deps, source, false, served.host.url)
+      const authored = await authorSuite(deps, source, false, served.host.url, 'e2e-characterize')
       if ('failure' in authored) return event('failed', authored.failure)
       usage = authored.usage
     }
@@ -116,7 +117,7 @@ async function publishSuiteOf(deps: E2EDeps, context: MigrationContext): Promise
     if (!served.ok) return event('failed', `the target release does not serve the plugins: ${served.failure.signature}`)
     try {
       mkdirSync(suiteDir, { recursive: true })
-      const authored = await authorSuite(deps, target, existing, served.host.url)
+      const authored = await authorSuite(deps, target, existing, served.host.url, 'e2e-publish')
       if ('failure' in authored) return event('failed', authored.failure)
       usage = authored.usage
     } finally {

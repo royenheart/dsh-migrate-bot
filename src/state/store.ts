@@ -101,6 +101,11 @@ export class StateStore {
     return files
   }
 
+  /** Fetch the branch without parsing logs, for a reader that only needs files. */
+  refresh(): string | undefined {
+    return this.fetch()
+  }
+
   /** Fetch the branch and read every migration log. */
   read(): StateSnapshot {
     const tip = this.fetch()

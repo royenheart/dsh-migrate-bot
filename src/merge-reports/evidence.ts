@@ -63,6 +63,8 @@ export interface Evidence {
   candidates: Array<{ url: string; title: string }>
   /** What the runs' manifests recorded about agent work, when they exist. */
   metrics?: RunMetrics | undefined
+  /** The newest Harbor evaluation a manifest recorded. */
+  evaluation?: { harborJob?: string | undefined; trialId?: string | undefined; record?: string | undefined } | undefined
 }
 
 export interface RunMetrics {
@@ -198,6 +200,9 @@ export async function collectEvidence(input: {
     cacheHitTokens: 0,
   }
   const usd: number[] = []
+  const warnings = [...migration.context.warnings]
+  let evaluation: Evidence['evaluation']
+  let evaluationAt = ''
   for (const path of input.files.list(`migrations/${migration.id}/runs`)) {
     if (!path.endsWith('/manifest.json')) continue
     const text = input.files.readFile(path)
@@ -205,10 +210,14 @@ export async function collectEvidence(input: {
     let parsed
     try {
       parsed = runManifestSchema.safeParse(JSON.parse(text))
-    } catch {
+    } catch (error) {
+      warnings.push(`run manifest ${path} is not JSON: ${error instanceof Error ? error.message : String(error)}`)
       continue
     }
-    if (!parsed.success) continue
+    if (!parsed.success) {
+      warnings.push(`run manifest ${path} does not validate: ${parsed.error.issues.map(issue => issue.message).join('; ')}`)
+      continue
+    }
     const totals = parsed.data.totals
     metrics.runs += 1
     metrics.sessions += totals.sessions
@@ -220,6 +229,11 @@ export async function collectEvidence(input: {
     metrics.outputTokens += totals.outputTokens
     metrics.cacheHitTokens += totals.cacheHitTokens
     if (totals.usd !== undefined) usd.push(totals.usd)
+    const found = parsed.data.evaluation
+    if (found !== undefined && [found.harborJob, found.trialId, found.record].some(value => value !== undefined) && parsed.data.startedAt >= evaluationAt) {
+      evaluation = found
+      evaluationAt = parsed.data.startedAt
+    }
   }
   if (usd.length > 0) metrics.usd = usd.reduce((sum, value) => sum + value, 0)
 
@@ -249,7 +263,7 @@ export async function collectEvidence(input: {
     comments,
     maintainerChanges,
     checks: proposalChecks(pull.body ?? ''),
-    warnings: migration.context.warnings,
+    warnings,
     reports: {
       overlap: read('reports/overlap.md'),
       extensionPoints: read('reports/extension-points.md'),
@@ -258,6 +272,7 @@ export async function collectEvidence(input: {
     patchReports,
     candidates,
     ...(metrics.runs === 0 ? {} : { metrics }),
+    ...(evaluation === undefined ? {} : { evaluation }),
   }
 }
 

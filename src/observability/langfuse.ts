@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { redactSecrets, traceSecrets } from '../agents/session-trace.ts'
 import type { RunManifest } from './manifest.ts'
 import type { SessionObservation, SessionRecord } from './session.ts'
 
@@ -20,6 +21,7 @@ export interface LangfuseSettings {
 
 export function langfuseSettings(env: NodeJS.ProcessEnv): LangfuseSettings | undefined {
   const host = env.LANGFUSE_HOST
+  if (host !== undefined && !/^https:\/\//.test(host) && !/^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?:\/|$)/.test(host)) return undefined
   const publicKey = env.LANGFUSE_PUBLIC_KEY
   const secretKey = env.LANGFUSE_SECRET_KEY
   if (host === undefined || host === '' || publicKey === undefined || publicKey === '' || secretKey === undefined || secretKey === '') return undefined
@@ -59,8 +61,8 @@ function hash(seed: string, length: number): string {
   return createHash('sha256').update(seed).digest('hex').slice(0, length)
 }
 
-export function traceIdFor(runId: string): string {
-  return hash(`trace:${runId}`, 32)
+export function traceIdFor(runId: string, namespace = ''): string {
+  return hash(`trace:${namespace}:${runId}`, 32)
 }
 
 function spanIdFor(seed: string): string {
@@ -84,7 +86,8 @@ function json(value: unknown): string {
 }
 
 function bounded(text: string, max = 8_000): string {
-  return text.length <= max ? text : `${text.slice(0, max - 1)}…`
+  const redacted = redactSecrets(text, traceSecrets(process.env))
+  return redacted.length <= max ? redacted : `${redacted.slice(0, max - 1)}…`
 }
 
 function span(input: {
@@ -270,12 +273,17 @@ export class LangfuseExporter {
     private readonly fetchImpl: typeof fetch = fetch,
   ) {}
 
-  traceId(runId: string): string {
-    return traceIdFor(runId)
+  traceId(runId: string, namespace = ''): string {
+    return traceIdFor(runId, namespace)
   }
 
   async export(manifest: RunManifest, sessions: readonly SessionRecord[]): Promise<{ exported: boolean; detail?: string | undefined }> {
-    const payload = buildOtlpPayload(manifest, sessions)
+    let payload: OtlpPayload
+    try {
+      payload = buildOtlpPayload(manifest, sessions)
+    } catch (error) {
+      return { exported: false, detail: error instanceof Error ? error.message : String(error) }
+    }
     const auth = Buffer.from(`${this.settings.publicKey}:${this.settings.secretKey}`).toString('base64')
     try {
       const response = await this.fetchImpl(`${this.settings.host}/api/public/otel/v1/traces`, {

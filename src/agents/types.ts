@@ -6,6 +6,8 @@ export type AgentKind = 'overlap' | 'extension-points' | 'repair' | 'e2e-authori
 
 export interface AgentRequest {
   kind: AgentKind
+  /** The evidence name when one kind runs more than once, such as the two e2e-authoring calls. */
+  name?: string | undefined
   prompt: string
   workdir: string
   agent: AgentConfig
