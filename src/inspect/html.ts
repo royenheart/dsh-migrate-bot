@@ -39,7 +39,7 @@ export function renderInspectHtml(data: InspectData): string {
   #full td.n { width: 3.5em; text-align: right; color: var(--muted); user-select: none; }
   #full td.add { background: var(--add); } #full td.del { background: var(--del); }
   #full td.blank { background: transparent; }
-  #full td.sep { width: 1px; padding: 0; background: var(--line); }
+  #full th.left, #full td.left { border-right: 1px solid var(--line); }
   #graph, #graphdiff > div { border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; }
   #graphdiff { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 900px) { #graphdiff { grid-template-columns: 1fr; } }
@@ -216,10 +216,18 @@ function renderFull(from, to, name, before, after, beforeStored, afterStored) {
     return
   }
   const table = document.createElement('table')
+  const cols = document.createElement('colgroup')
+  for (const width of ['3.5em', '', '3.5em', '']) {
+    const col = document.createElement('col')
+    if (width !== '') col.style.width = width
+    cols.append(col)
+  }
+  table.append(cols)
   const head = document.createElement('thead')
   const headRow = document.createElement('tr')
-  for (const [text, span] of [['From ' + from.runId, 2], ['', 1], ['To ' + to.runId, 2]]) {
+  for (const [text, span, cls] of [['From ' + from.runId, 2, 'left'], ['To ' + to.runId, 2, '']]) {
     const th = document.createElement('th')
+    if (cls !== '') th.className = cls
     th.textContent = text
     th.colSpan = span
     headRow.append(th)
@@ -232,8 +240,7 @@ function renderFull(from, to, name, before, after, beforeStored, afterStored) {
   for (const row of fullRows(before, after)) {
     const tr = document.createElement('tr')
     tr.append(cell('n', row.left === null ? '' : String(++leftLine)))
-    tr.append(cell(row.leftClass, row.left ?? ''))
-    tr.append(cell('sep', ''))
+    tr.append(cell((row.leftClass + ' left').trim(), row.left ?? ''))
     tr.append(cell('n', row.right === null ? '' : String(++rightLine)))
     tr.append(cell(row.rightClass, row.right ?? ''))
     body.append(tr)
@@ -252,7 +259,7 @@ function render() {
   const evaluationParts = evaluation === undefined ? [] : [
     evaluation.harborJob === undefined ? '' : 'Harbor job <span class="mono">' + esc(evaluation.harborJob) + '</span>',
     evaluation.trialId === undefined ? '' : 'trial <span class="mono">' + esc(evaluation.trialId) + '</span>',
-    evaluation.record === undefined ? '' : /^https?:\/\//.test(evaluation.record) ? '<a href="' + esc(evaluation.record) + '">record</a>' : 'record <span class="mono">' + esc(evaluation.record) + '</span>',
+    evaluation.record === undefined ? '' : evaluation.record.startsWith('http://') || evaluation.record.startsWith('https://') ? '<a href="' + esc(evaluation.record) + '">record</a>' : 'record <span class="mono">' + esc(evaluation.record) + '</span>',
   ].filter(Boolean)
   const evalLinks = evaluationParts.length === 0 ? '' : '<p>Evaluation: ' + evaluationParts.join(' · ') + '</p>'
   const warningText = data.warnings.length === 0 ? '' : '<p class="muted">Evidence warnings: ' + data.warnings.map(esc).join('; ') + '</p>'
