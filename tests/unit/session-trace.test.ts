@@ -68,6 +68,8 @@ test('a trace line survives encoding, and is stripped from diagnostics', () => {
   const line = encodeTraceLine('tool read: ok')
   assert.equal(decodeTraceLine(line), 'tool read: ok')
   assert.equal(decodeTraceLine('not a trace'), undefined)
+  assert.equal(decodeTraceLine(encodeTraceLine('tok', 'secret-token'), 'secret-token'), 'tok')
+  assert.equal(decodeTraceLine(encodeTraceLine('tok', 'secret-token'), 'other-token'), undefined)
   assert.equal(stripTraceLines(`keep\n${line}\nkeep 2`), 'keep\nkeep 2')
 })
 

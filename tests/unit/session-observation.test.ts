@@ -60,5 +60,7 @@ test('an observation line survives encoding and is stripped from diagnostics', (
   const line = encodeObservationLine({ seq: 1, time: 1, type: 'other' })
   assert.deepEqual(decodeObservationLine(line), { seq: 1, time: 1, type: 'other' })
   assert.equal(decodeObservationLine('not one'), undefined)
+  assert.deepEqual(decodeObservationLine(encodeObservationLine({ seq: 2, time: 2, type: 'other' }, 'secret-token'), 'secret-token'), { seq: 2, time: 2, type: 'other' })
+  assert.equal(decodeObservationLine(encodeObservationLine({ seq: 2, time: 2, type: 'other' }, 'secret-token'), 'other-token'), undefined)
   assert.equal(stripObservationLines(`keep\n${line}\nkeep 2`), 'keep\nkeep 2')
 })

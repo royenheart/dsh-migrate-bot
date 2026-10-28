@@ -104,6 +104,7 @@ async function run(ctx, task, io) {
   const traceSecrets = traceModule === undefined || typeof traceModule.traceSecrets !== 'function' ? [] : traceModule.traceSecrets(process.env)
   const traceState = {}
   const traceKind = process.env.DSH_MIGRATE_TRACE_KIND || ''
+  const eventToken = process.env.DSH_MIGRATE_EVENT_TOKEN || ''
   const observationOf = process.env.DSH_MIGRATE_OBSERVATIONS === '1' ? await loadObservation() : undefined
   const startedAt = Date.now()
   const intervalMs = Number(process.env.DSH_MIGRATE_STATUS_INTERVAL_MS || 10000)
@@ -139,11 +140,11 @@ async function run(ctx, task, io) {
           continue
         }
         if (emitted + lines.length > 20) {
-          io.stderr.write(`${traceOf.encodeTraceLine('… further events omitted from this tick')}\n`)
+          io.stderr.write(`${traceOf.encodeTraceLine('… further events omitted from this tick', eventToken)}\n`)
           return
         }
         for (const line of lines) {
-          io.stderr.write(`${traceOf.encodeTraceLine(line)}\n`)
+          io.stderr.write(`${traceOf.encodeTraceLine(line, eventToken)}\n`)
           emitted += 1
         }
         traceCursor = seq + 1
@@ -167,7 +168,7 @@ async function run(ctx, task, io) {
         }
         if (emitted >= limit) return
         observationCursor = seq + 1
-        io.stderr.write(`${observationOf.encodeObservationLine(observation)}\n`)
+        io.stderr.write(`${observationOf.encodeObservationLine(observation, eventToken)}\n`)
         emitted += 1
       }
     } catch {

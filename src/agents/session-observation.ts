@@ -149,15 +149,16 @@ export function translateObservation(
   return { ...base, type: 'other' }
 }
 
-export function encodeObservationLine(observation: SessionObservation): string {
-  return `${OBSERVATION_PREFIX} ${JSON.stringify(observation)}`
+export function encodeObservationLine(observation: SessionObservation, token = ''): string {
+  return `${OBSERVATION_PREFIX}${token === '' ? '' : `${token}:`} ${JSON.stringify(observation)}`
 }
 
-export function decodeObservationLine(line: string): SessionObservation | undefined {
+export function decodeObservationLine(line: string, token?: string | undefined): SessionObservation | undefined {
   const trimmed = line.trim()
-  if (!trimmed.startsWith(OBSERVATION_PREFIX)) return undefined
+  const prefix = token === undefined || token === '' ? OBSERVATION_PREFIX : `${OBSERVATION_PREFIX}${token}:`
+  if (!trimmed.startsWith(prefix)) return undefined
   try {
-    const parsed: unknown = JSON.parse(trimmed.slice(OBSERVATION_PREFIX.length).trim())
+    const parsed: unknown = JSON.parse(trimmed.slice(prefix.length).trim())
     if (!isRecord(parsed)) return undefined
     if (typeof parsed.seq !== 'number' || typeof parsed.time !== 'number' || typeof parsed.type !== 'string') return undefined
     return parsed as unknown as SessionObservation

@@ -186,15 +186,16 @@ export function translateSessionEvent(event: unknown, state: TraceState = {}, op
 }
 
 /** One line the runner writes to stderr; JSON keeps the decoded text exactly one line. */
-export function encodeTraceLine(text: string): string {
-  return `${TRACE_PREFIX} ${JSON.stringify(text)}`
+export function encodeTraceLine(text: string, token = ''): string {
+  return `${TRACE_PREFIX}${token === '' ? '' : `${token}:`} ${JSON.stringify(text)}`
 }
 
 /** The text of a trace line, or undefined for a line that is not one. */
-export function decodeTraceLine(line: string): string | undefined {
+export function decodeTraceLine(line: string, token?: string | undefined): string | undefined {
   const trimmed = line.trim()
-  if (!trimmed.startsWith(TRACE_PREFIX)) return undefined
-  const raw = trimmed.slice(TRACE_PREFIX.length).trim()
+  const prefix = token === undefined || token === '' ? TRACE_PREFIX : `${TRACE_PREFIX}${token}:`
+  if (!trimmed.startsWith(prefix)) return undefined
+  const raw = trimmed.slice(prefix.length).trim()
   if (raw === '') return undefined
   try {
     const parsed: unknown = JSON.parse(raw)

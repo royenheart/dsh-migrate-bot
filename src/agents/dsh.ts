@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PACKAGE_ROOT } from '../paths.ts'
@@ -82,6 +83,7 @@ function defaultSpawn(
     onLog?: ((line: string) => void) | undefined
     onTrace?: ((line: string) => void) | undefined
     onObservation?: ((observation: SessionObservation) => void) | undefined
+    eventToken?: string | undefined
   },
 ): Promise<DshSpawnResult> {
   return new Promise((resolve, reject) => {
@@ -115,12 +117,12 @@ function defaultSpawn(
           options.onStatus?.(progress)
           continue
         }
-        const trace = decodeTraceLine(line)
+        const trace = decodeTraceLine(line, options.eventToken)
         if (trace !== undefined) {
           options.onTrace?.(redactSecrets(trace, secrets))
           continue
         }
-        const observation = decodeObservationLine(line)
+        const observation = decodeObservationLine(line, options.eventToken)
         if (observation !== undefined) {
           options.onObservation?.(observation)
           continue
@@ -139,8 +141,8 @@ function defaultSpawn(
       clearTimeout(timer)
       if (stderrRest !== '') {
         const progress = decodeStatusLine(stderrRest)
-        const trace = decodeTraceLine(stderrRest)
-        const observation = decodeObservationLine(stderrRest)
+        const trace = decodeTraceLine(stderrRest, options.eventToken)
+        const observation = decodeObservationLine(stderrRest, options.eventToken)
         if (progress !== undefined) options.onStatus?.(progress)
         else if (trace !== undefined) options.onTrace?.(redactSecrets(trace, secrets))
         else if (observation !== undefined) options.onObservation?.(observation)
@@ -203,6 +205,8 @@ export function createDshRunner(options: {
         options.onStatus?.(progress)
       }
       const onObservation = request.onObservation ?? options.onObservation
+      const eventToken = randomUUID()
+      env.DSH_MIGRATE_EVENT_TOKEN = eventToken
       const result = spawnImpl === undefined
         ? await defaultSpawn(
           ['--profile', 'migrate', request.prompt],
@@ -214,6 +218,7 @@ export function createDshRunner(options: {
             ...(options.onLog === undefined ? {} : { onLog: options.onLog }),
             ...(options.onTrace === undefined ? {} : { onTrace: options.onTrace }),
             ...(onObservation === undefined ? {} : { onObservation }),
+            eventToken,
           },
         )
         : await spawnImpl(
