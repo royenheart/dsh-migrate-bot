@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import type { InspectData } from '../observability/evidence.ts'
 
 /**
- * A self-contained page over the live-run evidence on the state branch:
+ * A page over the live-run evidence on the state branch:
  * choose two runs and a session, read the prompt diff, and see the run totals
  * and the statechart. It deliberately reads only the data it is given, so a
  * future framework can feed the same page from its own run store.
