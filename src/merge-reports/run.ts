@@ -1,5 +1,6 @@
 import { PACKAGE_VERSION } from '../paths.ts'
 import { sha256 } from '../observability/manifest.ts'
+import { agentUsage } from '../agents/dsh.ts'
 import { isQuotaError } from '../quota/errors.ts'
 import { channelPrompt } from '../prompts/reports.ts'
 import { inline } from '../render/text.ts'
@@ -111,6 +112,8 @@ async function reportToChannel(
     })
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
+    const progress = agentUsage(error)
+    const usage = progress === undefined ? undefined : { inputTokens: progress.inputTokens, outputTokens: progress.outputTokens, cacheHitTokens: progress.cacheHitTokens, ...(progress.costUsd === undefined ? {} : { usd: progress.costUsd }) }
     deps.observer?.record({
       kind: 'report',
       name: `report-${channel.id}`,
@@ -119,10 +122,12 @@ async function reportToChannel(
       startedAt,
       endedAt: new Date().toISOString(),
       outcome: isQuotaError(error) ? 'spend-cap' : 'failed',
+      ...(usage === undefined ? {} : { usage }),
+      ...(progress === undefined ? {} : { progress: { turns: progress.turns, steps: progress.steps, elapsedSeconds: progress.elapsedSeconds } }),
       toolCalls: observations.filter(observation => observation.type === 'tool-call').length,
       observations,
     })
-    return { outcome: 'failed', detail: isQuotaError(error) ? `spend cap: ${detail}` : detail }
+    return { outcome: 'failed', detail: isQuotaError(error) ? `spend cap: ${detail}` : detail, ...(usage === undefined ? {} : { usage }) }
   }
   const usage = session.usage === undefined
     ? undefined

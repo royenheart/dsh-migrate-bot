@@ -76,6 +76,7 @@ test('the exporter posts OTLP JSON with basic auth and the real-time header', as
   assert.match(String(calls[0]?.init.body), /resourceSpans/)
   assert.doesNotMatch(String(calls[0]?.init.body), /sk-test-secret-value/)
   assert.match(String(calls[0]?.init.body), /sk-<redacted>/)
+  assert.equal(traceIdFor('1-1', 'repo-a') === traceIdFor('1-1', 'repo-b'), false)
 })
 
 test('a failed export is reported, never thrown', async () => {
@@ -91,6 +92,8 @@ test('a failed export is reported, never thrown', async () => {
 test('the exporter is disabled without all three variables', () => {
   assert.equal(langfuseSettings({}), undefined)
   assert.equal(langfuseSettings({ LANGFUSE_HOST: 'https://x', LANGFUSE_PUBLIC_KEY: 'pk' }), undefined)
+  assert.equal(langfuseSettings({ LANGFUSE_HOST: 'http://example.com', LANGFUSE_PUBLIC_KEY: 'pk', LANGFUSE_SECRET_KEY: 'sk' }), undefined)
+  assert.notEqual(langfuseSettings({ LANGFUSE_HOST: 'http://127.0.0.1:3000', LANGFUSE_PUBLIC_KEY: 'pk', LANGFUSE_SECRET_KEY: 'sk' }), undefined)
   assert.deepEqual(langfuseSettings({ LANGFUSE_HOST: 'https://x/', LANGFUSE_PUBLIC_KEY: 'pk', LANGFUSE_SECRET_KEY: 'sk' }), {
     host: 'https://x',
     publicKey: 'pk',

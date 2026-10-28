@@ -9,6 +9,7 @@ import { parseBlocker } from '../verify/blocker.ts'
 import { describeBaseline } from '../domain/outcome.ts'
 import { sha256 } from '../observability/manifest.ts'
 import type { SessionObservation, SessionObserver, SessionRecord } from '../observability/session.ts'
+import { agentUsage } from '../agents/dsh.ts'
 import type { AgentRequest, AgentRunner } from '../agents/types.ts'
 import type { SessionProgress } from '../agents/session-status.ts'
 import type { MigrateConfig } from '../config/schema.ts'
@@ -139,7 +140,10 @@ export class SessionRunner {
       return { usage }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
-      this.record({ kind: request.kind, name: request.name ?? request.kind, prompt: request.prompt, startedAt, outcome: isQuotaError(error) ? 'spend-cap' : 'failed', observations })
+      const progress = agentUsage(error)
+      const usage = usageOf(progress)
+      this.spent += usage?.usd ?? 0
+      this.record({ kind: request.kind, name: request.name ?? request.kind, prompt: request.prompt, startedAt, outcome: isQuotaError(error) ? 'spend-cap' : 'failed', progress, observations })
       return { failure: isQuotaError(error) ? `spend cap: ${detail}` : detail }
     }
   }
@@ -209,8 +213,11 @@ export class SessionRunner {
       })
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
-      this.record({ kind: request.kind, name, prompt, startedAt, outcome: isQuotaError(error) ? 'spend-cap' : 'failed', observations })
-      return done(isQuotaError(error) ? 'spend-cap' : 'failed', detail)
+      const progress = agentUsage(error)
+      const usage = usageOf(progress)
+      this.spent += usage?.usd ?? 0
+      this.record({ kind: request.kind, name, prompt, startedAt, outcome: isQuotaError(error) ? 'spend-cap' : 'failed', progress, observations })
+      return done(isQuotaError(error) ? 'spend-cap' : 'failed', detail, usage === undefined ? {} : { usage })
     }
     const usage = usageOf(result.usage)
     this.spent += usage?.usd ?? 0

@@ -227,3 +227,20 @@ test('a tree whose plugins all have a browser half leaves the boot check to the 
     cleanup()
   }
 })
+
+test('a session that fails after burning tokens keeps the usage', async () => {
+  const error = new Error('dsh agent failed (1): incomplete') as Error & {
+    usage: { turns: number; steps: number; elapsedSeconds: number; inputTokens: number; outputTokens: number; cacheHitTokens: number; cacheMissTokens: number; costUsd: number }
+  }
+  error.usage = { turns: 2, steps: 3, elapsedSeconds: 10, inputTokens: 100, outputTokens: 20, cacheHitTokens: 10, cacheMissTokens: 90, costUsd: 0.125 }
+  const { runner, cleanup } = sessions(parseConfig({}), { run: async () => { throw error } })
+  try {
+    const result = await runner.run(repairRequest, contextOf(input(), []))
+    assert.equal(result.event.type === 'session.done' && result.event.outcome, 'failed')
+    assert.equal(result.event.type === 'session.done' && result.event.usage?.inputTokens, 100)
+    assert.equal(result.event.type === 'session.done' && result.event.usage?.usd, 0.125)
+    assert.equal(runner.spent, 0.125)
+  } finally {
+    cleanup()
+  }
+})

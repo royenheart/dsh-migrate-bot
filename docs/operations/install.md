@@ -118,7 +118,7 @@ The state branch `dsh-migrate/state` needs nothing: v1 does not read v0's `seen.
 
 ## Spend
 
-Before each agent session of a migration job (the reviews, the repair attempts and the end-to-end authoring) the Action asks DeepSeek for the account balance, and stops when the account is unavailable or the sessions of the job have spent `quota.limit`, priced from their own token usage at the published rates. A review or a repair attempt that may not run stops the migration; an end-to-end authoring session that may not run leaves the suite as it was, and the migration goes on with the reason reported. A job cut short before the proposal was published leaves no log, so the next run starts the migration again and counts from zero. The merge report's sessions, one per channel, are not counted, whichever job sends them.
+Before each agent session of a migration job (the reviews, the repair attempts and the end-to-end authoring) the Action asks DeepSeek for the account balance, and stops when the account is unavailable or the sessions of the job have spent `quota.limit`, priced from their own token usage at the published rates. A review or a repair attempt that may not run stops the migration; an end-to-end authoring session that may not run leaves the suite as it was, and the migration goes on with the reason reported. A job cut short before the proposal was published leaves no log, so the next run starts the migration again and counts from zero. A session that fails after reporting usage counts what it spent; a session stopped before it starts counts nothing. The merge report's sessions, one per channel, are not counted, whichever job sends them.
 
 ## Report channels
 

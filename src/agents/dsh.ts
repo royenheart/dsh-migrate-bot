@@ -55,6 +55,17 @@ export class AgentTimeoutError extends Error {
   override readonly name = 'AgentTimeoutError'
 }
 
+/** Usage a failed session had already spent, when the runner reported it before failing. */
+export function agentUsage(error: unknown): SessionProgress | undefined {
+  if (typeof error !== 'object' || error === null || !('usage' in error)) return undefined
+  return (error as { usage?: SessionProgress }).usage
+}
+
+function withUsage(error: Error, usage: SessionProgress | undefined): Error {
+  if (usage !== undefined) Object.defineProperty(error, 'usage', { value: usage, enumerable: false })
+  return error
+}
+
 function takeLines(buffer: string): { lines: string[]; rest: string } {
   const parts = buffer.split(/\r?\n/)
   const rest = parts.pop() ?? ''
@@ -214,23 +225,23 @@ export function createDshRunner(options: {
           mkdirSync(options.reportDir, { recursive: true })
           writeFileSync(join(options.reportDir, `${request.kind}.raw.txt`), result.stdout, 'utf8')
         }
-        throw new AgentTimeoutError(
+        throw withUsage(new AgentTimeoutError(
           `dsh session (${request.kind}) exceeded its ${Math.round(timeoutMs / 1000)}s watchdog and was killed`
           + `\n--- last stderr ---\n${stripObservationLines(stripTraceLines(result.stderr)).trim().slice(-2000)}`,
-        )
+        ), lastUsage)
       }
       const combined = `${stripObservationLines(stripTraceLines(result.stderr))}\n${result.stdout}`
       if (isQuotaLimitText(combined)) {
-        throw new QuotaError('limit_exceeded', stripTraceLines(result.stderr).trim() || result.stdout.trim())
+        throw withUsage(new QuotaError('limit_exceeded', stripObservationLines(stripTraceLines(result.stderr)).trim() || result.stdout.trim()), lastUsage)
       }
       if (isInsufficientBalanceText(combined)) {
-        throw new QuotaError(
+        throw withUsage(new QuotaError(
           'insufficient_balance',
           `insufficient balance: dsh aborted the session (${stripObservationLines(stripTraceLines(result.stderr)).trim() || result.stdout.trim()})`,
-        )
+        ), lastUsage)
       }
       if (result.code !== 0) {
-        throw new Error(`dsh agent failed (${result.code}): ${stripObservationLines(stripTraceLines(result.stderr)) || result.stdout}`)
+        throw withUsage(new Error(`dsh agent failed (${result.code}): ${stripObservationLines(stripTraceLines(result.stderr)) || result.stdout}`), lastUsage)
       }
       const report = extractReport(result.stdout)
       if (options.reportDir !== undefined) {

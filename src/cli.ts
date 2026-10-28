@@ -46,6 +46,7 @@ commands:
   check                 run every check on the working tree against --target
   status                print the consumer state as JSON
   inspect               write an HTML page for a migration's live run evidence
+                        [--migration VERSION] [--out DIR]
   self-test             start one keyless session of the agent runtime
   print-config          print the validated configuration
 
@@ -417,11 +418,28 @@ async function postReply(github: GitHubClient, repository: Repository, issue: nu
   await github.rest('POST', path, z.object({}), { body: `${marker}\n${reply}` })
 }
 
-async function inspect(runtime: Runtime, options: Options): Promise<number> {
+interface InspectRuntime {
+  workdir: string
+  home: string
+  store: StateStore
+}
+
+/** Inspect reads only the state branch; a broken consumer config or secret file must not block it. */
+function inspectRuntime(values: Options, env: NodeJS.ProcessEnv): InspectRuntime {
+  const workdir = resolve(values.workdir ?? process.cwd())
+  return {
+    workdir,
+    home: resolve(env.DSH_MIGRATE_HOME ?? join(workdir, '.dsh-migrate')),
+    store: new StateStore(workdir, env),
+  }
+}
+
+async function inspect(runtime: InspectRuntime, options: Options): Promise<number> {
   try {
     runtime.store.refresh()
     const data = readInspectData(runtime.store, options.migration)
-    const out = options.out ?? join(runtime.home, 'inspect')
+    if (options.out === '') throw new Error('--out needs a directory')
+    const out = options.out === undefined ? join(runtime.home, 'inspect') : resolve(runtime.workdir, options.out)
     const path = writeInspectHtml(data, out)
     log(`inspect: ${data.migrationId}: ${String(data.runs.length)} run(s), ${String(data.runs.reduce((sum, run) => sum + run.manifest.sessions.length, 0))} session(s)`)
     log(path)
@@ -471,7 +489,7 @@ async function main(argv: readonly string[]): Promise<number> {
     case 'check':
       return await check(loadRuntime(values, env))
     case 'inspect':
-      return await inspect(loadRuntime(values, env), values)
+      return await inspect(inspectRuntime(values, env), values)
     default:
       process.stderr.write(USAGE)
       return 2
