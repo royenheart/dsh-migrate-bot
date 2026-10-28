@@ -32,6 +32,14 @@ export function renderInspectHtml(data: InspectData): string {
   .card b { display: block; font-size: 18px; } .card span { color: var(--muted); font-size: 12px; }
   #diff { border: 1px solid var(--line); border-radius: 8px; overflow: auto; max-height: 60vh; padding: 8px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
   #diff .add { background: var(--add); } #diff .del { background: var(--del); }
+  #full { border: 1px solid var(--line); border-radius: 8px; overflow: auto; max-height: 70vh; }
+  #full table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  #full th { position: sticky; top: 0; background: var(--bg); border-bottom: 1px solid var(--line); padding: 6px; text-align: left; font-size: 12px; }
+  #full td { vertical-align: top; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; padding: 1px 6px; }
+  #full td.n { width: 3.5em; text-align: right; color: var(--muted); user-select: none; }
+  #full td.add { background: var(--add); } #full td.del { background: var(--del); }
+  #full td.blank { background: transparent; }
+  #full td.sep { width: 1px; padding: 0; background: var(--line); }
   #graph, #graphdiff > div { border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; }
   #graphdiff { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 900px) { #graphdiff { grid-template-columns: 1fr; } }
@@ -47,12 +55,13 @@ export function renderInspectHtml(data: InspectData): string {
     <label>From run <select id="from"></select></label>
     <label>To run <select id="to"></select></label>
     <label>Session <select id="session"></select></label>
-    <label>View <select id="view"><option value="diff">prompt diff</option><option value="graph">statechart</option><option value="graph-diff">statechart diff</option></select></label>
+    <label>View <select id="view"><option value="full">prompt side-by-side (full)</option><option value="diff">prompt diff</option><option value="graph">statechart</option><option value="graph-diff">statechart diff</option></select></label>
   </div>
   <div id="summary"></div>
   <div id="cards" class="cards"></div>
   <h2 id="title">Prompt diff</h2>
   <div id="diff"></div>
+  <div id="full"></div>
   <div id="graph" hidden></div>
   <div id="graphdiff" hidden></div>
 </main>
@@ -140,6 +149,99 @@ function renderGraphDiff(from, to) {
     $('from-graph').innerHTML = left.svg; $('to-graph').innerHTML = right.svg
   }).catch(error => { box.dataset.key = ''; if (box.dataset.token === key) box.textContent = String(error) })
 }
+
+const NL = String.fromCharCode(10)
+function splitLines(value) {
+  if (value === '') return ['']
+  const lines = value.split(NL)
+  if (value.endsWith(NL)) lines.pop()
+  return lines
+}
+function cell(className, text) {
+  const td = document.createElement('td')
+  if (className !== '') td.className = className
+  td.textContent = text
+  return td
+}
+function fullRows(before, after) {
+  if (globalThis.Diff === undefined) {
+    const left = splitLines(before), right = splitLines(after)
+    return Array.from({ length: Math.max(left.length, right.length) }, (_, index) => ({
+      left: left[index] ?? null,
+      right: right[index] ?? null,
+      leftClass: '',
+      rightClass: '',
+    }))
+  }
+  const rows = []
+  let removed = []
+  let added = []
+  const flush = () => {
+    const count = Math.max(removed.length, added.length)
+    for (let index = 0; index < count; index += 1) {
+      rows.push({
+        left: removed[index] ?? null,
+        right: added[index] ?? null,
+        leftClass: removed[index] === undefined ? 'blank' : 'del',
+        rightClass: added[index] === undefined ? 'blank' : 'add',
+      })
+    }
+    removed = []
+    added = []
+  }
+  for (const part of globalThis.Diff.diffLines(before, after)) {
+    const lines = splitLines(part.value)
+    if (part.removed) {
+      removed.push(...lines)
+      continue
+    }
+    if (part.added) {
+      added.push(...lines)
+      continue
+    }
+    flush()
+    for (const line of lines) rows.push({ left: line, right: line, leftClass: '', rightClass: '' })
+  }
+  flush()
+  return rows
+}
+function renderFull(from, to, name, before, after, beforeStored, afterStored) {
+  const box = $('full')
+  box.replaceChildren()
+  if (!beforeStored || !afterStored) {
+    const missing = [!beforeStored ? 'from' : '', !afterStored ? 'to' : ''].filter(Boolean).join(' and ')
+    box.textContent = 'No prompt stored in the ' + missing + ' run.' + NL + NL
+      + (beforeStored ? 'From:' + NL + before : '') + (beforeStored && afterStored ? NL + NL : '')
+      + (afterStored ? 'To:' + NL + after : '')
+    return
+  }
+  const table = document.createElement('table')
+  const head = document.createElement('thead')
+  const headRow = document.createElement('tr')
+  for (const [text, span] of [['From ' + from.runId, 2], ['', 1], ['To ' + to.runId, 2]]) {
+    const th = document.createElement('th')
+    th.textContent = text
+    th.colSpan = span
+    headRow.append(th)
+  }
+  head.append(headRow)
+  table.append(head)
+  const body = document.createElement('tbody')
+  let leftLine = 0
+  let rightLine = 0
+  for (const row of fullRows(before, after)) {
+    const tr = document.createElement('tr')
+    tr.append(cell('n', row.left === null ? '' : String(++leftLine)))
+    tr.append(cell(row.leftClass, row.left ?? ''))
+    tr.append(cell('sep', ''))
+    tr.append(cell('n', row.right === null ? '' : String(++rightLine)))
+    tr.append(cell(row.rightClass, row.right ?? ''))
+    body.append(tr)
+  }
+  table.append(body)
+  box.append(table)
+}
+
 function render() {
   const from = runOf($('from').value), to = runOf($('to').value), name = $('session').value
   const beforeStored = Object.prototype.hasOwnProperty.call(from.prompts, name)
@@ -172,8 +274,11 @@ function render() {
     }
   }
   $('diff').hidden = $('view').value !== 'diff'
-  $('title').textContent = $('view').value === 'diff' ? 'Prompt diff: ' + name
-    : $('view').value === 'graph' ? 'Statechart' : 'Statechart diff (from → to)'
+  $('full').hidden = $('view').value !== 'full'
+  if ($('view').value === 'full') renderFull(from, to, name, before, after, beforeStored, afterStored)
+  $('title').textContent = $('view').value === 'full' ? 'Full prompt: ' + name
+    : $('view').value === 'diff' ? 'Prompt diff: ' + name
+      : $('view').value === 'graph' ? 'Statechart' : 'Statechart diff (from → to)'
   $('graph').hidden = $('view').value !== 'graph'
   $('graphdiff').hidden = $('view').value !== 'graph-diff'
   if ($('view').value === 'graph') renderGraph($('graph'), to.manifest.workflow.graph, to.manifest.workflow.state)

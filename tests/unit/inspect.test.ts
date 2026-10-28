@@ -79,6 +79,7 @@ test('inspect data reads the runs and prompts the state branch stores', () => {
     assert.match(html, /prompt diff/)
     assert.match(html, /stateDiagram-v2/)
     assert.match(html, /graph-diff/)
+    assert.match(html, /prompt side-by-side \(full\)/)
     assert.match(html, /run state/)
     const module = /<script type="module">([\s\S]*?)<\/script>/.exec(html)?.[1]
     assert.ok(module !== undefined)
