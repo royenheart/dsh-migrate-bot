@@ -25,7 +25,7 @@ test('the configuration fails fast and names every problem', () => {
   if (ok.ok) {
     assert.equal(ok.config.PUBLIC_URL, 'https://deploy.example')
     assert.equal(ok.config.IDLE_MINUTES, 5)
-    assert.equal(ok.config.TTL_DAYS, 3)
+    assert.equal(ok.config.TTL_DAYS, 7)
     assert.equal(ok.config.conformance, true)
   }
 })

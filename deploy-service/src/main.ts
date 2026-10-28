@@ -45,6 +45,7 @@ async function main(): Promise<void> {
     ttlDays: config.TTL_DAYS,
     idleMinutes: config.IDLE_MINUTES,
     provider,
+    providerKind: config.PROVIDER,
     log,
   })
   await previews.load()

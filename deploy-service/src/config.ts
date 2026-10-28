@@ -25,7 +25,7 @@ export const envSchema = z.object({
   DSH_VERSION: z.string().regex(/^[0-9A-Za-z.+-]+$/, 'must be a dsh version such as 0.2.0-rc.2').optional(),
   DSH_BIN: z.string().refine(isAbsolute, 'must be an absolute path').optional(),
   IDLE_MINUTES: minutes.default(120),
-  TTL_DAYS: z.coerce.number().int().min(1).max(365).default(3),
+  TTL_DAYS: z.coerce.number().int().min(1).max(365).default(7),
   PORT: z.coerce.number().int().min(0).max(65535).default(8080),
   HOST: z.string().min(1).default('0.0.0.0'),
   PUBLIC_VIEWS: flag,

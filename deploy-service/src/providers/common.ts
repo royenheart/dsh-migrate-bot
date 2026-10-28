@@ -19,21 +19,21 @@ export const LAUNCHER = ((): string => {
 
 /** How long a dependency install may take. */
 export const INSTALL_TIMEOUT_MS = 10 * 60_000
-/** How long the boot check may take; the Action's default for its own boot check. */
+/** How long the check may take; the Action's default for its own boot check. */
 export const CHECK_TIMEOUT_MS = 180_000
 /** How long an instance may take to print both ready lines. */
 export const START_TIMEOUT_MS = 120_000
-/** The most output the install or the boot check may write. */
+/** The most output the install or the check may write. */
 export const OUTPUT_BYTES = 16 * 1024 * 1024
 
 /**
- * Turn the install and boot check output into a build result.
+ * Turn the install and check output into a build result.
  *
- * The boot check is the Action's own: `classifyBoot` from `src/verify/boot.ts`
+ * The check is the Action's own: `classifyBoot` from `src/verify/boot.ts`
  * decides, so a preview is promoted on exactly the evidence a migration
  * accepts.
  * @param install - the dependency install.
- * @param check - the boot check, absent when the install failed.
+ * @param check - the check, absent when the install failed.
  */
 export function buildResult(install: SpawnResult, check: SpawnResult | undefined): BuildResult {
   if (install.code !== 0 || check === undefined) {
@@ -41,8 +41,8 @@ export function buildResult(install: SpawnResult, check: SpawnResult | undefined
     return { ok: false, detail: `Installing the plugin ${why}: ${tail(`${install.stdout}\n${install.stderr}`)}` }
   }
   const verdict = classifyBoot({ code: check.code, stdout: check.stdout, stderr: check.stderr, timedOut: check.killed !== undefined })
-  if (verdict.outcome === 'pass') return { ok: true, detail: `The boot check passed (${verdict.signature}).` }
-  return { ok: false, detail: `The boot check did not pass (${verdict.outcome}): ${verdict.signature}` }
+  if (verdict.outcome === 'pass') return { ok: true, detail: `The check passed (${verdict.signature}).` }
+  return { ok: false, detail: `The check did not pass (${verdict.outcome}): ${verdict.signature}` }
 }
 
 function tail(text: string): string {

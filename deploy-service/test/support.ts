@@ -153,7 +153,7 @@ export async function startService(options: { conformance?: boolean; publicViews
   }, options.conformance === true ? ['--conformance'] : [])
   if (!loaded.ok) throw new Error(loaded.problems.join('; '))
   const provider = new FakeProvider()
-  const previews = new PreviewManager({ dataDir, publicUrl: 'http://127.0.0.1:1', ttlDays: 7, idleMinutes: 30, provider, log: () => {} })
+  const previews = new PreviewManager({ dataDir, publicUrl: 'http://127.0.0.1:1', ttlDays: 7, idleMinutes: 30, provider, providerKind: 'process', log: () => {} })
   await previews.load()
   const server = createService({
     config: loaded.config,
@@ -195,7 +195,7 @@ export async function startService(options: { conformance?: boolean; publicViews
 }
 
 /** A plugin repository with a bare origin, and the head of a pull request branch. */
-export function pluginRepository(): { origin: string; head: string; root: string; commit: (file: string, content: string) => string; cleanup: () => void } {
+export function pluginRepository(): { origin: string; head: string; root: string; commit: (file: string, content: string) => string; pullRef: (pullRequest: number, sha: string) => void; cleanup: () => void } {
   const root = mkdtempSync(join(tmpdir(), 'dsh-deploy-repo-'))
   const origin = join(root, 'origin.git')
   const work = join(root, 'work')
@@ -220,7 +220,8 @@ export function pluginRepository(): { origin: string; head: string; root: string
     git(['push', '--quiet', origin, 'HEAD:refs/heads/feature'])
     return git(['rev-parse', 'HEAD'])
   }
-  return { origin, head: git(['rev-parse', 'HEAD']), root, commit, cleanup: () => { rmSync(root, { recursive: true, force: true }) } }
+  const pullRef = (pullRequest: number, sha: string): void => { git(['update-ref', `refs/pull/${String(pullRequest)}/head`, sha], origin) }
+  return { origin, head: git(['rev-parse', 'HEAD']), root, commit, pullRef, cleanup: () => { rmSync(root, { recursive: true, force: true }) } }
 }
 
 /** A signed GitHub `pull_request` delivery. */
@@ -237,7 +238,7 @@ export function pullRequestEvent(input: { action: string; number: number; sha: s
     headers: {
       'Content-Type': 'application/json',
       'X-GitHub-Event': 'pull_request',
-      'X-GitHub-Delivery': `delivery-${input.action}-${input.sha}`,
+      'X-GitHub-Delivery': `delivery-${input.action}-${String(input.number)}-${input.sha}`,
       'X-Hub-Signature-256': `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`,
     },
   }

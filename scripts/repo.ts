@@ -15,8 +15,11 @@ export const EXCLUDED_DIRS = new Set([
   '.bench',
   '.git',
   '.dsh-migrate',
+  '.harbor-venv',
+  '.verify-scratch',
   '.venv',
   'dist',
+  'jobs',
   'node_modules',
   'vendor',
 ])

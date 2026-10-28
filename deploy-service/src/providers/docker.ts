@@ -15,7 +15,7 @@ import type { BuildResult, InstanceProvider, InstanceSpec, RunningInstance } fro
  * the daemon resolves a bind mount on the host, whatever the service sees.
  *
  * Only the dependency install has a network, Docker's default bridge, in a
- * container that is removed when it ends. The boot check and the serving
+ * container that is removed when it ends. The check and the serving
  * instance have none: the instance container runs `launcher.mjs serve`, and a
  * second container joined to its network namespace runs `forward`, which turns
  * each loopback `dsh web` port into a Unix socket in a directory only that

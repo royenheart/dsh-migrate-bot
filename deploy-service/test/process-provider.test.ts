@@ -20,7 +20,7 @@ test('the process provider gives the plugin\'s code none of the service\'s envir
     writeFileSync(join(plugin, 'package.json'), '{"name":"@acme/plugin","version":"1.0.0","scripts":{"postinstall":"node -e \\"require(\'node:fs\').writeFileSync(\'install-env.json\', JSON.stringify(process.env))\\""}}\n')
     const provider = new ProcessProvider({ dshBin: dsh, dataDir: root, log: () => {} })
     const built = await provider.build({ id: 'p', workDir: plugin, homeDir: join(root, 'home'), stateDir: join(root, 'state'), socketDir: join(root, 'sockets') }, plugin)
-    assert.deepEqual(built, { ok: true, detail: 'The boot check passed (pass: reached the model call).' })
+    assert.deepEqual(built, { ok: true, detail: 'The check passed (pass: reached the model call).' })
     for (const file of [seen, join(plugin, 'install-env.json')]) {
       const env = JSON.parse(readFileSync(file, 'utf8')) as Record<string, string>
       assert.equal(env.DEPLOY_TOKEN, undefined, file)

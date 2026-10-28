@@ -186,9 +186,11 @@ test('extend moves the expiry, never past the ceiling', async () => {
     assert.equal((await service.call('POST', PATH, { body: { action: 'extend', days: 3, maxTtlDays: 8 } })).status, 409)
     assert.equal((await service.call('POST', PATH, { body: { action: 'extend', days: 0, maxTtlDays: 8 } })).status, 400)
     assert.equal((await service.call('POST', '/previews/acme%2Fplugin/99', { body: { action: 'extend', days: 1, maxTtlDays: 8 } })).status, 404)
-    // Expiry destroys.
+    // Expiry destroys, and the marker says a redeploy can rebuild.
     await service.previews.sweep(Date.now() + 9 * day)
-    assert.deepEqual(await state(service), { state: 'none' })
+    const expired = await state(service)
+    assert.equal(expired.state, 'none')
+    assert.match(String(expired.detail), /Expired at .*redeploy rebuilds it/)
   } finally {
     await service.close()
     repo.cleanup()
@@ -368,6 +370,94 @@ test('a file that is not UTF-8 is frozen, served and carried byte for byte', asy
   }
 })
 
+test('an expired preview is rebuilt from the pull request head on redeploy', async () => {
+  const repo = pluginRepository()
+  const service = await startService()
+  try {
+    repo.pullRef(7, repo.head)
+    await deliver(service, { action: 'opened', number: 7, sha: repo.head, cloneUrl: repo.origin })
+    await service.previews.sweep(Date.now() + 8 * 24 * 60 * 60 * 1000)
+    const expired = await state(service)
+    assert.equal(expired.state, 'none')
+    assert.match(String(expired.detail), /Expired at .*redeploy rebuilds it/)
+
+    const rebuilt = await service.call('POST', PATH, { body: { action: 'redeploy' } })
+    assert.equal(rebuilt.status, 202)
+    assert.equal((await rebuilt.json() as { state: string }).state, 'building')
+    await service.previews.settled()
+    const ready = await state(service)
+    assert.deepEqual([ready.state, ready.headSha], ['ready', repo.head])
+    assert.equal(service.provider.builds.length, 2)
+    const marker = JSON.parse(readFileSync(join(service.dataDir, 'pull-requests', `${ID}.json`), 'utf8')) as { state: string; cloneUrl: string }
+    assert.deepEqual([marker.state, marker.cloneUrl], ['open', repo.origin])
+  } finally {
+    await service.close()
+    repo.cleanup()
+  }
+})
+
+test('a destroyed preview is rebuilt fresh on redeploy', async () => {
+  const repo = pluginRepository()
+  const service = await startService()
+  try {
+    repo.pullRef(7, repo.head)
+    await deliver(service, { action: 'opened', number: 7, sha: repo.head, cloneUrl: repo.origin })
+    assert.equal((await service.call('DELETE', PATH)).status, 200)
+    assert.equal((await state(service)).state, 'none')
+
+    assert.equal((await service.call('POST', PATH, { body: { action: 'redeploy' } })).status, 202)
+    await service.previews.settled()
+    const ready = await state(service)
+    assert.deepEqual([ready.state, ready.headSha], ['ready', repo.head])
+    const marker = JSON.parse(readFileSync(join(service.dataDir, 'pull-requests', `${ID}.json`), 'utf8')) as { state: string }
+    assert.equal(marker.state, 'open')
+  } finally {
+    await service.close()
+    repo.cleanup()
+  }
+})
+
+test('a redeploy uses the pull request head as it is now, not the last event head', async () => {
+  const repo = pluginRepository()
+  const service = await startService()
+  try {
+    repo.pullRef(7, repo.head)
+    await deliver(service, { action: 'opened', number: 7, sha: repo.head, cloneUrl: repo.origin })
+    const moved = repo.commit('next.js', 'export const next = true\n')
+    repo.pullRef(7, moved)
+
+    assert.equal((await service.call('POST', PATH, { body: { action: 'redeploy' } })).status, 202)
+    await service.previews.settled()
+    const ready = await state(service)
+    assert.deepEqual([ready.state, ready.headSha], ['ready', moved])
+  } finally {
+    await service.close()
+    repo.cleanup()
+  }
+})
+
+test('a closed or refused pull request is not rebuilt by redeploy', async () => {
+  const repo = pluginRepository()
+  const service = await startService()
+  try {
+    repo.pullRef(7, repo.head)
+    await deliver(service, { action: 'opened', number: 7, sha: repo.head, cloneUrl: repo.origin })
+    await deliver(service, { action: 'closed', number: 7, sha: repo.head, cloneUrl: repo.origin })
+    const closed = await service.call('POST', PATH, { body: { action: 'redeploy' } })
+    assert.equal(closed.status, 409)
+    assert.match(await closed.text(), /closed/)
+    assert.equal((await state(service)).detail, 'The pull request is closed.')
+
+    await deliver(service, { action: 'opened', number: 8, sha: repo.head, cloneUrl: repo.origin, headRepository: 'stranger/plugin' })
+    const fork = await service.call('POST', '/previews/acme%2Fplugin/8', { body: { action: 'redeploy' } })
+    assert.equal(fork.status, 409)
+    assert.match(await fork.text(), /not in acme\/plugin/)
+  } finally {
+    await service.close()
+    repo.cleanup()
+  }
+})
+
 test('a closed pull request stays without a preview until it is reopened', async () => {
   const repo = pluginRepository()
   const service = await startService()
@@ -420,7 +510,9 @@ test('destroy and a closed pull request remove the preview; records survive a re
     assert.ok(!existsSync(join(dataDir, 'previews', ID, 'work.next-9')))
     assert.ok(!existsSync(join(dataDir, 'previews', ID, 'git.next-9')))
     assert.equal((await restarted.call('DELETE', PATH)).status, 200)
-    assert.deepEqual(await state(restarted), { state: 'none' })
+    const destroyed = await state(restarted)
+    assert.equal(destroyed.state, 'none')
+    assert.match(String(destroyed.detail), /Destroyed; redeploy rebuilds it/)
     assert.ok(!existsSync(join(dataDir, 'previews', ID)))
     assert.equal((await restarted.call('DELETE', PATH)).status, 404)
 

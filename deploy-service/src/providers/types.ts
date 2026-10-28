@@ -50,7 +50,7 @@ export interface BuildResult {
 export interface InstanceProvider {
   /**
    * Install the plugin's dependencies in a candidate working copy and run the
-   * keyless boot check on it. Nothing serves the candidate yet; the manager
+   * keyless check on it. Nothing serves the candidate yet; the manager
    * promotes it only when this passes.
    */
   build(spec: InstanceSpec, candidateDir: string): Promise<BuildResult>
