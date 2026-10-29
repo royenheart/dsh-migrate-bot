@@ -30,8 +30,6 @@ export function renderInspectHtml(data: InspectData): string {
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
   .card { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
   .card b { display: block; font-size: 18px; } .card span { color: var(--muted); font-size: 12px; }
-  #diff { border: 1px solid var(--line); border-radius: 8px; overflow: auto; max-height: 60vh; padding: 8px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
-  #diff .add { background: var(--add); } #diff .del { background: var(--del); }
   #full { border: 1px solid var(--line); border-radius: 8px; overflow: auto; max-height: 70vh; }
   #full table { border-collapse: collapse; width: 100%; table-layout: fixed; }
   #full th { position: sticky; top: 0; background: var(--bg); border-bottom: 1px solid var(--line); padding: 6px; text-align: left; font-size: 12px; }
@@ -40,9 +38,10 @@ export function renderInspectHtml(data: InspectData): string {
   #full td.add { background: var(--add); } #full td.del { background: var(--del); }
   #full td.blank { background: transparent; }
   #full th.left, #full td.left { border-right: 1px solid var(--line); }
-  #graph, #graphdiff > div { border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; }
+  #graph, #graphdiff > div { border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; max-height: 42vh; }
   #graphdiff { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 900px) { #graphdiff { grid-template-columns: 1fr; } }
+  #workflow-note { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
   .state { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #fff8c5; color: #6b4e00; font-weight: 600; }
   .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 </style>
@@ -55,14 +54,14 @@ export function renderInspectHtml(data: InspectData): string {
     <label>From run <select id="from"></select></label>
     <label>To run <select id="to"></select></label>
     <label>Session <select id="session"></select></label>
-    <label>View <select id="view"><option value="full">prompt side-by-side (full)</option><option value="diff">prompt diff</option><option value="graph">statechart</option><option value="graph-diff">statechart diff</option></select></label>
+    <label>View <select id="view"><option value="workflow">workflow + prompt</option><option value="full">prompt side-by-side (full)</option><option value="graph">statechart</option><option value="graph-diff">statechart diff</option></select></label>
   </div>
   <div id="summary"></div>
   <div id="cards" class="cards"></div>
-  <h2 id="title">Prompt diff</h2>
-  <div id="diff"></div>
-  <div id="full"></div>
+  <h2 id="title">Full prompt</h2>
   <div id="graph" hidden></div>
+  <p id="workflow-note" hidden>Click a state or a transition. A transition shows the target state's prompt, then the source state's prompt.</p>
+  <div id="full" hidden></div>
   <div id="graphdiff" hidden></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/diff@7.0.0/dist/diff.min.js"></script>
@@ -78,11 +77,21 @@ $('from').value = runs.length > 1 ? runs[runs.length - 2].runId : runs[0].runId
 $('to').value = runs[runs.length - 1].runId
 const runOf = id => runs.find(run => run.runId === id)
 const sessionsOf = pair => [...new Set(pair.flatMap(run => run.manifest.sessions.map(session => session.name)))]
+function stageOf(name) {
+  if (name === 'overlap') return 'review · overlap'
+  if (name === 'extension-points') return 'review · extension points'
+  const repair = /^repair-(\\d+)$/.exec(name)
+  if (repair !== null) return 'repair · attempt ' + repair[1]
+  if (name === 'e2e-characterize') return 'end-to-end · characterize'
+  if (name === 'e2e-publish') return 'end-to-end · publish'
+  if (name.startsWith('report-')) return 'merge report · ' + name.slice('report-'.length)
+  return name
+}
 function refreshSessions() {
   const from = runOf($('from').value), to = runOf($('to').value)
   const names = sessionsOf([from, to])
   $('session').replaceChildren()
-  for (const name of names) option($('session'), name, name)
+  for (const name of names) option($('session'), name, name + ' — ' + stageOf(name))
 }
 function metrics(run) {
   const totals = run.manifest.totals
@@ -109,19 +118,79 @@ function markCurrent(graph, state) {
 function edgesOf(graph) {
   return new Set((graph ?? '').split('\\n').map(line => line.trim()).filter(line => line.includes('-->')))
 }
+function edgeList(graph) {
+  return (graph ?? '').split('\\n').map(line => line.trim()).filter(line => line.includes('-->'))
+}
+let activeNode
+let activeEdge
+function markActive(graph, node, edge) {
+  let out = graph
+  if (node !== undefined && node !== '') out += '\\n  classDef active fill:#ddf4ff,stroke:#0969da,stroke-width:3px\\n  class ' + node + ' active'
+  return out
+}
+function promptNamesForNode(node) {
+  const names = sessionsOf([runOf($('from').value), runOf($('to').value)])
+  if (node === 'reviewing') return names.filter(name => name === 'overlap' || name === 'extension-points')
+  if (node === 'repairing') return names.filter(name => /^repair-/.test(name))
+  if (node === 'characterizing') return names.filter(name => name === 'e2e-characterize')
+  if (node === 'publishingE2E') return names.filter(name => name === 'e2e-publish')
+  if (node === 'reporting') return names.filter(name => /^report-/.test(name))
+  return []
+}
+function selectNode(node) {
+  const names = promptNamesForNode(node)
+  if (names.length === 0) { activeNode = node; activeEdge = undefined; render(); return }
+  let index = names.indexOf($('session').value)
+  if (activeNode === node && index >= 0) index = (index + 1) % names.length
+  else index = 0
+  $('session').value = names[index]
+  activeNode = node
+  activeEdge = undefined
+  render()
+}
+function selectEdge(index, source, target) {
+  const targetNames = promptNamesForNode(target)
+  const sourceNames = promptNamesForNode(source)
+  const names = targetNames.length > 0 ? targetNames : sourceNames
+  activeEdge = index
+  activeNode = targetNames.length > 0 ? target : sourceNames.length > 0 ? source : undefined
+  if (names.length > 0) $('session').value = names[0]
+  render()
+}
+function wireWorkflow(svg, graph) {
+  for (const group of svg.querySelectorAll('g.node')) {
+    const node = group.id.replace(/^state-/, '').replace(/-[0-9]+$/, '')
+    if (node === '' || node === 'root_start' || node === 'root_end') continue
+    group.style.cursor = 'pointer'
+    group.addEventListener('click', () => selectNode(node))
+  }
+  const edges = edgeList(graph)
+  for (const path of svg.querySelectorAll('path.transition')) {
+    const match = /edge([0-9]+)/.exec(path.id)
+    const index = match === null ? -1 : Number(match[1])
+    const edge = edges[index]
+    if (edge === undefined) continue
+    const [source, target] = edge.split('-->').map(part => part.trim())
+    path.style.cursor = 'pointer'
+    if (index === activeEdge) { path.style.stroke = '#0969da'; path.style.strokeWidth = '3px' }
+    path.addEventListener('click', (event) => { event.stopPropagation(); selectEdge(index, source, target) })
+  }
+}
 const mermaidPromise = import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs').then(({ default: mermaid }) => {
   mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' })
   return mermaid
 })
 let renderSeq = 0
-function renderGraph(box, graph, state) {
+function renderGraph(box, graph, state, interactive = false) {
   const safe = safeGraph(graph)
   if (safe === undefined) { box.textContent = 'No safe generated statechart in this run.'; return }
-  const marked = markCurrent(safe, state)
+  const marked = markActive(markCurrent(safe, state), activeNode, activeEdge)
   const key = String(renderSeq++)
   box.dataset.token = key
   mermaidPromise.then(mermaid => mermaid.render('graph-' + key, marked)).then(({ svg }) => {
-    if (box.dataset.token === key) box.innerHTML = svg
+    if (box.dataset.token !== key) return
+    box.innerHTML = svg
+    if (interactive) wireWorkflow(box.querySelector('svg'), safe)
   }).catch(error => { if (box.dataset.token === key) box.textContent = String(error) })
 }
 function renderGraphDiff(from, to) {
@@ -225,7 +294,7 @@ function renderFull(from, to, name, before, after, beforeStored, afterStored) {
   table.append(cols)
   const head = document.createElement('thead')
   const headRow = document.createElement('tr')
-  for (const [text, span, cls] of [['From ' + from.runId, 2, 'left'], ['To ' + to.runId, 2, '']]) {
+  for (const [text, span, cls] of [['From ' + from.runId + ' · ' + stageOf(name), 2, 'left'], ['To ' + to.runId + ' · ' + stageOf(name), 2, '']]) {
     const th = document.createElement('th')
     if (cls !== '') th.className = cls
     th.textContent = text
@@ -265,31 +334,23 @@ function render() {
   const warningText = data.warnings.length === 0 ? '' : '<p class="muted">Evidence warnings: ' + data.warnings.map(esc).join('; ') + '</p>'
   $('summary').innerHTML = warningText + '<p><span class="mono">' + esc(from.runId) + '</span> → <span class="mono">' + esc(to.runId) + '</span> · run state <span class="state">' + esc(to.manifest.workflow.state ?? to.manifest.outcome) + '</span></p>' + evalLinks
   $('cards').innerHTML = metrics(to).map(([label, value]) => '<div class="card"><b>' + value + '</b><span>' + label + '</span></div>').join('')
-  const box = $('diff'); box.replaceChildren()
-  if (!beforeStored || !afterStored) {
-    const missing = [!beforeStored ? 'from' : '', !afterStored ? 'to' : ''].filter(Boolean).join(' and ')
-    box.textContent = 'No prompt stored in the ' + missing + ' run.\\n\\n' + (beforeStored ? 'From:\\n' + before + '\\n\\n' : '') + (afterStored ? 'To:\\n' + after : '')
-  } else {
-    const patch = globalThis.Diff === undefined
-      ? 'diff unavailable; showing both prompts\\n--- ' + from.runId + '\\n' + before + '\\n+++ ' + to.runId + '\\n' + after
-      : globalThis.Diff.createTwoFilesPatch(from.runId, to.runId, before, after, '', '', { context: 3 })
-    for (const line of patch.split('\\n')) {
-      const span = document.createElement('span')
-      span.className = line.startsWith('+') && !line.startsWith('+++ ') ? 'add' : line.startsWith('-') && !line.startsWith('--- ') ? 'del' : ''
-      span.textContent = line + '\\n'
-      box.append(span)
-    }
+  const view = $('view').value
+  $('full').hidden = !(view === 'full' || view === 'workflow')
+  $('graph').hidden = !(view === 'graph' || view === 'workflow')
+  $('graphdiff').hidden = view !== 'graph-diff'
+  $('workflow-note').hidden = view !== 'workflow'
+  if (view === 'full' || view === 'workflow') renderFull(from, to, name, before, after, beforeStored, afterStored)
+  if (view === 'workflow') {
+    $('workflow-note').textContent = activeNode === undefined
+      ? 'Click a state or a transition. A transition shows the target state\\'s prompt, then the source state\\'s prompt.'
+      : 'Selected ' + (activeEdge === undefined ? 'state ' : 'transition → state ') + activeNode + ' · prompt ' + name + ' (' + stageOf(name) + ') · click again to switch'
+    renderGraph($('graph'), to.manifest.workflow.graph, to.manifest.workflow.state, true)
   }
-  $('diff').hidden = $('view').value !== 'diff'
-  $('full').hidden = $('view').value !== 'full'
-  if ($('view').value === 'full') renderFull(from, to, name, before, after, beforeStored, afterStored)
-  $('title').textContent = $('view').value === 'full' ? 'Full prompt: ' + name
-    : $('view').value === 'diff' ? 'Prompt diff: ' + name
-      : $('view').value === 'graph' ? 'Statechart' : 'Statechart diff (from → to)'
-  $('graph').hidden = $('view').value !== 'graph'
-  $('graphdiff').hidden = $('view').value !== 'graph-diff'
-  if ($('view').value === 'graph') renderGraph($('graph'), to.manifest.workflow.graph, to.manifest.workflow.state)
-  if ($('view').value === 'graph-diff') renderGraphDiff(from, to)
+  if (view === 'graph') renderGraph($('graph'), to.manifest.workflow.graph, to.manifest.workflow.state, false)
+  if (view === 'graph-diff') renderGraphDiff(from, to)
+  $('title').textContent = view === 'workflow' ? 'Workflow + prompt: ' + name + ' · ' + stageOf(name)
+    : view === 'full' ? 'Full prompt: ' + name + ' · ' + stageOf(name)
+      : view === 'graph' ? 'Statechart' : 'Statechart diff (from → to)'
 }
 for (const id of ['from', 'to']) $(id).addEventListener('change', () => { refreshSessions(); render() })
 $('session').addEventListener('change', render)
