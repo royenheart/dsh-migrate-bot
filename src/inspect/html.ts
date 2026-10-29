@@ -40,7 +40,7 @@ export function renderInspectHtml(data: InspectData): string {
   #full th.left, #full td.left { border-right: 1px solid var(--line); }
   #graph { display: grid; gap: 12px; }
   #graph.two { grid-template-columns: 1fr 1fr; }
-  #graph .graph-panel { border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; max-height: 42vh; }
+  #graph .graph-panel { border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; max-height: 30vh; }
   #graph .node.active rect, #graph .node.active polygon { stroke: #0969da; stroke-width: 3px; }
   #full { margin-top: 16px; }
   #graph .graph-panel h3 { margin: 0 0 6px; font-size: 13px; }
@@ -51,6 +51,7 @@ export function renderInspectHtml(data: InspectData): string {
   @media (max-width: 900px) { #graphdiff { grid-template-columns: 1fr; } }
   #workflow-note { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
   .selection { margin: 8px 0; padding: 8px 10px; border-left: 3px solid #0969da; background: color-mix(in srgb, #0969da 7%, transparent); font-size: 13px; }
+  #jump-prompt { border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); padding: 2px 8px; cursor: pointer; font: inherit; }
   .state { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #fff8c5; color: #6b4e00; font-weight: 600; }
   .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 </style>
@@ -67,6 +68,7 @@ export function renderInspectHtml(data: InspectData): string {
   </div>
   <div id="summary"></div>
   <div id="selection"></div>
+  <button id="jump-prompt" type="button">↓ prompt</button>
   <div id="cards" class="cards"></div>
   <h2 id="title">Full prompt</h2>
   <div id="evidence">
@@ -113,10 +115,30 @@ function metrics(run) {
   return [['sessions', totals.sessions], ['turns', totals.turns], ['steps', totals.steps], ['tool calls', totals.toolCalls], ['elapsed', totals.elapsedSeconds + 's'], ['cost', cost], ['input tokens', totals.inputTokens], ['output tokens', totals.outputTokens]]
 }
 function statesOf(graph) {
-  return new Set((graph ?? '').split('\\n').flatMap(line => {
-    const match = /^\\s*([A-Za-z_][\\w.-]*)\\s*-->\\s*([A-Za-z_][\\w.-]*)/.exec(line)
-    return match === null ? [] : [match[1], match[2]]
-  }).filter(state => state !== '[*]'))
+  const states = new Set()
+  for (const raw of (graph ?? '').split('\\n')) {
+    const line = raw.trim()
+    const edge = /^(\\[\\*\\]|[A-Za-z_][\\w.-]*)\\s*-->\\s*(\\[\\*\\]|[A-Za-z_][\\w.-]*)/.exec(line)
+    if (edge !== null) {
+      if (edge[1] !== '[*]') states.add(edge[1])
+      if (edge[2] !== '[*]') states.add(edge[2])
+      continue
+    }
+    const declared = /^(?:state\\s+)?([A-Za-z_][\\w.-]*)\\s*:/.exec(line)
+    if (declared !== null) {
+      states.add(declared[1])
+      continue
+    }
+    const bare = /^[A-Za-z_][\\w.-]*$/.exec(line)
+    if (bare !== null && !['stateDiagram-v2', 'direction', 'classDef', 'class', 'note', 'end'].includes(line)) states.add(line)
+  }
+  return states
+}
+function nodesOf(run, graph) {
+  return new Set(run.manifest.workflow.nodes ?? [...statesOf(graph)])
+}
+function runEdgesOf(run, graph) {
+  return new Set(run.manifest.workflow.edges ?? [...edgesOf(graph)])
 }
 function mark(graph, only, cls, fill) {
   if (only.length === 0) return graph
@@ -150,6 +172,14 @@ function promptNamesForNode(node) {
   if (node === 'publishingE2E') return names.filter(name => name === 'e2e-publish')
   if (node === 'reporting') return names.filter(name => /^report-/.test(name))
   return []
+}
+function showNoPrompt(message) {
+  const box = $('full')
+  box.replaceChildren()
+  const note = document.createElement('p')
+  note.className = 'muted'
+  note.textContent = message
+  box.append(note)
 }
 function updatePrompt() {
   const from = runOf($('from').value), to = runOf($('to').value), name = $('session').value
@@ -191,22 +221,9 @@ function revealNode(node) {
     if (groupRect.top < panelRect.top + 8 || groupRect.bottom > panelRect.bottom - 8) {
       panel.scrollTop += groupRect.top - panelRect.top - panel.clientHeight / 2 + groupRect.height / 2
     }
-  }
-}
-function syncPanels() {
-  const panels = [...document.querySelectorAll('#graph .graph-panel')]
-  let syncing = false
-  for (const panel of panels) {
-    panel.addEventListener('scroll', () => {
-      if (syncing) return
-      syncing = true
-      for (const other of panels) {
-        if (other === panel) continue
-        other.scrollTop = panel.scrollTop
-        other.scrollLeft = panel.scrollLeft
-      }
-      syncing = false
-    })
+    if (groupRect.left < panelRect.left + 8 || groupRect.right > panelRect.right - 8) {
+      panel.scrollLeft += groupRect.left - panelRect.left - panel.clientWidth / 2 + groupRect.width / 2
+    }
   }
 }
 function selectNode(node) {
@@ -214,9 +231,11 @@ function selectNode(node) {
   activeNode = node
   activeEdge = undefined
   if (names.length === 0) {
-    updatePrompt()
+    showNoPrompt('State ' + node + ' runs no agent prompt. Choose a review, repair, end-to-end, or report state.')
     highlightWorkflow()
+    revealNode(node)
     $('workflow-note').textContent = 'State ' + node + ' has no agent prompt; click a review, repair, or end-to-end state.'
+    $('selection').textContent = 'Workflow state ' + node + ' has no agent prompt'
     return
   }
   let index = names.indexOf($('session').value)
@@ -235,19 +254,21 @@ function selectEdge(edge, source, target) {
   activeEdge = edge
   activeNode = targetNames.length > 0 ? target : sourceNames.length > 0 ? source : undefined
   if (names.length > 0) $('session').value = names[0]
-  updatePrompt()
+  if (names.length > 0) updatePrompt()
+  else showNoPrompt('Transition ' + edge + ' has no prompt on either side. Choose a state.')
   highlightWorkflow()
   if (activeNode !== undefined) revealNode(activeNode)
   $('workflow-note').textContent = names.length > 0
     ? 'Selected transition → state ' + activeNode + ' · prompt ' + names[0] + ' (' + stageOf(names[0]) + ')'
     : 'Transition ' + edge + ' has no prompt on either side; click a state to choose one.'
+  if (names.length === 0) $('selection').textContent = 'Transition ' + edge + ' has no agent prompt'
 }
 function wireWorkflow(svg, graph) {
   for (const group of svg.querySelectorAll('g.node')) {
     const node = group.id.replace(/^state-/, '').replace(/-[0-9]+$/, '')
     if (node === '' || node === 'root_start' || node === 'root_end') continue
     group.style.cursor = 'pointer'
-    group.addEventListener('click', () => selectNode(node))
+    group.dataset.node = node
   }
   const edges = edgeList(graph)
   for (const path of svg.querySelectorAll('path.transition')) {
@@ -258,7 +279,8 @@ function wireWorkflow(svg, graph) {
     const [source, target] = edge.split('-->').map(part => part.trim())
     path.style.cursor = 'pointer'
     path.dataset.edge = edge
-    path.addEventListener('click', (event) => { event.stopPropagation(); selectEdge(edge, source, target) })
+    path.dataset.source = source
+    path.dataset.target = target
   }
 }
 const mermaidPromise = import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs').then(({ default: mermaid }) => {
@@ -266,19 +288,21 @@ const mermaidPromise = import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/
   return mermaid
 })
 let renderSeq = 0
-function renderGraph(box, graph, state, interactive = false) {
+let graphGeneration = 0
+function renderGraph(box, graph, state, interactive = false, generation = graphGeneration) {
+  if (generation !== graphGeneration) return
   const safe = safeGraph(graph)
   if (safe === undefined) { box.textContent = 'No safe generated statechart in this run.'; return }
   const marked = markActive(markCurrent(safe, state), activeNode, activeEdge)
   const key = String(renderSeq++)
   box.dataset.token = key
   mermaidPromise.then(mermaid => mermaid.render('graph-' + key, marked)).then(({ svg }) => {
-    if (box.dataset.token !== key) return
+    if (generation !== graphGeneration || box.dataset.token !== key) return
     box.innerHTML = svg
     if (interactive) { wireWorkflow(box.querySelector('svg'), safe); highlightWorkflow() }
-  }).catch(error => { if (box.dataset.token === key) box.textContent = String(error) })
+  }).catch(error => { if (generation === graphGeneration && box.dataset.token === key) box.textContent = String(error) })
 }
-function renderWorkflowGraphs(from, to) {
+function renderWorkflowGraphs(from, to, generation = graphGeneration) {
   const box = $('graph')
   box.replaceChildren()
   box.classList.add('two')
@@ -288,15 +312,16 @@ function renderWorkflowGraphs(from, to) {
     box.textContent = 'One of these runs has no recorded statechart, so there is no workflow diff.'
     return
   }
-  const fromStates = statesOf(fromGraph), toStates = statesOf(toGraph)
-  const fromEdges = edgesOf(fromGraph), toEdges = edgesOf(toGraph)
+  const fromGraphStates = statesOf(fromGraph), toGraphStates = statesOf(toGraph)
+  const fromStates = nodesOf(from, fromGraph), toStates = nodesOf(to, toGraph)
+  const fromEdges = runEdgesOf(from, fromGraph), toEdges = runEdgesOf(to, toGraph)
   const onlyFromStates = [...fromStates].filter(state => !toStates.has(state))
   const onlyToStates = [...toStates].filter(state => !fromStates.has(state))
   const onlyFromEdges = [...fromEdges].filter(edge => !toEdges.has(edge))
   const onlyToEdges = [...toEdges].filter(edge => !fromEdges.has(edge))
   const panels = [
-    ['From ' + from.runId, mark(fromGraph, onlyFromStates, 'removed', '#ffebe9'), from.manifest.workflow.state, onlyFromStates.length, onlyFromEdges],
-    ['To ' + to.runId, mark(toGraph, onlyToStates, 'added', '#dafbe1'), to.manifest.workflow.state, onlyToStates.length, onlyToEdges],
+    ['From ' + from.runId, mark(fromGraph, onlyFromStates.filter(state => fromGraphStates.has(state)), 'removed', '#ffebe9'), from.manifest.workflow.state, onlyFromStates.length, onlyFromEdges],
+    ['To ' + to.runId, mark(toGraph, onlyToStates.filter(state => toGraphStates.has(state)), 'added', '#dafbe1'), to.manifest.workflow.state, onlyToStates.length, onlyToEdges],
   ]
   for (const [title, graph, state, stateCount, onlyEdges] of panels) {
     const panel = document.createElement('div')
@@ -313,20 +338,21 @@ function renderWorkflowGraphs(from, to) {
     const target = document.createElement('div')
     panel.append(heading, summary, target)
     box.append(panel)
-    renderGraph(target, graph, state, true)
+    renderGraph(target, graph, state, true, generation)
   }
-  syncPanels()
 }
-function renderGraphDiff(from, to) {
+function renderGraphDiff(from, to, generation = graphGeneration) {
+  if (generation !== graphGeneration) return
   const before = safeGraph(from.manifest.workflow.graph)
   const after = safeGraph(to.manifest.workflow.graph)
   if (before === undefined || after === undefined) { $('graphdiff').textContent = 'One of these runs has no recorded statechart, so there is nothing to compare.'; return }
-  const fromStates = statesOf(before), toStates = statesOf(after)
-  const fromEdges = edgesOf(before), toEdges = edgesOf(after)
+  const beforeGraphStates = statesOf(before), afterGraphStates = statesOf(after)
+  const fromStates = nodesOf(from, before), toStates = nodesOf(to, after)
+  const fromEdges = runEdgesOf(from, before), toEdges = runEdgesOf(to, after)
   const onlyFrom = [...fromEdges].filter(edge => !toEdges.has(edge))
   const onlyTo = [...toEdges].filter(edge => !fromEdges.has(edge))
-  const beforeMarked = mark(before, [...fromStates].filter(state => !toStates.has(state)), 'removed', '#ffebe9')
-  const afterMarked = mark(after, [...toStates].filter(state => !fromStates.has(state)), 'added', '#dafbe1')
+  const beforeMarked = mark(before, [...fromStates].filter(state => !toStates.has(state) && beforeGraphStates.has(state)), 'removed', '#ffebe9')
+  const afterMarked = mark(after, [...toStates].filter(state => !fromStates.has(state) && afterGraphStates.has(state)), 'added', '#dafbe1')
   const box = $('graphdiff')
   const key = (from.runId + '-' + to.runId).replace(/[^A-Za-z0-9_-]/g, '_')
   if (box.dataset.key !== key) {
@@ -340,7 +366,7 @@ function renderGraphDiff(from, to) {
   ])).then(([left, right]) => {
     if (box.dataset.token !== key) return
     $('from-graph').innerHTML = left.svg; $('to-graph').innerHTML = right.svg
-  }).catch(error => { box.dataset.key = ''; if (box.dataset.token === key) box.textContent = String(error) })
+  }).catch(error => { box.dataset.key = ''; if (generation === graphGeneration && box.dataset.token === key) box.textContent = String(error) })
 }
 
 const NL = String.fromCharCode(10)
@@ -442,6 +468,18 @@ function renderFull(from, to, name, before, after, beforeStored, afterStored) {
   box.append(table)
 }
 
+$('graph').addEventListener('click', (event) => {
+  const path = event.target.closest?.('path.transition')
+  if (path !== null && path !== undefined && path.dataset.edge !== undefined) {
+    selectEdge(path.dataset.edge, path.dataset.source ?? '', path.dataset.target ?? '')
+    return
+  }
+  const group = event.target.closest?.('g.node')
+  if (group === null || group === undefined) return
+  const node = group.dataset.node ?? group.id.replace(/^state-/, '').replace(/-[0-9]+$/, '')
+  if (node !== '') selectNode(node)
+})
+
 function render() {
   const from = runOf($('from').value), to = runOf($('to').value), name = $('session').value
   const beforeStored = Object.prototype.hasOwnProperty.call(from.prompts, name)
@@ -459,6 +497,8 @@ function render() {
   $('summary').innerHTML = warningText + '<p><span class="mono">' + esc(from.runId) + '</span> → <span class="mono">' + esc(to.runId) + '</span> · run state <span class="state">' + esc(to.manifest.workflow.state ?? to.manifest.outcome) + '</span></p>' + evalLinks
   $('cards').innerHTML = metrics(to).map(([label, value]) => '<div class="card"><b>' + value + '</b><span>' + label + '</span></div>').join('')
   const view = $('view').value
+  graphGeneration += 1
+  const generation = graphGeneration
   document.body.dataset.view = view
   $('workflow-pane').hidden = !(view === 'graph' || view === 'workflow')
   $('full').hidden = !(view === 'full' || view === 'workflow')
@@ -470,7 +510,7 @@ function render() {
     $('workflow-note').textContent = activeNode === undefined
       ? 'Click a state or a transition. A transition shows the target state\\'s prompt, then the source state\\'s prompt.'
       : 'Selected ' + (activeEdge === undefined ? 'state ' : 'transition → state ') + activeNode + ' · prompt ' + name + ' (' + stageOf(name) + ') · click again to switch'
-    renderWorkflowGraphs(from, to)
+    renderWorkflowGraphs(from, to, generation)
   }
   if (view === 'graph') renderGraph($('graph'), to.manifest.workflow.graph, to.manifest.workflow.state, false)
   if (view === 'graph-diff') renderGraphDiff(from, to)
@@ -480,6 +520,7 @@ function render() {
   $('selection').textContent = 'Selected prompt: ' + name + ' · ' + stageOf(name) + (activeNode === undefined ? '' : ' · workflow state ' + activeNode)
 }
 for (const id of ['from', 'to']) $(id).addEventListener('change', () => { activeNode = undefined; activeEdge = undefined; refreshSessions(); render() })
+$('jump-prompt').addEventListener('click', () => $('full').scrollIntoView({ behavior: 'smooth', block: 'start' }))
 $('session').addEventListener('change', updatePrompt)
 $('view').addEventListener('change', render)
 refreshSessions()

@@ -51,6 +51,8 @@ test('a manifest totals sessions and keeps prompt hashes, not prompt text', () =
   assert.equal(JSON.stringify(manifest).includes('review this plugin'), false)
   assert.equal(manifest.workflow.hash.length, 64)
   assert.equal(manifest.workflow.state, 'accepted')
+  assert.ok((manifest.workflow.nodes?.length ?? 0) > 0)
+  assert.ok((manifest.workflow.edges?.length ?? 0) > 0)
   assert.equal(manifest.evaluation?.trialId, 'trial-1')
   assert.equal(runManifestSchema.safeParse(manifest).success, true)
   assert.equal(manifestPath('0.2.1-rc.2', '123-1'), 'migrations/0.2.1-rc.2/runs/123-1/manifest.json')

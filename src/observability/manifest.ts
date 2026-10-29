@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { PACKAGE_ROOT, PACKAGE_VERSION } from '../paths.ts'
-import { workflowDiagram } from '../workflow/graph.ts'
+import { workflowDiagram, workflowInventory } from '../workflow/graph.ts'
 import type { AgentConfig } from '../config/schema.ts'
 import type { ManifestCheck, SessionRecord } from './session.ts'
 
@@ -57,6 +57,8 @@ export const runManifestSchema = z.object({
     hash: z.string().regex(/^[0-9a-f]{64}$/),
     adapter: z.literal('local'),
     graph: z.string().min(1).optional(),
+    nodes: z.array(z.string().min(1)).optional(),
+    edges: z.array(z.string().min(1)).optional(),
     state: z.string().min(1).optional(),
   }),
   plugin: z.array(z.string().min(1)).min(1),
@@ -194,6 +196,7 @@ export function buildRunManifest(input: ManifestInput): RunManifest {
       hash: workflowHash(),
       adapter: 'local',
       graph: workflowDiagram(),
+      ...workflowInventory(),
       ...(input.state === undefined ? {} : { state: input.state }),
     },
     plugin: input.plugin,

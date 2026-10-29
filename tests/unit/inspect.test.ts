@@ -85,6 +85,9 @@ test('inspect data reads the runs and prompts the state branch stores', () => {
     const module = /<script type="module">([\s\S]*?)<\/script>/.exec(html)?.[1]
     assert.ok(module !== undefined)
     assert.doesNotThrow(() => new Function(module))
+    assert.match(module, /const generation = graphGeneration/)
+    assert.doesNotMatch(module, /syncPanels/)
+    assert.match(html, /id="jump-prompt"/)
     const path = writeInspectHtml(data, join(root, 'inspect'))
     assert.equal(path, join(root, 'inspect', 'index.html'))
   } finally {
