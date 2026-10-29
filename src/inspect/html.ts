@@ -39,13 +39,14 @@ export function renderInspectHtml(data: InspectData): string {
   #full td.blank { background: transparent; }
   #full th.left, #full td.left { border-right: 1px solid var(--line); }
   #graph { display: grid; gap: 12px; }
-  #graph.two { grid-template-columns: 1fr; }
-  #graph .graph-panel { border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; max-height: 32vh; }
+  #graph.two { grid-template-columns: 1fr 1fr; }
+  #graph .graph-panel { border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; max-height: 42vh; }
+  #graph .node.active rect, #graph .node.active polygon { stroke: #0969da; stroke-width: 3px; }
+  #full { margin-top: 16px; }
   #graph .graph-panel h3 { margin: 0 0 6px; font-size: 13px; }
   #graphdiff > div { border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; }
   #evidence { display: block; }
-  body[data-view="workflow"] #evidence { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.15fr); gap: 16px; align-items: start; }
-  @media (max-width: 1000px) { body[data-view="workflow"] #evidence { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { #graph.two { grid-template-columns: 1fr; } }
   #graphdiff { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 900px) { #graphdiff { grid-template-columns: 1fr; } }
   #workflow-note { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
@@ -148,16 +149,50 @@ function promptNamesForNode(node) {
   if (node === 'reporting') return names.filter(name => /^report-/.test(name))
   return []
 }
+function updatePrompt() {
+  const from = runOf($('from').value), to = runOf($('to').value), name = $('session').value
+  const beforeStored = Object.prototype.hasOwnProperty.call(from.prompts, name)
+  const afterStored = Object.prototype.hasOwnProperty.call(to.prompts, name)
+  const before = beforeStored ? from.prompts[name] : '(no prompt stored)'
+  const after = afterStored ? to.prompts[name] : '(no prompt stored)'
+  const scrollY = window.scrollY
+  const fullScroll = $('full').scrollTop
+  renderFull(from, to, name, before, after, beforeStored, afterStored)
+  $('title').textContent = $('view').value === 'workflow'
+    ? 'Workflow + prompt: ' + name + ' · ' + stageOf(name)
+    : 'Full prompt: ' + name + ' · ' + stageOf(name)
+  $('full').scrollTop = fullScroll
+  window.scrollTo(0, scrollY)
+}
+function highlightWorkflow() {
+  for (const group of document.querySelectorAll('#graph g.node')) {
+    const node = group.id.replace(/^state-/, '').replace(/-[0-9]+$/, '')
+    group.classList.toggle('active', node === activeNode)
+  }
+  for (const path of document.querySelectorAll('#graph path.transition')) {
+    const edge = path.dataset.edge
+    const selected = edge !== undefined && edge === activeEdge
+    path.style.stroke = selected ? '#0969da' : ''
+    path.style.strokeWidth = selected ? '3px' : ''
+  }
+}
 function selectNode(node) {
   const names = promptNamesForNode(node)
-  if (names.length === 0) { activeNode = node; activeEdge = undefined; render(); return }
-  let index = names.indexOf($('session').value)
-  if (activeNode === node && index >= 0) index = (index + 1) % names.length
-  else index = 0
-  $('session').value = names[index]
   activeNode = node
   activeEdge = undefined
-  render()
+  if (names.length === 0) {
+    updatePrompt()
+    highlightWorkflow()
+    $('workflow-note').textContent = 'State ' + node + ' has no agent prompt; click a review, repair, or end-to-end state.'
+    return
+  }
+  let index = names.indexOf($('session').value)
+  if (index >= 0 && names.length > 1) index = (index + 1) % names.length
+  else if (index < 0) index = 0
+  $('session').value = names[index]
+  updatePrompt()
+  highlightWorkflow()
+  $('workflow-note').textContent = 'Selected state ' + node + ' · prompt ' + names[index] + ' (' + stageOf(names[index]) + ') · click again to switch'
 }
 function selectEdge(edge, source, target) {
   const targetNames = promptNamesForNode(target)
@@ -166,7 +201,11 @@ function selectEdge(edge, source, target) {
   activeEdge = edge
   activeNode = targetNames.length > 0 ? target : sourceNames.length > 0 ? source : undefined
   if (names.length > 0) $('session').value = names[0]
-  render()
+  updatePrompt()
+  highlightWorkflow()
+  $('workflow-note').textContent = names.length > 0
+    ? 'Selected transition → state ' + activeNode + ' · prompt ' + names[0] + ' (' + stageOf(names[0]) + ')'
+    : 'Transition ' + edge + ' has no prompt on either side; click a state to choose one.'
 }
 function wireWorkflow(svg, graph) {
   for (const group of svg.querySelectorAll('g.node')) {
@@ -183,7 +222,7 @@ function wireWorkflow(svg, graph) {
     if (edge === undefined) continue
     const [source, target] = edge.split('-->').map(part => part.trim())
     path.style.cursor = 'pointer'
-    if (edge === activeEdge) { path.style.stroke = '#0969da'; path.style.strokeWidth = '3px' }
+    path.dataset.edge = edge
     path.addEventListener('click', (event) => { event.stopPropagation(); selectEdge(edge, source, target) })
   }
 }
@@ -201,12 +240,13 @@ function renderGraph(box, graph, state, interactive = false) {
   mermaidPromise.then(mermaid => mermaid.render('graph-' + key, marked)).then(({ svg }) => {
     if (box.dataset.token !== key) return
     box.innerHTML = svg
-    if (interactive) wireWorkflow(box.querySelector('svg'), safe)
+    if (interactive) { wireWorkflow(box.querySelector('svg'), safe); highlightWorkflow() }
   }).catch(error => { if (box.dataset.token === key) box.textContent = String(error) })
 }
 function renderWorkflowGraphs(from, to) {
   const box = $('graph')
   box.replaceChildren()
+  box.classList.add('two')
   const fromGraph = safeGraph(from.manifest.workflow.graph)
   const toGraph = safeGraph(to.manifest.workflow.graph)
   if (fromGraph === undefined || toGraph === undefined) {
@@ -402,8 +442,8 @@ function render() {
     : view === 'full' ? 'Full prompt: ' + name + ' · ' + stageOf(name)
       : view === 'graph' ? 'Statechart' : 'Statechart diff (from → to)'
 }
-for (const id of ['from', 'to']) $(id).addEventListener('change', () => { refreshSessions(); render() })
-$('session').addEventListener('change', render)
+for (const id of ['from', 'to']) $(id).addEventListener('change', () => { activeNode = undefined; activeEdge = undefined; refreshSessions(); render() })
+$('session').addEventListener('change', updatePrompt)
 $('view').addEventListener('change', render)
 refreshSessions()
 render()
