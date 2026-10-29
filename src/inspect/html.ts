@@ -50,6 +50,7 @@ export function renderInspectHtml(data: InspectData): string {
   #graphdiff { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 900px) { #graphdiff { grid-template-columns: 1fr; } }
   #workflow-note { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+  .selection { margin: 8px 0; padding: 8px 10px; border-left: 3px solid #0969da; background: color-mix(in srgb, #0969da 7%, transparent); font-size: 13px; }
   .state { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #fff8c5; color: #6b4e00; font-weight: 600; }
   .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 </style>
@@ -65,6 +66,7 @@ export function renderInspectHtml(data: InspectData): string {
     <label>View <select id="view"><option value="workflow">workflow + prompt</option><option value="full">prompt side-by-side (full)</option><option value="graph">statechart</option><option value="graph-diff">statechart diff</option></select></label>
   </div>
   <div id="summary"></div>
+  <div id="selection"></div>
   <div id="cards" class="cards"></div>
   <h2 id="title">Full prompt</h2>
   <div id="evidence">
@@ -112,7 +114,7 @@ function metrics(run) {
 }
 function statesOf(graph) {
   return new Set((graph ?? '').split('\\n').flatMap(line => {
-    const match = /^\s*([A-Za-z_][\w.-]*)\s*-->\s*([A-Za-z_][\w.-]*)/.exec(line)
+    const match = /^\\s*([A-Za-z_][\\w.-]*)\\s*-->\\s*([A-Za-z_][\\w.-]*)/.exec(line)
     return match === null ? [] : [match[1], match[2]]
   }).filter(state => state !== '[*]'))
 }
@@ -163,6 +165,7 @@ function updatePrompt() {
     : 'Full prompt: ' + name + ' · ' + stageOf(name)
   $('full').scrollTop = fullScroll
   window.scrollTo(0, scrollY)
+  $('selection').textContent = 'Selected prompt: ' + name + ' · ' + stageOf(name) + (activeNode === undefined ? '' : ' · workflow state ' + activeNode)
 }
 function highlightWorkflow() {
   for (const group of document.querySelectorAll('#graph g.node')) {
@@ -174,6 +177,36 @@ function highlightWorkflow() {
     const selected = edge !== undefined && edge === activeEdge
     path.style.stroke = selected ? '#0969da' : ''
     path.style.strokeWidth = selected ? '3px' : ''
+  }
+}
+function nodeGroup(panel, node) {
+  return [...panel.querySelectorAll('g.node')].find(group => group.id.replace(/^state-/, '').replace(/-[0-9]+$/, '') === node)
+}
+function revealNode(node) {
+  for (const panel of document.querySelectorAll('#graph .graph-panel')) {
+    const group = nodeGroup(panel, node)
+    if (group === undefined) continue
+    const panelRect = panel.getBoundingClientRect()
+    const groupRect = group.getBoundingClientRect()
+    if (groupRect.top < panelRect.top + 8 || groupRect.bottom > panelRect.bottom - 8) {
+      panel.scrollTop += groupRect.top - panelRect.top - panel.clientHeight / 2 + groupRect.height / 2
+    }
+  }
+}
+function syncPanels() {
+  const panels = [...document.querySelectorAll('#graph .graph-panel')]
+  let syncing = false
+  for (const panel of panels) {
+    panel.addEventListener('scroll', () => {
+      if (syncing) return
+      syncing = true
+      for (const other of panels) {
+        if (other === panel) continue
+        other.scrollTop = panel.scrollTop
+        other.scrollLeft = panel.scrollLeft
+      }
+      syncing = false
+    })
   }
 }
 function selectNode(node) {
@@ -192,6 +225,7 @@ function selectNode(node) {
   $('session').value = names[index]
   updatePrompt()
   highlightWorkflow()
+  revealNode(node)
   $('workflow-note').textContent = 'Selected state ' + node + ' · prompt ' + names[index] + ' (' + stageOf(names[index]) + ') · click again to switch'
 }
 function selectEdge(edge, source, target) {
@@ -203,6 +237,7 @@ function selectEdge(edge, source, target) {
   if (names.length > 0) $('session').value = names[0]
   updatePrompt()
   highlightWorkflow()
+  if (activeNode !== undefined) revealNode(activeNode)
   $('workflow-note').textContent = names.length > 0
     ? 'Selected transition → state ' + activeNode + ' · prompt ' + names[0] + ' (' + stageOf(names[0]) + ')'
     : 'Transition ' + edge + ' has no prompt on either side; click a state to choose one.'
@@ -280,6 +315,7 @@ function renderWorkflowGraphs(from, to) {
     box.append(panel)
     renderGraph(target, graph, state, true)
   }
+  syncPanels()
 }
 function renderGraphDiff(from, to) {
   const before = safeGraph(from.manifest.workflow.graph)
@@ -441,6 +477,7 @@ function render() {
   $('title').textContent = view === 'workflow' ? 'Workflow + prompt: ' + name + ' · ' + stageOf(name)
     : view === 'full' ? 'Full prompt: ' + name + ' · ' + stageOf(name)
       : view === 'graph' ? 'Statechart' : 'Statechart diff (from → to)'
+  $('selection').textContent = 'Selected prompt: ' + name + ' · ' + stageOf(name) + (activeNode === undefined ? '' : ' · workflow state ' + activeNode)
 }
 for (const id of ['from', 'to']) $(id).addEventListener('change', () => { activeNode = undefined; activeEdge = undefined; refreshSessions(); render() })
 $('session').addEventListener('change', updatePrompt)
