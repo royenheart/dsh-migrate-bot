@@ -38,7 +38,14 @@ export function renderInspectHtml(data: InspectData): string {
   #full td.add { background: var(--add); } #full td.del { background: var(--del); }
   #full td.blank { background: transparent; }
   #full th.left, #full td.left { border-right: 1px solid var(--line); }
-  #graph, #graphdiff > div { border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; max-height: 42vh; }
+  #graph { display: grid; gap: 12px; }
+  #graph.two { grid-template-columns: 1fr; }
+  #graph .graph-panel { border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; max-height: 32vh; }
+  #graph .graph-panel h3 { margin: 0 0 6px; font-size: 13px; }
+  #graphdiff > div { border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow: auto; }
+  #evidence { display: block; }
+  body[data-view="workflow"] #evidence { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.15fr); gap: 16px; align-items: start; }
+  @media (max-width: 1000px) { body[data-view="workflow"] #evidence { grid-template-columns: 1fr; } }
   #graphdiff { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 900px) { #graphdiff { grid-template-columns: 1fr; } }
   #workflow-note { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
@@ -59,9 +66,13 @@ export function renderInspectHtml(data: InspectData): string {
   <div id="summary"></div>
   <div id="cards" class="cards"></div>
   <h2 id="title">Full prompt</h2>
-  <div id="graph" hidden></div>
-  <p id="workflow-note" hidden>Click a state or a transition. A transition shows the target state's prompt, then the source state's prompt.</p>
-  <div id="full" hidden></div>
+  <div id="evidence">
+    <div id="workflow-pane" hidden>
+      <div id="graph" hidden></div>
+      <p id="workflow-note" hidden>Click a state or a transition. A transition shows the target state's prompt, then the source state's prompt.</p>
+    </div>
+    <div id="full" hidden></div>
+  </div>
   <div id="graphdiff" hidden></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/diff@7.0.0/dist/diff.min.js"></script>
@@ -148,11 +159,11 @@ function selectNode(node) {
   activeEdge = undefined
   render()
 }
-function selectEdge(index, source, target) {
+function selectEdge(edge, source, target) {
   const targetNames = promptNamesForNode(target)
   const sourceNames = promptNamesForNode(source)
   const names = targetNames.length > 0 ? targetNames : sourceNames
-  activeEdge = index
+  activeEdge = edge
   activeNode = targetNames.length > 0 ? target : sourceNames.length > 0 ? source : undefined
   if (names.length > 0) $('session').value = names[0]
   render()
@@ -172,8 +183,8 @@ function wireWorkflow(svg, graph) {
     if (edge === undefined) continue
     const [source, target] = edge.split('-->').map(part => part.trim())
     path.style.cursor = 'pointer'
-    if (index === activeEdge) { path.style.stroke = '#0969da'; path.style.strokeWidth = '3px' }
-    path.addEventListener('click', (event) => { event.stopPropagation(); selectEdge(index, source, target) })
+    if (edge === activeEdge) { path.style.stroke = '#0969da'; path.style.strokeWidth = '3px' }
+    path.addEventListener('click', (event) => { event.stopPropagation(); selectEdge(edge, source, target) })
   }
 }
 const mermaidPromise = import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs').then(({ default: mermaid }) => {
@@ -192,6 +203,43 @@ function renderGraph(box, graph, state, interactive = false) {
     box.innerHTML = svg
     if (interactive) wireWorkflow(box.querySelector('svg'), safe)
   }).catch(error => { if (box.dataset.token === key) box.textContent = String(error) })
+}
+function renderWorkflowGraphs(from, to) {
+  const box = $('graph')
+  box.replaceChildren()
+  const fromGraph = safeGraph(from.manifest.workflow.graph)
+  const toGraph = safeGraph(to.manifest.workflow.graph)
+  if (fromGraph === undefined || toGraph === undefined) {
+    box.textContent = 'One of these runs has no recorded statechart, so there is no workflow diff.'
+    return
+  }
+  const fromStates = statesOf(fromGraph), toStates = statesOf(toGraph)
+  const fromEdges = edgesOf(fromGraph), toEdges = edgesOf(toGraph)
+  const onlyFromStates = [...fromStates].filter(state => !toStates.has(state))
+  const onlyToStates = [...toStates].filter(state => !fromStates.has(state))
+  const onlyFromEdges = [...fromEdges].filter(edge => !toEdges.has(edge))
+  const onlyToEdges = [...toEdges].filter(edge => !fromEdges.has(edge))
+  const panels = [
+    ['From ' + from.runId, mark(fromGraph, onlyFromStates, 'removed', '#ffebe9'), from.manifest.workflow.state, onlyFromStates.length, onlyFromEdges],
+    ['To ' + to.runId, mark(toGraph, onlyToStates, 'added', '#dafbe1'), to.manifest.workflow.state, onlyToStates.length, onlyToEdges],
+  ]
+  for (const [title, graph, state, stateCount, onlyEdges] of panels) {
+    const panel = document.createElement('div')
+    panel.className = 'graph-panel'
+    const heading = document.createElement('h3')
+    heading.textContent = title
+    const summary = document.createElement('p')
+    summary.className = 'muted'
+    const edgeList = onlyEdges.slice(0, 4).join(', ') + (onlyEdges.length > 4 ? ' …' : '')
+    summary.textContent = stateCount === 0 && onlyEdges.length === 0
+      ? 'no structural difference from the other run'
+      : String(stateCount) + ' state(s) only here' + (stateCount === 0 ? '' : ' (colored)')
+        + ' · ' + String(onlyEdges.length) + ' transition(s) only here' + (onlyEdges.length === 0 ? '' : ': ' + edgeList)
+    const target = document.createElement('div')
+    panel.append(heading, summary, target)
+    box.append(panel)
+    renderGraph(target, graph, state, true)
+  }
 }
 function renderGraphDiff(from, to) {
   const before = safeGraph(from.manifest.workflow.graph)
@@ -335,6 +383,8 @@ function render() {
   $('summary').innerHTML = warningText + '<p><span class="mono">' + esc(from.runId) + '</span> → <span class="mono">' + esc(to.runId) + '</span> · run state <span class="state">' + esc(to.manifest.workflow.state ?? to.manifest.outcome) + '</span></p>' + evalLinks
   $('cards').innerHTML = metrics(to).map(([label, value]) => '<div class="card"><b>' + value + '</b><span>' + label + '</span></div>').join('')
   const view = $('view').value
+  document.body.dataset.view = view
+  $('workflow-pane').hidden = !(view === 'graph' || view === 'workflow')
   $('full').hidden = !(view === 'full' || view === 'workflow')
   $('graph').hidden = !(view === 'graph' || view === 'workflow')
   $('graphdiff').hidden = view !== 'graph-diff'
@@ -344,7 +394,7 @@ function render() {
     $('workflow-note').textContent = activeNode === undefined
       ? 'Click a state or a transition. A transition shows the target state\\'s prompt, then the source state\\'s prompt.'
       : 'Selected ' + (activeEdge === undefined ? 'state ' : 'transition → state ') + activeNode + ' · prompt ' + name + ' (' + stageOf(name) + ') · click again to switch'
-    renderGraph($('graph'), to.manifest.workflow.graph, to.manifest.workflow.state, true)
+    renderWorkflowGraphs(from, to)
   }
   if (view === 'graph') renderGraph($('graph'), to.manifest.workflow.graph, to.manifest.workflow.state, false)
   if (view === 'graph-diff') renderGraphDiff(from, to)
