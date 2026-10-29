@@ -51,6 +51,9 @@ export function renderInspectHtml(data: InspectData): string {
   @media (max-width: 900px) { #graphdiff { grid-template-columns: 1fr; } }
   #workflow-note { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
   .selection { margin: 8px 0; padding: 8px 10px; border-left: 3px solid #0969da; background: color-mix(in srgb, #0969da 7%, transparent); font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+  .chip { border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--fg); padding: 3px 9px; font: 12px/1.4 ui-sans-serif, system-ui, sans-serif; cursor: pointer; }
+  .chip.active { border-color: #0969da; color: #0969da; background: color-mix(in srgb, #0969da 9%, transparent); }
   #jump-prompt { border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); padding: 2px 8px; cursor: pointer; font: inherit; }
   .state { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #fff8c5; color: #6b4e00; font-weight: 600; }
   .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
@@ -69,6 +72,7 @@ export function renderInspectHtml(data: InspectData): string {
   <div id="summary"></div>
   <div id="selection"></div>
   <button id="jump-prompt" type="button">↓ prompt</button>
+  <div id="stage-chips" class="chips"></div>
   <div id="cards" class="cards"></div>
   <h2 id="title">Full prompt</h2>
   <div id="evidence">
@@ -181,6 +185,35 @@ function showNoPrompt(message) {
   note.textContent = message
   box.append(note)
 }
+function nodeForPrompt(name) {
+  if (name === 'overlap' || name === 'extension-points') return 'reviewing'
+  if (name.startsWith('repair-')) return 'repairing'
+  if (name === 'e2e-characterize') return 'characterizing'
+  if (name === 'e2e-publish') return 'publishingE2E'
+  if (name.startsWith('report-')) return 'reporting'
+  return undefined
+}
+function renderStageChips() {
+  const box = $('stage-chips')
+  box.replaceChildren()
+  for (const name of sessionsOf([runOf($('from').value), runOf($('to').value)])) {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'chip' + (name === $('session').value ? ' active' : '')
+    button.textContent = stageOf(name)
+    button.title = name
+    button.addEventListener('click', () => {
+      $('session').value = name
+      activeNode = nodeForPrompt(name)
+      activeEdge = undefined
+      updatePrompt()
+      highlightWorkflow()
+      if (activeNode !== undefined) revealNode(activeNode)
+      $('workflow-note').textContent = 'Selected prompt ' + name + ' · ' + stageOf(name)
+    })
+    box.append(button)
+  }
+}
 function updatePrompt() {
   const from = runOf($('from').value), to = runOf($('to').value), name = $('session').value
   const beforeStored = Object.prototype.hasOwnProperty.call(from.prompts, name)
@@ -196,6 +229,7 @@ function updatePrompt() {
   $('full').scrollTop = fullScroll
   window.scrollTo(0, scrollY)
   $('selection').textContent = 'Selected prompt: ' + name + ' · ' + stageOf(name) + (activeNode === undefined ? '' : ' · workflow state ' + activeNode)
+  renderStageChips()
 }
 function highlightWorkflow() {
   for (const group of document.querySelectorAll('#graph g.node')) {
@@ -518,6 +552,7 @@ function render() {
     : view === 'full' ? 'Full prompt: ' + name + ' · ' + stageOf(name)
       : view === 'graph' ? 'Statechart' : 'Statechart diff (from → to)'
   $('selection').textContent = 'Selected prompt: ' + name + ' · ' + stageOf(name) + (activeNode === undefined ? '' : ' · workflow state ' + activeNode)
+  renderStageChips()
 }
 for (const id of ['from', 'to']) $(id).addEventListener('change', () => { activeNode = undefined; activeEdge = undefined; refreshSessions(); render() })
 $('jump-prompt').addEventListener('click', () => $('full').scrollIntoView({ behavior: 'smooth', block: 'start' }))
