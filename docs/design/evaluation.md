@@ -95,6 +95,7 @@ Each record also names a snapshot of what the Action brought to the run, `snapsh
 | Task | One task across the records of a subject: the reward of each attempt, durations and cost |
 | Diff | One artifact of two attempts, of two records or of one, in a Monaco diff editor; a `proposed.diff` also gets its file list and diffstat. `?subject&task&from&fromAttempt&to&toAttempt&artifact&view`, and `range=latest` for the two newest records |
 | Field | The proposals in the consumer repositories |
+| Run evidence | An `inspect.json` from a live state branch: prompt and workflow comparison, loaded in the browser |
 
 The Field page is built from the consumers' state branches at build time, not from records: the event log keeps when each proposal was published and when its pull request closed, merged or not, so storing that again would be a copy to keep in step. The build asks GitHub only for the maintainer commits on merged proposals. It reports, per consumer and overall, the merge rate over decided proposals, the share merged without a maintainer commit, and the median hours from publishing to merging. The consumer list is `CONSUMERS` in `scripts/site.ts`.
 

@@ -53,6 +53,11 @@ test('inspect reads a seeded state branch and writes the live evidence page', ()
     assert.match(html, /0\.2\.0/)
     assert.match(html, /review this plugin/)
     assert.match(html, /stateDiagram-v2/)
+
+    const jsonRun = spawnSync(process.execPath, [join(PACKAGE_ROOT, 'dist', 'src', 'cli.js'), 'inspect', '--workdir', repo.work, '--migration', '0.2.0', '--out', 'evidence-json', '--json'], { cwd: repo.work, encoding: 'utf8' })
+    assert.equal(jsonRun.status, 0, jsonRun.stderr)
+    const bundle = JSON.parse(readFileSync(join(repo.work, 'evidence-json', 'inspect.json'), 'utf8')) as { runs: Array<{ prompts: Record<string, string> }> }
+    assert.equal(bundle.runs[0]?.prompts.overlap, 'review this plugin\n')
   } finally {
     repo.cleanup()
   }

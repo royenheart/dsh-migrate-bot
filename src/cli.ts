@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, writeSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, writeSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { z } from 'zod'
@@ -46,7 +46,7 @@ commands:
   check                 run every check on the working tree against --target
   status                print the consumer state as JSON
   inspect               write an HTML page for a migration's live run evidence
-                        [--migration VERSION] [--out DIR]
+                        [--migration VERSION] [--out DIR] [--json]
   self-test             start one keyless session of the agent runtime
   print-config          print the validated configuration
 
@@ -67,6 +67,7 @@ const OPTIONS = {
   'skip-github': { type: 'boolean' },
   migration: { type: 'string' },
   out: { type: 'string' },
+  json: { type: 'boolean' },
   number: { type: 'string' },
   merged: { type: 'string' },
   body: { type: 'string' },
@@ -440,6 +441,14 @@ async function inspect(runtime: InspectRuntime, options: Options): Promise<numbe
     const data = readInspectData(runtime.store, options.migration)
     if (options.out === '') throw new Error('--out needs a directory')
     const out = options.out === undefined ? join(runtime.home, 'inspect') : resolve(runtime.workdir, options.out)
+    if (options.json === true) {
+      mkdirSync(out, { recursive: true })
+      const path = join(out, 'inspect.json')
+      writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`)
+      log(`inspect: ${data.migrationId}: ${String(data.runs.length)} run(s), ${String(data.runs.reduce((sum, run) => sum + run.manifest.sessions.length, 0))} session(s)`)
+      log(path)
+      return 0
+    }
     const path = writeInspectHtml(data, out)
     log(`inspect: ${data.migrationId}: ${String(data.runs.length)} run(s), ${String(data.runs.reduce((sum, run) => sum + run.manifest.sessions.length, 0))} session(s)`)
     log(path)
