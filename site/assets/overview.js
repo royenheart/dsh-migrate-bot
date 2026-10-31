@@ -23,6 +23,7 @@ function chart(records, subject) {
   })
   const values = records.filter(record => !['oracle', 'nop'].includes(record.subject.id)).map(point)
   const selected = { filter: `datum.subject === '${subject}'` }
+  const x = { field: 'at', type: 'temporal', title: 'UTC', scale: { type: 'utc' }, axis: { labelAngle: -30, labelOverlap: 'greedy', tickCount: 6 } }
   const tooltip = [
     { field: 'subject' }, { field: 'commit' }, { field: 'message' },
     { field: 'meanReward', format: '.3f' }, { field: 'low', format: '.3f' }, { field: 'high', format: '.3f' },
@@ -31,9 +32,9 @@ function chart(records, subject) {
     $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
     width: 'container', height: 280, data: { values },
     layer: [
-      { transform: [selected], mark: { type: 'errorband', opacity: 0.15 }, encoding: { x: { field: 'at', type: 'temporal', scale: { type: 'utc' } }, y: { field: 'low', type: 'quantitative', title: 'score', scale: { domain: [0, 1] } }, y2: { field: 'high' } } },
-      { mark: { type: 'line', point: true }, encoding: { x: { field: 'at', type: 'temporal', title: 'UTC', scale: { type: 'utc' } }, y: { field: 'meanReward', type: 'quantitative' }, color: { field: 'subject', type: 'nominal', title: 'subject', legend: { orient: 'bottom' } }, tooltip } },
-      { transform: [selected], mark: { type: 'line', strokeDash: [4, 3], point: true, color: '#1a7f37' }, encoding: { x: { field: 'at', type: 'temporal' }, y: { field: 'passRate', type: 'quantitative' }, tooltip: [{ field: 'subject' }, { field: 'commit' }, { field: 'passRate', title: 'passRate@1.0', format: '.3f' }] } },
+      { transform: [selected], mark: { type: 'errorband', opacity: 0.15 }, encoding: { x, y: { field: 'low', type: 'quantitative', title: 'score', scale: { domain: [0, 1] } }, y2: { field: 'high' } } },
+      { mark: { type: 'line', point: true }, encoding: { x, y: { field: 'meanReward', type: 'quantitative' }, color: { field: 'subject', type: 'nominal', title: 'subject', legend: { orient: 'bottom' } }, tooltip } },
+      { transform: [selected], mark: { type: 'line', strokeDash: [4, 3], point: true, color: '#1a7f37' }, encoding: { x, y: { field: 'passRate', type: 'quantitative' }, tooltip: [{ field: 'subject' }, { field: 'commit' }, { field: 'passRate', title: 'passRate@1.0', format: '.3f' }] } },
     ],
   }
   globalThis.vegaEmbed('#chart', spec, { actions: false }).then(({ view }) => {
@@ -46,13 +47,13 @@ function chart(records, subject) {
 }
 
 function recordsTable(records) {
-  $('records').innerHTML = `<thead><tr><th>Date (UTC)</th><th>Commit</th><th>Suite</th><th class="num">Tasks × attempts</th><th class="num">meanReward</th><th class="num">passRate@1.0</th><th class="num">passHatK</th><th class="num">costPerSuccess</th><th class="num">infrastructureRate</th><th></th></tr></thead><tbody>${records.map((record, index) => {
+  $('records').innerHTML = `<thead><tr><th>Date (UTC)</th><th>Commit</th><th>Suite</th><th class="num">Tasks × n</th><th class="num">Mean reward</th><th class="num">Pass rate @ 1.0</th><th class="num">Pass^k</th><th class="num">Cost / success</th><th class="num">Infrastructure rate</th><th></th></tr></thead><tbody>${records.map((record, index) => {
     const values = record.metrics.values
     const previous = records[index + 1]
     const compareLink = previous === undefined
       ? ''
       : `<a href="#compare" data-base="${escape(previous.id)}" data-head="${escape(record.id)}">compare</a> · ${previous.producer.snapshot === record.producer.snapshot ? '<span class="muted">Action unchanged</span>' : `<a href="changes.html?from=${encodeURIComponent(previous.id)}&to=${encodeURIComponent(record.id)}">what changed</a>`} · `
-    return `<tr><td>${day(record.createdAt)}</td><td><span class="mono">${short(record.producer.commit)}</span>${record.producer.dirty ? ' <span class="muted">(dirty)</span>' : ''}<br><span class="muted">${escape(record.producer.message)}</span></td><td class="mono">${short(record.suite.commit)}</td><td class="num">${fmt(values.eligibleTasks)} × ${record.subject.attempts}</td><td class="num">${fmt(values.meanReward)}${interval(record.metrics.intervals.meanReward)}</td><td class="num">${fmt(values['passRate@1.0'])}${interval(record.metrics.intervals['passRate@1.0'])}</td><td class="num">${fmt(values.passHatK)}</td><td class="num">${values.costPerSuccess === null ? '—' : `$${fmt(values.costPerSuccess, 2)}`}</td><td class="num">${fmt(values.infrastructureRate)}</td><td>${compareLink}<a href="data/records/${encodeURIComponent(record.id)}/record.json">record</a></td></tr>`
+    return `<tr><td>${day(record.createdAt)}</td><td><span class="mono">${short(record.producer.commit)}</span>${record.producer.dirty ? ' <span class="muted">(dirty)</span>' : ''}<br><span class="muted commit-message" title="${escape(record.producer.message)}">${escape(record.producer.message)}</span></td><td class="mono">${short(record.suite.commit)}</td><td class="num">${fmt(values.eligibleTasks)} × ${record.subject.attempts}</td><td class="num">${fmt(values.meanReward)}${interval(record.metrics.intervals.meanReward)}</td><td class="num">${fmt(values['passRate@1.0'])}${interval(record.metrics.intervals['passRate@1.0'])}</td><td class="num">${fmt(values.passHatK)}</td><td class="num">${values.costPerSuccess === null ? '—' : `$${fmt(values.costPerSuccess, 2)}`}</td><td class="num">${fmt(values.infrastructureRate)}</td><td>${compareLink}<a href="data/records/${encodeURIComponent(record.id)}/record.json">record</a></td></tr>`
   }).join('')}</tbody>`
 }
 
@@ -108,7 +109,7 @@ async function showCompare(baseId, headId) {
   state.head = headId
   $('base').value = baseId
   $('head').value = headId
-  $('compare-note').textContent = `${base.subject.id} → ${head.subject.id}`
+  $('compare-note').textContent = `${short(base.producer.commit)} · ${day(base.createdAt)} → ${short(head.producer.commit)} · ${day(head.createdAt)}`
   setParams({ base: baseId, head: headId })
   const notes = []
   if (base.subject.id !== head.subject.id) notes.push(`The subjects differ (${base.subject.id} → ${head.subject.id}): the comparison measures the subjects, not a change to one.`)
@@ -149,7 +150,7 @@ async function showTask(subject, task) {
     width: 'container', height: 220, data: { values: points },
     mark: { type: 'point', filled: true, size: 70 },
     encoding: {
-      x: { field: 'at', type: 'temporal', title: 'UTC', scale: { type: 'utc' } },
+      x: { field: 'at', type: 'temporal', title: 'UTC', scale: { type: 'utc' }, axis: { labelAngle: -30, labelOverlap: 'greedy', tickCount: 6 } },
       y: { field: 'reward', type: 'quantitative', scale: { domain: [0, 1] } },
       color: { field: 'outcome', type: 'nominal', legend: { orient: 'bottom' } },
       tooltip: [{ field: 'commit' }, { field: 'attempt' }, { field: 'outcome' }, { field: 'reward' }, { field: 'agentSec', title: 'agent seconds' }],

@@ -115,7 +115,7 @@ function refreshSessions() {
   for (const name of names) {
     const option = document.createElement('option')
     option.value = name
-    option.textContent = `${name} — ${stageOf(name)}`
+    option.textContent = stageOf(name)
     $('session').append(option)
   }
   $('session').value = names.includes(previous) ? previous : names[0] ?? ''
@@ -129,8 +129,8 @@ function renderMetrics() {
   const totals = toRun()?.manifest.totals
   const cards = totals === undefined ? [] : [
     ['sessions', totals.sessions], ['turns', totals.turns], ['steps', totals.steps], ['tool calls', totals.toolCalls],
-    ['elapsed', `${totals.elapsedSeconds}s`], ['cost', totals.usd === undefined ? '—' : `$${totals.usd.toFixed(6)}`],
-    ['input tokens', totals.inputTokens], ['output tokens', totals.outputTokens],
+    ['elapsed', `${totals.elapsedSeconds}s`], ['cost', totals.usd === undefined ? '—' : `$${totals.usd.toFixed(3)}`],
+    ['input tokens', Number(totals.inputTokens).toLocaleString('en-US')], ['output tokens', Number(totals.outputTokens).toLocaleString('en-US')],
   ]
   $('metrics').innerHTML = cards.map(([label, value]) => `<div class="stat"><b>${escape(value)}</b><span>${escape(label)}</span></div>`).join('')
 }
@@ -259,9 +259,12 @@ function workflowGraphs() {
     title.textContent = `${panel.label} ${panel.run.runId}`
     const note = document.createElement('p')
     note.className = 'diff-note'
-    note.textContent = panel.states.length === 0 && panel.edges.length === 0
+    const stateCount = panel.states.length
+    const edgeCount = panel.edges.length
+    note.textContent = stateCount === 0 && edgeCount === 0
       ? 'No structural difference from the other run.'
-      : `${panel.states.length} state(s) only here${panel.states.length > 0 ? ' (coloured)' : ''} · ${panel.edges.length} transition(s) only here${panel.edges.length > 0 ? `: ${panel.edges.slice(0, 4).join(', ')}` : ''}`
+      : `${stateCount} state${stateCount === 1 ? '' : 's'} · ${edgeCount} transition${edgeCount === 1 ? '' : 's'} only here`
+    note.title = panel.edges.join('\n')
     const graphBox = document.createElement('div')
     graphBox.className = 'graph'
     section.append(title, note, graphBox)
@@ -344,7 +347,7 @@ function selectNode(node) {
   updatePrompt()
   highlight()
   reveal(node)
-  $('selection').textContent = `Selected prompt: ${names[index]} · ${stageOf(names[index])} · workflow state ${node}`
+  $('selection').textContent = `Selected: ${stageOf(names[index])} · workflow state ${node}`
 }
 
 function selectEdge(edge, source, target) {
@@ -489,7 +492,7 @@ function updatePrompt() {
   if (from === undefined || to === undefined) return
   const name = $('session').value
   renderPromptTable(from, to, name)
-  $('selection').textContent = `Selected prompt: ${name} · ${stageOf(name)}${state.activeNode === undefined ? '' : ` · workflow state ${state.activeNode}`}`
+  $('selection').textContent = `Selected: ${stageOf(name)}${state.activeNode === undefined ? '' : ` · workflow state ${state.activeNode}`}`
   renderChips()
 }
 
