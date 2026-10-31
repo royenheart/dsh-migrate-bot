@@ -115,7 +115,12 @@ code, .mono { font-size: 12px; }
 .diffstat i.add { background: var(--pass); } .diffstat i.del { background: var(--fail); }
 #editor { height: 70vh; border: 1px solid var(--line); }
 .files { columns: 2; font-size: 12px; margin: .25rem 0 .75rem; }
-#chart { width: 100%; }
+#chart { width: 100%; padding: .4rem .8rem .2rem; }
+#task-chart { width: 100%; padding: .4rem .8rem .2rem; }
+main > .panel { margin-bottom: 1rem; }
+.panel-note { margin: 0; padding: .55rem .8rem .7rem; }
+.panel .table-wrap { border-left: 0; border-right: 0; border-bottom: 0; border-radius: 0; }
+.panel .table-wrap + .table-wrap { border-top: 1px solid var(--line); }
 .graphs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .graphs svg { max-width: 100%; height: auto; }
 .changes { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 1.25rem; align-items: start; }

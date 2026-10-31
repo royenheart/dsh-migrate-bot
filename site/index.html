@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Trend · dsh-migrate benchmark</title>
+<title>Overview · dsh-migrate benchmark</title>
 <link rel="stylesheet" href="assets/site.css">
 <script src="https://cdn.jsdelivr.net/npm/vega@5.30.0/build/vega.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/vega-lite@5.21.0/build/vega-lite.min.js"></script>
@@ -10,13 +10,55 @@
 </head>
 <body>
 <main>
-  <h1>Trend</h1>
-  <div class="controls"><label>Suite <select id="suite"></select></label><label>Subject <select id="subject"></select></label><span class="muted" id="summary"></span></div>
-  <div id="chart"></div>
-  <h2>Records</h2>
-  <table id="records"></table>
-  <p class="muted">Every number is computed from the records on the <code>bench/records</code> branch; the metrics are defined in <a href="https://github.com/royenheart/dsh-migrate-bot/blob/main/docs/reference/metrics.md">the metrics reference</a>. Bands are 95% bootstrap intervals over tasks.</p>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow">Benchmark</div>
+      <h1>Overview</h1>
+      <p>Scores, record comparison, task detail and field adoption on one page. Every view stays in the URL.</p>
+    </div>
+    <span class="muted" id="built"></span>
+  </div>
+
+  <div class="toolbar">
+    <label>Suite<select id="suite"></select></label>
+    <label>Subject<select id="subject"></select></label>
+    <label>Base<select id="base"></select></label>
+    <label>Head<select id="head"></select></label>
+    <label>Task<select id="task"></select></label>
+  </div>
+
+  <section class="panel" aria-labelledby="trend-title">
+    <div class="panel-head"><h2 id="trend-title">Score trend</h2><span class="muted" id="trend-note"></span></div>
+    <div id="chart"></div>
+    <p class="muted panel-note">meanReward lines and the selected subject's 95% bootstrap band; passRate@1.0 is dashed. Click a point to compare it with the previous record.</p>
+  </section>
+
+  <section class="panel" aria-labelledby="records-title">
+    <div class="panel-head"><h2 id="records-title">Records</h2><span class="muted">newest first</span></div>
+    <div class="table-wrap"><table id="records"></table></div>
+  </section>
+
+  <section class="panel" id="compare" aria-labelledby="compare-title">
+    <div class="panel-head"><h2 id="compare-title">Compare</h2><span class="muted" id="compare-note"></span></div>
+    <div id="compare-notes" class="panel-body"></div>
+    <div class="table-wrap"><table id="verdicts"></table></div>
+    <div class="table-wrap"><table id="metrics"></table></div>
+    <div class="table-wrap"><table id="tasks"></table></div>
+  </section>
+
+  <section class="panel" id="task" aria-labelledby="task-title">
+    <div class="panel-head"><h2 id="task-title">Task detail</h2><span class="muted" id="task-note"></span></div>
+    <div id="task-chart"></div>
+    <div class="table-wrap"><table id="attempts"></table></div>
+  </section>
+
+  <section class="panel" id="field" aria-labelledby="field-title">
+    <div class="panel-head"><h2 id="field-title">Field adoption</h2><span class="muted" id="field-note"></span></div>
+    <div class="table-wrap"><table id="field-metrics"></table></div>
+    <div class="table-wrap"><table id="field-migrations"></table></div>
+    <p class="muted panel-note">Derived from each consumer's <code>dsh-migrate/state</code> branch at site build time.</p>
+  </section>
 </main>
-<script type="module" src="assets/trend.js"></script>
+<script type="module" src="assets/overview.js"></script>
 </body>
 </html>

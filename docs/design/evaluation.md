@@ -89,15 +89,12 @@ Each record also names a snapshot of what the Action brought to the run, `snapsh
 
 | Page | Shows |
 |---|---|
-| Trend | Per subject, `meanReward` with its interval band and `passRate@1.0` over the records, and a table of every record with its commit message and a link to what changed in the Action since the record before it; a point opens the comparison with that record |
-| Compare | Two records: the paired verdicts, every metric side by side, and every attempt of every task as a chip that opens its diff |
+| Overview | The consolidated analysis page: per-subject trend and records, the selected pair's verdicts and metrics, one task across records, and the consumer proposals |
 | Changes | What changed in the Action between two records: the snapshot files grouped as statechart, configuration, prompts, agent runtime, upgrade skills and source, each with its diffstat, in a Monaco diff editor; the statechart also as its two diagrams side by side, with the states only one side has coloured. `?from&to&file&view`, and `range=latest` for the newest record and the newest earlier one whose Action differs |
-| Task | One task across the records of a subject: the reward of each attempt, durations and cost |
 | Diff | One artifact of two attempts, of two records or of one, in a Monaco diff editor; a `proposed.diff` also gets its file list and diffstat. `?subject&task&from&fromAttempt&to&toAttempt&artifact&view`, and `range=latest` for the two newest records |
-| Field | The proposals in the consumer repositories |
 | Run evidence | An `inspect.json` from a live state branch: prompt and workflow comparison, loaded in the browser |
 
-The Field page is built from the consumers' state branches at build time, not from records: the event log keeps when each proposal was published and when its pull request closed, merged or not, so storing that again would be a copy to keep in step. The build asks GitHub only for the maintainer commits on merged proposals. It reports, per consumer and overall, the merge rate over decided proposals, the share merged without a maintainer commit, and the median hours from publishing to merging. The consumer list is `CONSUMERS` in `scripts/site.ts`.
+The Field section is built from the consumers' state branches at build time, not from records: the event log keeps when each proposal was published and when its pull request closed, merged or not, so storing that again would be a copy to keep in step. The build asks GitHub only for the maintainer commits on merged proposals. It reports, per consumer and overall, the merge rate over decided proposals, the share merged without a maintainer commit, and the median hours from publishing to merging. The consumer list is `CONSUMERS` in `scripts/site.ts`.
 
 The charts are [Vega-Lite](https://vega.github.io/vega-lite/), which draws an interval band declaratively; the diff editor is [Monaco](https://microsoft.github.io/monaco-editor/), loaded on the Diff page only. Both come from a pinned CDN version, so the site has no build step of its own. Record data is fetched per page as it is needed, not embedded, because the records grow with every run.
 
