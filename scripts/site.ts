@@ -17,6 +17,7 @@ import { parseArgs } from 'node:util'
 import { maintainerCommits } from '../src/activities/proposal.ts'
 import { fieldMetrics, fieldMigrations, type FieldMetrics, type FieldMigration } from '../src/evaluation/field.ts'
 import { recordSchema } from '../src/evaluation/record.ts'
+import { taskScores } from '../src/evaluation/metrics.ts'
 import { git } from '../src/git/run.ts'
 import { GitHubClient, repositoryOf } from '../src/github/client.ts'
 import { StateStore } from '../src/state/store.ts'
@@ -35,6 +36,7 @@ export const CONSUMERS = [
 const PAGES = join(REPO_ROOT, 'site')
 /** The compiled metric library, beside this compiled script. */
 const METRICS_MODULE = join(import.meta.dirname, '..', 'src', 'evaluation', 'metrics.js')
+const PAIR_MODULE = join(import.meta.dirname, '..', 'src', 'evaluation', 'pair.js')
 
 export function buildSite(records: string, out: string): number {
   const problems = validateRecords(records)
@@ -42,12 +44,13 @@ export function buildSite(records: string, out: string): number {
   rmSync(out, { recursive: true, force: true })
   cpSync(PAGES, out, { recursive: true })
   cpSync(METRICS_MODULE, join(out, 'assets', 'metrics.js'))
+  cpSync(PAIR_MODULE, join(out, 'assets', 'pairing.js'))
   if (existsSync(join(records, 'snapshots'))) cpSync(join(records, 'snapshots'), join(out, 'data', 'snapshots'), { recursive: true })
   const dir = join(records, 'records')
   const summaries = (existsSync(dir) ? readdirSync(dir) : []).map((id) => {
     cpSync(join(dir, id), join(out, 'data', 'records', id), { recursive: true })
     const record = recordSchema.parse(JSON.parse(readFileSync(join(dir, id, 'record.json'), 'utf8')))
-    return { id, createdAt: record.createdAt, producer: record.producer, subject: record.subject, suite: record.suite, model: record.model, metrics: record.metrics }
+    return { id, createdAt: record.createdAt, producer: record.producer, subject: record.subject, suite: record.suite, model: record.model, metrics: record.metrics, scoredTasks: taskScores({ tasks: record.suite.tasks, attempts: record.attempts }).map(score => score.task) }
   }).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   mkdirSync(join(out, 'data'), { recursive: true })
   writeFileSync(join(out, 'data', 'index.json'), JSON.stringify({ records: summaries }))

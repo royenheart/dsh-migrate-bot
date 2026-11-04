@@ -1,12 +1,19 @@
 import { chip, day, diffHref, escape, fail, fmt, interval, loadField, loadIndex, loadRecord, nav, params, select, setParams, short } from './common.js'
-import { compare, METRICS } from './metrics.js'
+import { choosePair } from './pairing.js'
+import { compare, METRICS, pairedTaskCount } from './metrics.js'
 
 nav('Overview')
 
 const $ = id => document.getElementById(id)
 const state = { index: undefined, suite: '', subject: '', base: params.get('base') ?? '', head: params.get('head') ?? '', task: params.get('task') ?? '' }
+let selectionVersion = 0
+let taskVersion = 0
+
+/** How many records one task detail loads; the table names the cap when it applies. */
+const TASK_HISTORY_LIMIT = 50
 
 const label = record => `${record.subject.id} · ${short(record.producer.commit)} · ${day(record.createdAt)}`
+const pairLabel = record => record.suite.repository === state.suite ? label(record) : `${record.suite.repository} · ${label(record)}`
 const attemptInput = record => ({ tasks: record.suite.tasks, attempts: record.attempts, k: record.subject.attempts })
 
 function chart(records, subject) {
@@ -41,7 +48,7 @@ function chart(records, subject) {
     view.addEventListener('click', (_event, item) => {
       const same = values.filter(value => value.subject === item?.datum?.subject)
       const index = same.findIndex(value => value.id === item?.datum?.id)
-      if (index > 0) void setPair(same[index - 1].id, same[index].id)
+      if (index > 0) void showChartPair(item?.datum?.subject, same[index - 1].id, same[index].id)
     })
   })
 }
@@ -97,22 +104,43 @@ function tasksTable(base, head) {
   $('tasks').querySelectorAll('[data-task]').forEach(link => link.addEventListener('click', event => {
     event.preventDefault()
     state.task = link.dataset.task
-    $('task').value = state.task
-    void showTask(state.subject, state.task)
+    $('task-select').value = state.task
+    void showTask(state.subject, state.task, state.suite)
   }))
+}
+
+async function showChartPair(subject, baseId, headId) {
+  if (typeof subject !== 'string') return
+  selectionVersion += 1
+  state.subject = subject
+  state.base = baseId
+  state.head = headId
+  setParams({ subject, base: baseId, head: headId })
+  $('subject').value = subject
+  const records = state.index.records.filter(record => record.suite.repository === state.suite && record.subject.id === subject)
+  chart(state.index.records.filter(record => record.suite.repository === state.suite).reverse(), subject)
+  recordsTable(records)
+  $('trend-note').textContent = `${records.length} record(s) · ${subject}`
+  select('base', records.map(record => [record.id, label(record)]), baseId, value => { void setPair(value, state.head) })
+  select('head', records.map(record => [record.id, label(record)]), headId, value => { void setPair(state.base, value) })
+  await showCompare(baseId, headId)
 }
 
 async function showCompare(baseId, headId) {
   if (baseId === undefined || headId === undefined) return
+  const version = selectionVersion
   const [base, head] = await Promise.all([loadRecord(baseId), loadRecord(headId)])
+  if (version !== selectionVersion) return
   state.base = baseId
   state.head = headId
   $('base').value = baseId
   $('head').value = headId
-  $('compare-note').textContent = `${short(base.producer.commit)} · ${day(base.createdAt)} → ${short(head.producer.commit)} · ${day(head.createdAt)}`
+  $('compare-note').textContent = `${short(base.producer.commit)} · ${day(base.createdAt)} → ${short(head.producer.commit)} · ${day(head.createdAt)} · ${String(pairedTaskCount(attemptInput(base), attemptInput(head)))} paired task(s)`
   setParams({ base: baseId, head: headId })
   const notes = []
   if (base.subject.id !== head.subject.id) notes.push(`The subjects differ (${base.subject.id} → ${head.subject.id}): the comparison measures the subjects, not a change to one.`)
+  if (base.suite.repository !== head.suite.repository) notes.push(`The suites differ (${base.suite.repository} → ${head.suite.repository}): the tasks and suite revisions are different.`)
+  if (base.suite.repository !== state.suite || head.suite.repository !== state.suite) notes.push(`The selected suite is ${state.suite}, but the comparison uses ${base.suite.repository} and ${head.suite.repository}.`)
   if (base.suite.commit !== head.suite.commit) notes.push(`The suite commits differ (${short(base.suite.commit)} → ${short(head.suite.commit)}): only the tasks both scored are paired.`)
   const judge = record => record.suite.judge === undefined ? 'none' : `${record.suite.judge.model} at ${record.suite.judge.baseUrl}`
   if (judge(base) !== judge(head)) notes.push(`The report judges differ (${judge(base)} → ${judge(head)}): scores of the reports they graded do not compare.`)
@@ -125,18 +153,22 @@ async function showCompare(baseId, headId) {
   const tasks = [...new Set([...base.suite.tasks, ...head.suite.tasks].map(entry => entry.id))].sort()
   const task = tasks.includes(state.task) ? state.task : tasks[0] ?? ''
   state.task = task
-  select('task', tasks.map(id => [id, id]), task, value => { state.task = value; void showTask(state.subject, value) })
-  await showTask(state.subject, task)
+  select('task-select', tasks.map(id => [id, id]), task, value => { state.task = value; void showTask(state.subject, value, state.suite) })
+  await showTask(state.subject, task, state.suite)
 }
 
-async function showTask(subject, task) {
+async function showTask(subject, task, suite = state.suite) {
   if (subject === '' || task === '') return
+  const version = ++taskVersion
+  const selection = selectionVersion
+  const summaries = state.index.records.filter(record => record.suite.repository === suite && record.subject.id === subject)
+  const history = summaries.slice(0, TASK_HISTORY_LIMIT)
+  const records = await Promise.all(history.map(record => loadRecord(record.id)))
+  if (version !== taskVersion || selection !== selectionVersion) return
   state.subject = subject
   state.task = task
   setParams({ subject, task })
-  const summaries = state.index.records.filter(record => record.subject.id === subject)
-  const records = await Promise.all(summaries.map(record => loadRecord(record.id)))
-  $('task-note').textContent = `${subject} · ${task}`
+  $('task-note').textContent = `${subject} · ${task}${summaries.length > TASK_HISTORY_LIMIT ? ` · latest ${String(TASK_HISTORY_LIMIT)} of ${String(summaries.length)}` : ''}`
   const points = records.flatMap(record => record.attempts.filter(attempt => attempt.task === task).map(attempt => ({
     at: record.createdAt,
     commit: short(record.producer.commit),
@@ -166,40 +198,56 @@ async function showTask(subject, task) {
   }).join('')}</tbody>`
 }
 
+function defaultPair(records) {
+  return choosePair(records, state.base, state.head)
+}
+
 async function setPair(baseId, headId) {
+  selectionVersion += 1
   state.base = baseId
   state.head = headId
   await showCompare(baseId, headId)
 }
 
 async function showSuite(suite) {
+  selectionVersion += 1
   state.suite = suite
-  const onSuite = state.index.records.filter(record => record.suite.repository === suite)
+  const allRecords = state.index.records
+  const onSuite = allRecords.filter(record => record.suite.repository === suite)
+  const requested = allRecords.filter(record => record.id === state.base || record.id === state.head)
   const subjects = [...new Set(onSuite.map(record => record.subject.id))]
-  const subject = subjects.includes(params.get('subject')) ? params.get('subject') : subjects.find(id => !['oracle', 'nop'].includes(id)) ?? subjects[0]
+  const inferred = requested[0]?.subject.id
+  const subject = inferred !== undefined && subjects.includes(inferred) ? inferred : subjects.includes(params.get('subject')) ? params.get('subject') : subjects.find(id => !['oracle', 'nop'].includes(id)) ?? subjects[0]
   state.subject = subject
   setParams({ suite, subject })
   select('subject', subjects.map(id => [id, id]), subject, value => { void showSubject(value) })
-  $('trend-note').textContent = `${onSuite.length} record(s) · ${subject}`
-  chart([...onSuite].reverse(), subject)
   const records = onSuite.filter(record => record.subject.id === subject)
+  $('trend-note').textContent = `${records.length} record(s) · ${subject}`
+  chart([...onSuite].reverse(), subject)
   recordsTable(records)
-  const base = records.some(record => record.id === state.base) ? state.base : records[1]?.id ?? records[0]?.id ?? ''
-  const head = records.some(record => record.id === state.head) ? state.head : records[0]?.id ?? ''
-  select('base', records.map(record => [record.id, label(record)]), base, value => { void setPair(value, state.head) })
-  select('head', records.map(record => [record.id, label(record)]), head, value => { void setPair(state.base, value) })
+  const requestedBoth = requested.length === 2
+  const remote = requested.find(record => record.suite.repository !== suite)
+  const candidates = requestedBoth ? requested : remote === undefined ? records : allRecords.filter(record => record.suite.repository === remote.suite.repository && record.subject.id === remote.subject.id)
+  const [base, head] = defaultPair(candidates)
+  const options = remote === undefined ? onSuite : [...onSuite, ...candidates, ...requested]
+  const uniqueOptions = [...new Map(options.map(record => [record.id, record])).values()]
+  select('base', uniqueOptions.map(record => [record.id, pairLabel(record)]), base, value => { void setPair(value, state.head) })
+  select('head', uniqueOptions.map(record => [record.id, pairLabel(record)]), head, value => { void setPair(state.base, value) })
   if (records.length > 0) await setPair(base, head)
 }
 
 async function showSubject(subject) {
+  selectionVersion += 1
   state.subject = subject
   setParams({ subject })
   const records = state.index.records.filter(record => record.suite.repository === state.suite && record.subject.id === subject)
-  select('base', records.map(record => [record.id, label(record)]), records[1]?.id ?? records[0]?.id ?? '', value => { void setPair(value, state.head) })
-  select('head', records.map(record => [record.id, label(record)]), records[0]?.id ?? '', value => { void setPair(state.base, value) })
+  const [base, head] = defaultPair(records)
+  select('base', records.map(record => [record.id, label(record)]), base, value => { void setPair(value, state.head) })
+  select('head', records.map(record => [record.id, label(record)]), head, value => { void setPair(state.base, value) })
   chart(state.index.records.filter(record => record.suite.repository === state.suite).reverse(), subject)
+  $('trend-note').textContent = `${records.length} record(s) · ${subject}`
   recordsTable(records)
-  await setPair(records[1]?.id ?? records[0]?.id ?? '', records[0]?.id ?? '')
+  await setPair(base, head)
 }
 
 function fieldTables(field) {
@@ -213,18 +261,20 @@ function fieldTables(field) {
   $('field-migrations').innerHTML = `<thead><tr><th>Consumer</th><th>Release</th><th>Started (UTC)</th><th>State</th><th>Proposal</th><th>Fate</th><th class="num">Maintainer commits</th></tr></thead><tbody>${migrations.map(migration => `<tr><td>${escape(migration.consumer)}</td><td class="mono">${escape(migration.release)}</td><td>${day(migration.startedAt)}</td><td>${escape(migration.state)}</td><td>${migration.proposal === undefined ? '—' : `<a href="${escape(migration.proposal.url)}">${escape(migration.proposal.url.split('/').pop())}</a>`}</td><td>${migration.proposal?.closed === undefined ? (migration.proposal === undefined ? '—' : 'open') : migration.proposal.closed.merged ? `merged ${day(migration.proposal.closed.at)}` : `closed ${day(migration.proposal.closed.at)}`}</td><td class="num">${fmt(migration.proposal?.maintainerCommits)}</td></tr>`).join('')}${field.consumers.filter(consumer => consumer.error !== undefined).map(consumer => `<tr><td>${escape(consumer.repository)}</td><td colspan="6" class="muted">${escape(consumer.error)}</td></tr>`).join('')}</tbody>`
 }
 
+void loadField().then(fieldTables).catch(() => { $('field-note').textContent = 'Field data is absent; build the site with --field.' })
+
 try {
   state.index = await loadIndex()
   if (state.index.records.length === 0) throw new Error('No record has been published yet.')
   const suites = [...new Set(state.index.records.map(record => record.suite.repository))]
-  const suite = suites.includes(params.get('suite')) ? params.get('suite') : suites[0]
-  select('suite', suites.map(id => [id, id]), suite, value => { void showSuite(value) })
+  const requested = state.index.records.filter(record => record.id === state.base || record.id === state.head)
+  const suite = suites.includes(params.get('suite')) ? params.get('suite') : requested[0]?.suite.repository ?? suites[0]
+  select('suite', suites.map(id => [id, id]), suite, value => {
+    state.base = ''
+    state.head = ''
+    void showSuite(value)
+  })
   await showSuite(suite)
-  try {
-    fieldTables(await loadField())
-  } catch {
-    $('field-note').textContent = 'Field data is absent; build the site with --field.'
-  }
 } catch (error) {
   fail(error)
 }

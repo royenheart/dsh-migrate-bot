@@ -95,6 +95,7 @@ Each record also names a snapshot of what the Action brought to the run, `snapsh
 | Run evidence | An `inspect.json` from a live state branch, or the current run's bundle plus its migration history: prompt and workflow comparison, loaded in the browser |
 | Wiki | The generated index and per-page projection of the repository documentation, including the proposal and decision indexes |
 
+
 The Field section is built from the consumers' state branches at build time, not from records: the event log keeps when each proposal was published and when its pull request closed, merged or not, so storing that again would be a copy to keep in step. The build asks GitHub only for the maintainer commits on merged proposals. It reports, per consumer and overall, the merge rate over decided proposals, the share merged without a maintainer commit, and the median hours from publishing to merging. The consumer list is `CONSUMERS` in `scripts/site.ts`.
 
 The charts are [Vega-Lite](https://vega.github.io/vega-lite/), which draws an interval band declaratively; the diff editor is [Monaco](https://microsoft.github.io/monaco-editor/), loaded on the Diff page only. Both come from a pinned CDN version, so the site has no build step of its own. Record data is fetched per page as it is needed, not embedded, because the records grow with every run.
@@ -137,3 +138,4 @@ The suite does not require isolation from its agent: it states that "security is
 
 - **The report uses a two-level navigation: Benchmark contains Overview and Changes, while Run evidence and Wiki are top-level peers** (*decided*). Why: the analysis area and its pages remain visibly distinct from the live-run and documentation workspaces. Constraint: every report page uses `site/assets/common.js`; `Benchmark` is the active area on Overview and Changes, and Wiki carries no Benchmark subnav. Revisit when: the site grows another analysis area or a third Benchmark page.
 - **The Overview chooses the most comparable record pair by default** (*decided*). Why: the newest two records can share few tasks, so their paired verdict says `not-comparable` while an older pair of the same subject supports a real comparison. Constraint: the default base and head maximize the number of tasks both records scored, then prefer the newer head; an explicit `base` and `head` in the URL always win. Revisit when: the site can show a comparison matrix instead of one selected pair.
+
