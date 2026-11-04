@@ -32,8 +32,23 @@ export const loadField = () => json('data/field.json')
 
 export function nav(current) {
   const header = document.createElement('header')
+  header.className = 'site-header'
   const benchmark = current === 'Overview' || current === 'Changes'
-  header.innerHTML = `<strong>dsh-migrate</strong><div class="nav-group"><span class="nav-label${benchmark ? ' active' : ''}">Benchmark</span><a href="index.html"${current === 'Overview' ? ' aria-current="page"' : ''}>Overview</a><a href="changes.html"${current === 'Changes' ? ' aria-current="page"' : ''}>Changes</a></div><a href="inspect.html"${current === 'Run evidence' ? ' aria-current="page"' : ''}>Run evidence</a><a href="wiki.html"${current === 'Wiki' ? ' aria-current="page"' : ''}>Wiki</a>`
+  const page = name => current === name ? ' aria-current="page"' : ''
+  header.innerHTML = `
+    <div class="topbar">
+      <a class="brand" href="index.html">dsh-migrate</a>
+      <nav aria-label="Primary">
+        <a id="benchmark-area" href="index.html"${benchmark ? ' aria-current="true"' : ''}>Benchmark</a>
+        <a href="inspect.html"${page('Run evidence')}>Run evidence</a>
+        <a href="wiki.html"${page('Wiki')}>Wiki</a>
+      </nav>
+    </div>
+    ${benchmark ? `
+      <nav class="section-nav" aria-labelledby="benchmark-area">
+        <a href="index.html"${page('Overview')}>Overview</a>
+        <a href="changes.html"${page('Changes')}>Changes</a>
+      </nav>` : ''}`
   document.body.prepend(header)
 }
 
