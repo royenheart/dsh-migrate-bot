@@ -51,4 +51,6 @@ The entry point to the documentation: `AGENTS.md` holds the rules and links here
 | The full engineering principles every change follows | `docs/engineering.md` | [Persistent data design](engineering.md#1-persistent-data-design) |
 | The user-facing capability catalog | `docs/features.md` | [Feature catalog](features.md#feature-catalog) |
 | The index of design decisions and open questions | `docs/decisions.md` | [Design decisions index](decisions.md#design-decisions-index) |
+| How an open question becomes a design decision | `docs/proposals/README.md` | [Lifecycle](proposals/README.md#lifecycle) |
+| The proposal for opt-in consumer run evidence intake | `docs/proposals/evidence-intake.md` | [Problem](proposals/evidence-intake.md#problem) |
 | How documentation is organised, written, and kept from drifting | `docs/AGENTS.md` | [The tier taxonomy: one home per fact](AGENTS.md#the-tier-taxonomy-one-home-per-fact) |

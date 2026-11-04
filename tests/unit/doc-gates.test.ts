@@ -11,6 +11,7 @@ import {
 } from '../../scripts/md.ts'
 import { parseIndexRows, verifyIndexShape } from '../../scripts/verify-doc-index.ts'
 import { verifyChangelog } from '../../scripts/verify-changelog.ts'
+import { verifyProposalSource, verifyProposals } from '../../scripts/verify-proposals.ts'
 
 test('verify-changelog accepts a generated changelog', () => {
   const source = '# Changelog\n\nintro\n\n## v0.2.0 (2026-01-01)\n\n### Feat\n\n- a thing\n\n## v0.1.0 (2026-01-01)\n\n### Feat\n\n- first\n'
@@ -163,4 +164,5 @@ test('proposal gate accepts the shipped proposal and rejects a missing status an
   assert.ok(narrative.some(item => item.detail.includes('Status')))
   const commented = verifyProposalSource('# Proposal: commented\n\nStatus: open\n\n## Problem\n\n## Proposal\n\n## Decisions needed\n\n## Acceptance criteria\n\n<!--\n## Risks\n-->\n', 'docs/proposals/commented.md')
   assert.ok(commented.some(item => item.detail.includes('Risks')))
+
 })

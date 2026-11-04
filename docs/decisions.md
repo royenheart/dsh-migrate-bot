@@ -17,3 +17,4 @@ The wiki's **Decisions** page renders this index beside the source documents. A 
 
 Open questions live as design proposals under `docs/proposals/`; decided questions live in the owning document's Design decisions section, and the index records their status.
 
+

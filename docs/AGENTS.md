@@ -14,6 +14,7 @@ Each fact has exactly one home — the tier whose job it is. Everywhere else, li
 | [features.md](features.md) | The user-facing capability catalog: entry point, implementation, and owning document | Detailed behaviour, which the owning document states |
 | [engineering.md](engineering.md) | The full engineering principles every change follows | Project-specific facts, which the owning document states |
 | [decisions.md](decisions.md) | The index of decided and open questions, linking their owners | The decision text, which the owning document holds |
+| [proposals/](proposals/README.md) | Open or parked questions awaiting the owner's decision, with options, costs and acceptance criteria | Decided designs, which move into the owning document |
 | [index.md](index.md) | The lookup table: subject → owning document → owning section | Any fact of its own; every row points somewhere else |
 | [reference/](reference/workflow.md) | Generated: the configuration keys, the workflow statechart, the comment commands, the benchmark metrics and records | Hand edits; change the source the page names |
 | [design/](design/workflow.md) | How a mechanism works, why it is shaped that way, what it guarantees; how the Action is evaluated | Measured results, procedures, current task state |

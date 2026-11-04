@@ -56,7 +56,7 @@ For anything that processes data, files, model context, or batches, establish th
 
 ## 9. Design decisions
 
-When a design question needs the owner's decision because options carry real costs or the choice changes functionality, responsibility, the data model, or an external contract, do not choose alone. Write the question, options and their costs, recommendation and reason, and what remains blocked; continue with the unblocked work. Before implementing, read the existing decisions: the Design decisions section of the pull request description, decision items in review comments, Decision paragraphs in this pull request's commit messages, and the Design decisions sections of the authoritative documents. Implement decided items as decided; when a requirement contradicts an existing decision, stop and state the conflict.
+When a design proposal needs the owner's decision because options carry real costs or the choice changes functionality, responsibility, the data model, or an external contract, do not choose alone. Write the question, options and their costs, recommendation and reason, and what remains blocked in an open [proposal](proposals/README.md); continue with the unblocked work. Before implementing, read the existing decisions: the Design decisions section of the pull request description, decision items in review comments, Decision paragraphs in this pull request's commit messages, and the Design decisions sections of the authoritative documents. Implement decided items as decided; when a requirement contradicts an existing decision, stop and state the conflict.
 
 ## 10. Documentation and language
 
