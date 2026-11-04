@@ -3,7 +3,7 @@ import { escape, nav } from './common.js'
 nav('Run evidence')
 
 const $ = id => document.getElementById(id)
-const state = { data: undefined, generation: 0, activeNode: undefined, activeEdge: undefined, mermaid: undefined }
+const state = { data: undefined, dataUrl: undefined, warnings: [], history: [], loaded: new Map(), generation: 0, activeNode: undefined, activeEdge: undefined, mermaid: undefined }
 
 function stageOf(name) {
   if (name === 'overlap') return 'review · overlap'
@@ -25,7 +25,7 @@ function nodeForPrompt(name) {
   return undefined
 }
 
-function runs() { return state.data?.runs ?? [] }
+function runs() { return [...state.loaded.values()] }
 function runOf(id) { return runs().find(run => run.runId === id) }
 function fromRun() { return runOf($('from').value) }
 function toRun() { return runOf($('to').value) }
@@ -40,13 +40,36 @@ function status(text, error = false) {
   box.classList.toggle('warning', error)
 }
 
+function signInUrl() {
+  if (state.dataUrl === undefined) return undefined
+  try {
+    const url = new URL(state.dataUrl)
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return undefined
+    if (url.username !== '' || url.password !== '') return undefined
+    url.pathname = url.pathname.replace(/\/inspect\.json$/, '')
+    url.search = ''
+    return url.toString()
+  } catch {
+    return undefined
+  }
+}
+
+function showLoadFailure(error) {
+  const message = error instanceof Error ? error.message : String(error)
+  const box = $('view').hidden ? $('loader-error') : $('selection')
+  box.hidden = false
+  const signIn = signInUrl()
+  box.innerHTML = signIn === undefined ? escape(message) : `${escape(message)} <a href="${escape(signIn)}">Sign in and open this run</a>`
+}
+
 async function readJsonUrl(url) {
-  const response = await fetch(url, { cache: 'no-store' })
+  const credentials = new URLSearchParams(location.search).get('credentials') === 'include' ? 'include' : 'same-origin'
+  const response = await fetch(url, { cache: 'no-store', credentials })
   if (!response.ok) throw new Error(`${url}: HTTP ${String(response.status)}`)
   return await response.json()
 }
 
-function accept(data) {
+function mergeBundle(data, current = false) {
   if (typeof data !== 'object' || data === null || !Array.isArray(data.runs) || data.runs.length === 0) {
     throw new Error('not an inspect bundle: runs[] is missing or empty')
   }
@@ -54,36 +77,85 @@ function accept(data) {
     if (typeof run?.runId !== 'string' || typeof run?.manifest?.startedAt !== 'string' || typeof run?.prompts !== 'object' || run.prompts === null) {
       throw new Error('not an inspect bundle: a run has no runId, manifest or prompts')
     }
+    state.loaded.set(run.runId, run)
   }
   state.data = data
+  if (current) state.warnings = Array.isArray(data.warnings) ? data.warnings : []
+  if (Array.isArray(data.history) && data.history.length > 0) state.history = data.history
+  else state.history = runs().map(run => ({ runId: run.runId, startedAt: run.manifest.startedAt }))
   state.activeNode = undefined
   state.activeEdge = undefined
+}
+
+function evidenceUrlFor(runId) {
+  if (state.dataUrl === undefined) throw new Error('the run evidence bundle was loaded from a file, so earlier runs are not reachable')
+  const url = new URL(state.dataUrl)
+  const parts = url.pathname.split('/')
+  const view = parts.lastIndexOf('view')
+  if (view < 0 || parts[view + 1] === undefined) throw new Error('the evidence URL does not name a run')
+  parts[view + 1] = encodeURIComponent(runId)
+  url.pathname = parts.join('/')
+  return url.toString()
+}
+
+async function loadRun(runId) {
+  if (state.loaded.has(runId)) return
+  const data = await readJsonUrl(evidenceUrlFor(runId))
+  mergeBundle(data)
+}
+
+async function accept(data, dataUrl = state.dataUrl) {
+  state.loaded.clear()
+  state.dataUrl = dataUrl
+  mergeBundle(data, true)
+  const summaries = state.history
+  const current = runs().at(-1)
+  const toId = summaries.at(-1)?.runId ?? current?.runId
+  const previous = summaries.at(-2)?.runId
+  let fromId = previous !== undefined && (state.loaded.has(previous) || dataUrl !== undefined) ? previous : toId
+  if (toId !== undefined && !state.loaded.has(toId)) await loadRun(toId)
+  if (fromId !== undefined && !state.loaded.has(fromId)) {
+    try { await loadRun(fromId) } catch { fromId = toId }
+  }
   $('loader').hidden = true
   $('view').hidden = false
-  const all = runs()
   $('from').replaceChildren()
   $('to').replaceChildren()
-  for (const run of all) {
+  for (const run of summaries) {
     for (const select of [$('from'), $('to')]) {
       const option = document.createElement('option')
       option.value = run.runId
-      option.textContent = `${run.runId} · ${run.manifest.startedAt}`
+      option.textContent = `${run.runId} · ${run.startedAt}`
       select.append(option)
     }
   }
-  $('from').value = all.length > 1 ? all[all.length - 2].runId : all[0].runId
-  $('to').value = all[all.length - 1].runId
+  if (fromId !== undefined) $('from').value = fromId
+  if (toId !== undefined) $('to').value = toId
   refreshSessions()
   render()
 }
 
+async function selectRun() {
+  try {
+    await Promise.all([loadRun($('from').value), loadRun($('to').value)])
+    state.activeNode = undefined
+    state.activeEdge = undefined
+    refreshSessions()
+    render()
+  } catch (error) {
+    showLoadFailure(error)
+  }
+}
+
+
 async function loadFile(file) {
   try {
-    accept(JSON.parse(await file.text()))
+    state.dataUrl = undefined
+    await accept(JSON.parse(await file.text()), undefined)
   } catch (error) {
     $('loader').hidden = false
     $('view').hidden = true
-    status(error instanceof Error ? error.message : String(error), true)
+    showLoadFailure(error)
   }
 }
 
@@ -94,11 +166,12 @@ $('file').addEventListener('change', () => {
 $('load-url').addEventListener('click', async () => {
   const url = $('url').value.trim()
   if (url === '') { status('enter a URL first', true); return }
-  try { accept(await readJsonUrl(url)) } catch (error) { status(error instanceof Error ? error.message : String(error), true) }
+  state.dataUrl = url
+  try { await accept(await readJsonUrl(url), url) } catch (error) { showLoadFailure(error) }
 })
 $('jump').addEventListener('click', () => $('prompts').scrollIntoView({ behavior: 'smooth', block: 'start' }))
-$('from').addEventListener('change', () => { state.activeNode = undefined; state.activeEdge = undefined; refreshSessions(); render() })
-$('to').addEventListener('change', () => { state.activeNode = undefined; state.activeEdge = undefined; refreshSessions(); render() })
+$('from').addEventListener('change', () => { void selectRun() })
+$('to').addEventListener('change', () => { void selectRun() })
 $('session').addEventListener('change', () => {
   const name = $('session').value
   state.activeNode = nodeForPrompt(name)
@@ -136,7 +209,7 @@ function renderMetrics() {
 }
 
 function renderWarnings() {
-  const warnings = state.data?.warnings ?? []
+  const warnings = state.warnings ?? []
   const run = toRun()
   const evaluation = run?.manifest.evaluation
   const pieces = []
@@ -515,10 +588,12 @@ function refreshSessionsIfNeeded() {
 }
 
 const query = new URLSearchParams(location.search)
-if (query.get('data') !== null) {
-  void readJsonUrl(query.get('data')).then(accept).catch(error => {
+const dataUrl = query.get('data')
+if (dataUrl !== null) {
+  state.dataUrl = dataUrl
+  void readJsonUrl(dataUrl).then(data => accept(data, dataUrl)).catch(error => {
     $('loader').hidden = false
     $('view').hidden = true
-    status(error instanceof Error ? error.message : String(error), true)
+    showLoadFailure(error)
   })
 }

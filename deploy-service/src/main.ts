@@ -50,9 +50,10 @@ async function main(): Promise<void> {
   })
   await previews.load()
   const idempotency = new IdempotencyStore(join(config.DATA_DIR, 'idempotency'))
+  const runs = new RunStore(join(config.DATA_DIR, 'runs'), config.PUBLIC_URL, config.EVIDENCE_URL)
   const server = createService({
     config,
-    runs: new RunStore(join(config.DATA_DIR, 'runs'), config.PUBLIC_URL),
+    runs,
     previews,
     idempotency,
     proxy: new InstanceProxy(new URL(config.PUBLIC_URL).origin),
@@ -66,6 +67,8 @@ async function main(): Promise<void> {
   const sweep = setInterval(() => {
     void previews.sweep().catch((error: unknown) => { log(`sweep failed: ${error instanceof Error ? error.message : String(error)}`) })
     idempotency.prune()
+    const deleted = runs.prune(config.RETENTION_DAYS)
+    if (deleted > 0) log(`retention: deleted ${String(deleted)} run record(s)`)
   }, 60_000)
   const shutdown = (): void => {
     clearInterval(sweep)

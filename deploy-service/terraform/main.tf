@@ -50,6 +50,8 @@ resource "hcloud_server" "service" {
     tunnel_token          = var.cloudflare_tunnel_token
     profile               = local.tunnel ? "tunnel" : "public"
     public_views          = var.public_views ? "true" : "false"
+    evidence_url          = var.evidence_url
+    retention_days        = var.retention_days
     dsh_version           = var.dsh_version
     source_repository     = var.source_repository
     source_ref            = var.source_ref

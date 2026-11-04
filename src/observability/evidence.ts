@@ -19,9 +19,16 @@ export interface RunEvidence {
   prompts: Record<string, string>
 }
 
+export interface RunSummary {
+  runId: string
+  startedAt: string
+}
+
 export interface InspectData {
   migrationId: string
   runs: RunEvidence[]
+  /** Every run of the migration, including runs not included in `runs`. */
+  history: RunSummary[]
   /** Runs that exist but could not be read, and prompt mismatches. */
   warnings: string[]
 }
@@ -41,7 +48,7 @@ export function migrationIds(files: MigrationFiles): string[] {
   })
 }
 
-export function readRunEvidence(files: MigrationFiles, migrationId: string, warnings: string[] = []): RunEvidence[] {
+export function readRunEvidence(files: MigrationFiles, migrationId: string, warnings: string[] = [], promptRunId?: string | undefined): RunEvidence[] {
   const runs: RunEvidence[] = []
   for (const path of files.list(`migrations/${migrationId}/runs`).sort()) {
     if (!path.endsWith('/manifest.json')) continue
@@ -58,6 +65,10 @@ export function readRunEvidence(files: MigrationFiles, migrationId: string, warn
       continue
     }
     const prompts: Record<string, string> = Object.create(null) as Record<string, string>
+    if (promptRunId !== undefined && manifest.runId !== promptRunId) {
+      runs.push({ runId: manifest.runId, manifest, prompts })
+      continue
+    }
     for (const session of manifest.sessions) {
       const expected = `prompts/${session.promptSha256}.md`
       const legacyPath = `prompts/${session.name}.md`
@@ -86,17 +97,35 @@ export function readRunEvidence(files: MigrationFiles, migrationId: string, warn
   return runs.sort((left, right) => left.manifest.startedAt.localeCompare(right.manifest.startedAt))
 }
 
-export function readInspectData(files: MigrationFiles, migrationId?: string | undefined): InspectData {
+/**
+ * The newest run id in a migration, without reading any prompt text.
+ * @param files - the state-branch files.
+ * @param migrationId - the migration.
+ */
+export function latestRunId(files: MigrationFiles, migrationId: string): string | undefined {
+  const warnings: string[] = []
+  return readRunEvidence(files, migrationId, warnings, '__none__').at(-1)?.runId
+}
+
+export function readInspectData(files: MigrationFiles, migrationId?: string | undefined, currentRunId?: string | undefined): InspectData {
   const ids = migrationIds(files)
   if (ids.length === 0) throw new Error('the state branch holds no migration')
   const id = migrationId ?? ids.at(-1)
   if (id === undefined) throw new Error('the state branch holds no migration')
   if (!ids.includes(id)) throw new Error(`migration \`${id}\` is not on the state branch; known: ${ids.join(', ')}`)
   const warnings: string[] = []
-  const runs = readRunEvidence(files, id, warnings)
+  const runs = readRunEvidence(files, id, warnings, currentRunId)
   if (runs.length === 0) {
     const detail = warnings.length === 0 ? '' : `; ${String(warnings.length)} manifest(s) exist but do not parse: ${warnings.slice(0, 3).join('; ')}`
     throw new Error(`migration \`${id}\` has no usable run manifest${detail}`)
   }
-  return { migrationId: id, runs, warnings }
+  const selected = currentRunId === undefined ? runs : runs.filter(run => run.runId === currentRunId)
+  if (selected.length === 0) throw new Error(`run \`${String(currentRunId)}\` has no usable manifest in migration \`${id}\``)
+  const allHistory = runs.map(run => ({ runId: run.runId, startedAt: run.manifest.startedAt }))
+  const history = allHistory.slice(-500)
+  if (currentRunId !== undefined && !history.some(run => run.runId === currentRunId)) {
+    const current = allHistory.find(run => run.runId === currentRunId)
+    if (current !== undefined) history.splice(0, 1, current)
+  }
+  return { migrationId: id, runs: selected, history, warnings }
 }

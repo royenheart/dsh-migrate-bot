@@ -29,10 +29,12 @@ services:
       DATA_DIR: ${DATA_DIR:?set DATA_DIR in .env}
       PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL in .env}
       PUBLIC_VIEWS: ${PUBLIC_VIEWS:-false}
+      EVIDENCE_URL: ${EVIDENCE_URL:-}
       PROVIDER: docker
       DSH_IMAGE: ${DSH_IMAGE:-dsh-migrate-preview:0.2.0-rc.2}
       IDLE_MINUTES: ${IDLE_MINUTES:-120}
       TTL_DAYS: ${TTL_DAYS:-7}
+      RETENTION_DAYS: ${RETENTION_DAYS:-90}
       INSTANCE_PREFIX: ${INSTANCE_PREFIX:-dsh-preview-}
       # Fixed: Caddy and cloudflared reach the service at service:8080.
       HOST: 0.0.0.0

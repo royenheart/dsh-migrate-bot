@@ -137,9 +137,10 @@ export interface TestService {
  * Start a service on a free port.
  * @param options.conformance - start with `--conformance`.
  * @param options.publicViews - `PUBLIC_VIEWS=true`.
+ * @param options.evidenceUrl - `EVIDENCE_URL` for the benchmark page.
  * @param options.dataDir - a data directory the caller owns and removes, so a restart can reuse it.
  */
-export async function startService(options: { conformance?: boolean; publicViews?: boolean; dataDir?: string } = {}): Promise<TestService> {
+export async function startService(options: { conformance?: boolean; publicViews?: boolean; evidenceUrl?: string; dataDir?: string } = {}): Promise<TestService> {
   const dataDir = options.dataDir ?? mkdtempSync(join(tmpdir(), 'dsh-deploy-test-'))
   const ownsData = options.dataDir === undefined
   const loaded = loadConfig({
@@ -150,6 +151,7 @@ export async function startService(options: { conformance?: boolean; publicViews
     PROVIDER: 'process',
     DSH_BIN: '/nonexistent/dsh',
     PUBLIC_VIEWS: options.publicViews === true ? 'true' : 'false',
+    ...(options.evidenceUrl === undefined ? {} : { EVIDENCE_URL: options.evidenceUrl }),
   }, options.conformance === true ? ['--conformance'] : [])
   if (!loaded.ok) throw new Error(loaded.problems.join('; '))
   const provider = new FakeProvider()
@@ -157,7 +159,7 @@ export async function startService(options: { conformance?: boolean; publicViews
   await previews.load()
   const server = createService({
     config: loaded.config,
-    runs: new RunStore(join(dataDir, 'runs'), 'http://127.0.0.1:1'),
+    runs: new RunStore(join(dataDir, 'runs'), 'http://127.0.0.1:1', options.evidenceUrl),
     previews,
     idempotency: new IdempotencyStore(join(dataDir, 'idempotency')),
     proxy: new InstanceProxy('http://127.0.0.1:1'),

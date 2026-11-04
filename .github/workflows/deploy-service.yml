@@ -11,6 +11,7 @@ on:
       - deploy-service/**
       - src/deploy/**
       - src/commands/**
+      - src/observability/evidence-schema.ts
       - tests/e2e/deploy-service.test.ts
       - .github/workflows/deploy-service.yml
   push:
@@ -19,6 +20,7 @@ on:
       - deploy-service/**
       - src/deploy/**
       - src/commands/**
+      - src/observability/evidence-schema.ts
       - tests/e2e/deploy-service.test.ts
       - .github/workflows/deploy-service.yml
 

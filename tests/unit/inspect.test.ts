@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readInspectData } from '../../src/observability/evidence.ts'
+import { inspectDataSchema } from '../../src/observability/evidence-schema.ts'
 import { renderInspectHtml, writeInspectHtml } from '../../src/inspect/html.ts'
 import { buildRunManifest, serializeManifest, sha256 } from '../../src/observability/manifest.ts'
 import type { SessionRecord } from '../../src/observability/session.ts'
@@ -69,8 +70,13 @@ test('inspect data reads the runs and prompts the state branch stores', () => {
     mkdirSync(join(root, 'docs', 'reference'), { recursive: true })
     writeFileSync(join(root, 'docs', 'reference', 'workflow.md'), '# Workflow\n\n```mermaid\nstateDiagram-v2\n  [*] --> checking\n```\n')
     const data = readInspectData(filesFor(), '0.2.0')
+    assert.equal(inspectDataSchema.safeParse(data).success, true)
     assert.equal(data.migrationId, '0.2.0')
     assert.equal(data.runs.length, 2)
+    const current = readInspectData(filesFor(), '0.2.0', '123-1')
+    assert.equal(current.runs.length, 1)
+    assert.equal(current.runs[0]?.runId, '123-1')
+    assert.equal(current.history.length, 2)
     assert.equal(data.runs[0]?.prompts.overlap, prompt)
     assert.match(data.runs[0]?.manifest.workflow.graph ?? '', /stateDiagram-v2/)
     const html = renderInspectHtml(data)

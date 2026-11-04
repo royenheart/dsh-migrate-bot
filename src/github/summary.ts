@@ -1,6 +1,6 @@
 import { appendFileSync } from 'node:fs'
 import { describeBaseline } from '../domain/outcome.ts'
-import { externalUrl, inline } from '../render/text.ts'
+import { EVIDENCE_URL_LIMIT, externalUrl, inline } from '../render/text.ts'
 import type { MigrationView } from '../workflow/projection.ts'
 
 /**
@@ -13,7 +13,7 @@ export function statusOf(state: string): string {
   return state === 'awaitingMerge' ? 'proposed' : state
 }
 
-export function renderStepSummary(input: { view: MigrationView; pluginName: string; logStreamUrl?: string | undefined }): string {
+export function renderStepSummary(input: { view: MigrationView; pluginName: string; logStreamUrl?: string | undefined; evidenceUrl?: string | undefined }): string {
   const { view } = input
   const context = view.context
   const lines = [
@@ -32,6 +32,8 @@ export function renderStepSummary(input: { view: MigrationView; pluginName: stri
   if (proposal !== undefined) lines.push(`- Proposal: ${externalUrl(proposal.pullRequest.url, 300) ?? `#${String(proposal.pullRequest.number)}`}`)
   const stream = input.logStreamUrl === undefined ? undefined : externalUrl(input.logStreamUrl, 300)
   if (stream !== undefined) lines.push(`- Run log stream: ${stream}`)
+  const evidence = input.evidenceUrl === undefined ? undefined : externalUrl(input.evidenceUrl, EVIDENCE_URL_LIMIT)
+  if (evidence !== undefined) lines.push(`- Run evidence: ${evidence}`)
   return `${lines.join('\n')}\n`
 }
 

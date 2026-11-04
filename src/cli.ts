@@ -28,7 +28,8 @@ import { inline } from './render/text.ts'
 import { skillsSource, syncUpgradeSkills } from './skills/upgrade.ts'
 import { StateStore } from './state/store.ts'
 import { recorderFor, type RunRecorder } from './observability/recorder.ts'
-import { readInspectData } from './observability/evidence.ts'
+import { latestRunId, readInspectData } from './observability/evidence.ts'
+import { publishRunEvidence } from './deploy/evidence.ts'
 import { writeInspectHtml } from './inspect/html.ts'
 import { badgeOf } from './workflow/badge.ts'
 import { InJobEngine } from './engine.ts'
@@ -212,7 +213,7 @@ function report(runtime: Runtime, engine: InJobEngine, view: MigrationView | und
     log_stream_url: stream?.url,
     ...extra,
   }, runtime.env)
-  if (view !== undefined) writeStepSummary(renderStepSummary({ view, pluginName: pluginNames(runtime.workdir), logStreamUrl: stream?.url }), runtime.env)
+  if (view !== undefined) writeStepSummary(renderStepSummary({ view, pluginName: pluginNames(runtime.workdir), logStreamUrl: stream?.url, ...(typeof extra.run_evidence_url === 'string' ? { evidenceUrl: extra.run_evidence_url } : {}) }), runtime.env)
 }
 
 async function run(runtime: Runtime, force: boolean): Promise<number> {
@@ -255,23 +256,77 @@ async function run(runtime: Runtime, force: boolean): Promise<number> {
   })
   if (decision.action === 'skip') {
     log(`skipped (${decision.reason}): ${inline(decision.detail, 300)}`)
-    report(runtime, engine, undefined, { status: 'skipped', target_tag: target.tag })
+    // A reconcile or resume may have run a session with no later migration start.
+    // Persist this run before repairing evidence, so it has a manifest.
+    const observed = engine.status().migrations[0]
+    if (observed !== undefined) {
+      try {
+        await recorder.flush({ store: runtime.store, migrationId: observed.id, runDir: join(runtime.home, 'runs', runtime.runId), view: observed })
+      } catch (error) {
+        log(`manifest: ${inline(error instanceof Error ? error.message : String(error), 300)}`)
+      }
+    }
+    const repairId = projection.migrations[0]?.id ?? projection.open?.id ?? projection.processed?.id
+    if (repairId !== undefined && runtime.config.deploy.enabled) {
+      try {
+        const lastRunId = latestRunId(runtime.store, repairId)
+        if (lastRunId !== undefined) {
+          const startedAt = readInspectData(runtime.store, repairId, lastRunId).runs[0]?.manifest.startedAt
+          const repaired = await publishRunEvidence({
+            config: runtime.config,
+            env: runtime.env,
+            runId: lastRunId,
+            repository: runtime.repository === undefined ? 'unknown' : slugOf(runtime.repository),
+            migrationId: repairId,
+            store: runtime.store,
+            seal: true,
+            sealComplete: false,
+            ...(startedAt === undefined ? {} : { openedAt: startedAt }),
+            log,
+          })
+          if (repaired !== undefined) report(runtime, engine, undefined, { status: 'skipped', target_tag: target.tag, run_evidence_url: repaired })
+          else report(runtime, engine, undefined, { status: 'skipped', target_tag: target.tag })
+        } else report(runtime, engine, undefined, { status: 'skipped', target_tag: target.tag })
+      } catch (error) {
+        log(`run evidence: ${inline(error instanceof Error ? error.message : String(error), 300)}`)
+        report(runtime, engine, undefined, { status: 'skipped', target_tag: target.tag })
+      }
+    } else report(runtime, engine, undefined, { status: 'skipped', target_tag: target.tag })
     return 0
   }
   excludeIgnoredPaths(runtime.workdir)
   stream = await openLogStream({ config: runtime.config, env: runtime.env, repository: runtime.repository === undefined ? 'unknown' : slugOf(runtime.repository), runId: runtime.runId, log })
+  let streamClosed = false
   try {
     log(`migrating to ${target.tag}${decision.supersedes === undefined ? '' : `, taking over the proposal of ${decision.supersedes}`}`)
     const view = await engine.start(target.version, migrationInput(runtime, target, projection.verified, decision.proposal), decision.supersedes)
     try {
       await recorder.flush({ store: runtime.store, migrationId: view.id, runDir: join(runtime.home, 'runs', runtime.runId), view })
     } catch (error) {
-      log(`manifest: ${error instanceof Error ? error.message : String(error)}`)
+      log(`manifest: ${inline(error instanceof Error ? error.message : String(error), 300)}`)
     }
-    report(runtime, engine, view)
+    await stream.close()
+    streamClosed = true
+    let evidenceUrl: string | undefined
+    try {
+      evidenceUrl = await publishRunEvidence({
+        config: runtime.config,
+        env: runtime.env,
+        runId: runtime.runId,
+        repository: runtime.repository === undefined ? 'unknown' : slugOf(runtime.repository),
+        migrationId: view.id,
+        store: runtime.store,
+        seal: runtime.config.deploy.logStream === false || stream.url === undefined,
+        sealComplete: !(runtime.config.deploy.logStream && stream.url === undefined),
+        log,
+      })
+    } catch (error) {
+      log(`run evidence: ${inline(error instanceof Error ? error.message : String(error), 300)}`)
+    }
+    report(runtime, engine, view, evidenceUrl === undefined ? {} : { run_evidence_url: evidenceUrl })
     return view.state === 'failed' || view.state === 'error' ? 1 : 0
   } finally {
-    await stream.close()
+    if (!streamClosed) await stream.close()
   }
 }
 
@@ -333,9 +388,24 @@ async function pullRequestClosed(runtime: Runtime, options: Options): Promise<nu
   try {
     await recorder.flush({ store: runtime.store, migrationId: view.id, runDir: join(runtime.home, 'runs', runtime.runId), view })
   } catch (error) {
-    log(`manifest: ${error instanceof Error ? error.message : String(error)}`)
+    log(`manifest: ${inline(error instanceof Error ? error.message : String(error), 300)}`)
   }
-  report(runtime, engine, view)
+  let evidenceUrl: string | undefined
+  try {
+    evidenceUrl = await publishRunEvidence({
+      config: runtime.config,
+      env: runtime.env,
+      runId: runtime.runId,
+      repository: runtime.repository === undefined ? 'unknown' : slugOf(runtime.repository),
+      migrationId: view.id,
+      store: runtime.store,
+      seal: true,
+      log,
+    })
+  } catch (error) {
+    log(`run evidence: ${inline(error instanceof Error ? error.message : String(error), 300)}`)
+  }
+  report(runtime, engine, view, evidenceUrl === undefined ? {} : { run_evidence_url: evidenceUrl })
   return view.state === 'error' ? 1 : 0
 }
 

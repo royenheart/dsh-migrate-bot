@@ -13,6 +13,6 @@ The user-facing capabilities of the Action, the benchmark report, and the deploy
 | F7 | Stream a run log and publish a preview | deploy service `/runs`, `/view`, `/p`, `/previews` | `deploy-service/src/` | [The HTTP contract](design/deploy-service.md#8-the-http-contract) |
 | F8 | Ask for status, a report, or a preview action by comment | `/dsh-migrate …` comment | `src/cli.ts`, `src/commands/` | [Comment commands](design/workflow.md#9-comment-commands) |
 | F9 | Deliver merge reports to configured channels | `reports.channels` | `src/merge-reports/` | [Merge reports](design/workflow.md#8-merge-reports) |
+| F10 | Store and serve run evidence for automatic inspection | deploy service `/view/<runId>/inspect.json` (current run plus history) | `deploy-service/src/runs.ts`, `src/deploy/evidence.ts` | [HTTP contract](design/deploy-service.md#8-the-http-contract) |
 
 The catalogue names capabilities, not every function. A new feature adds a row and an entry in [the index](index.md); a removed feature deletes its row.
-
