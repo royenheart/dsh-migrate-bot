@@ -1,6 +1,6 @@
 import { day, escape, fail, loadArtifact, loadIndex, loadRecord, nav, params, select, setParams, short } from './common.js'
 
-nav('Diff')
+nav('Changes')
 
 const MONACO = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs'
 const monaco = new Promise((resolve) => {

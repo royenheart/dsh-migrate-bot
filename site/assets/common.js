@@ -31,9 +31,9 @@ export async function loadArtifact(id, path) {
 export const loadField = () => json('data/field.json')
 
 export function nav(current) {
-  const pages = [['index.html', 'Overview'], ['changes.html', 'Changes'], ['inspect.html', 'Run evidence'], ['wiki.html', 'Wiki']]
   const header = document.createElement('header')
-  header.innerHTML = `<strong>dsh-migrate <span class="brand-suffix">benchmark</span></strong>${pages.map(([href, label]) => `<a href="${href}"${label === current ? ' aria-current="page"' : ''}>${label}</a>`).join('')}`
+  const benchmark = current === 'Overview' || current === 'Changes'
+  header.innerHTML = `<strong>dsh-migrate</strong><div class="nav-group"><span class="nav-label${benchmark ? ' active' : ''}">Benchmark</span><a href="index.html"${current === 'Overview' ? ' aria-current="page"' : ''}>Overview</a><a href="changes.html"${current === 'Changes' ? ' aria-current="page"' : ''}>Changes</a></div><a href="inspect.html"${current === 'Run evidence' ? ' aria-current="page"' : ''}>Run evidence</a><a href="wiki.html"${current === 'Wiki' ? ' aria-current="page"' : ''}>Wiki</a>`
   document.body.prepend(header)
 }
 
