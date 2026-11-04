@@ -78,9 +78,14 @@ test('the site carries the pages, the metric library, and the records newest fir
     writeRecord(records, 'new', '2026-10-02T00:00:00Z')
     const out = join(root, 'site')
     assert.equal(buildSite(records, out), 2)
-    for (const page of ['index.html', 'compare.html', 'changes.html', 'task.html', 'diff.html', 'field.html', 'assets/metrics.js', 'data/records/new/record.json', 'data/snapshots/' + JSON.parse(readFileSync(join(records, 'records', 'new', 'record.json'), 'utf8')).producer.snapshot + '/files/workflow.md']) assert.ok(existsSync(join(out, page)), page)
+    for (const page of ['index.html', 'compare.html', 'changes.html', 'task.html', 'diff.html', 'field.html', 'inspect.html', 'wiki.html', 'assets/inspect.js', 'assets/wiki.js', 'assets/metrics.js', 'assets/pairing.js', 'data/wiki.json', 'data/wiki-pages/README.md.json', 'data/records/new/record.json', 'data/snapshots/' + JSON.parse(readFileSync(join(records, 'records', 'new', 'record.json'), 'utf8')).producer.snapshot + '/files/workflow.md']) assert.ok(existsSync(join(out, page)), page)
+    const wiki = JSON.parse(readFileSync(join(out, 'data', 'wiki.json'), 'utf8')) as { pages: Array<{ source: string }> }
+    assert.ok(wiki.pages.some(page => page.source === 'README.md'))
+    assert.match(readFileSync(join(out, 'data', 'wiki-pages', 'README.md.json'), 'utf8'), /# dsh-migrate-bot/)
+    assert.ok(wiki.pages.some(page => page.source === 'docs/decisions.md'))
+    assert.ok(wiki.pages.some(page => page.source === 'docs/features.md'))
     assert.doesNotMatch(readFileSync(join(out, 'assets', 'metrics.js'), 'utf8'), /^import /m)
-    const index = JSON.parse(readFileSync(join(out, 'data', 'index.json'), 'utf8')) as { records: Array<{ id: string; attempts?: unknown }> }
+    const index = JSON.parse(readFileSync(join(out, 'data', 'index.json'), 'utf8')) as { records: Array<{ id: string; attempts?: unknown; scoredTasks?: string[] }> }
     assert.deepEqual(index.records.map(record => record.id), ['new', 'old'])
     assert.equal(index.records[0]?.attempts, undefined)
     writeRecord(records, 'bad', '2026-10-03T00:00:00Z', (record) => { record.metrics.values.meanReward = 0.5 })

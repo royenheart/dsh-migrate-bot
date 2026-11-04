@@ -93,7 +93,7 @@ The supported shape is Cloudflare Zero Trust: a tunnel from the service outwards
 Rules that hold whatever fronts the service:
 
 - **The API needs the deploy token; the webhook needs its signature.** The Action's calls carry the bearer token, GitHub's deliveries carry an HMAC signature over the body, and neither is ever exempt.
-- **No credential in any URL.** Not the API key, not the deploy token, not a signed query parameter that grants access on its own. The Action enforces its half: a page URL the service names is linked only when it parses as `http(s)`, carries no credentials, fits the 300 characters a rendered URL is given, and cannot escape the link it is put in. A URL that fails is dropped, so the run is left without a page rather than republishing a secret or linking somewhere nobody named. Cutting one to fit is a failure too, because what a reader would click would be a different URL.
+- **No credential in any URL.** Not the API key, not the deploy token, not a signed query parameter that grants access on its own. The Action enforces its half: a page URL the service names is linked only when it parses as `http(s)`, carries no credentials, fits the 300 characters a rendered URL is given (512 for the evidence link), and cannot escape the link it is put in. A URL that fails is dropped, so the run is left without a page rather than republishing a secret or linking somewhere nobody named. Cutting one to fit is a failure too, because what a reader would click would be a different URL.
 - **The API key never reaches the browser.** Neither does `dsh web`'s own launch token: the service's proxy exchanges it for a session itself.
 - **No credential reaches an instance.** The proxy removes the bearer token, every cookie, and the `cf-access-*` identity headers before a request reaches a preview.
 - **The policy is the consumer's.** The deploy service belongs to the consumer, so the identities allowed to reach a preview are theirs to decide; this Action neither hosts the service nor knows the policy.
@@ -126,7 +126,7 @@ The Action gives an event ten seconds, the `publish-result` report five, and any
 
 | Call | Body | Answer |
 |---|---|---|
-| `POST /runs` | `{ runId, repository, kind }` | `{ url }`, the page a person watches |
+| `POST /runs` | `{ runId, repository, kind, openedAt? }`; `openedAt` is the original run start time, sent only when skip repair recreates an old record so retention still applies to the original age | `{ url }`, the page a person watches |
 | `POST /runs/{runId}/events` | `{ seq, at, message }`, one logged line | any 2xx |
 | `POST /runs/{runId}/finish` | `{ events, attempted, complete }`: how many events were accepted, how many were produced, and whether the record is whole | any 2xx |
 | `POST /previews/{repository}/{pullRequest}` | `{ action, days?, maxTtlDays? }`; `extend` carries both numbers and `publish` carries none. A `redeploy` may carry a `headSha`, which a service ignores, because it resolves the head itself | any 2xx; a `publish` answers `{ revision, headSha }` |
@@ -222,3 +222,7 @@ The reference implementation is held to it three ways: the unit tests in `deploy
 - **A hosted, multi-tenant deploy service.** The service is the consumer's, for the same reason the report channels' destinations are: it holds their code and decides who may reach it.
 - **A scale-to-zero machine provider.** A provider that starts a machine per preview (Fly Machines and similar) would remove the idle cost of a server; it is a possible later `InstanceProvider`, and the interface is shaped so that it is additive.
 - **In the reference implementation:** a warning before an expiry or a destroy, a model credential injected into previews, an egress allow-list and a disk quota for previews, and credentials for cloning a private repository. A deployment that needs one of these adds it in front of or around the service.
+
+## Design decisions
+
+- **Run evidence is stored with its run and served from the deploy service** (*decided*). Why: one URL opens the same prompts and workflows the state branch holds, and the page reads one bounded bundle instead of authenticated branch files. Constraint: `POST /runs/<runId>/evidence` validates a bounded `InspectData` bundle, stores it beside the run, and `GET /view/<runId>/inspect.json` serves it under the existing view policy; the state branch remains the source of record. Revisit when: the deploy service can read the state branch directly, or the report reads a shared evidence store.

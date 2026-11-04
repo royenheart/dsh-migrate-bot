@@ -6,7 +6,7 @@
  *
  * The pages are `site/`; this script adds the data they read: `data/index.json`
  * (one summary per record, newest first), every record directory as it is, the
- * compiled metric library, and with `--field` `data/field.json`. Records that
+ * compiled metric library, the `data/wiki.json` index and `data/wiki-pages/` pages, and with `--field` `data/field.json`. Records that
  * do not validate are refused. docs/design/evaluation.md describes the report.
  */
 
@@ -21,6 +21,7 @@ import { git } from '../src/git/run.ts'
 import { GitHubClient, repositoryOf } from '../src/github/client.ts'
 import { StateStore } from '../src/state/store.ts'
 import { validateRecords } from './bench.ts'
+import { writeWikiData } from './wiki.ts'
 import { REPO_ROOT } from './repo.ts'
 
 /** The repositories that run the Action; the Field page reports their proposals. */
@@ -50,6 +51,7 @@ export function buildSite(records: string, out: string): number {
   }).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   mkdirSync(join(out, 'data'), { recursive: true })
   writeFileSync(join(out, 'data', 'index.json'), JSON.stringify({ records: summaries }))
+  writeWikiData(out)
   return summaries.length
 }
 

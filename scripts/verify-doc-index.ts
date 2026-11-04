@@ -47,11 +47,18 @@ export interface IndexViolation {
  * @param source - the index document's text.
  * @returns the rows, in document order.
  */
+/** Split one Markdown table row into trimmed cells, accepting a missing final pipe. */
+function tableCells(line: string): string[] {
+  const cells = line.split('|').slice(1).map(cell => cell.trim())
+  if (cells.at(-1) === '') cells.pop()
+  return cells
+}
+
 export function parseIndexRows(source: string): IndexRow[] {
   const rows: IndexRow[] = []
   for (const [index, line] of source.split('\n').entries()) {
     if (!line.startsWith('|')) continue
-    const cells = line.split('|').slice(1, -1).map(cell => cell.trim())
+    const cells = tableCells(line)
     if (cells.length !== 3) continue
     const [topic, home, entry] = cells
     if (topic === undefined || home === undefined || entry === undefined) continue
@@ -69,6 +76,26 @@ export function parseIndexRows(source: string): IndexRow[] {
   return rows
 }
 
+/** Check the fixed shape of every data row in the index. */
+export function verifyIndexShape(source: string): IndexViolation[] {
+  const violations: IndexViolation[] = []
+  for (const [index, line] of source.split('\n').entries()) {
+    if (!line.startsWith('|')) continue
+    const cells = tableCells(line)
+    if (cells.length === 0 || cells.every(cell => /^-+$/.test(cell))) continue
+    if (cells[0] === 'Topic') continue
+    if (cells.length !== 3) {
+      violations.push({ line: index + 1, detail: `row has ${String(cells.length)} cell(s), expected 3` })
+      continue
+    }
+    const [topic, home, entry] = cells
+    if (topic === undefined || topic === '') violations.push({ line: index + 1, detail: 'row has no topic' })
+    if (home === undefined || !/^`[^`]+`$/.test(home)) violations.push({ line: index + 1, detail: 'home is not one backticked path' })
+    if (entry === undefined || linksOf(entry).length !== 1) violations.push({ line: index + 1, detail: 'entry point is not exactly one Markdown link' })
+  }
+  return violations
+}
+
 /**
  * Check the index against the documents it claims to cover.
  * @returns one entry per defect, and how many rows were read.
@@ -78,7 +105,7 @@ export function verifyDocIndex(): { violations: IndexViolation[]; rows: number }
   const source = readText(absIndex)
   const indexAnchors = documentAnchors(source)
   const rows = parseIndexRows(source)
-  const violations: IndexViolation[] = []
+  const violations: IndexViolation[] = verifyIndexShape(source)
 
   for (const row of rows) {
     if (row.topic === '') {

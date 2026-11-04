@@ -92,7 +92,8 @@ Each record also names a snapshot of what the Action brought to the run, `snapsh
 | Overview | The consolidated analysis page: per-subject trend and records, the selected pair's verdicts and metrics, one task across records, and the consumer proposals |
 | Changes | What changed in the Action between two records: the snapshot files grouped as statechart, configuration, prompts, agent runtime, upgrade skills and source, each with its diffstat, in a Monaco diff editor; the statechart also as its two diagrams side by side, with the states only one side has coloured. `?from&to&file&view`, and `range=latest` for the newest record and the newest earlier one whose Action differs |
 | Diff | One artifact of two attempts, of two records or of one, in a Monaco diff editor; a `proposed.diff` also gets its file list and diffstat. `?subject&task&from&fromAttempt&to&toAttempt&artifact&view`, and `range=latest` for the two newest records |
-| Run evidence | An `inspect.json` from a live state branch: prompt and workflow comparison, loaded in the browser |
+| Run evidence | An `inspect.json` from a live state branch, or the current run's bundle plus its migration history: prompt and workflow comparison, loaded in the browser |
+| Wiki | The generated index and per-page projection of the repository documentation, including the proposal and decision indexes |
 
 The Field section is built from the consumers' state branches at build time, not from records: the event log keeps when each proposal was published and when its pull request closed, merged or not, so storing that again would be a copy to keep in step. The build asks GitHub only for the maintainer commits on merged proposals. It reports, per consumer and overall, the merge rate over decided proposals, the share merged without a maintainer commit, and the median hours from publishing to merging. The consumer list is `CONSUMERS` in `scripts/site.ts`.
 
@@ -131,3 +132,8 @@ The hidden tests are the tests the author's migration changed, kept only where t
 A task enters the suite when the oracle scores 1.0 on it and `nop` scores below 1.0.
 
 The suite does not require isolation from its agent: it states that "security is guaranteed jointly by the one-shot container, the scope constraints, and the verifier", sets no `[agent] user`, and uploads `tests/` only after the agent has finished. The adapter therefore runs as root in the task container, like the suite's own agents.
+
+## Design decisions
+
+- **The report uses a two-level navigation: Benchmark contains Overview and Changes, while Run evidence and Wiki are top-level peers** (*decided*). Why: the analysis area and its pages remain visibly distinct from the live-run and documentation workspaces. Constraint: every report page uses `site/assets/common.js`; `Benchmark` is the active area on Overview and Changes, and Wiki carries no Benchmark subnav. Revisit when: the site grows another analysis area or a third Benchmark page.
+- **The Overview chooses the most comparable record pair by default** (*decided*). Why: the newest two records can share few tasks, so their paired verdict says `not-comparable` while an older pair of the same subject supports a real comparison. Constraint: the default base and head maximize the number of tasks both records scored, then prefer the newer head; an explicit `base` and `head` in the URL always win. Revisit when: the site can show a comparison matrix instead of one selected pair.

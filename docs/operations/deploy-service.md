@@ -38,7 +38,7 @@ The service is configured only by its environment. It validates every variable a
 | `PORT`, `HOST` | no, 8080 and `0.0.0.0` | Where the service listens. Compose fixes them to the defaults, because Caddy and `cloudflared` reach the service at `service:8080` |
 | `INSTANCE_PREFIX` | no, `dsh-preview-` | Prefix of every container the `docker` provider creates; it touches no other container. Two services on one Docker daemon need different prefixes |
 
-`--conformance` is the only flag; it is for a deployment the conformance suite checks, never for one a repository uses.
+`--conformance` is the only flag; it is for a deployment the conformance suite checks, never for one a repository uses. Run the suite against the service directly, or from inside the identity proxy: it carries the deploy bearer, not an interactive Access login, so an outward IAP redirect is outside the suite's view-policy check.
 
 ## On any host with Docker
 

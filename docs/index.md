@@ -46,6 +46,9 @@ The entry point to the documentation: `AGENTS.md` holds the rules and links here
 | Checking any deploy service against the Action's client | `docs/design/deploy-service.md` | [The conformance suite](design/deploy-service.md#10-the-conformance-suite) |
 | Running the reference deploy service: images, configuration, compose, Terraform, wiring a repository, verifying | `docs/operations/deploy-service.md` | [Configuration](operations/deploy-service.md#configuration) |
 | What a host needs to run the deploy service, at any provider | `docs/operations/deploy-service.md` | [On any host with Docker](operations/deploy-service.md#on-any-host-with-docker) |
-| The rules for every agent session in this repository | `AGENTS.md` | [Rules](../AGENTS.md#rules) |
+| The rules for every agent session in this repository | `AGENTS.md` | [Repository invariants](../AGENTS.md#repository-invariants) |
 | Every project term, its name in code, and the words it replaces | `docs/glossary.md` | [Migrations](glossary.md#migrations) |
+| The full engineering principles every change follows | `docs/engineering.md` | [Persistent data design](engineering.md#1-persistent-data-design) |
+| The user-facing capability catalog | `docs/features.md` | [Feature catalog](features.md#feature-catalog) |
+| The index of design decisions and open questions | `docs/decisions.md` | [Design decisions index](decisions.md#design-decisions-index) |
 | How documentation is organised, written, and kept from drifting | `docs/AGENTS.md` | [The tier taxonomy: one home per fact](AGENTS.md#the-tier-taxonomy-one-home-per-fact) |

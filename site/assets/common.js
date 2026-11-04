@@ -31,7 +31,7 @@ export async function loadArtifact(id, path) {
 export const loadField = () => json('data/field.json')
 
 export function nav(current) {
-  const pages = [['index.html', 'Overview'], ['changes.html', 'Changes'], ['inspect.html', 'Run evidence']]
+  const pages = [['index.html', 'Overview'], ['changes.html', 'Changes'], ['inspect.html', 'Run evidence'], ['wiki.html', 'Wiki']]
   const header = document.createElement('header')
   header.innerHTML = `<strong>dsh-migrate <span class="brand-suffix">benchmark</span></strong>${pages.map(([href, label]) => `<a href="${href}"${label === current ? ' aria-current="page"' : ''}>${label}</a>`).join('')}`
   document.body.prepend(header)

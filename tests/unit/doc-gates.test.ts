@@ -9,7 +9,7 @@ import {
   splitTarget,
   stripInlineMarkdown,
 } from '../../scripts/md.ts'
-import { parseIndexRows } from '../../scripts/verify-doc-index.ts'
+import { parseIndexRows, verifyIndexShape } from '../../scripts/verify-doc-index.ts'
 import { verifyChangelog } from '../../scripts/verify-changelog.ts'
 
 test('verify-changelog accepts a generated changelog', () => {
@@ -124,4 +124,43 @@ test('parseIndexRows reads the fixed table shape and skips its header', () => {
     ['| Topic | Home | Entry point |', '|---|---|---|', '| A subject | `docs/a.md` | [Section](a.md#section) |', ''].join('\n'),
   )
   assert.deepEqual(rows, [{ line: 3, topic: 'A subject', home: 'docs/a.md', linkUrl: 'a.md#section' }])
+})
+
+test('the index parser accepts CRLF and trailing spaces after the closing pipe', () => {
+  const source = '| Topic | Home | Entry point |\r\n|---|---|---|\r\n| A subject | `docs/a.md` | [Section](a.md#section) |  \r\n'
+  assert.deepEqual(parseIndexRows(source), [{ line: 3, topic: 'A subject', home: 'docs/a.md', linkUrl: 'a.md#section' }])
+  assert.deepEqual(verifyIndexShape(source), [])
+})
+
+test('the index shape check rejects a fourth cell without a closing pipe', () => {
+  const violations = verifyIndexShape('| Topic | Home | Entry point |\n|---|---|---|\n| Subject | `docs/a.md` | [A](a.md#section) | extra')
+  assert.equal(violations.length, 1)
+  assert.match(violations[0]?.detail ?? '', /4 cell/)
+})
+
+test('headingsOf ignores headings inside HTML comments', () => {
+  const headings = headingsOf('# Proposal: x\n\n<!--\n## Risks\n-->\n\n## Problem\n')
+  assert.deepEqual(headings.map(heading => heading.text), ['Proposal: x', 'Problem'])
+})
+
+test('the index shape check rejects extra cells, a missing home path, and a second link', () => {
+  const source = ['| Topic | Home | Entry point |', '|---|---|---|', '| Four | `docs/a.md` | [A](a.md#section) | extra |', '| Bare | docs/a.md | [A](a.md#section) |', '| Two | `docs/a.md` | [A](a.md#section) [B](a.md#section) |'].join('\n')
+  const violations = verifyIndexShape(source)
+  assert.equal(violations.length, 3)
+  assert.match(violations[0]?.detail ?? '', /4 cell/)
+  assert.match(violations[1]?.detail ?? '', /backticked/)
+  assert.match(violations[2]?.detail ?? '', /exactly one/)
+})
+test('proposal gate accepts the shipped proposal and rejects a missing status and section', () => {
+  const result = verifyProposals()
+  assert.equal(result.violations.length, 0, result.violations.map(v => v.detail).join('; '))
+  assert.ok(result.checked >= 1)
+  const invalid = verifyProposalSource('# Proposal: missing\n\n## Problem\n\n## Proposal\n\n## Decisions needed\n\n## Acceptance criteria\n\n## Risks\n', 'docs/proposals/invalid.md')
+  assert.ok(invalid.some(item => item.detail.includes('Status')))
+  const fenced = verifyProposalSource('# Proposal: fenced\n\n```text\nStatus: open\n```\n\n## Problem\n\n## Proposal\n\n## Decisions needed\n\n## Acceptance criteria\n\n## Risks\n', 'docs/proposals/fenced.md')
+  assert.ok(fenced.some(item => item.detail.includes('Status')))
+  const narrative = verifyProposalSource('# Proposal: narrative\n\nThe migration gate says\nStatus: open\n\n## Problem\n\n## Proposal\n\n## Decisions needed\n\n## Acceptance criteria\n\n## Risks\n', 'docs/proposals/narrative.md')
+  assert.ok(narrative.some(item => item.detail.includes('Status')))
+  const commented = verifyProposalSource('# Proposal: commented\n\nStatus: open\n\n## Problem\n\n## Proposal\n\n## Decisions needed\n\n## Acceptance criteria\n\n<!--\n## Risks\n-->\n', 'docs/proposals/commented.md')
+  assert.ok(commented.some(item => item.detail.includes('Risks')))
 })

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wiki · dsh-migrate</title>
+<link rel="stylesheet" href="assets/site.css">
+<script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
+</head>
+<body>
+<main>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow">Documentation</div>
+      <h1>Wiki</h1>
+      <p>The repository documents, projected into one page. The documents remain the source of record.</p>
+    </div>
+  </div>
+  <div class="wiki-layout">
+    <aside class="wiki-sidebar" aria-label="Wiki navigation">
+      <label class="field">Filter<input id="wiki-filter" type="search" placeholder="Filter documents" autocomplete="off"></label>
+      <nav id="wiki-nav"></nav>
+    </aside>
+    <article id="wiki-content" class="wiki-content" aria-live="polite"></article>
+  </div>
+</main>
+<script type="module" src="assets/wiki.js"></script>
+</body>
+</html>
