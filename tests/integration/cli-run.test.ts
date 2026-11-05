@@ -27,7 +27,7 @@ if (!process.env.DEEPSEEK_API_KEY) {
 process.stderr.write('dsh-migrate-status: ' + JSON.stringify({ turns: 1, steps: 2, elapsedSeconds: 1, inputTokens: 100, outputTokens: 50, cacheHitTokens: 10, cacheMissTokens: 90, costUsd: 0.01 }) + '\\n')
 const fs = require('node:fs')
 if (task.includes('Output contract')) {
-  process.stdout.write('Findings.\\n\\n\`\`\`json\\n{"title":"Clean migration","body":"## Run\\\\nnothing to report"}\\n\`\`\`\\n')
+  process.stdout.write('Findings.\\n\\n\`\`\`json\\n{"title":"Clean migration","findings":[],"limits":[]}\\n\`\`\`\\n')
 } else if (task.includes('extension points of a harness release')) {
   fs.appendFileSync('index.js', 'export const migrated = true\\n')
   process.stdout.write('# Extension points\\n\\n## 3. Edits you made\\nadded an export\\n')

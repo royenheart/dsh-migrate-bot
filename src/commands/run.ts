@@ -56,6 +56,11 @@ export function commandKey(repository: string, pullRequest: number, verb: string
   return `${repository}#${String(pullRequest)}:${verb}:comment=${commentId}`
 }
 
+const pullSchema = z.object({
+  state: z.string(),
+  head: z.object({ ref: z.string(), sha: z.string(), repo: z.object({ full_name: z.string() }).nullable() }),
+})
+
 /** The migration whose proposal the comment's thread belongs to. */
 function migrationOf(projection: Projection, issueNumber: number | undefined): MigrationView | undefined {
   if (issueNumber === undefined) return undefined
@@ -85,7 +90,15 @@ async function execute(input: CommandRunInput): Promise<CommandOutcome> {
   if (input.repository === undefined || input.issueNumber === undefined) {
     return { ok: false, reply: `**\`${spec.verb}\` cannot run:** the comment names no pull request of a known repository.` }
   }
-  const preview: PreviewKey = { repository: slugOf(input.repository), pullRequest: input.issueNumber }
+  const migration = migrationOf(input.status(), input.issueNumber)
+  const preview: PreviewKey = {
+    repository: slugOf(input.repository),
+    pullRequest: migration?.context.proposal?.pullRequest.number ?? input.issueNumber,
+  }
+  if (spec.verb === 'redeploy') {
+    const problem = await redeployProblem(input, preview)
+    if (problem !== undefined) return { ok: false, reply: `**\`redeploy\` could not run:** ${problem}` }
+  }
   const client = createDeployClient(service, input.fetchImpl, commandKey(preview.repository, preview.pullRequest, spec.verb, input.commentId))
   if (spec.verb === 'publish') return await publishCommand(input, client, preview)
   const { extendDays, ttlDays } = input.config.deploy.preview
@@ -125,16 +138,17 @@ async function statusCommand(input: CommandRunInput): Promise<CommandOutcome> {
   const service = resolveDeployService(input.config, input.env)
   if (input.config.deploy.enabled) {
     lines.push('', '**Deploy service**', '', `- \`${input.config.deploy.endpoint ?? '(unset)'}\``)
-    lines.push(...await previewLines(input, service))
+    const migration = migrationOf(projection, input.issueNumber)
+    lines.push(...await previewLines(input, service, migration?.context.proposal?.pullRequest.number ?? input.issueNumber))
   }
   lines.push('', '<details><summary>Commands</summary>', '', renderCommandHelp(), '', '</details>')
   return { ok: true, reply: lines.join('\n') }
 }
 
-async function previewLines(input: CommandRunInput, service: DeployService | { reason: string }): Promise<string[]> {
+async function previewLines(input: CommandRunInput, service: DeployService | { reason: string }, pullRequest: number | undefined): Promise<string[]> {
   if ('reason' in service) return [`- Preview deployment: not asked (${service.reason})`]
-  if (input.repository === undefined || input.issueNumber === undefined) return ['- Preview deployment: not asked (no pull request is named)']
-  const result = await createDeployClient(service, input.fetchImpl).status({ repository: slugOf(input.repository), pullRequest: input.issueNumber })
+  if (input.repository === undefined || pullRequest === undefined) return ['- Preview deployment: not asked (no pull request is named)']
+  const result = await createDeployClient(service, input.fetchImpl).status({ repository: slugOf(input.repository), pullRequest })
   if (!result.ok) return [`- Preview deployment: the deploy service could not be asked (${inline(result.reason, 300)})`]
   const state = parsePreviewState(result.body)
   if (state.state === undefined && state.url === undefined) return ['- Preview deployment: none for this pull request']
@@ -176,11 +190,6 @@ async function reportCommand(input: CommandRunInput, dryRun: boolean, resend: bo
   if (after.context.input.settings.reportChannels.length === 0) lines.push('No report channel is enabled.')
   return { ok: true, reply: lines.join('\n') }
 }
-
-const pullSchema = z.object({
-  state: z.string(),
-  head: z.object({ ref: z.string(), sha: z.string(), repo: z.object({ full_name: z.string() }).nullable() }),
-})
 
 async function publishCommand(
   input: CommandRunInput,
@@ -244,6 +253,17 @@ async function publishCommand(
   }
   const checks = applied.checks === undefined ? '' : `\n\n${renderTreeCheck(applied.checks)}`
   return { ok: false, reply: `**\`publish\` was refused at the ${applied.stage} stage.** Nothing reached \`${pull.head.ref}\`.\n\n${inline(applied.detail, 600)}${checks}` }
+}
+
+/** Why a redeploy must not run, when the pull request can be read; undefined lets the service decide. */
+async function redeployProblem(input: CommandRunInput, preview: PreviewKey): Promise<string | undefined> {
+  if (input.github === undefined) return undefined
+  const pull = await input.github.rest('GET', `/repos/${preview.repository}/pulls/${String(preview.pullRequest)}`, pullSchema)
+  if (pull.state !== 'open') return `pull request #${String(preview.pullRequest)} is ${pull.state}.`
+  if (pull.head.repo?.full_name !== preview.repository) {
+    return `pull request #${String(preview.pullRequest)} lives in ${pull.head.repo?.full_name ?? 'a deleted repository'}, not in ${preview.repository}.`
+  }
+  return undefined
 }
 
 /** Tell the deploy service how a publish ended; a service that cannot be told is a log line. */

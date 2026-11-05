@@ -71,8 +71,8 @@ async function showFile(path, before, after, view) {
   graphs.innerHTML = ''
   box.style.display = ''
   const api = await monaco
-  if (editor === undefined) editor = api.editor.createDiffEditor(box, { readOnly: true, automaticLayout: true, originalEditable: false })
-  editor.updateOptions({ renderSideBySide: view !== 'inline' })
+  if (editor === undefined) editor = api.editor.createDiffEditor(box, { readOnly: true, automaticLayout: true, originalEditable: false, wordWrap: 'on', diffWordWrap: 'on' })
+  editor.updateOptions({ renderSideBySide: view !== 'inline', wordWrap: 'on', diffWordWrap: 'on' })
   const previous = editor.getModel()
   editor.setModel({ original: api.editor.createModel(before ?? '', languageOf(path)), modified: api.editor.createModel(after ?? '', languageOf(path)) })
   previous?.original.dispose()
@@ -91,7 +91,7 @@ async function render(state, records) {
   const changed = rows.filter(row => row.status !== 'unchanged')
   const score = record => `${record.subject.id} meanReward ${fmt(record.metrics.values.meanReward)}`
   document.getElementById('summary').innerHTML = `<p><span class="mono">${short(from.producer.commit)}</span> ${escape(from.producer.message)} <span class="muted">(${day(from.createdAt)}, ${score(from)})</span><br>→ <span class="mono">${short(to.producer.commit)}</span> ${escape(to.producer.message)} <span class="muted">(${day(to.createdAt)}, ${score(to)})</span></p>
-    <p>${from.producer.snapshot === to.producer.snapshot ? 'The Action was the same in both runs.' : `${changed.length} of ${rows.length} file(s) changed.`} <a href="compare.html?base=${encodeURIComponent(from.id)}&head=${encodeURIComponent(to.id)}">Compare the scores</a></p>`
+    <p>${from.producer.snapshot === to.producer.snapshot ? 'The Action was the same in both runs.' : `${changed.length} / ${rows.length} files changed.`} <a href="compare.html?base=${encodeURIComponent(from.id)}&head=${encodeURIComponent(to.id)}">Compare the scores</a></p>`
   if (state.file === undefined || !paths.includes(state.file)) state.file = changed[0]?.path ?? paths[0]
   const entry = row => `<a href="#" data-path="${escape(row.path)}" class="mono${row.path === state.file ? ' selected' : ''}">${escape(row.path.slice(row.path.indexOf('/') + 1) || row.path)}</a>${row.status === 'unchanged' ? '' : ` <span class="${row.status === 'modified' ? '' : 'muted'}">${row.status === 'modified' ? '' : row.status}</span> <span class="improvement">+${row.add}</span> <span class="regression">−${row.del}</span>${bar(row.add, row.del)}`}`
   const groups = GROUPS.map(([prefix, title]) => [title, rows.filter(row => groupOf(row.path) === prefix)]).filter(([, members]) => members.length > 0)
@@ -118,7 +118,7 @@ try {
   const index = await loadIndex()
   const records = index.records
   if (records.length === 0) throw new Error('No record has been published yet.')
-  const label = record => `${short(record.producer.commit)} · ${record.subject.id} · ${day(record.createdAt)} · ${record.producer.message.slice(0, 60)}`
+  const label = record => `${short(record.producer.commit)} · ${record.subject.id} · ${day(record.createdAt)}`
   const state = { from: params.get('from'), to: params.get('to'), file: params.get('file') ?? undefined, view: params.get('view') ?? 'side-by-side' }
   // `range=latest`, or a missing side: the newest record, and the newest earlier one whose Action differs.
   if (params.get('range') === 'latest' || !records.some(record => record.id === state.to)) state.to = records[0].id

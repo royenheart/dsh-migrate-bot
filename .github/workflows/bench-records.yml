@@ -37,13 +37,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      # Until the first records are pushed there is nothing to build.
+      # The wiki still publishes before the first record; the report shows its empty state.
       - id: records
         run: |
           if git ls-remote --exit-code --heads origin bench/records > /dev/null; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::origin has no bench/records branch yet, so there is no report to publish"
+            status=$?
+            if [ "$status" -eq 2 ]; then
+              echo "::notice::origin has no bench/records branch yet; publishing the empty report and wiki"
+            else
+              echo "::error::could not inspect origin/bench/records (git exit $status)"
+              exit "$status"
+            fi
           fi
       - if: steps.records.outputs.present == 'true'
         uses: actions/checkout@v4
@@ -51,20 +57,17 @@ jobs:
           ref: bench/records
           path: .bench/records
           persist-credentials: false
-      - if: steps.records.outputs.present == 'true'
-        uses: actions/setup-node@v4
+      - if: steps.records.outputs.present != 'true'
+        run: mkdir -p .bench/records
+      - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - if: steps.records.outputs.present == 'true'
-        run: npm ci
-      - if: steps.records.outputs.present == 'true'
-        run: npm run site -- --field
+      - run: npm ci
+      - run: npm run site -- --field
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - if: steps.records.outputs.present == 'true'
-        uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: .bench/site
       - id: deploy
-        if: steps.records.outputs.present == 'true'
         uses: actions/deploy-pages@v4

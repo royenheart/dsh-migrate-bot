@@ -31,9 +31,24 @@ export async function loadArtifact(id, path) {
 export const loadField = () => json('data/field.json')
 
 export function nav(current) {
-  const pages = [['index.html', 'Trend'], ['compare.html', 'Compare'], ['changes.html', 'Changes'], ['task.html', 'Task'], ['diff.html', 'Diff'], ['field.html', 'Field']]
   const header = document.createElement('header')
-  header.innerHTML = `<strong>dsh-migrate benchmark</strong>${pages.map(([href, label]) => `<a href="${href}"${label === current ? ' aria-current="page"' : ''}>${label}</a>`).join('')}`
+  header.className = 'site-header'
+  const benchmark = current === 'Overview' || current === 'Changes'
+  const page = name => current === name ? ' aria-current="page"' : ''
+  header.innerHTML = `
+    <div class="topbar">
+      <a class="brand" href="index.html">dsh-migrate</a>
+      <nav aria-label="Primary">
+        <a id="benchmark-area" href="index.html"${benchmark ? ' aria-current="true"' : ''}>Benchmark</a>
+        <a href="inspect.html"${page('Run evidence')}>Run evidence</a>
+        <a href="wiki.html"${page('Wiki')}>Wiki</a>
+      </nav>
+    </div>
+    ${benchmark ? `
+      <nav class="section-nav" aria-labelledby="benchmark-area">
+        <a href="index.html"${page('Overview')}>Overview</a>
+        <a href="changes.html"${page('Changes')}>Changes</a>
+      </nav>` : ''}`
   document.body.prepend(header)
 }
 

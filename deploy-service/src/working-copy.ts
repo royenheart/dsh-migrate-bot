@@ -59,6 +59,33 @@ export async function git(tree: Tree, args: readonly string[], env: NodeJS.Proce
   return { ok: result.code === 0, stdout: result.stdoutBytes, detail: detail === '' ? `git ${args[0] ?? ''} exited ${String(result.code)}` : detail.slice(0, 1000) }
 }
 
+/**
+ * Resolve a pull request's current head from the remote, without cloning it.
+ *
+ * A command handler has no checkout, and the last webhook event may be older
+ * than the branch. `git ls-remote` asks the remote for `refs/pull/<n>/head`
+ * directly; for a public GitHub repository it needs no credential.
+ * @param cloneUrl - the repository's clone URL, from the webhook or the marker.
+ * @param pullRequest - the pull request number.
+ * @returns the current head, or why it could not be read.
+ */
+export async function pullRequestHead(cloneUrl: string, pullRequest: number): Promise<{ ok: true; sha: string } | { ok: false; detail: string }> {
+  const ref = `refs/pull/${String(pullRequest)}/head`
+  const result = await runProcess('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'maintenance.auto=false', 'ls-remote', '--exit-code', cloneUrl, ref], {
+    timeoutMs: 60_000,
+    maxBytes: 1024 * 1024,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+  })
+  if (result.code !== 0) {
+    const detail = result.killed !== undefined ? `killed (${result.killed})` : result.error ?? (result.stderr.trim() || result.stdout.trim())
+    return { ok: false, detail: detail === '' ? `the remote has no ${ref}` : detail.slice(0, 1000) }
+  }
+  const line = result.stdoutBytes.toString('utf8').split('\n').map(line => line.trim()).find(line => line.endsWith(`\t${ref}`))
+  const match = line === undefined ? null : /^([0-9a-f]{40})\t/.exec(line)
+  if (match?.[1] === undefined) return { ok: false, detail: `the remote answered ${ref} without a full commit id` }
+  return { ok: true, sha: match[1] }
+}
+
 /** Directories a dependency install creates, which are never part of a preview's change. */
 const EXCLUDED = ['node_modules/', '.npm/']
 

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import { readJson, writeJson } from './files.ts'
 import { failure, json, type Answer } from './http.ts'
-import { carry, checkout, excludeBuildOutput, freeze, git, type Tree } from './working-copy.ts'
+import { carry, checkout, excludeBuildOutput, freeze, git, pullRequestHead, type Tree } from './working-copy.ts'
 import type { InstanceProvider, InstanceSpec, RunningInstance } from './providers/types.ts'
 
 /**
@@ -26,8 +26,10 @@ import type { InstanceProvider, InstanceSpec, RunningInstance } from './provider
  * directory, mounted nowhere), `home/` (the instance's dsh home), `state/` (the
  * launcher's ready file), `sockets/` (the instance's Unix sockets),
  * `revisions/<revision>.diff`, and `unapplied/` (changes that did not carry onto
- * a new head). `DATA_DIR/pull-requests/<id>.json` remembers a pull request that
- * was closed or refused, so a late event does not bring its preview back.
+ * a new head). `DATA_DIR/pull-requests/<id>.json` remembers a pull request's
+ * state after its preview directory is gone: open, expired, destroyed, refused
+ * or closed. It carries the clone URL, so a redeploy can resolve the current
+ * head and rebuild an expired or destroyed preview.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -84,8 +86,19 @@ const recordSchema = z.object({
 
 export type PreviewRecord = z.output<typeof recordSchema>
 
-/** A pull request that has no preview on purpose. */
-const markerSchema = z.object({ closed: z.boolean(), detail: z.string() })
+/** What a marker remembers after the preview directory is gone. */
+const markerStateSchema = z.enum(['open', 'expired', 'destroyed', 'refused', 'closed'])
+export type MarkerState = z.output<typeof markerStateSchema>
+
+/** A pull request's state without a preview: the reason it has none, and how to rebuild it. */
+const markerSchema = z.object({
+  closed: z.boolean(),
+  detail: z.string(),
+  state: markerStateSchema.optional(),
+  cloneUrl: z.string().optional(),
+  headSha: z.string().optional(),
+})
+type Marker = z.output<typeof markerSchema>
 
 export interface PreviewKey {
   repository: string
@@ -115,6 +128,8 @@ export interface PreviewManagerOptions {
   ttlDays: number
   idleMinutes: number
   provider: InstanceProvider
+  /** The provider kind decides whether a missing marker may derive a GitHub clone URL. */
+  providerKind: 'docker' | 'process'
   log: (message: string) => void
 }
 
@@ -186,8 +201,41 @@ export class PreviewManager {
     return record
   }
 
-  private marker(id: string): z.output<typeof markerSchema> | undefined {
+  private marker(id: string): Marker | undefined {
     return readJson(join(this.markers, `${id}.json`), markerSchema)
+  }
+
+  /** The state a marker names, including markers written before `state` existed. */
+  private markerState(marker: Marker | undefined): MarkerState | undefined {
+    if (marker === undefined) return undefined
+    if (marker.state !== undefined) return marker.state
+    if (marker.closed) return 'closed'
+    // An old marker without a state and without a clone URL is a refusal.
+    return marker.cloneUrl === undefined ? 'refused' : 'open'
+  }
+
+  private writeMarker(id: string, marker: Marker): void {
+    writeJson(join(this.markers, `${id}.json`), marker)
+  }
+
+  /**
+   * Where a preview with no marker may fetch its repository from.
+   *
+   * The reference service previews public GitHub repositories; a preview that
+   * predates markers has no clone URL left. Reconstructing the canonical URL is
+   * safe only for the docker provider, whose clone URLs are `https:` GitHub
+   * URLs; the process provider's local paths cannot be guessed.
+   * @param key - the pull request.
+   */
+  private deriveCloneUrl(key: PreviewKey): string | undefined {
+    return this.options.providerKind === 'docker' ? `https://github.com/${key.repository}.git` : undefined
+  }
+
+  /** The current head of a pull request, or why it could not be read. */
+  private async resolveHead(key: PreviewKey, cloneUrl: string): Promise<{ ok: true; sha: string } | { ok: false; detail: string }> {
+    const resolved = await pullRequestHead(cloneUrl, key.pullRequest)
+    if (!resolved.ok) this.options.log(`pull request ${key.repository}#${String(key.pullRequest)}: could not resolve its head: ${resolved.detail}`)
+    return resolved
   }
 
   /** Run `work` after every earlier locked operation on the same preview. */
@@ -250,6 +298,7 @@ export class PreviewManager {
           revisions: [],
         }
       : { ...existing, cloneUrl: event.cloneUrl, headSha: event.headSha })
+    this.writeMarker(id, { closed: false, detail: '', state: 'open', cloneUrl: event.cloneUrl, headSha: event.headSha })
     this.rebuild(id)
     return record
   }
@@ -262,7 +311,7 @@ export class PreviewManager {
   refuse(key: PreviewKey, reason: string): void {
     const id = previewId(key)
     if (this.marker(id)?.closed === true) return
-    writeJson(join(this.markers, `${id}.json`), { closed: false, detail: reason })
+    this.writeMarker(id, { closed: false, detail: reason, state: 'refused' })
     this.options.log(`pull request ${key.repository}#${String(key.pullRequest)}: no preview: ${reason}`)
   }
 
@@ -273,8 +322,14 @@ export class PreviewManager {
    */
   async close(key: PreviewKey): Promise<boolean> {
     const id = previewId(key)
-    writeJson(join(this.markers, `${id}.json`), { closed: true, detail: 'The pull request is closed.' })
-    if (!this.records.has(id)) return false
+    const record = this.records.get(id)
+    this.writeMarker(id, {
+      closed: true,
+      detail: 'The pull request is closed.',
+      state: 'closed',
+      ...(record === undefined ? {} : { cloneUrl: record.cloneUrl, headSha: record.headSha }),
+    })
+    if (record === undefined) return false
     await this.remove(id, 'removed because the pull request was closed')
     return true
   }
@@ -376,7 +431,7 @@ export class PreviewManager {
         } else {
           const checked = await this.options.provider.build(this.spec(id), candidate.workTree)
           if (!checked.ok) {
-            return { ok: false, detail: `The new head passed the boot check, but not with the working copy's change carried onto it, so the previous build keeps serving. ${checked.detail}` }
+            return { ok: false, detail: `The new head passed the check, but not with the working copy's change carried onto it, so the previous build keeps serving. ${checked.detail}` }
           }
           const excluded = await excludeBuildOutput(candidate)
           if (!excluded.ok) return { ok: false, detail: `What the build created could not be kept out of the working copy's change: ${excluded.detail}` }
@@ -475,7 +530,7 @@ export class PreviewManager {
     const record = this.find(key)
     if (record !== undefined) return json(200, this.state(record))
     const marker = this.marker(previewId(key))
-    return json(200, { state: 'none', ...(marker === undefined ? {} : { detail: marker.detail }) })
+    return json(200, { state: 'none', ...(marker === undefined || marker.detail === '' ? {} : { detail: marker.detail }) })
   }
 
   /**
@@ -486,16 +541,42 @@ export class PreviewManager {
   async request(key: PreviewKey, body: unknown): Promise<Answer> {
     const parsed = requestSchema.safeParse(body)
     if (!parsed.success) return failure(400, `invalid request: ${parsed.error.issues.map(issue => `${issue.path.join('.')} ${issue.message}`).join('; ')}`)
-    const record = this.find(key)
-    if (record === undefined) {
-      return failure(404, `no preview for ${key.repository}#${String(key.pullRequest)}; the deploy service creates one from the pull request's webhook event`)
-    }
     const request = parsed.data
+    const record = this.find(key)
+    const marker = this.marker(previewId(key))
+    const markerState = this.markerState(marker)
+    // A close writes the marker before it removes the record; never rebuild in that window.
+    if (markerState === 'closed') return failure(409, `the pull request ${key.repository}#${String(key.pullRequest)} is closed`)
+    if (record === undefined) {
+      if (request.action !== 'redeploy') {
+        return failure(404, `no preview for ${key.repository}#${String(key.pullRequest)}; the deploy service creates one from the pull request's webhook event`)
+      }
+      if (markerState === 'refused') return failure(409, marker?.detail ?? 'this pull request is not previewed')
+      const cloneUrl = marker?.cloneUrl ?? this.deriveCloneUrl(key)
+      if (cloneUrl === undefined) {
+        return failure(404, `no preview for ${key.repository}#${String(key.pullRequest)}; redeploy needs a marker with its clone URL`)
+      }
+      const head = await this.resolveHead(key, cloneUrl)
+      if (!head.ok) {
+        return failure(404, `no preview for ${key.repository}#${String(key.pullRequest)}; its head could not be read: ${head.detail}`)
+      }
+      const created = this.announce({ ...key, headSha: head.sha, cloneUrl }, false)
+      if (created === undefined) return failure(409, `the pull request ${key.repository}#${String(key.pullRequest)} is closed`)
+      this.options.log(`preview ${created.id}: recreated at ${head.sha.slice(0, 12)}`)
+      return json(202, { state: 'building', headSha: created.headSha })
+    }
     if (request.action === 'redeploy') {
-      // The head is the one the last pull_request event named, never one the
-      // caller supplies: a command handler has no checkout of the branch.
-      this.rebuild(record.id)
-      return json(202, { state: 'building', headSha: record.headSha })
+      // Resolve the current head rather than trusting the last event: a webhook
+      // may be late, and the caller never supplies the head.
+      const resolved = await this.resolveHead(key, record.cloneUrl)
+      const latest = this.records.get(record.id)
+      if (latest === undefined) return failure(404, `no preview for ${key.repository}#${String(key.pullRequest)}`)
+      if (resolved.ok && resolved.sha !== latest.headSha) {
+        this.save({ ...latest, headSha: resolved.sha })
+      }
+      const rebuilt = this.records.get(record.id) ?? latest
+      this.rebuild(rebuilt.id)
+      return json(202, { state: 'building', headSha: rebuilt.headSha })
     }
     if (request.action === 'extend') return this.extend(record, request.days, request.maxTtlDays)
     return await this.locked(record.id, async () => await this.publish(record.id))
@@ -582,7 +663,17 @@ export class PreviewManager {
    */
   async destroy(key: PreviewKey): Promise<Answer> {
     const id = previewId(key)
-    if (!this.records.has(id)) return failure(404, `no preview for ${key.repository}#${String(key.pullRequest)}`)
+    const record = this.records.get(id)
+    if (record === undefined) return failure(404, `no preview for ${key.repository}#${String(key.pullRequest)}`)
+    // A destroy is a removal, not a close: a later redeploy rebuilds a fresh
+    // preview from the pull request's head, without the old working copy.
+    this.writeMarker(id, {
+      closed: false,
+      detail: 'Destroyed; redeploy rebuilds it from the pull request head.',
+      state: 'destroyed',
+      cloneUrl: record.cloneUrl,
+      headSha: record.headSha,
+    })
     await this.remove(id, 'destroyed')
     return json(200, { destroyed: true })
   }
@@ -607,6 +698,13 @@ export class PreviewManager {
   async sweep(now: number = Date.now()): Promise<void> {
     for (const record of this.all()) {
       if (Date.parse(record.expiresAt) <= now) {
+        this.writeMarker(record.id, {
+          closed: false,
+          detail: `Expired at ${record.expiresAt}; redeploy rebuilds it from the pull request head.`,
+          state: 'expired',
+          cloneUrl: record.cloneUrl,
+          headSha: record.headSha,
+        })
         await this.remove(record.id, `expired at ${record.expiresAt}`)
         continue
       }

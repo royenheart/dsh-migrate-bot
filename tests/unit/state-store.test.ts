@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { BADGE_FILE, logPath, migrationFile, parseLog, serializeLog, StateLogError, StateStore, STATE_BRANCH } from '../../src/state/store.ts'
+import { join } from 'node:path'
+import { BADGE_FILE, logPath, migrationFile, parseLog, serializeLog, StateFetchError, StateLogError, StateStore, STATE_BRANCH } from '../../src/state/store.ts'
 import { checkout } from '../support/repository.ts'
 import { input, logOf, proposedEvents } from '../support/migration.ts'
 
@@ -93,6 +94,17 @@ test('a checkout without a remote keeps the state branch as a local ref', () => 
     // A write built on a stale tip is refused rather than moving the ref.
     const stale = store.write(undefined, new Map([[BADGE_FILE, 'x\n']]), 'stale')
     assert.equal(stale.ok, false)
+  } finally {
+    repo.cleanup()
+  }
+})
+
+
+test('a failed fetch is an error, not stale evidence', () => {
+  const repo = checkout()
+  try {
+    repo.git(['remote', 'set-url', 'origin', join(repo.remote, 'missing')])
+    assert.throws(() => new StateStore(repo.work).read(), StateFetchError)
   } finally {
     repo.cleanup()
   }

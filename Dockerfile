@@ -54,6 +54,7 @@ RUN set -eux; \
 # copied from the submodule because a Docker action's build context does not
 # carry submodules. scripts/verify-skills-pin.ts fails when the two drift.
 ARG UPGRADE_SKILL_COMMIT=ef075767b476e8000c716a18f848028eebcd5aef
+ENV DSH_MIGRATE_SKILL_COMMIT=${UPGRADE_SKILL_COMMIT}
 RUN git clone --filter=blob:none --no-checkout https://github.com/oh-my-dsh/dsh-plugin-upgrade-skill.git /opt/dsh-migrate/vendor/upgrade-skill \
   && git -C /opt/dsh-migrate/vendor/upgrade-skill fetch --depth 1 origin "$UPGRADE_SKILL_COMMIT" \
   && git -C /opt/dsh-migrate/vendor/upgrade-skill checkout --detach FETCH_HEAD \

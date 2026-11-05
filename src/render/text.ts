@@ -45,6 +45,8 @@ function collapse(value: string): string {
     .trim()
 }
 
+export const EVIDENCE_URL_LIMIT = 512
+
 /**
  * A URL a target named, or nothing.
  *

@@ -16,7 +16,8 @@ test('an empty file yields the defaults', () => {
     assert.equal(config.checks.boot.timeoutMs, 180_000)
     assert.equal(config.checks.e2e.failurePolicy, 'advisory')
     assert.equal(config.deploy.enabled, false)
-    assert.equal(config.deploy.preview.extendDays, 7)
+    assert.equal(config.deploy.trace, 'summary')
+    assert.equal(config.deploy.preview.extendDays, 14)
     assert.deepEqual(config.reports.channels, {})
   }
 })

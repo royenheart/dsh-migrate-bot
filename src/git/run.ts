@@ -30,7 +30,7 @@ export function git(args: readonly string[], options: GitOptions): SpawnSyncRetu
     encoding: 'utf8',
     maxBuffer: 256 * 1024 * 1024,
     ...(options.input === undefined ? {} : { input: options.input }),
-    ...(options.env === undefined ? {} : { env: options.env }),
+    env: { ...(options.env ?? process.env), LC_ALL: 'C' },
   })
 }
 

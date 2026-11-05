@@ -20,6 +20,7 @@ import { verifyMarkdownWrap } from './verify-md-wrap.ts'
 import { verifyPureCore } from './verify-pure-core.ts'
 import { readReleaseFiles, verifyRelease } from './verify-release.ts'
 import { GLOSSARY, termDocuments, verifyTerms } from './verify-terms.ts'
+import { verifyProposals } from './verify-proposals.ts'
 import { readText } from './repo.ts'
 
 /** What one gate reported. */
@@ -44,6 +45,7 @@ export function runGates(): GateResult[] {
   const changelog = verifyChangelog()
   const skillsPin = verifySkillsPin()
   const priceTable = verifyPriceTable()
+  const proposals = verifyProposals()
   return [
     {
       name: 'changelog',
@@ -85,6 +87,7 @@ export function runGates(): GateResult[] {
           ? `pricing/deepseek.json matches the runtime table (${String(priceTable.ageDays)} days old)`
           : priceTable.violations.map(v => v.detail).join('; '),
     },
+    listed('proposals', 'every proposal has a status and the required sections', proposals.violations.map(v => `${v.file}: ${v.detail}`)),
     listed('terms', 'no replaced word in prose, every term defined once', verifyTerms(termDocuments(), readText(GLOSSARY)).map(v => `${v.file}:${String(v.line)} ${v.detail}`)),
     listed('english', 'every tracked text file is English', verifyEnglish().map(v => `${v.file}:${String(v.line)} ${v.detail}`)),
     listed('md-wrap', 'every Markdown paragraph is one line', verifyMarkdownWrap().map(v => `${v.file}:${String(v.line)} continues a paragraph`)),

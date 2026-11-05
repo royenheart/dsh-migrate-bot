@@ -140,6 +140,31 @@ test('a migration streams its run log, and the comment commands drive a real pre
     repo.git(['checkout', '--quiet', 'main'])
     github.addPull({ number: 1, head: { ref: 'feature', sha: head } })
 
+    // A second pull request whose plugin has a browser half and inserts an
+    // agent-preset row. The headless boot check used to stay pending on
+    // `agentPresets`; the web composition the preview serves provides it.
+    repo.git(['checkout', '--quiet', '-b', 'web-check'])
+    const webManifest = JSON.parse(readFileSync(join(repo.work, 'package.json'), 'utf8')) as { exports: Record<string, string>; dsh: Record<string, unknown> }
+    webManifest.dsh.client = { platform: 'web' }
+    webManifest.exports['./client'] = './src/client.js'
+    writeFileSync(join(repo.work, 'package.json'), `${JSON.stringify(webManifest, null, 2)}\n`)
+    writeFileSync(join(repo.work, 'src', 'client.js'), 'export function apply() {}\n')
+    appendFileSync(join(repo.work, 'cordis.patch.yml'), [
+      '- insert:',
+      '    - id: fixture-agent-preset',
+      "      name: '@deepseek-ai/dsh-agent-preset'",
+      '      config:',
+      '        id: fixture',
+      '        order: 100',
+      '        plugins: []',
+      '',
+    ].join('\n'))
+    repo.git(['add', '-A'])
+    repo.git(['commit', '--quiet', '-m', 'web half with an agent preset'])
+    repo.git(['push', '--quiet', 'origin', 'HEAD:web-check'])
+    const webHead = repo.git(['rev-parse', 'HEAD'])
+    repo.git(['checkout', '--quiet', 'main'])
+
     // The service.
     const dataDir = join(scratch, 'data')
     const service = spawn(process.execPath, [SERVICE], {
@@ -234,6 +259,32 @@ test('a migration streams its run log, and the comment commands drive a real pre
     assert.equal(safe.status, 200)
     assert.match(await safe.text(), /<!doctype html>/i)
 
+    // 2b. A browser-half plugin that inserts an agent preset builds and serves.
+    const webEvent = JSON.stringify({
+      action: 'opened',
+      number: 2,
+      pull_request: { head: { sha: webHead, ref: 'web-check', repo: { full_name: 'acme/plugin' } } },
+      repository: { full_name: 'acme/plugin', clone_url: repo.remote },
+    })
+    const deliveredWeb = await fetch(`${endpoint}/github/webhook`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-GitHub-Event': 'pull_request',
+        'X-GitHub-Delivery': 'delivery-web-1',
+        'X-Hub-Signature-256': `sha256=${createHmac('sha256', SECRET).update(webEvent).digest('hex')}`,
+      },
+      body: webEvent,
+    })
+    assert.equal(deliveredWeb.status, 202)
+    const webReady = await until('the browser-half preview to leave building', 180_000, async () => {
+      const state = await (await call('GET', '/previews/acme%2Fplugin/2')).json() as Record<string, unknown>
+      return state.state === 'building' ? undefined : state
+    })
+    assert.equal(webReady.state, 'ready', `${JSON.stringify(webReady)}\n${serviceLog}`)
+    assert.equal(webReady.headSha, webHead)
+    assert.equal((await call('DELETE', '/previews/acme%2Fplugin/2')).status, 200)
+
     // 3. The comment commands, as the comment job runs them.
     const commandEnv = { ...env, GITHUB_TOKEN: 'ghs_stub', GITHUB_REPOSITORY: 'acme/plugin', GITHUB_API_URL: api.url }
     const comment = async (id: number, body: string): Promise<string> => {
@@ -278,7 +329,9 @@ test('a migration streams its run log, and the comment commands drive a real pre
     assert.deepEqual(reported.checks, [{ check: 'mechanical', outcome: 'pass' }])
 
     assert.match(await comment(105, '/dsh-migrate destroy'), /`destroy` accepted/)
-    assert.deepEqual(await preview(), { state: 'none' })
+    const destroyed = await preview()
+    assert.equal(destroyed.state, 'none')
+    assert.match(String(destroyed.detail), /Destroyed; redeploy rebuilds it/)
     assert.ok(!existsSync(join(dataDir, 'previews', id)))
     assert.deepEqual(readdirSync(join(dataDir, 'previews')), [])
   } finally {

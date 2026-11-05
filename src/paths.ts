@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -8,6 +8,18 @@ import { fileURLToPath } from 'node:url'
  * priced the same way wherever the CLI runs.
  */
 export const PACKAGE_ROOT = resolve(import.meta.dirname, '..', '..')
+
+/** The Action version the report names, or undefined when its package manifest cannot be read. */
+export const PACKAGE_VERSION: string | undefined = (() => {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'))
+    return typeof parsed === 'object' && parsed !== null && typeof (parsed as { version?: unknown }).version === 'string'
+      ? (parsed as { version: string }).version
+      : undefined
+  } catch {
+    return undefined
+  }
+})()
 
 /**
  * Walk up from a compiled or source file until the app root (has fixtures/).

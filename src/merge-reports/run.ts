@@ -1,15 +1,20 @@
+import { PACKAGE_VERSION } from '../paths.ts'
+import { sha256 } from '../observability/manifest.ts'
+import { agentUsage } from '../agents/dsh.ts'
 import { isQuotaError } from '../quota/errors.ts'
 import { channelPrompt } from '../prompts/reports.ts'
 import { inline } from '../render/text.ts'
 import { GitHubClient, type Repository } from '../github/client.ts'
-import { resolveChannels, UPGRADE_SKILL_CHANNEL } from './channels.ts'
+import { MIGRATE_BOT_CHANNEL, resolveChannels, UPGRADE_SKILL_CHANNEL } from './channels.ts'
 import { collectEvidence, type MigrationFiles, type ReportedMigration } from './evidence.ts'
+import { renderMigrateBotReport } from './render.ts'
 import { renderEvidence } from './render.ts'
 import { deliver } from './deliver.ts'
-import { duplicatePayloadSchema, parsePayload, reportPayloadSchema } from './parse.ts'
+import { duplicatePayloadSchema, migrateBotPayloadSchema, parsePayload, reportPayloadSchema } from './parse.ts'
 import type { AgentRunner } from '../agents/types.ts'
 import type { MigrateConfig } from '../config/schema.ts'
 import type { SessionUsage } from '../workflow/model.ts'
+import type { SessionObservation, SessionObserver } from '../observability/session.ts'
 
 /**
  * Send one migration's merge report to one channel.
@@ -32,6 +37,8 @@ export interface ReportDeps {
   workdir: string
   /** Load or unload the community upgrade skills for the next session. */
   syncSkills: (enabled: boolean) => void
+  /** Collects the report session for the run manifest and Langfuse. */
+  observer?: SessionObserver | undefined
   fetchImpl?: typeof fetch | undefined
 }
 
@@ -77,24 +84,50 @@ async function reportToChannel(
     repository: deps.repository,
     migration,
     files: deps.files,
+    ...(PACKAGE_VERSION === undefined ? {} : { actionVersion: PACKAGE_VERSION }),
+    model: {
+      provider: deps.config.agent.provider,
+      model: deps.config.agent.model,
+      thinking: deps.config.agent.thinking,
+      reasoningEffort: deps.config.agent.reasoningEffort,
+    },
     searchCandidates: duplicateCheck,
   })
   const drafts = evidence.patchReports.filter(report => report.kind === 'draft')
   if (duplicateCheck && drafts.length === 0) return { outcome: 'skipped', detail: 'the migration wrote no discussion draft' }
 
   deps.syncSkills(channel.id === UPGRADE_SKILL_CHANNEL)
+  const prompt = channelPrompt(channel, renderEvidence(evidence, { includeCandidates: duplicateCheck }))
+  const startedAt = new Date().toISOString()
+  const observations: SessionObservation[] = []
   let session
   try {
     session = await deps.agent.run({
       kind: 'report',
-      prompt: channelPrompt(channel, renderEvidence(evidence, { includeCandidates: duplicateCheck })),
+      prompt,
       workdir: deps.workdir,
       agent: deps.config.agent,
       apiKey: deps.apiKey,
+      onObservation: observation => { observations.push(observation) },
     })
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
-    return { outcome: 'failed', detail: isQuotaError(error) ? `spend cap: ${detail}` : detail }
+    const progress = agentUsage(error)
+    const usage = progress === undefined ? undefined : { inputTokens: progress.inputTokens, outputTokens: progress.outputTokens, cacheHitTokens: progress.cacheHitTokens, ...(progress.costUsd === undefined ? {} : { usd: progress.costUsd }) }
+    deps.observer?.record({
+      kind: 'report',
+      name: `report-${channel.id}`,
+      prompt,
+      promptSha256: sha256(prompt),
+      startedAt,
+      endedAt: new Date().toISOString(),
+      outcome: isQuotaError(error) ? 'spend-cap' : 'failed',
+      ...(usage === undefined ? {} : { usage }),
+      ...(progress === undefined ? {} : { progress: { turns: progress.turns, steps: progress.steps, elapsedSeconds: progress.elapsedSeconds } }),
+      toolCalls: observations.filter(observation => observation.type === 'tool-call').length,
+      observations,
+    })
+    return { outcome: 'failed', detail: isQuotaError(error) ? `spend cap: ${detail}` : detail, ...(usage === undefined ? {} : { usage }) }
   }
   const usage = session.usage === undefined
     ? undefined
@@ -105,10 +138,34 @@ async function reportToChannel(
       ...(session.usage.costUsd === undefined ? {} : { usd: session.usage.costUsd }),
     }
   progress.usage = usage
+  deps.observer?.record({
+    kind: 'report',
+    name: `report-${channel.id}`,
+    prompt,
+    promptSha256: sha256(prompt),
+    startedAt,
+    endedAt: new Date().toISOString(),
+    outcome: 'completed',
+    output: session.report,
+    ...(usage === undefined ? {} : { usage }),
+    ...(session.usage === undefined
+      ? {}
+      : { progress: { turns: session.usage.turns, steps: session.usage.steps, elapsedSeconds: session.usage.elapsedSeconds } }),
+    toolCalls: observations.filter(observation => observation.type === 'tool-call').length,
+    observations,
+  })
   const client = new GitHubClient(token, deps.env, deps.fetchImpl)
 
   // The payload is the last fenced JSON block of everything the session printed; the report the runner extracts is its first plain or markdown block.
   if (!duplicateCheck) {
+    if (channel.id === MIGRATE_BOT_CHANNEL) {
+      const parsed = parsePayload(session.raw, migrateBotPayloadSchema)
+      if (!parsed.ok) return { outcome: 'failed', detail: parsed.reason, usage }
+      const rendered = renderMigrateBotReport(evidence, parsed.value)
+      if (mode === 'dry-run') return { outcome: 'dry-run', detail: `${rendered.title}\n\n${rendered.body.slice(0, 1_200)}`, usage }
+      const url = await deliver(client, channel, rendered)
+      return { outcome: 'delivered', detail: `${channel.method} created in ${channel.repo}`, url, usage }
+    }
     const parsed = parsePayload(session.raw, reportPayloadSchema)
     if (!parsed.ok) return { outcome: 'failed', detail: parsed.reason, usage }
     if (mode === 'dry-run') return { outcome: 'dry-run', detail: `${parsed.value.title}\n\n${parsed.value.body.slice(0, 1_200)}`, usage }

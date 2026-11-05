@@ -154,8 +154,9 @@ export function documentAnchors(source: string): Set<string> {
  */
 export function headingsOf(source: string): Heading[] {
   const fenced = fencedLines(source)
+  const visible = source.replace(/<!--[\s\S]*?-->/g, comment => comment.replace(/[^\n]/g, ' '))
   const headings: Heading[] = []
-  for (const [index, line] of source.split('\n').entries()) {
+  for (const [index, line] of visible.split('\n').entries()) {
     if (fenced[index] === true) continue
     const match = /^(#{1,6})\s+(.*?)\s*$/.exec(line)
     if (match?.[1] === undefined || match[2] === undefined) continue

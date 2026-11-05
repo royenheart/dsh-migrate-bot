@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { validateRecords } from '../../scripts/bench.ts'
 import { botSnapshot, checkSnapshot, storeSnapshot } from '../../scripts/snapshot.ts'
 import { attemptOf, finished, outcomeOf, type TrialResult } from '../../src/evaluation/harbor.ts'
-import { AGENT_TIMEOUT, bootstrap, compare, computeMetrics, MIN_PAIRED_TASKS, taskScores, type MetricInput } from '../../src/evaluation/metrics.ts'
+import { AGENT_TIMEOUT, bootstrap, compare, computeMetrics, MIN_PAIRED_TASKS, pairedTaskCount, taskScores, type MetricInput } from '../../src/evaluation/metrics.ts'
 import type { Attempt, BenchmarkRecord, TaskEntry } from '../../src/evaluation/record.ts'
 
 const task = (id: string, extra: Partial<TaskEntry> = {}): TaskEntry => ({ id, family: id[0] ?? 'M', networkMode: 'public', agentTimeoutSec: 1800, applicable: true, feasible: true, ...extra })
@@ -84,6 +84,15 @@ test('bootstrap intervals are deterministic and bracket the estimate', () => {
   assert.deepEqual(first, bootstrap(values, statistic))
   assert.ok(first !== undefined && first[0] < statistic(values) && statistic(values) < first[1])
   assert.equal(bootstrap([1], statistic), undefined)
+})
+
+test('the comparable pair count is the intersection of scored tasks', () => {
+  const tasks = [task('M1'), task('M2'), task('M3')]
+  const base = run(tasks, [attempt('M1', 1), attempt('M2', 0)])
+  const head = run(tasks, [attempt('M1', 1), attempt('M3', 1)])
+  assert.equal(pairedTaskCount(base, head), 1)
+  assert.equal(pairedTaskCount(base, run([task('M1')], [attempt('M1', 1)])), 1)
+  assert.equal(pairedTaskCount(base, run([task('M3')], [attempt('M3', 1)])), 0)
 })
 
 test('a paired comparison reports a regression only when its interval excludes zero', () => {

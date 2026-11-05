@@ -1,6 +1,6 @@
 import { day, escape, fail, loadArtifact, loadIndex, loadRecord, nav, params, select, setParams, short } from './common.js'
 
-nav('Diff')
+nav('Changes')
 
 const MONACO = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs'
 const monaco = new Promise((resolve) => {
@@ -69,6 +69,9 @@ try {
   const index = await loadIndex()
   if (index.records.length === 0) throw new Error('No record has been published yet.')
   const subjects = [...new Set(index.records.map(record => record.subject.id))]
+  let pairPinned = params.get('from') !== null && params.get('to') !== null
+  let pairChanged = false
+  let taskPinned = params.get('task') !== null
   const state = {
     subject: subjects.includes(params.get('subject')) ? params.get('subject') : subjects[0],
     task: params.get('task'),
@@ -81,25 +84,52 @@ try {
   }
   const update = async (change) => {
     Object.assign(state, change)
-    const records = index.records.filter(record => record.subject.id === state.subject)
-    const tasks = [...new Set(records.flatMap(record => record.suite.tasks.map(task => task.id)))].sort()
-    if (!tasks.includes(state.task)) state.task = tasks[0]
+    const requestedPair = pairPinned && state.from !== undefined && state.to !== undefined && index.records.some(record => record.id === state.from) && index.records.some(record => record.id === state.to)
+    const records = requestedPair ? index.records : index.records.filter(record => record.subject.id === state.subject)
+    const pairRecords = requestedPair ? index.records.filter(record => record.id === state.from || record.id === state.to) : []
+    const pairTaskIds = pairRecords.map(record => new Set(record.suite.tasks.map(task => task.id)))
+    const pairTasks = pairRecords.length < 2 ? [] : [...pairTaskIds[0] ?? []].filter(task => pairTaskIds[1]?.has(task) === true).sort()
+    const tasks = requestedPair ? pairTasks : [...new Set(records.flatMap(record => record.suite.tasks.map(task => task.id)))].sort()
+    if (!taskPinned) state.task = tasks[0]
+    if (requestedPair && pairChanged && tasks.length > 0 && !tasks.includes(state.task)) {
+      taskPinned = false
+      state.task = tasks[0]
+      pairChanged = false
+    }
+    if (!requestedPair && !taskPinned && !tasks.includes(state.task)) state.task = tasks[0]
     const holding = records.filter(record => record.suite.tasks.some(task => task.id === state.task))
     // `range=latest`, or a missing side, selects the two newest records of the subject.
-    if (params.get('range') === 'latest' || !holding.some(record => record.id === state.to)) state.to = holding[0]?.id
-    if (params.get('range') === 'latest' || !holding.some(record => record.id === state.from)) state.from = holding[1]?.id ?? holding[0]?.id
+    if (!requestedPair) {
+      if (params.get('range') === 'latest' || !holding.some(record => record.id === state.to)) state.to = holding[0]?.id
+      if (params.get('range') === 'latest' || !holding.some(record => record.id === state.from)) state.from = holding[1]?.id ?? holding[0]?.id
+    }
     params.delete('range')
     const [from, to] = await Promise.all([loadRecord(state.from), loadRecord(state.to)])
     const attemptsOf = record => record.attempts.filter(attempt => attempt.task === state.task).map(attempt => [String(attempt.attempt), String(attempt.attempt)])
     const artifacts = [...new Set([from, to].flatMap(record => record.attempts.filter(attempt => attempt.task === state.task).flatMap(attempt => Object.keys(attempt.artifacts))))].sort()
     if (!artifacts.includes(state.artifact)) state.artifact = artifacts[0] ?? state.artifact
-    const options = holding.map(record => [record.id, `${short(record.producer.commit)} · ${day(record.createdAt)}`])
-    select('subject', subjects.map(id => [id, id]), state.subject, value => update({ subject: value }).catch(fail))
-    select('task', tasks.map(id => [id, id]), state.task, value => update({ task: value }).catch(fail))
+    const chosen = requestedPair ? index.records.filter(record => record.id === state.from || record.id === state.to) : []
+    const optionRecords = [...new Map([...holding, ...chosen].map(record => [record.id, record])).values()]
+    const options = optionRecords.map(record => [record.id, `${short(record.producer.commit)} · ${day(record.createdAt)}`])
+    select('subject', subjects.map(id => [id, id]), state.subject, value => {
+      pairPinned = false
+      taskPinned = false
+      update({ subject: value, from: undefined, to: undefined }).catch(fail)
+    })
+    select('task', tasks.map(id => [id, id]), state.task, value => {
+      taskPinned = true
+      update({ task: value }).catch(fail)
+    })
     select('artifact', artifacts.map(name => [name, name]), state.artifact, value => update({ artifact: value }).catch(fail))
     select('view', [['side-by-side', 'side by side'], ['inline', 'inline']], state.view, value => update({ view: value }).catch(fail))
-    select('from', options, state.from, value => update({ from: value }).catch(fail))
-    select('to', options, state.to, value => update({ to: value }).catch(fail))
+    select('from', options, state.from, value => {
+      pairChanged = true
+      update({ from: value }).catch(fail)
+    })
+    select('to', options, state.to, value => {
+      pairChanged = true
+      update({ to: value }).catch(fail)
+    })
     select('fromAttempt', attemptsOf(from), state.fromAttempt, value => update({ fromAttempt: value }).catch(fail))
     select('toAttempt', attemptsOf(to), state.toAttempt, value => update({ toAttempt: value }).catch(fail))
     await render(state)

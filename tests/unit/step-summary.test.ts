@@ -14,6 +14,10 @@ test('a proposed migration names its status, the attempts and the proposal', () 
   assert.match(summary, /Repair attempts: 0/)
   assert.match(summary, /Proposal: https:\/\/github\.com\/acme\/plugin\/pull\/9/)
   assert.match(summary, /Run log stream: https:\/\/deploy\.example\/runs\/1/)
+  const withEvidence = renderStepSummary({ view, pluginName: '@acme/plugin', evidenceUrl: 'https://site.example/inspect.html?data=1' })
+  assert.match(withEvidence, /Run evidence: https:\/\/site\.example\/inspect\.html\?data=1/)
+  const longEvidence = `https://site.example/inspect.html?data=${'x'.repeat(300)}`
+  assert.match(renderStepSummary({ view, pluginName: '@acme/plugin', evidenceUrl: longEvidence }), /Run evidence: https:\/\/site\.example/)
 })
 
 test('a failed migration names the failing check and why it stopped', () => {

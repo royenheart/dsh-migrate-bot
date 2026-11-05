@@ -89,6 +89,7 @@ ${failing.length === 0 ? '' : `\n${failing.map(check => wrapFenced(neutralizeEmb
 
 - [ ] The documented capabilities and entry points still work.
 - [ ] A capability the overlap review marked \`shrink\` or \`retire\` is really covered by the target release.
+- [ ] Merge with a merge commit, and wait for the migration report before deleting \`dsh-migrate/proposal\`.
 `
   return { title, issue, pullRequest }
 }

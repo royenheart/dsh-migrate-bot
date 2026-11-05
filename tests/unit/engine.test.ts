@@ -141,3 +141,24 @@ test('an event for a migration the state branch does not hold is refused', async
     repo.cleanup()
   }
 })
+
+test('live state events are unique transitions and end at the final state', async () => {
+  const repo = checkout()
+  try {
+    const states: string[] = []
+    const live = new InJobEngine({
+      store: new StateStore(repo.work),
+      activities: scripted(proposal(10)),
+      run: 'state-run',
+      log: () => {},
+      onState: state => { states.push(state) },
+      now: () => new Date('2026-10-10T00:00:00Z'),
+    })
+    const view = await live.start('0.2.0', always)
+    assert.deepEqual([...new Set(states)], states)
+    assert.equal(states.at(-1), view.state)
+    assert.equal(states.at(-1), 'awaitingMerge')
+  } finally {
+    repo.cleanup()
+  }
+})

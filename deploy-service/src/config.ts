@@ -25,10 +25,15 @@ export const envSchema = z.object({
   DSH_VERSION: z.string().regex(/^[0-9A-Za-z.+-]+$/, 'must be a dsh version such as 0.2.0-rc.2').optional(),
   DSH_BIN: z.string().refine(isAbsolute, 'must be an absolute path').optional(),
   IDLE_MINUTES: minutes.default(120),
-  TTL_DAYS: z.coerce.number().int().min(1).max(365).default(3),
+  TTL_DAYS: z.coerce.number().int().min(1).max(365).default(7),
+  RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
   PORT: z.coerce.number().int().min(0).max(65535).default(8080),
   HOST: z.string().min(1).default('0.0.0.0'),
   PUBLIC_VIEWS: flag,
+  EVIDENCE_URL: z.preprocess(value => value === '' ? undefined : value, z.url({ protocol: /^https?$/ }).transform(url => url.replace(/\/+$/, '')).refine(url => {
+    const parsed = new URL(url)
+    return !url.includes('?') && !url.includes('#') && parsed.username === '' && parsed.password === ''
+  }, 'must be a base URL without query, fragment or credentials').optional()),
   INSTANCE_PREFIX: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]*$/).default('dsh-preview-'),
 }).superRefine((env, context) => {
   if (env.PROVIDER === 'docker' && env.DSH_IMAGE === undefined) {

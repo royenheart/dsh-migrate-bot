@@ -5,7 +5,7 @@
 // the preview image carries nothing but Node and dsh.
 //
 //   launcher.mjs install   install the plugin's dependencies in PLUGIN_DIR
-//   launcher.mjs check     the keyless boot check of PLUGIN_DIR; prints dsh's output
+//   launcher.mjs check     the keyless check of PLUGIN_DIR; prints dsh's output
 //   launcher.mjs serve     two `dsh web` processes, with and without the plugin;
 //                          writes their loopback ports and launch tokens to STATE_DIR/ready.json
 //   launcher.mjs forward   one Unix socket per `dsh web` in SOCKET_DIR, forwarded to its loopback port
@@ -27,7 +27,7 @@ const pluginDir = env.PLUGIN_DIR ?? '/plugin'
 /** What `dsh web` prints once it listens; the token is its launch token. */
 const READY = /dsh web: (http:\/\/127\.0\.0\.1:(\d+))\/\?token=([A-Za-z0-9_-]+)/
 
-/** The keyless model route of the boot check: a placeholder key and a closed port. */
+/** The keyless model route of the check: a placeholder key and a closed port. */
 const KEYLESS = {
   DEEPSEEK_API_KEY: 'probe-placeholder-key',
   DEEPSEEK_BASE_URL: 'http://127.0.0.1:9/v1',
@@ -73,28 +73,90 @@ function install() {
   run(['run', 'build', '--if-present'])
 }
 
-function check() {
-  const plugin = pluginName()
-  const home = mkdtempSync(join(tmpdir(), 'dsh-preview-check-'))
+/** Whether the plugin root declares a browser half (`dsh.client`). */
+function declaresClient() {
   try {
-    writeProfile(home, 'check', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', plugin], plugin)
-    const result = spawnSync(dsh, ['--profile', 'check', 'ping'], {
+    const manifest = JSON.parse(readFileSync(join(pluginDir, 'package.json'), 'utf8'))
+    const client = manifest?.dsh?.client
+    return typeof client === 'object' && client !== null
+  } catch {
+    return false
+  }
+}
+
+/** The model route is keyless; the launch token is a credential and never reaches the log. */
+function redact(text) {
+  return text.replace(/token=[A-Za-z0-9_-]+/g, 'token=<redacted>')
+}
+
+/** The headless check: boot the plugin and stop at the model call. */
+function checkHeadless(plugin, home) {
+  writeProfile(home, 'check', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', plugin], plugin)
+  const result = spawnSync(dsh, ['--profile', 'check', 'ping'], {
+    cwd: pluginDir,
+    env: { ...env, ...KEYLESS, DSH_HOME: home },
+    encoding: 'utf8',
+    timeout: Number(env.CHECK_TIMEOUT_MS ?? 180_000),
+    killSignal: 'SIGKILL',
+  })
+  process.stdout.write(result.stdout ?? '')
+  process.stderr.write(result.stderr ?? '')
+  if (result.error?.code === 'ETIMEDOUT') {
+    process.stderr.write('dsh-preview: boot check timed out\n')
+    return 124
+  }
+  return result.status ?? 1
+}
+
+/** The web check: load the plugin in the composition `serve` uses and wait for its ready line. */
+function checkWeb(plugin, home) {
+  writeProfile(home, 'check', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', plugin], plugin)
+  return new Promise((resolve) => {
+    const child = spawn(dsh, ['--profile', 'check', '--host', '127.0.0.1', '--port', '0', '--no-open'], {
       cwd: pluginDir,
       env: { ...env, ...KEYLESS, DSH_HOME: home },
-      encoding: 'utf8',
-      timeout: Number(env.CHECK_TIMEOUT_MS ?? 180_000),
-      killSignal: 'SIGKILL',
+      stdio: ['ignore', 'pipe', 'pipe'],
     })
-    process.stdout.write(result.stdout ?? '')
-    process.stderr.write(result.stderr ?? '')
-    if (result.error?.code === 'ETIMEDOUT') {
-      process.stderr.write('dsh-preview: boot check timed out\n')
-      process.exit(124)
+    let output = ''
+    let settled = false
+    const finish = (code) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      process.stdout.write(redact(output))
+      child.kill('SIGTERM')
+      setTimeout(() => { child.kill('SIGKILL') }, 5_000).unref?.()
+      resolve(code)
     }
-    process.exit(result.status ?? 1)
+    const timer = setTimeout(() => {
+      process.stderr.write('dsh-preview: web check timed out\n')
+      finish(124)
+    }, Number(env.CHECK_TIMEOUT_MS ?? 180_000))
+    const onData = (chunk) => {
+      output += String(chunk)
+      if (READY.test(output)) finish(0)
+    }
+    child.stdout.on('data', onData)
+    child.stderr.on('data', onData)
+    child.on('error', (error) => {
+      output += `dsh-preview: ${error.message}\n`
+      finish(1)
+    })
+    // A server that exits cleanly without a ready line has not passed the check.
+    child.on('exit', (code) => { finish(code === 0 ? 1 : code ?? 1) })
+  })
+}
+
+async function check() {
+  const plugin = pluginName()
+  const home = mkdtempSync(join(tmpdir(), 'dsh-preview-check-'))
+  let code
+  try {
+    code = declaresClient() ? await checkWeb(plugin, home) : checkHeadless(plugin, home)
   } finally {
     rmSync(home, { recursive: true, force: true })
   }
+  process.exit(code)
 }
 
 /** Start one `dsh web` and resolve with its port and launch token. */
@@ -178,7 +240,7 @@ async function forward() {
 
 const mode = process.argv[2]
 if (mode === 'install') install()
-else if (mode === 'check') check()
+else if (mode === 'check') await check()
 else if (mode === 'serve') await serve()
 else if (mode === 'forward') await forward()
 else fail(`unknown mode ${String(mode)}; expected install, check, serve or forward`)

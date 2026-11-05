@@ -13,6 +13,22 @@ export const reportPayloadSchema = z.object({
 })
 export type ReportPayload = z.infer<typeof reportPayloadSchema>
 
+/** One finding the migrate-bot report returns as data; the Action renders the body. */
+export const migrateBotFindingSchema = z.object({
+  stage: z.string().trim().min(1).max(40),
+  severity: z.enum(['high', 'medium', 'low']),
+  finding: z.string().trim().min(1).max(2_000),
+  evidence: z.string().trim().min(1).max(4_000),
+  fix: z.string().trim().min(1).max(2_000),
+  attribution: z.enum(['action', 'pre-existing', 'upstream']).default('action'),
+})
+export const migrateBotPayloadSchema = z.object({
+  title: z.string().trim().min(1),
+  findings: z.array(migrateBotFindingSchema).max(10),
+  limits: z.array(z.string().trim().min(1).max(500)).max(3).optional(),
+})
+export type MigrateBotPayload = z.infer<typeof migrateBotPayloadSchema>
+
 export const duplicateDecisionSchema = z.object({
   slug: z.string().min(1),
   post: z.boolean(),

@@ -49,8 +49,9 @@ A consumer configures the Action in `.github/dsh-migrate.yml`. Every key is opti
 | `deploy.endpoint` | URL | — | Base URL of the deploy service. Required when `enabled`. |
 | `deploy.tokenEnv` | string | `DSH_MIGRATE_DEPLOY_TOKEN` | Environment variable holding the deploy service token ([which names reach the Action](../operations/install.md#the-workflow)). |
 | `deploy.logStream` | boolean | `true` | Stream the run log to the deploy service. |
+| `deploy.trace` | `off` \| `summary` \| `full` | `summary` | How much of a session to stream as trace lines: `off`, `summary` (tool names and short results), or `full` (bounded tool arguments and results). |
 | `deploy.commands` | boolean | `true` | Accept `/dsh-migrate` comment commands. |
 | `deploy.preview.enabled` | boolean | `true` | Allow preview deployments. |
-| `deploy.preview.ttlDays` | integer | `7` | Days before a preview deployment is destroyed. |
+| `deploy.preview.ttlDays` | integer | `14` | Days before a preview deployment is destroyed; also the ceiling for `extend`. |
 | `deploy.preview.idleMinutes` | integer | `120` | Minutes without a request before a preview deployment stops. |
 | `deploy.preview.extendDays` | integer | — | Days one `extend` command asks for; at most `ttlDays`, which is also the default. |

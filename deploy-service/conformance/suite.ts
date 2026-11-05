@@ -1,8 +1,9 @@
 import { randomInt } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 import { configSchema } from '#action/config/schema.js'
 import { createDeployClient, deployRequest, parseFrozenRevision, parsePreviewState, type DeployResult, type DeployService, type PreviewKey } from '#action/deploy/client.js'
 import { openLogStream } from '#action/deploy/log-stream.js'
-import { externalUrl } from '#action/render/text.js'
+import { EVIDENCE_URL_LIMIT, externalUrl } from '#action/render/text.js'
 
 /**
  * The deploy service contract, exercised from the Action's side.
@@ -82,6 +83,26 @@ export async function runConformance(options: ConformanceOptions): Promise<Check
     }
     expectOk(await deployRequest({ service, method: 'POST', path: `/runs/${encodeURIComponent(runId)}/finish`, body: { events: 3, attempted: 3, complete: true } }), 'finish')
     return 'three events and a finish'
+  })
+
+  await check('evidence is stored and served under the view policy', async () => {
+    const bundle = {
+      migrationId: 'conformance',
+      runs: [{
+        runId,
+        manifest: { runId, migrationId: 'conformance', startedAt: new Date().toISOString(), workflow: {}, target: {}, sessions: [] },
+        prompts: {},
+      }],
+    }
+    const saved = await deployRequest({ service, method: 'POST', path: `/runs/${encodeURIComponent(runId)}/evidence`, body: bundle })
+    expectOk(saved, 'POST evidence')
+    const named = (saved.body as { url?: unknown } | undefined)?.url
+    if (typeof named !== 'string' || externalUrl(named, EVIDENCE_URL_LIMIT) === undefined) throw new Error('POST evidence named no usable url')
+    const served = await deployRequest({ service, method: 'GET', path: `/view/${encodeURIComponent(runId)}/inspect.json` })
+    expectOk(served, 'GET evidence')
+    if (typeof served.body !== 'object' || served.body === null) throw new Error('evidence was not JSON')
+    if (!isDeepStrictEqual(served.body, bundle)) throw new Error('served evidence differs from the uploaded bundle')
+    return 'stored and served'
   })
 
   await check('the Action\'s run log stream opens, delivers, and seals', async () => {

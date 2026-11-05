@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { parsePatchReport, type PatchReport } from '../github/patch-reports.ts'
+import { runManifestSchema } from '../observability/manifest.ts'
 import { slugOf, type GitHubClient, type Repository } from '../github/client.ts'
 import type { MigrationContext } from '../workflow/machine.ts'
 
@@ -45,15 +46,38 @@ export interface Evidence {
     mergedAt?: string | undefined
     mergedBy?: string | undefined
   }
+  /** The Action release that produced the migration, when its package manifest was readable. */
+  actionVersion?: string | undefined
+  /** The model route the migration's sessions used. */
+  model: { provider: string; model: string; thinking: string; reasoningEffort: string }
   issueUrl: string
   comments: AuthoredComment[]
   /** What changed on the proposal branch after this Action last pushed it. */
   maintainerChanges: { known: true; files: ChangedFile[] } | { known: false; note: string }
+  /** The check lines the proposal body reported. */
+  checks: string[]
   warnings: string[]
   reports: { overlap?: string | undefined; extensionPoints?: string | undefined; repairs: string[] }
   patchReports: PatchReport[]
   /** Existing upstream threads found for each discussion draft. */
   candidates: Array<{ url: string; title: string }>
+  /** What the runs' manifests recorded about agent work, when they exist. */
+  metrics?: RunMetrics | undefined
+  /** The newest Harbor evaluation a manifest recorded. */
+  evaluation?: { harborJob?: string | undefined; trialId?: string | undefined; record?: string | undefined } | undefined
+}
+
+export interface RunMetrics {
+  runs: number
+  sessions: number
+  turns: number
+  steps: number
+  toolCalls: number
+  elapsedSeconds: number
+  inputTokens: number
+  outputTokens: number
+  cacheHitTokens: number
+  usd?: number | undefined
 }
 
 /** What the state branch holds for one migration. */
@@ -80,9 +104,8 @@ const commentSchema = z.object({
   submitted_at: z.string().nullable().optional(),
   path: z.string().optional(),
 })
-const compareSchema = z.object({
-  files: z.array(z.object({ filename: z.string(), status: z.string(), additions: z.number(), deletions: z.number() })).optional(),
-})
+const changedFileSchema = z.object({ filename: z.string(), status: z.string(), additions: z.number(), deletions: z.number() })
+const compareSchema = z.object({ files: z.array(changedFileSchema).optional() })
 const searchSchema = z.object({ items: z.array(z.object({ html_url: z.string(), title: z.string() })) })
 const discussionSearchSchema = z.object({
   search: z.object({ nodes: z.array(z.object({ url: z.string().optional(), title: z.string().optional() }).nullable()) }),
@@ -95,6 +118,10 @@ export async function collectEvidence(input: {
   repository: Repository
   migration: ReportedMigration
   files: MigrationFiles
+  /** The Action release that produced the migration. */
+  actionVersion?: string | undefined
+  /** The model route the migration's sessions used. */
+  model: { provider: string; model: string; thinking: string; reasoningEffort: string }
   /** Search upstream for threads that may already cover a discussion draft. */
   searchCandidates: boolean
 }): Promise<Evidence> {
@@ -125,13 +152,27 @@ export async function collectEvidence(input: {
   comments.sort((left, right) => left.createdAt.localeCompare(right.createdAt))
 
   let maintainerChanges: Evidence['maintainerChanges']
-  try {
-    const compared = pull.head.sha === proposal.headSha
-      ? { files: [] }
-      : await github.rest('GET', `/repos/${repo}/compare/${proposal.headSha}...${pull.head.sha}`, compareSchema)
-    maintainerChanges = { known: true, files: (compared.files ?? []).sort((a, b) => a.filename.localeCompare(b.filename)) }
-  } catch (error) {
-    maintainerChanges = { known: false, note: error instanceof Error ? error.message : String(error) }
+  if (pull.head.sha === proposal.headSha) {
+    maintainerChanges = { known: true, files: [] }
+  } else {
+    try {
+      const compared = await github.rest('GET', `/repos/${repo}/compare/${proposal.headSha}...${pull.head.sha}`, compareSchema)
+      maintainerChanges = { known: true, files: (compared.files ?? []).sort((a, b) => a.filename.localeCompare(b.filename)) }
+    } catch (compareError) {
+      // A squash or rebase merge can rewrite the proposal head; a branch that
+      // is deleted before this runs can then make the compare unreachable. The
+      // pull request's stored file list survives both, so the report keeps its
+      // changed-file table.
+      try {
+        const files = await github.paginate(`/repos/${repo}/pulls/${String(proposal.pullRequest.number)}/files`, changedFileSchema)
+        maintainerChanges = { known: true, files: [...files].sort((a, b) => a.filename.localeCompare(b.filename)) }
+      } catch (filesError) {
+        maintainerChanges = {
+          known: false,
+          note: `${compareError instanceof Error ? compareError.message : String(compareError)}; ${filesError instanceof Error ? filesError.message : String(filesError)}`,
+        }
+      }
+    }
   }
 
   const read = (name: string): string | undefined => input.files.readFile(`migrations/${migration.id}/${name}`)
@@ -146,6 +187,55 @@ export async function collectEvidence(input: {
       const report = parsePatchReport(slug, input.files.readFile(path) ?? '')
       return report === undefined ? [] : [report]
     })
+
+  const metrics: RunMetrics = {
+    runs: 0,
+    sessions: 0,
+    turns: 0,
+    steps: 0,
+    toolCalls: 0,
+    elapsedSeconds: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheHitTokens: 0,
+  }
+  const usd: number[] = []
+  const warnings = [...migration.context.warnings]
+  let evaluation: Evidence['evaluation']
+  let evaluationAt = ''
+  for (const path of input.files.list(`migrations/${migration.id}/runs`)) {
+    if (!path.endsWith('/manifest.json')) continue
+    const text = input.files.readFile(path)
+    if (text === undefined) continue
+    let parsed
+    try {
+      parsed = runManifestSchema.safeParse(JSON.parse(text))
+    } catch (error) {
+      warnings.push(`run manifest ${path} is not JSON: ${error instanceof Error ? error.message : String(error)}`)
+      continue
+    }
+    if (!parsed.success) {
+      warnings.push(`run manifest ${path} does not validate: ${parsed.error.issues.map(issue => issue.message).join('; ')}`)
+      continue
+    }
+    const totals = parsed.data.totals
+    metrics.runs += 1
+    metrics.sessions += totals.sessions
+    metrics.turns += totals.turns
+    metrics.steps += totals.steps
+    metrics.toolCalls += totals.toolCalls
+    metrics.elapsedSeconds += totals.elapsedSeconds
+    metrics.inputTokens += totals.inputTokens
+    metrics.outputTokens += totals.outputTokens
+    metrics.cacheHitTokens += totals.cacheHitTokens
+    if (totals.usd !== undefined) usd.push(totals.usd)
+    const found = parsed.data.evaluation
+    if (found !== undefined && [found.harborJob, found.trialId, found.record].some(value => value !== undefined) && parsed.data.startedAt >= evaluationAt) {
+      evaluation = found
+      evaluationAt = parsed.data.startedAt
+    }
+  }
+  if (usd.length > 0) metrics.usd = usd.reduce((sum, value) => sum + value, 0)
 
   const candidates: Evidence['candidates'] = []
   if (input.searchCandidates) {
@@ -168,9 +258,12 @@ export async function collectEvidence(input: {
       ...(pull.merged_by?.login === undefined ? {} : { mergedBy: pull.merged_by.login }),
     },
     issueUrl: proposal.issue.url,
+    ...(input.actionVersion === undefined ? {} : { actionVersion: input.actionVersion }),
+    model: input.model,
     comments,
     maintainerChanges,
-    warnings: migration.context.warnings,
+    checks: proposalChecks(pull.body ?? ''),
+    warnings,
     reports: {
       overlap: read('reports/overlap.md'),
       extensionPoints: read('reports/extension-points.md'),
@@ -178,7 +271,27 @@ export async function collectEvidence(input: {
     },
     patchReports,
     candidates,
+    ...(metrics.runs === 0 ? {} : { metrics }),
+    ...(evaluation === undefined ? {} : { evaluation }),
   }
+}
+
+/** The check lines under the proposal body's `## Checks` heading. */
+function proposalChecks(body: string): string[] {
+  const checks: string[] = []
+  let inside = false
+  for (const line of body.split(/\r?\n/)) {
+    if (line.trim() === '## Checks') {
+      inside = true
+      continue
+    }
+    if (inside && line.startsWith('## ')) break
+    if (inside && line.startsWith('- ')) {
+      const check = line.slice(2).trim()
+      if (check !== '') checks.push(check)
+    }
+  }
+  return checks.slice(0, 20)
 }
 
 /** Issues, pull requests and discussions upstream whose text matches a draft title. */

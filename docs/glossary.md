@@ -79,3 +79,9 @@ Every document uses these terms as written here and does not redefine them. *Rep
 | **rules** | The instructions in `AGENTS.md` that every agent session in this repository follows. | — | standing orders |
 | **gate** | A deterministic repository check run by `npm run gates`. | `scripts/verify-*.ts` | — |
 | **postmortem** | A dated account of an incident under `docs/postmortems/`. | — | — |
+| **feature catalog** | The table of user-facing capabilities, their entry point, implementation, and owning document. | `docs/features.md` | feature table |
+| **wiki** | The generated documentation site projected from `README.md`, `AGENTS.md`, and `docs/` and served as part of the benchmark report. | `site/wiki.html`, the built site’s `data/wiki.json` and `data/wiki-pages/` | docs site |
+| **design decision** | A binding choice recorded in the Design decisions section of its owning document and linked from `docs/decisions.md`. | Design decisions sections | decision record |
+| **run evidence bundle** | The `inspect.json` payload that carries one migration's runs, manifests, and prompts for the Run evidence page. | `InspectData`, `inspect.json` | inspect data |
+| **design proposal** | An open or parked decision with options, recommendation, acceptance criteria and risks. | `docs/proposals/` | design question |
+| **consumer evidence intake** | The proposed opt-in path that stores a consumer's run evidence privately and derives product signals from it. | `EvidenceSubmission` | feedback upload |

@@ -59,6 +59,12 @@ variable "public_views" {
   default     = false
 }
 
+variable "evidence_url" {
+  description = "Base URL of the benchmark site; when set, a run page's evidence link opens the integrated Run evidence page."
+  type        = string
+  default     = ""
+}
+
 variable "dsh_version" {
   description = "The @deepseek-ai/dsh version the preview image installs."
   type        = string
@@ -81,4 +87,10 @@ variable "conformance_mode" {
   description = "Start the service with --conformance. Only for a throwaway deployment that the conformance suite checks."
   type        = bool
   default     = false
+}
+
+variable "retention_days" {
+  description = "How long run logs and evidence are kept before deletion."
+  type        = number
+  default     = 90
 }

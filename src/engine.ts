@@ -38,6 +38,8 @@ export interface EngineOptions {
   /** The workflow run, recorded in each `started` entry. */
   run: string
   log: (message: string) => void
+  /** The top-level state after each transition, for a live run page. */
+  onState?: ((state: string) => void) | undefined
   now?: () => Date
 }
 
@@ -95,11 +97,22 @@ export class InJobEngine {
     const replayed = replay(this.state.logs.get(id) ?? [])
     if (replayed === undefined) throw new EngineError(`migration ${id} has no started entry`)
     let { snapshot, pending } = replayed
+    let lastState = ''
+    const emitState = (state: string): void => {
+      if (state === lastState) return
+      lastState = state
+      try {
+        this.options.onState?.(state)
+      } catch {
+        // The live page is best effort; it never fails a migration.
+      }
+    }
     const touched = new Set([id])
     let files = new Map<string, string>()
     while (snapshot.status === 'active') {
       const request = pending[0]
       if (request === undefined) break
+      emitState(stateOf(snapshot))
       this.options.log(`${id}: ${stateOf(snapshot)} → ${describe(request)}`)
       const result = await this.execute(request, snapshot.context)
       this.options.log(`${id}: ${outcomeOf(result.event)}`)
@@ -107,6 +120,7 @@ export class InJobEngine {
       for (const [name, content] of result.files ?? []) files.set(migrationFile(id, name), content)
       const [next, actions] = transition(migrationMachine, snapshot, result.event)
       snapshot = next
+      emitState(stateOf(snapshot))
       pending = actions.filter(action => action.type === 'run').map(action => action.params as ActivityRequest)
       if (result.event.type === 'proposal.published' && supersedes !== undefined) {
         this.append(supersedes, { kind: 'event', at: this.now().toISOString(), event: { type: 'proposal.superseded', by: id } })
@@ -118,6 +132,7 @@ export class InJobEngine {
       }
     }
     this.persist(touched, files, `dsh-migrate: ${id} ${stateOf(snapshot)}`)
+    emitState(stateOf(snapshot))
     this.options.log(`${id}: ${stateOf(snapshot)}`)
     const view = this.status().migrations.find(migration => migration.id === id)
     if (view === undefined) throw new EngineError(`migration ${id} vanished from the projection`)

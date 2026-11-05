@@ -33,6 +33,8 @@ export interface ServiceDeps {
 
 /** The largest API request body; a run event is far smaller. */
 const API_BODY_LIMIT = 1024 * 1024
+/** The largest evidence bundle; prompts and manifests are text. */
+const EVIDENCE_BODY_LIMIT = 8 * 1024 * 1024
 /** The largest webhook body GitHub sends. */
 const WEBHOOK_BODY_LIMIT = 25 * 1024 * 1024
 /** How long a `slow` conformance answer waits: past the Action's twenty seconds. */
@@ -58,8 +60,8 @@ function previewKey(repository: string | undefined, pullRequest: string | undefi
   return { repository, pullRequest: Number(pullRequest) }
 }
 
-async function jsonBody(req: IncomingMessage): Promise<unknown> {
-  const body = await readBody(req, API_BODY_LIMIT)
+async function jsonBody(req: IncomingMessage, limit = API_BODY_LIMIT): Promise<unknown> {
+  const body = await readBody(req, limit)
   if (body.length === 0) return undefined
   return JSON.parse(body.toString('utf8'))
 }
@@ -80,6 +82,7 @@ export function createService(deps: ServiceDeps): Server {
       if (first === undefined && second === undefined) return runs.open(await jsonBody(req))
       if (first !== undefined && second === 'events' && third === undefined) return runs.append(first, await jsonBody(req))
       if (first !== undefined && second === 'finish' && third === undefined) return runs.finish(first, await jsonBody(req))
+      if (first !== undefined && second === 'evidence' && third === undefined) return runs.saveEvidence(first, await jsonBody(req, EVIDENCE_BODY_LIMIT))
       return failure(404, 'no such run path')
     }
     const key = previewKey(first, second)
@@ -176,9 +179,11 @@ export function createService(deps: ServiceDeps): Server {
       return send(res, await webhook(req))
     }
     if (root === 'view' || root === 'p') {
-      if (!mayView(req)) return send(res, { ...failure(401, 'this page needs the deploy token, or an identity-aware proxy in front of the service with PUBLIC_VIEWS=true'), headers: { 'WWW-Authenticate': 'Bearer' } })
+      if (!mayView(req)) return send(res, { ...failure(401, 'this page needs the deploy token, or an identity-aware proxy in front of the service with PUBLIC_VIEWS=true'), headers: { 'WWW-Authenticate': 'Bearer', ...(root === 'view' ? runs.corsHeaders() : {}) } })
       if (root === 'view') {
-        if (req.method !== 'GET' || parts.length !== 2 || parts[1] === undefined) return send(res, failure(404, 'no such page'))
+        if (req.method !== 'GET' || parts[1] === undefined) return send(res, failure(404, 'no such page'))
+        if (parts.length === 3 && parts[2] === 'inspect.json') return send(res, runs.evidence(parts[1]))
+        if (parts.length !== 2) return send(res, failure(404, 'no such page'))
         return send(res, runs.page(parts[1]))
       }
       const target = proxyTarget(url.pathname, url.search)

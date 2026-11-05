@@ -16,8 +16,17 @@ import type { z } from 'zod'
  * @param value - the record.
  */
 export function writeJson(path: string, value: unknown): void {
+  writeJsonText(path, `${JSON.stringify(value, null, 2)}\n`)
+}
+
+/** Write one compact JSON value atomically; evidence uses its byte count as the storage bound. */
+export function writeJsonCompact(path: string, value: unknown): void {
+  writeJsonText(path, JSON.stringify(value))
+}
+
+function writeJsonText(path: string, text: string): void {
   const temporary = `${path}.${String(process.pid)}.tmp`
-  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 })
+  writeFileSync(temporary, text, { mode: 0o600 })
   renameSync(temporary, path)
 }
 

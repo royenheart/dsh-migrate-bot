@@ -238,6 +238,12 @@ export interface Comparison {
  * {@link MIN_PAIRED_TASKS} the resamples repeat a handful of values and the
  * interval says nothing, so the pair is not comparable.
  */
+/** The tasks both records scored, which a paired comparison can use. */
+export function pairedTaskCount(base: MetricInput, head: MetricInput): number {
+  const before = new Set(taskScores(base).map(score => score.task))
+  return taskScores(head).filter(score => before.has(score.task)).length
+}
+
 export function compare(base: MetricInput, head: MetricInput): Comparison[] {
   const before = new Map(taskScores(base).map(score => [score.task, score]))
   const pairs = taskScores(head).flatMap((score) => {

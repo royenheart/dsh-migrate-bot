@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run evidence · dsh-migrate</title>
+<link rel="stylesheet" href="assets/site.css">
+<script src="https://cdn.jsdelivr.net/npm/diff@7.0.0/dist/diff.min.js"></script>
+</head>
+<body>
+<main>
+  <div class="page-head">
+    <div>
+      <div class="eyebrow">Run evidence</div>
+      <h1>Prompts and workflows</h1>
+      <p>Load an <code>inspect.json</code> from <code>dsh-migrate inspect --json</code>. Both workflows follow the selected stage.</p>
+    </div>
+  </div>
+
+  <section id="loader" class="panel loader">
+    <div class="panel-head"><h2>Load evidence</h2><span class="muted">JSON stays in this browser</span></div>
+    <div class="panel-body">
+      <div class="row">
+        <label class="field">Evidence file<input id="file" type="file" accept="application/json,.json"></label>
+        <label class="field">Or URL<input id="url" type="url" placeholder="https://…/inspect.json" size="42"></label>
+        <button id="load-url" type="button" class="primary">Load URL</button>
+      </div>
+      <p id="loader-error" class="warning" hidden></p>
+      <p class="muted">Generate the bundle where the repository is checked out, then load it here. The file stays in the browser.</p>
+    </div>
+  </section>
+
+  <section id="view" hidden>
+    <div class="inspect-controls controls">
+      <label>From<select id="from"></select></label>
+      <label>To<select id="to"></select></label>
+      <label>Stage<select id="session"></select></label>
+      <button id="jump" type="button">Jump to prompt</button>
+    </div>
+    <div id="selection" class="selection"></div>
+    <div id="chips" class="stage-chips"></div>
+    <div id="metrics" class="stat-grid"></div>
+    <div id="warnings"></div>
+    <div id="workflows" class="inspect-grid"></div>
+    <section class="inspect-prompts panel">
+      <div class="panel-head"><h2 id="prompt-title">Prompt comparison</h2><span id="prompt-stage" class="muted"></span></div>
+      <div id="prompts" class="table-wrap"></div>
+    </section>
+  </section>
+</main>
+<script type="module" src="assets/inspect.js"></script>
+</body>
+</html>

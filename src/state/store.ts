@@ -50,6 +50,10 @@ export class StateLogError extends Error {
   override readonly name = 'StateLogError'
 }
 
+export class StateFetchError extends Error {
+  override readonly name = 'StateFetchError'
+}
+
 /** Parse one event log; a line that does not validate is an error, never skipped. */
 export function parseLog(path: string, text: string): LogEntry[] {
   const entries: LogEntry[] = []
@@ -84,7 +88,13 @@ export class StateStore {
   }
 
   private fetch(): string | undefined {
-    if (this.remote) git(['fetch', '--quiet', REMOTE, `+refs/heads/${STATE_BRANCH}:${REMOTE_REF}`], { cwd: this.cwd })
+    if (this.remote) {
+      const fetched = git(['fetch', '--quiet', REMOTE, `+refs/heads/${STATE_BRANCH}:${REMOTE_REF}`], { cwd: this.cwd })
+      // A repository whose state branch has not been created yet is not an error.
+      if (fetched.status !== 0 && !/couldn't find remote ref|could not find remote ref/i.test(fetched.stderr)) {
+        throw new StateFetchError(`could not fetch ${STATE_BRANCH}: ${fetched.stderr.trim() || `git exited ${String(fetched.status)}`}`)
+      }
+    }
     const tip = git(['rev-parse', '--verify', '--quiet', this.ref], { cwd: this.cwd })
     return tip.status === 0 ? tip.stdout.trim() : undefined
   }
@@ -99,6 +109,11 @@ export class StateStore {
       if (path !== undefined && blob !== undefined) files.set(path, blob)
     }
     return files
+  }
+
+  /** Fetch the branch without parsing logs, for a reader that only needs files. */
+  refresh(): string | undefined {
+    return this.fetch()
   }
 
   /** Fetch the branch and read every migration log. */

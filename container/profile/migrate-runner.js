@@ -56,6 +56,28 @@ async function loadProgress() {
   return mod.summarizeSessionEvents
 }
 
+async function loadTrace() {
+  const root = process.env.DSH_MIGRATE_APP_ROOT
+  if (!root) return undefined
+  try {
+    return await import(`${root}/dist/src/agents/session-trace.js`)
+  } catch {
+    // The trace is an improvement; an older Action image without it still runs.
+    return undefined
+  }
+}
+
+async function loadObservation() {
+  const root = process.env.DSH_MIGRATE_APP_ROOT
+  if (!root) return undefined
+  try {
+    return await import(`${root}/dist/src/agents/session-observation.js`)
+  } catch {
+    // Observation is an improvement; a run without it keeps the status counter.
+    return undefined
+  }
+}
+
 function isQuotaReason(reason) {
   const code = reason?.error?.code
   const message = reason?.error?.message ?? ''
@@ -76,6 +98,14 @@ async function run(ctx, task, io) {
   const model = process.env.DSH_MIGRATE_MODEL || selection.model
   const current = { ...selection, provider, model }
   const progressOf = await loadProgress()
+  const traceLevel = process.env.DSH_MIGRATE_TRACE_LEVEL || 'summary'
+  const traceModule = await loadTrace()
+  const traceOf = traceLevel === 'off' ? undefined : traceModule
+  const traceSecrets = traceModule === undefined || typeof traceModule.traceSecrets !== 'function' ? [] : traceModule.traceSecrets(process.env)
+  const traceState = {}
+  const traceKind = process.env.DSH_MIGRATE_TRACE_KIND || ''
+  const eventToken = process.env.DSH_MIGRATE_EVENT_TOKEN || ''
+  const observationOf = process.env.DSH_MIGRATE_OBSERVATIONS === '1' ? await loadObservation() : undefined
   const startedAt = Date.now()
   const intervalMs = Number(process.env.DSH_MIGRATE_STATUS_INTERVAL_MS || 10000)
 
@@ -89,6 +119,63 @@ async function run(ctx, task, io) {
   })
   await agent.whenIdle()
   const firstSeq = agent.session.seq
+  let traceCursor = firstSeq
+  let observationCursor = firstSeq
+  const emitTrace = () => {
+    if (traceOf === undefined) return
+    try {
+      const events = agent.session.snapshotEvents()
+      let emitted = 0
+      for (const event of events) {
+        const seq = typeof event.seq === 'number' ? event.seq : undefined
+        if (seq === undefined || seq < traceCursor) continue
+        const lines = traceOf.translateSessionEvent(event, traceState, {
+          secrets: traceSecrets,
+          maxChars: 2000,
+          includeText: traceKind !== 'report',
+          toolResults: traceLevel === 'full' ? 'full' : 'summary',
+        })
+        if (lines.length === 0) {
+          traceCursor = seq + 1
+          continue
+        }
+        if (emitted + lines.length > 20) {
+          io.stderr.write(`${traceOf.encodeTraceLine('… further events omitted from this tick', eventToken)}\n`)
+          return
+        }
+        for (const line of lines) {
+          io.stderr.write(`${traceOf.encodeTraceLine(line, eventToken)}\n`)
+          emitted += 1
+        }
+        traceCursor = seq + 1
+      }
+    } catch {
+      // A trace failure must never interrupt the session; the counter still runs.
+    }
+  }
+  const emitObservations = (limit = 100) => {
+    if (observationOf === undefined || typeof observationOf.translateObservation !== 'function') return 0
+    try {
+      const events = agent.session.snapshotEvents()
+      let emitted = 0
+      for (const event of events) {
+        const seq = typeof event.seq === 'number' ? event.seq : undefined
+        if (seq === undefined || seq < observationCursor) continue
+        const observation = observationOf.translateObservation(event, { secrets: traceSecrets, maxChars: 4000 })
+        if (observation === undefined) {
+          observationCursor = seq + 1
+          continue
+        }
+        if (emitted >= limit) return
+        observationCursor = seq + 1
+        io.stderr.write(`${observationOf.encodeObservationLine(observation, eventToken)}\n`)
+        emitted += 1
+      }
+    } catch {
+      // Observation is evidence; never interrupt the session for it.
+    }
+    return emitted
+  }
   const soFar = Number(process.env.DSH_MIGRATE_USAGE_SO_FAR || 0)
   const limit = Number(process.env.DSH_MIGRATE_USAGE_LIMIT || 0)
   const timer = setInterval(() => {
@@ -97,6 +184,8 @@ async function run(ctx, task, io) {
         model: process.env.DSH_MIGRATE_MODEL || 'deepseek-v4-flash',
       })
       io.stderr.write(`dsh-migrate-status: ${JSON.stringify(progress)}\n`)
+      emitTrace()
+      emitObservations()
       const used = soFar + usageUnits(progress)
       if (Number.isFinite(limit) && limit > 0 && used >= limit) {
         io.stderr.write(`dsh-migrate: quota limit exceeded: this run spent ${used} USD of limit ${limit}\n`)
@@ -114,6 +203,10 @@ async function run(ctx, task, io) {
   }))
   await agent.whenIdle()
   clearInterval(timer)
+  emitTrace()
+  for (let pass = 0; pass < 100; pass += 1) {
+    if (emitObservations(500) === 0) break
+  }
   await sessions.flush(agent.session)
   const finalProgress = progressOf(agent.session.snapshotEvents(), (Date.now() - startedAt) / 1000, {
     model: process.env.DSH_MIGRATE_MODEL || 'deepseek-v4-flash',

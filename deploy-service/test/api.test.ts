@@ -20,12 +20,18 @@ test('the configuration fails fast and names every problem', () => {
   assert.ok(!processProvider.ok && processProvider.problems.some(problem => problem.startsWith('DSH_VERSION')))
   const flag = loadConfig({ ...base, PROVIDER: 'process', DSH_VERSION: '0.2.0' }, ['--verbose'])
   assert.ok(!flag.ok && flag.problems.some(problem => problem.includes('--verbose')))
+  const blankEvidence = loadConfig({ ...base, PROVIDER: 'process', DSH_VERSION: '0.2.0', EVIDENCE_URL: '' }, [])
+  assert.ok(blankEvidence.ok && blankEvidence.config.EVIDENCE_URL === undefined)
+  for (const evidenceUrl of ['https://report.example/?', 'https://report.example/#', 'https://report.example/?x=1', 'https://report.example/#x', 'https://user:pass@report.example/']) {
+    const invalidEvidence = loadConfig({ ...base, PROVIDER: 'process', DSH_VERSION: '0.2.0', EVIDENCE_URL: evidenceUrl }, [])
+    assert.equal(invalidEvidence.ok, false, evidenceUrl)
+  }
   const ok = loadConfig({ ...base, PROVIDER: 'process', DSH_VERSION: '0.2.0', IDLE_MINUTES: '5' }, ['--conformance'])
   assert.ok(ok.ok)
   if (ok.ok) {
     assert.equal(ok.config.PUBLIC_URL, 'https://deploy.example')
     assert.equal(ok.config.IDLE_MINUTES, 5)
-    assert.equal(ok.config.TTL_DAYS, 3)
+    assert.equal(ok.config.TTL_DAYS, 7)
     assert.equal(ok.config.conformance, true)
   }
 })

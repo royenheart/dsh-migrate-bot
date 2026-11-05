@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, writeSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, writeSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { z } from 'zod'
@@ -27,6 +27,10 @@ import { createQuotaQuery } from './quota/query.ts'
 import { inline } from './render/text.ts'
 import { skillsSource, syncUpgradeSkills } from './skills/upgrade.ts'
 import { StateStore } from './state/store.ts'
+import { recorderFor, type RunRecorder } from './observability/recorder.ts'
+import { latestRunId, readInspectData } from './observability/evidence.ts'
+import { publishRunEvidence } from './deploy/evidence.ts'
+import { writeInspectHtml } from './inspect/html.ts'
 import { badgeOf } from './workflow/badge.ts'
 import { InJobEngine } from './engine.ts'
 import { decideStart } from './workflow/start.ts'
@@ -42,6 +46,8 @@ commands:
   comment               carry out a /dsh-migrate comment: --body --comment-id --author --association --issue
   check                 run every check on the working tree against --target
   status                print the consumer state as JSON
+  inspect               write an HTML page for a migration's live run evidence
+                        [--migration VERSION] [--out DIR] [--json]
   self-test             start one keyless session of the agent runtime
   print-config          print the validated configuration
 
@@ -60,6 +66,9 @@ const OPTIONS = {
   target: { type: 'string' },
   force: { type: 'boolean' },
   'skip-github': { type: 'boolean' },
+  migration: { type: 'string' },
+  out: { type: 'string' },
+  json: { type: 'boolean' },
   number: { type: 'string' },
   merged: { type: 'string' },
   body: { type: 'string' },
@@ -140,12 +149,14 @@ function skillsSync(runtime: Runtime): (enabled: boolean) => void {
   }
 }
 
-function engineFor(runtime: Runtime): InJobEngine {
+function engineFor(runtime: Runtime, recorder?: RunRecorder): InJobEngine {
   const agent = createDshRunner({
     ...(runtime.env.DSH_HOME === undefined ? {} : { dshHome: runtime.env.DSH_HOME }),
     timeoutMs: runtime.config.timeouts.agentMs,
     onStatus(progress) { log(`dsh: ${formatSessionProgress(progress)}`) },
     onLog(line) { log(line) },
+    ...(runtime.config.deploy.trace === 'off' ? {} : { onTrace(line: string) { stream?.publish(`[trace] ${line}`) } }),
+    traceLevel: runtime.config.deploy.trace,
   })
   const activities = createActivities({
     workdir: runtime.workdir,
@@ -161,8 +172,15 @@ function engineFor(runtime: Runtime): InJobEngine {
     runUrl: runtime.runUrl,
     syncSkills: skillsSync(runtime),
     log,
+    ...(recorder === undefined ? {} : { observer: recorder }),
   })
-  return new InJobEngine({ store: runtime.store, activities, run: runtime.runId, log })
+  return new InJobEngine({
+    store: runtime.store,
+    activities,
+    run: runtime.runId,
+    log,
+    onState(state) { stream?.publish(`dsh-migrate-state: ${state}`) },
+  })
 }
 
 function migrationInput(runtime: Runtime, target: MigrationInput['target'], verified: MigrationInput['target'] | undefined, proposal: MigrationInput['proposal']): MigrationInput {
@@ -195,7 +213,7 @@ function report(runtime: Runtime, engine: InJobEngine, view: MigrationView | und
     log_stream_url: stream?.url,
     ...extra,
   }, runtime.env)
-  if (view !== undefined) writeStepSummary(renderStepSummary({ view, pluginName: pluginNames(runtime.workdir), logStreamUrl: stream?.url }), runtime.env)
+  if (view !== undefined) writeStepSummary(renderStepSummary({ view, pluginName: pluginNames(runtime.workdir), logStreamUrl: stream?.url, ...(typeof extra.run_evidence_url === 'string' ? { evidenceUrl: extra.run_evidence_url } : {}) }), runtime.env)
 }
 
 async function run(runtime: Runtime, force: boolean): Promise<number> {
@@ -215,7 +233,15 @@ async function run(runtime: Runtime, force: boolean): Promise<number> {
     return 1
   }
   const target = await resolveTarget(runtime.config.target)
-  const engine = engineFor(runtime)
+  const recorder = recorderFor({
+    runId: runtime.runId,
+    ...(runtime.runUrl === undefined ? {} : { runUrl: runtime.runUrl }),
+    plugin: findPlugins(runtime.workdir).map(plugin => plugin.name),
+    agent: runtime.config.agent,
+    env: runtime.env,
+    log,
+  })
+  const engine = engineFor(runtime, recorder)
   await reconcileOpenProposal(runtime, engine)
   await resumeReporting(runtime, engine)
   const projection = engine.status()
@@ -230,18 +256,77 @@ async function run(runtime: Runtime, force: boolean): Promise<number> {
   })
   if (decision.action === 'skip') {
     log(`skipped (${decision.reason}): ${inline(decision.detail, 300)}`)
-    report(runtime, engine, undefined, { status: 'skipped', target_tag: target.tag })
+    // A reconcile or resume may have run a session with no later migration start.
+    // Persist this run before repairing evidence, so it has a manifest.
+    const observed = engine.status().migrations[0]
+    if (observed !== undefined) {
+      try {
+        await recorder.flush({ store: runtime.store, migrationId: observed.id, runDir: join(runtime.home, 'runs', runtime.runId), view: observed })
+      } catch (error) {
+        log(`manifest: ${inline(error instanceof Error ? error.message : String(error), 300)}`)
+      }
+    }
+    const repairId = projection.migrations[0]?.id ?? projection.open?.id ?? projection.processed?.id
+    if (repairId !== undefined && runtime.config.deploy.enabled) {
+      try {
+        const lastRunId = latestRunId(runtime.store, repairId)
+        if (lastRunId !== undefined) {
+          const startedAt = readInspectData(runtime.store, repairId, lastRunId).runs[0]?.manifest.startedAt
+          const repaired = await publishRunEvidence({
+            config: runtime.config,
+            env: runtime.env,
+            runId: lastRunId,
+            repository: runtime.repository === undefined ? 'unknown' : slugOf(runtime.repository),
+            migrationId: repairId,
+            store: runtime.store,
+            seal: true,
+            sealComplete: false,
+            ...(startedAt === undefined ? {} : { openedAt: startedAt }),
+            log,
+          })
+          if (repaired !== undefined) report(runtime, engine, undefined, { status: 'skipped', target_tag: target.tag, run_evidence_url: repaired })
+          else report(runtime, engine, undefined, { status: 'skipped', target_tag: target.tag })
+        } else report(runtime, engine, undefined, { status: 'skipped', target_tag: target.tag })
+      } catch (error) {
+        log(`run evidence: ${inline(error instanceof Error ? error.message : String(error), 300)}`)
+        report(runtime, engine, undefined, { status: 'skipped', target_tag: target.tag })
+      }
+    } else report(runtime, engine, undefined, { status: 'skipped', target_tag: target.tag })
     return 0
   }
   excludeIgnoredPaths(runtime.workdir)
   stream = await openLogStream({ config: runtime.config, env: runtime.env, repository: runtime.repository === undefined ? 'unknown' : slugOf(runtime.repository), runId: runtime.runId, log })
+  let streamClosed = false
   try {
     log(`migrating to ${target.tag}${decision.supersedes === undefined ? '' : `, taking over the proposal of ${decision.supersedes}`}`)
     const view = await engine.start(target.version, migrationInput(runtime, target, projection.verified, decision.proposal), decision.supersedes)
-    report(runtime, engine, view)
+    try {
+      await recorder.flush({ store: runtime.store, migrationId: view.id, runDir: join(runtime.home, 'runs', runtime.runId), view })
+    } catch (error) {
+      log(`manifest: ${inline(error instanceof Error ? error.message : String(error), 300)}`)
+    }
+    await stream.close()
+    streamClosed = true
+    let evidenceUrl: string | undefined
+    try {
+      evidenceUrl = await publishRunEvidence({
+        config: runtime.config,
+        env: runtime.env,
+        runId: runtime.runId,
+        repository: runtime.repository === undefined ? 'unknown' : slugOf(runtime.repository),
+        migrationId: view.id,
+        store: runtime.store,
+        seal: runtime.config.deploy.logStream === false || stream.url === undefined,
+        sealComplete: !(runtime.config.deploy.logStream && stream.url === undefined),
+        log,
+      })
+    } catch (error) {
+      log(`run evidence: ${inline(error instanceof Error ? error.message : String(error), 300)}`)
+    }
+    report(runtime, engine, view, evidenceUrl === undefined ? {} : { run_evidence_url: evidenceUrl })
     return view.state === 'failed' || view.state === 'error' ? 1 : 0
   } finally {
-    await stream.close()
+    if (!streamClosed) await stream.close()
   }
 }
 
@@ -281,7 +366,15 @@ async function pullRequestClosed(runtime: Runtime, options: Options): Promise<nu
     process.stderr.write('pull-request-closed needs --number N and --merged true|false\n')
     return 2
   }
-  const engine = engineFor(runtime)
+  const recorder = recorderFor({
+    runId: runtime.runId,
+    ...(runtime.runUrl === undefined ? {} : { runUrl: runtime.runUrl }),
+    plugin: findPlugins(runtime.workdir).map(plugin => plugin.name),
+    agent: runtime.config.agent,
+    env: runtime.env,
+    log,
+  })
+  const engine = engineFor(runtime, recorder)
   // The open proposal first: an older migration whose proposal a newer one took over carries the same number.
   const projection = engine.status()
   const migration = projection.open?.context.proposal?.pullRequest.number === number
@@ -292,7 +385,27 @@ async function pullRequestClosed(runtime: Runtime, options: Options): Promise<nu
     return 0
   }
   const view = await engine.deliver(migration.id, { type: 'pull-request.closed', number, merged: options.merged === 'true' })
-  report(runtime, engine, view)
+  try {
+    await recorder.flush({ store: runtime.store, migrationId: view.id, runDir: join(runtime.home, 'runs', runtime.runId), view })
+  } catch (error) {
+    log(`manifest: ${inline(error instanceof Error ? error.message : String(error), 300)}`)
+  }
+  let evidenceUrl: string | undefined
+  try {
+    evidenceUrl = await publishRunEvidence({
+      config: runtime.config,
+      env: runtime.env,
+      runId: runtime.runId,
+      repository: runtime.repository === undefined ? 'unknown' : slugOf(runtime.repository),
+      migrationId: view.id,
+      store: runtime.store,
+      seal: true,
+      log,
+    })
+  } catch (error) {
+    log(`run evidence: ${inline(error instanceof Error ? error.message : String(error), 300)}`)
+  }
+  report(runtime, engine, view, evidenceUrl === undefined ? {} : { run_evidence_url: evidenceUrl })
   return view.state === 'error' ? 1 : 0
 }
 
@@ -314,7 +427,7 @@ async function comment(runtime: Runtime, options: Options): Promise<number> {
     reply = '**Commands are disabled** by `deploy.commands: false`.'
   } else {
     const engine = engineFor(runtime)
-    const agent = createDshRunner({ timeoutMs: runtime.config.timeouts.agentMs, onLog: log })
+    const agent = createDshRunner({ timeoutMs: runtime.config.timeouts.agentMs, onLog: log, traceLevel: 'off' })
     const outcome = await runCommand({
       command: parsed.command,
       config: runtime.config,
@@ -376,6 +489,46 @@ async function postReply(github: GitHubClient, repository: Repository, issue: nu
   await github.rest('POST', path, z.object({}), { body: `${marker}\n${reply}` })
 }
 
+interface InspectRuntime {
+  workdir: string
+  home: string
+  store: StateStore
+}
+
+/** Inspect reads only the state branch; a broken consumer config or secret file must not block it. */
+function inspectRuntime(values: Options, env: NodeJS.ProcessEnv): InspectRuntime {
+  const workdir = resolve(values.workdir ?? process.cwd())
+  return {
+    workdir,
+    home: resolve(env.DSH_MIGRATE_HOME ?? join(workdir, '.dsh-migrate')),
+    store: new StateStore(workdir, env),
+  }
+}
+
+async function inspect(runtime: InspectRuntime, options: Options): Promise<number> {
+  try {
+    runtime.store.refresh()
+    const data = readInspectData(runtime.store, options.migration)
+    if (options.out === '') throw new Error('--out needs a directory')
+    const out = options.out === undefined ? join(runtime.home, 'inspect') : resolve(runtime.workdir, options.out)
+    if (options.json === true) {
+      mkdirSync(out, { recursive: true })
+      const path = join(out, 'inspect.json')
+      writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`)
+      log(`inspect: ${data.migrationId}: ${String(data.runs.length)} run(s), ${String(data.runs.reduce((sum, run) => sum + run.manifest.sessions.length, 0))} session(s)`)
+      log(path)
+      return 0
+    }
+    const path = writeInspectHtml(data, out)
+    log(`inspect: ${data.migrationId}: ${String(data.runs.length)} run(s), ${String(data.runs.reduce((sum, run) => sum + run.manifest.sessions.length, 0))} session(s)`)
+    log(path)
+    return 0
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
+    return 1
+  }
+}
+
 async function check(runtime: Runtime): Promise<number> {
   const target = await resolveTarget(runtime.config.target)
   excludeIgnoredPaths(runtime.workdir)
@@ -414,6 +567,8 @@ async function main(argv: readonly string[]): Promise<number> {
       return await comment(loadRuntime(values, env), values)
     case 'check':
       return await check(loadRuntime(values, env))
+    case 'inspect':
+      return await inspect(inspectRuntime(values, env), values)
     default:
       process.stderr.write(USAGE)
       return 2

@@ -109,10 +109,11 @@ export const configSchema = z.strictObject({
       .describe('Base URL of the deploy service. Required when `enabled`.'),
     tokenEnv: envName.default(DEFAULT_DEPLOY_TOKEN_ENV).describe('Environment variable holding the deploy service token ([which names reach the Action](../operations/install.md#the-workflow)).'),
     logStream: z.boolean().default(true).describe('Stream the run log to the deploy service.'),
+    trace: z.enum(['off', 'summary', 'full']).default('summary').describe('How much of a session to stream as trace lines: `off`, `summary` (tool names and short results), or `full` (bounded tool arguments and results).'),
     commands: z.boolean().default(true).describe('Accept `/dsh-migrate` comment commands.'),
     preview: z.strictObject({
       enabled: z.boolean().default(true).describe('Allow preview deployments.'),
-      ttlDays: z.number().int().min(1).default(7).describe('Days before a preview deployment is destroyed.'),
+      ttlDays: z.number().int().min(1).default(14).describe('Days before a preview deployment is destroyed; also the ceiling for `extend`.'),
       idleMinutes: z.number().int().min(1).default(120).describe('Minutes without a request before a preview deployment stops.'),
       extendDays: z.number().int().min(1).optional().describe('Days one `extend` command asks for; at most `ttlDays`, which is also the default.'),
     }).prefault({})

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PACKAGE_ROOT } from '../paths.ts'
@@ -10,6 +11,9 @@ import {
   isQuotaLimitText,
   type SessionProgress,
 } from './session-status.ts'
+import { decodeTraceLine, redactSecrets, stripTraceLines, traceSecrets } from './session-trace.ts'
+import { decodeObservationLine, stripObservationLines } from './session-observation.ts'
+import type { SessionObservation } from '../observability/session.ts'
 import type { AgentRequest, AgentResult, AgentRunner } from './types.ts'
 
 const REPORT_FENCE = /^```(?:markdown)?\n([\s\S]*?)\n```$/m
@@ -52,6 +56,17 @@ export class AgentTimeoutError extends Error {
   override readonly name = 'AgentTimeoutError'
 }
 
+/** Usage a failed session had already spent, when the runner reported it before failing. */
+export function agentUsage(error: unknown): SessionProgress | undefined {
+  if (typeof error !== 'object' || error === null || !('usage' in error)) return undefined
+  return (error as { usage?: SessionProgress }).usage
+}
+
+function withUsage(error: Error, usage: SessionProgress | undefined): Error {
+  if (usage !== undefined) Object.defineProperty(error, 'usage', { value: usage, enumerable: false })
+  return error
+}
+
 function takeLines(buffer: string): { lines: string[]; rest: string } {
   const parts = buffer.split(/\r?\n/)
   const rest = parts.pop() ?? ''
@@ -66,6 +81,9 @@ function defaultSpawn(
     timeoutMs: number
     onStatus?: ((progress: SessionProgress) => void) | undefined
     onLog?: ((line: string) => void) | undefined
+    onTrace?: ((line: string) => void) | undefined
+    onObservation?: ((observation: SessionObservation) => void) | undefined
+    eventToken?: string | undefined
   },
 ): Promise<DshSpawnResult> {
   return new Promise((resolve, reject) => {
@@ -86,6 +104,7 @@ function defaultSpawn(
     let stderr = ''
     let stderrRest = ''
     let quotaSeen = ''
+    const secrets = traceSecrets(process.env)
     child.stdout.on('data', chunk => { stdout += String(chunk) })
     child.stderr.on('data', chunk => {
       const text = String(chunk)
@@ -96,6 +115,16 @@ function defaultSpawn(
         const progress = decodeStatusLine(line)
         if (progress !== undefined) {
           options.onStatus?.(progress)
+          continue
+        }
+        const trace = decodeTraceLine(line, options.eventToken)
+        if (trace !== undefined) {
+          options.onTrace?.(redactSecrets(trace, secrets))
+          continue
+        }
+        const observation = decodeObservationLine(line, options.eventToken)
+        if (observation !== undefined) {
+          options.onObservation?.(observation)
           continue
         }
         if (line.startsWith('dsh-migrate:')) {
@@ -112,7 +141,11 @@ function defaultSpawn(
       clearTimeout(timer)
       if (stderrRest !== '') {
         const progress = decodeStatusLine(stderrRest)
+        const trace = decodeTraceLine(stderrRest, options.eventToken)
+        const observation = decodeObservationLine(stderrRest, options.eventToken)
         if (progress !== undefined) options.onStatus?.(progress)
+        else if (trace !== undefined) options.onTrace?.(redactSecrets(trace, secrets))
+        else if (observation !== undefined) options.onObservation?.(observation)
         else if (stderrRest.startsWith('dsh-migrate:')) {
           options.onLog?.(stderrRest)
           if (isInsufficientBalanceText(stderrRest)) quotaSeen = stderrRest
@@ -135,6 +168,10 @@ export function createDshRunner(options: {
   timeoutMs?: number | undefined
   onStatus?: ((progress: SessionProgress) => void) | undefined
   onLog?: ((line: string) => void) | undefined
+  onTrace?: ((line: string) => void) | undefined
+  onObservation?: ((observation: SessionObservation) => void) | undefined
+  /** How much of the session the runner translates; `off` keeps the counter only. */
+  traceLevel?: 'off' | 'summary' | 'full' | undefined
 } = {}): AgentRunner {
   const timeoutMs = options.timeoutMs ?? DEFAULT_AGENT_TIMEOUT_MS
   const spawnImpl = options.spawnImpl
@@ -154,6 +191,9 @@ export function createDshRunner(options: {
         DSH_MIGRATE_STATUS_INTERVAL_MS: process.env.DSH_MIGRATE_STATUS_INTERVAL_MS ?? '10000',
         DSH_MIGRATE_USAGE_SO_FAR: String(request.usageSoFar ?? 0),
         DSH_MIGRATE_APP_ROOT: PACKAGE_ROOT,
+        DSH_MIGRATE_TRACE_KIND: request.kind,
+        DSH_MIGRATE_TRACE_LEVEL: options.traceLevel ?? 'summary',
+        ...((request.onObservation ?? options.onObservation) === undefined ? {} : { DSH_MIGRATE_OBSERVATIONS: '1' }),
       }
       if (request.usageLimit !== undefined) env.DSH_MIGRATE_USAGE_LIMIT = String(request.usageLimit)
       Object.assign(env, request.env)
@@ -164,6 +204,9 @@ export function createDshRunner(options: {
         lastUsage = progress
         options.onStatus?.(progress)
       }
+      const onObservation = request.onObservation ?? options.onObservation
+      const eventToken = randomUUID()
+      env.DSH_MIGRATE_EVENT_TOKEN = eventToken
       const result = spawnImpl === undefined
         ? await defaultSpawn(
           ['--profile', 'migrate', request.prompt],
@@ -173,6 +216,9 @@ export function createDshRunner(options: {
             timeoutMs,
             onStatus,
             ...(options.onLog === undefined ? {} : { onLog: options.onLog }),
+            ...(options.onTrace === undefined ? {} : { onTrace: options.onTrace }),
+            ...(onObservation === undefined ? {} : { onObservation }),
+            eventToken,
           },
         )
         : await spawnImpl(
@@ -184,23 +230,23 @@ export function createDshRunner(options: {
           mkdirSync(options.reportDir, { recursive: true })
           writeFileSync(join(options.reportDir, `${request.kind}.raw.txt`), result.stdout, 'utf8')
         }
-        throw new AgentTimeoutError(
+        throw withUsage(new AgentTimeoutError(
           `dsh session (${request.kind}) exceeded its ${Math.round(timeoutMs / 1000)}s watchdog and was killed`
-          + `\n--- last stderr ---\n${result.stderr.trim().slice(-2000)}`,
-        )
+          + `\n--- last stderr ---\n${stripObservationLines(stripTraceLines(result.stderr)).trim().slice(-2000)}`,
+        ), lastUsage)
       }
-      const combined = `${result.stderr}\n${result.stdout}`
+      const combined = `${stripObservationLines(stripTraceLines(result.stderr))}\n${result.stdout}`
       if (isQuotaLimitText(combined)) {
-        throw new QuotaError('limit_exceeded', result.stderr.trim() || result.stdout.trim())
+        throw withUsage(new QuotaError('limit_exceeded', stripObservationLines(stripTraceLines(result.stderr)).trim() || result.stdout.trim()), lastUsage)
       }
       if (isInsufficientBalanceText(combined)) {
-        throw new QuotaError(
+        throw withUsage(new QuotaError(
           'insufficient_balance',
-          `insufficient balance: dsh aborted the session (${result.stderr.trim() || result.stdout.trim()})`,
-        )
+          `insufficient balance: dsh aborted the session (${stripObservationLines(stripTraceLines(result.stderr)).trim() || result.stdout.trim()})`,
+        ), lastUsage)
       }
       if (result.code !== 0) {
-        throw new Error(`dsh agent failed (${result.code}): ${result.stderr || result.stdout}`)
+        throw withUsage(new Error(`dsh agent failed (${result.code}): ${stripObservationLines(stripTraceLines(result.stderr)) || result.stdout}`), lastUsage)
       }
       const report = extractReport(result.stdout)
       if (options.reportDir !== undefined) {
