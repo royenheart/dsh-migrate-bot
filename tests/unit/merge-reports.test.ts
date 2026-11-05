@@ -8,6 +8,7 @@ import { FakeGitHub } from '../support/github.ts'
 import { contextOf, input, proposal, proposedEvents, settings } from '../support/migration.ts'
 import type { AgentRequest, AgentRunner } from '../../src/agents/types.ts'
 import { buildRunManifest, serializeManifest, sha256 } from '../../src/observability/manifest.ts'
+import { PACKAGE_VERSION } from '../../src/paths.ts'
 
 const ENV = { GITHUB_API_URL: 'https://api.test', DSH_MIGRATE_REPORT_BOT_TOKEN: 'bot-token', DSH_MIGRATE_REPORT_HARNESS_TOKEN: 'harness-token' }
 const OPEN = proposal(9)
@@ -62,7 +63,7 @@ test('an analysis channel reasons over the merge and delivers one issue to its r
   assert.match(prompt, /\| `index\.js` \| modified \| 1 \| 1 \|/)
   assert.match(prompt, /Decision: keep/)
   assert.match(prompt, /"findings"/)
-  assert.match(prompt, /Action version: `1\.0\.0-rc\.2`/)
+  assert.ok(prompt.includes(`Action version: \`${PACKAGE_VERSION ?? 'unknown'}\``))
   assert.match(prompt, /Model: `deepseek-official\/deepseek-v4-flash`/)
   const body = github.external[0]?.body ?? ''
   assert.match(body, /## Findings/)
