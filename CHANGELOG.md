@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/).
 Entries are generated from the commit history by [Commitizen](https://commitizen-tools.github.io/commitizen/); do not edit them by hand.
 
+## v1.0.0-rc.3 (2026-11-06)
+
+### Feat
+
+- **evidence**: store the current run with a migration history index
+- **deploy-service**: bound, retain, and repair run evidence
+- **bench**: choose the most comparable default record pair
+- **docs**: add the engineering principles, proposal system, and generated wiki
+- **site**: publish the wiki and evidence pages under a two-level navigation
+
+### Fix
+
+- **evidence**: upgrade old bundles, preserve retention time, and seal incomplete runs
+- **site**: keep explicit endpoints, filter state, and cross-suite context
+- **docs**: repair generated paths, anchors, gates, and index parsing
+- **ci**: publish the empty report and wiki before the first record exists
+
 ## v1.0.0-rc.2 (2026-10-19)
 
 ### Fix
