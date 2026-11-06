@@ -155,9 +155,9 @@ async function run(ctx, task, io) {
   }
   const emitObservations = (limit = 100) => {
     if (observationOf === undefined || typeof observationOf.translateObservation !== 'function') return 0
+    let emitted = 0
     try {
       const events = agent.session.snapshotEvents()
-      let emitted = 0
       for (const event of events) {
         const seq = typeof event.seq === 'number' ? event.seq : undefined
         if (seq === undefined || seq < observationCursor) continue
