@@ -30,11 +30,18 @@ export function parseCommand(body: string): ParseCommandResult {
     while (true) {
       const index = line.indexOf(COMMAND_PREFIX, from)
       if (index < 0) break
-      // A package name or URL such as `royenheart/dsh-migrate-bot` contains the
-      // prefix but is not a command. Only whitespace or the end of the line may
-      // follow the prefix; otherwise keep looking for a real command later.
+      // A package name, path, or URL such as `royenheart/dsh-migrate-bot` or
+      // `https://example.com/dsh-migrate` contains the prefix but is not a
+      // command. A command starts the line or follows punctuation such as
+      // whitespace, a code fence, or an opening parenthesis, and only whitespace
+      // or the end of the line may follow the prefix; otherwise keep looking for
+      // a real command later.
+      const before = index === 0 ? undefined : line[index - 1]
       const after = line[index + COMMAND_PREFIX.length]
-      if (after !== undefined && !/\s/.test(after)) {
+      const startsCommand = before === undefined
+        || /\s/.test(before)
+        || ['`', '(', '[', '"', "'", '>', '*'].includes(before)
+      if (!startsCommand || (after !== undefined && !/\s/.test(after))) {
         from = index + 1
         continue
       }
