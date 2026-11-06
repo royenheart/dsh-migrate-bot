@@ -16,7 +16,7 @@ There are two images, both built from this repository.
 | The service | `docker build -f deploy-service/Dockerfile -t dsh-migrate-deploy-service .` from the repository root | The service, git, and the Docker CLI |
 | The preview image | `docker build --build-arg DSH_VERSION=0.2.0-rc.2 -t dsh-migrate-preview:0.2.0-rc.2 deploy-service/preview-image` | One pinned `@deepseek-ai/dsh` and the launcher every preview runs |
 
-The preview image's tag names its dsh version, and `DSH_IMAGE` names the tag, so every preview of a deployment runs the same dsh. To move previews to another release, build the image with another `DSH_VERSION` and change `DSH_IMAGE`.
+The preview image's tag names its dsh version, and Compose derives `DSH_IMAGE` from `DSH_VERSION`, so every preview of a deployment runs the same dsh. To move previews to another release, build the image with another `DSH_VERSION`; one value changes both the build tag and the service's image. A custom image needs a Compose override.
 
 ## Configuration
 
@@ -29,8 +29,8 @@ The service is configured only by its environment. It validates every variable a
 | `DATA_DIR` | yes | Absolute path of the data directory, at most 62 bytes because preview sockets live under it. With the `docker` provider it must be the same path on the host and in the service's container |
 | `PUBLIC_URL` | yes | The service's public base URL; run pages and preview links are built from it |
 | `PROVIDER` | yes | `docker`, or `process` for CI and tests. Compose fixes it to `docker` |
-| `DSH_IMAGE` | with `docker` | The preview image |
-| `DSH_VERSION` | with `process`, unless `DSH_BIN` is set | The dsh version installed into `DATA_DIR/dsh/`. Compose does not pass it to the service; in `.env` it is the preview image's build argument |
+| `DSH_IMAGE` | with `docker` | The preview image. Compose derives it as `dsh-migrate-preview:<DSH_VERSION>`; only a direct service run or a Compose override sets it explicitly |
+| `DSH_VERSION` | with `process`, unless `DSH_BIN` is set | The dsh version previews run. Compose uses it as the preview image's build tag and derives `DSH_IMAGE` from it |
 | `DSH_BIN` | no | An installed `dsh` the `process` provider uses instead. Compose does not pass it |
 | `IDLE_MINUTES` | no, 120 | Minutes without a request through the preview proxy before an instance stops |
 | `TTL_DAYS` | no, 7 | Days from creation to a preview's first expiry. `extend` moves it out, never past the consumer's `deploy.preview.ttlDays` (14 by default) after creation, so keep it below that |
@@ -113,7 +113,7 @@ A coding agent can run the service for a maintainer by following this page; it a
 | How the service is reached: a DNS name pointing at the host, or a Cloudflare Tunnel | A DNS name | `PUBLIC_HOSTNAME` and `COMPOSE_PROFILES=public`, or the tunnel token and `COMPOSE_PROFILES=tunnel` |
 | Who may open run pages and previews | Only requests that carry the token | `PUBLIC_VIEWS=true` only behind an identity-aware proxy the maintainer has set up |
 | Where the data lives | `/srv/dsh-deploy` | `DATA_DIR` |
-| Which dsh release previews run | The one in `deploy-service/.env.example` | `DSH_VERSION`, `DSH_IMAGE` |
+| Which dsh release previews run | The one in `deploy-service/.env.example` | `DSH_VERSION` |
 | Which repositories use it | The one being set up | A webhook in each; the service previews public repositories only |
 
 On the host, the agent checks the requirements of [On any host with Docker](#on-any-host-with-docker) before writing anything, generates `DEPLOY_TOKEN` and `GITHUB_WEBHOOK_SECRET` there with `openssl rand -hex 32` into `deploy-service/.env`, readable only by its owner, and never prints them. It starts the stack, waits for `/healthz`, and runs the conformance suite ([Verifying a deployment](#verifying-a-deployment)). The maintainer then copies `DEPLOY_TOKEN` into the consumer's secret `DSH_MIGRATE_DEPLOY_TOKEN` and the webhook secret into the webhook, or lets the agent pipe each from `.env` into `gh secret set` and into `gh api --input`, so that no value appears in the conversation or on a command line. The consumer side is [Wiring a consumer repository](#wiring-a-consumer-repository).
