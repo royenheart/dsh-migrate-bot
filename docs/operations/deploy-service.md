@@ -16,7 +16,7 @@ There are two images, both built from this repository.
 | The service | `docker build -f deploy-service/Dockerfile -t dsh-migrate-deploy-service .` from the repository root | The service, git, and the Docker CLI |
 | The preview image | `docker build --build-arg DSH_VERSION=0.2.0-rc.2 -t dsh-migrate-preview:0.2.0-rc.2 deploy-service/preview-image` | One pinned `@deepseek-ai/dsh` and the launcher every preview runs |
 
-The preview image's tag names its dsh version, and Compose derives `DSH_IMAGE` from `DSH_VERSION`, so every preview of a deployment runs the same dsh. To move previews to another release, build the image with another `DSH_VERSION`; one value changes both the build tag and the service's image. A custom image needs a Compose override.
+The preview image's tag names its dsh version, and Compose derives `DSH_IMAGE` from `DSH_VERSION`, so every preview of a deployment runs the same dsh. To move previews to another release, build the image with another `DSH_VERSION`; one value changes both the build tag and the service's image. A custom image needs a Compose override. After changing `DSH_VERSION` on an existing deployment, rebuild the preview image and recreate the service so it picks up the derived image tag.
 
 ## Configuration
 
