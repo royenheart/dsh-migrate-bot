@@ -66,6 +66,7 @@ export class FakeProvider implements InstanceProvider {
   /** The files of each tree a build checked, by name. */
   readonly builds: string[][] = []
   readonly started: string[] = []
+  readonly models: (InstanceSpec['model'])[] = []
   readonly stopped: string[] = []
   readonly destroyed: string[] = []
   readonly seen: SeenRequest[] = []
@@ -86,6 +87,7 @@ export class FakeProvider implements InstanceProvider {
   }
 
   async start(spec: InstanceSpec): Promise<RunningInstance> {
+    this.models.push(spec.model)
     if (this.startDelayMs > 0) await new Promise(resolve => setTimeout(resolve, this.startDelayMs))
     mkdirSync(spec.socketDir, { recursive: true })
     const plugin = await fakeWeb('plugin', join(spec.socketDir, 'plugin.sock'), this.seen)
@@ -140,22 +142,23 @@ export interface TestService {
  * @param options.evidenceUrl - `EVIDENCE_URL` for the benchmark page.
  * @param options.dataDir - a data directory the caller owns and removes, so a restart can reuse it.
  */
-export async function startService(options: { conformance?: boolean; publicViews?: boolean; evidenceUrl?: string; dataDir?: string } = {}): Promise<TestService> {
+export async function startService(options: { conformance?: boolean; publicViews?: boolean; evidenceUrl?: string; dataDir?: string; previewDomain?: string; publicUrl?: string } = {}): Promise<TestService> {
   const dataDir = options.dataDir ?? mkdtempSync(join(tmpdir(), 'dsh-deploy-test-'))
   const ownsData = options.dataDir === undefined
   const loaded = loadConfig({
     DEPLOY_TOKEN: TOKEN,
     GITHUB_WEBHOOK_SECRET: SECRET,
     DATA_DIR: dataDir,
-    PUBLIC_URL: 'http://127.0.0.1:1',
+    PUBLIC_URL: options.publicUrl ?? 'http://127.0.0.1:1',
     PROVIDER: 'process',
     DSH_BIN: '/nonexistent/dsh',
     PUBLIC_VIEWS: options.publicViews === true ? 'true' : 'false',
     ...(options.evidenceUrl === undefined ? {} : { EVIDENCE_URL: options.evidenceUrl }),
+    ...(options.previewDomain === undefined ? {} : { PREVIEW_DOMAIN: options.previewDomain }),
   }, options.conformance === true ? ['--conformance'] : [])
   if (!loaded.ok) throw new Error(loaded.problems.join('; '))
   const provider = new FakeProvider()
-  const previews = new PreviewManager({ dataDir, publicUrl: 'http://127.0.0.1:1', ttlDays: 7, idleMinutes: 30, provider, providerKind: 'process', log: () => {} })
+  const previews = new PreviewManager({ dataDir, publicUrl: options.publicUrl ?? 'http://127.0.0.1:1', ttlDays: 7, idleMinutes: 30, provider, providerKind: 'process', ...(options.previewDomain === undefined ? {} : { previewDomain: options.previewDomain }), log: () => {} })
   await previews.load()
   const server = createService({
     config: loaded.config,

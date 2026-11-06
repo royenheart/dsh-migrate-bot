@@ -10,9 +10,10 @@ The user-facing capabilities of the Action, the benchmark report, and the deploy
 | F4 | Run the Harbor benchmark and compare records | `npm run bench -- run` | `scripts/bench.ts`, `src/evaluation/` | [Benchmark](operations/benchmark.md#a-run) |
 | F5 | Read the benchmark report | `npm run site` / GitHub Pages | `scripts/site.ts`, `site/` | [The report](design/evaluation.md#7-the-report) |
 | F6 | Read the documentation wiki | `npm run site`, then **Wiki** | `scripts/wiki.ts`, `site/wiki.html` | [Documentation standard](AGENTS.md#the-wiki-is-a-projection) |
-| F7 | Stream a run log and publish a preview | deploy service `/runs`, `/view`, `/p`, `/previews` | `deploy-service/src/` | [The HTTP contract](design/deploy-service.md#8-the-http-contract) |
+| F7 | Stream a run log and publish a preview | deploy service `/runs`, `/view`, `/p/<id>/` or `p-<id>.<PREVIEW_DOMAIN>`, `/previews` | `deploy-service/src/` | [The HTTP contract](design/deploy-service.md#8-the-http-contract) |
 | F8 | Ask for status, a report, or a preview action by comment | `/dsh-migrate …` comment | `src/cli.ts`, `src/commands/` | [Comment commands](design/workflow.md#9-comment-commands) |
 | F9 | Deliver merge reports to configured channels | `reports.channels` | `src/merge-reports/` | [Merge reports](design/workflow.md#8-merge-reports) |
 | F10 | Store and serve run evidence for automatic inspection | deploy service `/view/<runId>/inspect.json` (current run plus history) | `deploy-service/src/runs.ts`, `src/deploy/evidence.ts` | [HTTP contract](design/deploy-service.md#8-the-http-contract) |
+| F11 | Use a model in a live preview without local checkout | deploy service model gateway + `/p/<id>/` or `p-<id>.<PREVIEW_DOMAIN>` | `deploy-service/src/model-gateway.ts` | [Preview model access](design/deploy-service.md#12-preview-model-access) |
 
 The catalogue names capabilities, not every function. A new feature adds a row and an entry in [the index](index.md); a removed feature deletes its row.

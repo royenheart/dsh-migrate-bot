@@ -6,6 +6,7 @@ import { readJson, writeJson } from './files.ts'
 import { failure, json, type Answer } from './http.ts'
 import { carry, checkout, excludeBuildOutput, freeze, git, pullRequestHead, type Tree } from './working-copy.ts'
 import type { InstanceProvider, InstanceSpec, RunningInstance } from './providers/types.ts'
+import type { ModelGateway } from './model-gateway.ts'
 
 /**
  * The preview manager: one record per pull request, its working copy, its
@@ -130,6 +131,10 @@ export interface PreviewManagerOptions {
   provider: InstanceProvider
   /** The provider kind decides whether a missing marker may derive a GitHub clone URL. */
   providerKind: 'docker' | 'process'
+  /** The service-owned model gateway, when model access is configured. */
+  modelGateway?: ModelGateway | undefined
+  /** When set, preview pages answer from p-<id>.<domain> instead of a path on the public origin. */
+  previewDomain?: string | undefined
   log: (message: string) => void
 }
 
@@ -409,6 +414,7 @@ export class PreviewManager {
    * @returns whether the candidate was promoted, a sentence about the change, and the file the change was set aside in when it did not apply.
    */
   private async promote(id: string, candidate: Tree, sha: string): Promise<{ ok: boolean; detail: string; unapplied?: string }> {
+    this.options.modelGateway?.revoke(id)
     await this.options.provider.stop(id)
     const work = this.tree(id)
     const record = this.records.get(id)
@@ -479,7 +485,23 @@ export class PreviewManager {
     const record = this.records.get(id)
     if (record?.builtSha === undefined || !existsSync(this.tree(id).workTree)) throw new Error('this preview has no build to serve')
     this.lastRequest.set(id, Date.now())
-    return await this.options.provider.start(this.spec(id))
+    const spec = this.spec(id)
+    this.options.modelGateway?.revoke(id)
+    const grant = this.options.modelGateway?.issue(id)
+    if (grant !== undefined && this.options.modelGateway !== undefined) {
+      spec.model = {
+        token: grant.token,
+        baseUrl: this.options.providerKind === 'docker'
+          ? grant.baseUrl
+          : `http://127.0.0.1:${String(this.options.modelGateway.tcpPort)}`,
+      }
+    }
+    try {
+      return await this.options.provider.start(spec)
+    } catch (error) {
+      this.options.modelGateway?.revoke(id)
+      throw error
+    }
   }
 
   /** Note a request through the proxy, which is what keeps an instance from idling out. */
@@ -503,14 +525,20 @@ export class PreviewManager {
     }
   }
 
-  /** The instance's state as the Action's `status` reads it. */
+  /** The base URL a person opens for this preview, including its trailing slash. */
+  previewBase(id: string): string {
+    return this.options.previewDomain === undefined
+      ? `${this.options.publicUrl}/p/${id}/`
+      : `${new URL(this.options.publicUrl).protocol}//p-${id}.${this.options.previewDomain}${new URL(this.options.publicUrl).port === '' ? '' : `:${new URL(this.options.publicUrl).port}`}/`
+  }
+
   private state(record: PreviewRecord): Record<string, unknown> {
     const state = record.building
       ? 'building'
       : record.lastBuild?.ok === false
         ? 'failed'
         : this.options.provider.running(record.id) !== undefined ? 'ready' : 'stopped'
-    const base = `${this.options.publicUrl}/p/${record.id}/`
+    const base = this.previewBase(record.id)
     return {
       state,
       ...(record.builtSha === undefined ? {} : { url: base, safeUrl: `${base}safe/`, headSha: record.builtSha }),
@@ -578,7 +606,11 @@ export class PreviewManager {
       this.rebuild(rebuilt.id)
       return json(202, { state: 'building', headSha: rebuilt.headSha })
     }
-    if (request.action === 'extend') return this.extend(record, request.days, request.maxTtlDays)
+    if (request.action === 'extend') return await this.locked(record.id, async () => {
+      const current = this.records.get(record.id)
+      if (current === undefined) return failure(404, `no preview for ${key.repository}#${String(key.pullRequest)}`)
+      return this.extend(current, request.days, request.maxTtlDays)
+    })
     return await this.locked(record.id, async () => await this.publish(record.id))
   }
 
@@ -681,13 +713,17 @@ export class PreviewManager {
   private async remove(id: string, why: string): Promise<void> {
     // A build in progress sees a newer generation and discards its candidate.
     this.generations.set(id, (this.generations.get(id) ?? 0) + 1)
-    await this.locked(id, async () => {
-      await this.options.provider.destroy(id)
-      this.records.delete(id)
-      this.lastRequest.delete(id)
-      rmSync(this.dirs(id).root, { recursive: true, force: true })
-    })
+    await this.locked(id, async () => await this.removeUnderLock(id))
     this.options.log(`preview ${id}: ${why}`)
+  }
+
+  /** Remove a record while its preview lock is already held. */
+  private async removeUnderLock(id: string): Promise<void> {
+    this.options.modelGateway?.revoke(id)
+    await this.options.provider.destroy(id)
+    this.records.delete(id)
+    this.lastRequest.delete(id)
+    rmSync(this.dirs(id).root, { recursive: true, force: true })
   }
 
   /**
@@ -696,29 +732,53 @@ export class PreviewManager {
    * @param now - the current time, in milliseconds.
    */
   async sweep(now: number = Date.now()): Promise<void> {
-    for (const record of this.all()) {
-      if (Date.parse(record.expiresAt) <= now) {
-        this.writeMarker(record.id, {
-          closed: false,
-          detail: `Expired at ${record.expiresAt}; redeploy rebuilds it from the pull request head.`,
-          state: 'expired',
-          cloneUrl: record.cloneUrl,
-          headSha: record.headSha,
+    const records = this.all()
+    let next = 0
+    const worker = async (): Promise<void> => {
+      for (;;) {
+        const record = records[next]
+        next += 1
+        if (record === undefined) return
+        if (Date.parse(record.expiresAt) <= now) {
+          const removed = await this.locked(record.id, async () => {
+            const current = this.records.get(record.id)
+            if (current === undefined || Date.parse(current.expiresAt) > now) return false
+            this.generations.set(record.id, (this.generations.get(record.id) ?? 0) + 1)
+            this.writeMarker(record.id, {
+              closed: false,
+              detail: `Expired at ${current.expiresAt}; redeploy rebuilds it from the pull request head.`,
+              state: 'expired',
+              cloneUrl: current.cloneUrl,
+              headSha: current.headSha,
+            })
+            await this.removeUnderLock(record.id)
+            return true
+          })
+          if (removed) this.options.log(`preview ${record.id}: expired at ${record.expiresAt}`)
+          continue
+        }
+        const running = this.options.provider.running(record.id)
+        if (running !== undefined) {
+          const idle = (this.openSockets.get(record.id) ?? 0) === 0
+            && now - (this.lastRequest.get(record.id) ?? 0) > this.options.idleMinutes * 60_000
+          if (!idle) continue
+        }
+        const stopped = await this.locked(record.id, async () => {
+          if (this.options.provider.running(record.id) === undefined) {
+            this.options.modelGateway?.revoke(record.id)
+            return false
+          }
+          const idle = (this.openSockets.get(record.id) ?? 0) === 0
+            && now - (this.lastRequest.get(record.id) ?? 0) > this.options.idleMinutes * 60_000
+          if (!idle) return false
+          this.options.modelGateway?.revoke(record.id)
+          await this.options.provider.stop(record.id)
+          return true
         })
-        await this.remove(record.id, `expired at ${record.expiresAt}`)
-        continue
+        if (stopped) this.options.log(`preview ${record.id}: stopped after ${String(this.options.idleMinutes)} idle minute(s)`)
       }
-      const idle = (): boolean => this.options.provider.running(record.id) !== undefined
-        && (this.openSockets.get(record.id) ?? 0) === 0
-        && now - (this.lastRequest.get(record.id) ?? 0) > this.options.idleMinutes * 60_000
-      if (!idle()) continue
-      const stopped = await this.locked(record.id, async () => {
-        if (!idle()) return false
-        await this.options.provider.stop(record.id)
-        return true
-      })
-      if (stopped) this.options.log(`preview ${record.id}: stopped after ${String(this.options.idleMinutes)} idle minute(s)`)
     }
+    await Promise.all(Array.from({ length: Math.min(4, records.length) }, worker))
   }
 
   /**
