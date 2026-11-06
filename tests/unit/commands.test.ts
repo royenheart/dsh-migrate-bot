@@ -115,6 +115,14 @@ test('a command is read out of the prose around it', () => {
   assert.equal(parsed.ok && parsed.command.spec.verb, 'status')
 })
 
+test('a package name or URL sharing the prefix is not a command', () => {
+  assert.equal(parseCommand('royenheart/dsh-migrate-bot@v1.0.0-rc.4').ok, false)
+  assert.equal(parseCommand('https://github.com/royenheart/dsh-migrate-bot').ok, false)
+  const parsed = parseCommand('The package is royenheart/dsh-migrate-bot.\n\n/dsh-migrate status')
+  assert.equal(parsed.ok, true)
+  assert.equal(parsed.ok && parsed.command.spec.verb, 'status')
+})
+
 test('flags are accepted only where the verb declares them', () => {
   const dry = parseCommand('/dsh-migrate report --dry-run')
   assert.equal(dry.ok, true)
