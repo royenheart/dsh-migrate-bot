@@ -30,7 +30,7 @@ The service is configured only by its environment. It validates every variable a
 | `PUBLIC_URL` | yes | The service's public base URL; run pages and preview links are built from it |
 | `PROVIDER` | yes | `docker`, or `process` for CI and tests. Compose fixes it to `docker` |
 | `DSH_IMAGE` | with `docker` | The preview image. Compose derives it as `dsh-migrate-preview:<DSH_VERSION>`; only a direct service run or a Compose override sets it explicitly |
-| `DSH_VERSION` | with `process`, unless `DSH_BIN` is set | The dsh version previews run. Compose uses it as the preview image's build tag and derives `DSH_IMAGE` from it |
+| `DSH_VERSION` | with `process`, unless `DSH_BIN` is set | The dsh version previews run. Compose uses it as the preview image's build tag and derives `DSH_IMAGE` from it; it must be Docker-tag-safe, so a semver build metadata suffix is not supported |
 | `DSH_BIN` | no | An installed `dsh` the `process` provider uses instead. Compose does not pass it |
 | `IDLE_MINUTES` | no, 120 | Minutes without a request through the preview proxy before an instance stops |
 | `TTL_DAYS` | no, 7 | Days from creation to a preview's first expiry. `extend` moves it out, never past the consumer's `deploy.preview.ttlDays` (14 by default) after creation, so keep it below that |
