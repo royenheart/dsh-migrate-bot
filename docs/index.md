@@ -42,6 +42,7 @@ The entry point to the documentation: `AGENTS.md` holds the rules and links here
 | Which actions run the checks, and which are advice | `docs/design/deploy-service.md` | [Check policy](design/deploy-service.md#7-check-policy) |
 | The calls a deploy service must serve, and what it owes beyond their shape | `docs/design/deploy-service.md` | [The HTTP contract](design/deploy-service.md#8-the-http-contract) |
 | What a deploy service answers for a publish, and who pushes the change | `docs/design/deploy-service.md` | [Preview publish](design/deploy-service.md#81-preview-publish) |
+| How a live preview reaches a model without receiving the provider key | `docs/design/deploy-service.md` | [Preview model access](design/deploy-service.md#12-preview-model-access) |
 | How the reference deploy service is built: run store, idempotency, preview manager, instance providers | `docs/design/deploy-service.md` | [The reference implementation](design/deploy-service.md#9-the-reference-implementation) |
 | Checking any deploy service against the Action's client | `docs/design/deploy-service.md` | [The conformance suite](design/deploy-service.md#10-the-conformance-suite) |
 | Running the reference deploy service: images, configuration, compose, Terraform, wiring a repository, verifying | `docs/operations/deploy-service.md` | [Configuration](operations/deploy-service.md#configuration) |
@@ -53,4 +54,5 @@ The entry point to the documentation: `AGENTS.md` holds the rules and links here
 | The index of design decisions and open questions | `docs/decisions.md` | [Design decisions index](decisions.md#design-decisions-index) |
 | How an open question becomes a design decision | `docs/proposals/README.md` | [Lifecycle](proposals/README.md#lifecycle) |
 | The proposal for opt-in consumer run evidence intake | `docs/proposals/evidence-intake.md` | [Problem](proposals/evidence-intake.md#problem) |
+| The parked proposal for bring-your-own-key preview access | `docs/proposals/preview-byok.md` | [Problem](proposals/preview-byok.md#problem) |
 | How documentation is organised, written, and kept from drifting | `docs/AGENTS.md` | [The tier taxonomy: one home per fact](AGENTS.md#the-tier-taxonomy-one-home-per-fact) |

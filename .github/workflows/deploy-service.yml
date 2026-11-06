@@ -13,6 +13,7 @@ on:
       - src/commands/**
       - src/observability/evidence-schema.ts
       - tests/e2e/deploy-service.test.ts
+      - tests/e2e/model-access.test.ts
       - .github/workflows/deploy-service.yml
   push:
     branches: [main]
@@ -22,6 +23,7 @@ on:
       - src/commands/**
       - src/observability/evidence-schema.ts
       - tests/e2e/deploy-service.test.ts
+      - tests/e2e/model-access.test.ts
       - .github/workflows/deploy-service.yml
 
 permissions:
@@ -80,4 +82,4 @@ jobs:
       - name: The CLI against the reference service, with real dsh web previews
         env:
           DEPLOY_SERVICE_E2E: required
-        run: node --test dist/tests/e2e/deploy-service.test.js
+        run: node --test dist/tests/e2e/deploy-service.test.js dist/tests/e2e/model-access.test.js

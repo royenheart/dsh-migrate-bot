@@ -42,26 +42,43 @@ resource "hcloud_server" "service" {
   ssh_keys     = var.ssh_key_ids
   firewall_ids = [hcloud_firewall.service.id]
   user_data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
-    volume_id             = hcloud_volume.data.id
-    data_dir              = local.data_dir
-    public_hostname       = var.public_hostname
-    deploy_token          = random_password.deploy_token.result
-    github_webhook_secret = var.github_webhook_secret
-    tunnel_token          = var.cloudflare_tunnel_token
-    profile               = local.tunnel ? "tunnel" : "public"
-    public_views          = var.public_views ? "true" : "false"
-    evidence_url          = var.evidence_url
-    retention_days        = var.retention_days
-    dsh_version           = var.dsh_version
-    source_repository     = var.source_repository
-    source_ref            = var.source_ref
-    service_flags         = var.conformance_mode ? "--conformance" : ""
+    volume_id                = hcloud_volume.data.id
+    data_dir                 = local.data_dir
+    public_hostname          = var.public_hostname
+    deploy_token             = random_password.deploy_token.result
+    github_webhook_secret    = var.github_webhook_secret
+    tunnel_token             = var.cloudflare_tunnel_token
+    profile                  = local.tunnel ? "tunnel" : "public"
+    public_views             = var.public_views ? "true" : "false"
+    evidence_url             = var.evidence_url
+    retention_days           = var.retention_days
+    dsh_version              = var.dsh_version
+    source_repository        = var.source_repository
+    source_ref               = var.source_ref
+    service_flags            = var.conformance_mode ? "--conformance" : ""
+    preview_domain           = var.preview_domain
+    model_api_key            = var.model_api_key
+    model_upstream           = var.model_upstream
+    model_models             = var.model_models
+    model_max_requests       = var.model_max_requests
+    model_max_body_bytes     = var.model_max_body_bytes
+    model_max_concurrency    = var.model_max_concurrency
+    model_global_concurrency = var.model_global_concurrency
+    model_timeout_ms         = var.model_timeout_ms
   })
 
   lifecycle {
     precondition {
       condition     = !local.tunnel || var.public_hostname != ""
       error_message = "public_hostname is required with a tunnel: it is the hostname the tunnel routes to the service."
+    }
+    precondition {
+      condition     = var.preview_domain == "" || local.tunnel
+      error_message = "preview_domain requires cloudflare_tunnel_token in the reference module; a manual Compose deployment must add a wildcard Caddy site explicitly."
+    }
+    precondition {
+      condition     = !var.public_views || local.tunnel
+      error_message = "public_views requires cloudflare_tunnel_token in the reference module; a manual Compose deployment can supply an identity-aware proxy instead."
     }
   }
 }

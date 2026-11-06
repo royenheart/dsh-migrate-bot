@@ -221,6 +221,20 @@ async function forward() {
       await new Promise(resolve => setTimeout(resolve, 250))
     }
   }
+  const modelPort = Number(env.MODEL_PORT ?? 0)
+  const modelSocket = env.MODEL_SOCKET
+  if (Number.isInteger(modelPort) && modelPort > 0 && typeof modelSocket === 'string' && modelSocket !== '') {
+    const relay = createServer((socket) => {
+      const upstream = createConnection({ path: modelSocket })
+      socket.pipe(upstream).pipe(socket)
+      socket.on('error', () => upstream.destroy())
+      upstream.on('error', () => socket.destroy())
+    })
+    await new Promise((resolve, reject) => {
+      relay.once('error', reject)
+      relay.listen(modelPort, '127.0.0.1', () => { relay.off('error', reject); resolve() })
+    })
+  }
   mkdirSync(socketDir, { recursive: true })
   for (const entry of ['plugin', 'safe']) {
     const port = Number(ready[entry]?.port)

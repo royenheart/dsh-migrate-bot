@@ -37,10 +37,27 @@ The service is configured only by its environment. It validates every variable a
 | `RETENTION_DAYS` | no, 90 | Days a run record, its log and its evidence are kept; the periodic sweep deletes older records |
 | `PUBLIC_VIEWS` | no, `false` | `true` serves `/view/…` and `/p/…` without the token; only behind an identity-aware proxy |
 | `EVIDENCE_URL` | no | Dedicated base URL of the benchmark site; when set, a run page's evidence link opens the integrated Run evidence page instead of the raw JSON. Its origin receives credentialed CORS, so it must not share an origin with unrelated pages. If the site cannot authenticate, its Run evidence page offers a link to the run page for the identity-provider login |
+| `PREVIEW_DOMAIN` | no | Optional DNS suffix for preview origins. When set, a preview answers on `p-<id>.<PREVIEW_DOMAIN>` and the old `/p/<id>/` path redirects there. The preview and the control/run pages then have different origins |
+| `MODEL_API_KEY` | no | Service-owned provider key for live preview conversations. Empty keeps previews keyless. Supply it through the deployment environment (for example Compose `.env` or an operator-provided secret environment), never Git; the gateway is the only process that reads it |
+| `MODEL_UPSTREAM` | no, `https://api.deepseek.com/anthropic` | Fixed DeepSeek Messages-compatible upstream base for the model gateway; it carries a path and no trailing `/v1`, uses HTTPS (loopback may use HTTP), and the gateway forwards only `/v1/messages` and `/v1/models` |
+| `MODEL_MODELS` | no | Comma-separated model ids the gateway admits; empty admits every id |
+| `MODEL_MAX_REQUESTS` | no, 200 | Model requests one preview grant may make |
+| `MODEL_MAX_BODY_BYTES` | no, 20971520 | Largest Messages request body the gateway buffers, in bytes |
+| `MODEL_MAX_CONCURRENCY` | no, 2 | Concurrent model requests one preview grant may keep in flight |
+| `MODEL_GLOBAL_CONCURRENCY` | no, 20 | Concurrent model requests the gateway serves across all previews |
+| `MODEL_TIMEOUT_MS` | no, 600000 | Upstream request deadline, in milliseconds |
 | `PORT`, `HOST` | no, 8080 and `0.0.0.0` | Where the service listens. Compose fixes them to the defaults, because Caddy and `cloudflared` reach the service at `service:8080` |
 | `INSTANCE_PREFIX` | no, `dsh-preview-` | Prefix of every container the `docker` provider creates; it touches no other container. Two services on one Docker daemon need different prefixes |
 
 `--conformance` is the only flag; it is for a deployment the conformance suite checks, never for one a repository uses. Run the suite against the service directly, or from inside the identity proxy: it carries the deploy bearer, not an interactive Access login, so an outward IAP redirect is outside the suite's view-policy check.
+
+## Model access in a preview
+
+The preview can use a model while the real provider key stays in the deploy service. Set `MODEL_API_KEY` in the service's secret environment; the service starts a model gateway, each preview start receives an instance-lifetime grant, and the preview's dsh server sends requests through a loopback relay to that gateway. The gateway replaces the grant with the provider key and forwards one fixed DeepSeek Messages-compatible path. The preview process and its plugin receive the grant, which is scoped to that preview, its request cap and its concurrency; the provider key never reaches the preview or the browser.
+
+The gateway defaults to `https://api.deepseek.com/anthropic`; `MODEL_UPSTREAM` selects another fixed origin. `MODEL_MODELS` limits the model ids, `MODEL_MAX_REQUESTS` caps one grant; `MODEL_MAX_BODY_BYTES`, `MODEL_MAX_CONCURRENCY`, `MODEL_GLOBAL_CONCURRENCY` and `MODEL_TIMEOUT_MS` bound the request path. A grant lives with its preview deployment and is revoked when that instance stops, is destroyed, expires or is rebuilt; after the request cap, redeploy or restart the preview to issue a new grant. Rebuild the preview image as well as the service image when updating the launcher: the preview image carries the forwarder relay and its tag changes only with `DSH_VERSION`. The gateway listens on a Unix socket inside `DATA_DIR/model/` for the Docker provider and a loopback TCP port for the process provider; the preview container keeps `--network none`, and only its forwarder mounts the gateway socket. When `MODEL_API_KEY` is empty, previews remain keyless and no gateway starts. A viewer who saves a model key in the preview's Settings → Models page shadows the grant because dsh reads its local credential store before the inherited environment; clear that saved key or reset the preview home to recover. The process provider runs preview code as the service user and is intended for CI or local checks; use the Docker provider when the provider-key boundary must hold.
+
+Set `PREVIEW_DOMAIN` when previews should have their own origins. The service then builds preview URLs as `<scheme>://p-<id>.<PREVIEW_DOMAIN>/` and redirects the old `/p/<id>/` path there; use the Cloudflare Tunnel profile with a wildcard public hostname for `*.PREVIEW_DOMAIN` and separate Access applications for the plugin and safe entries; the reference Caddy `public` profile serves only `PUBLIC_HOSTNAME`, so use the Tunnel profile for preview origins or add a wildcard Caddy site explicitly. A wildcard certificate alone does not add that site. The control page and run pages stay on `PUBLIC_URL`.
 
 ## On any host with Docker
 
@@ -62,7 +79,7 @@ The service runs on any Linux host that meets these requirements, from any cloud
 3. Set `EVIDENCE_URL` to the benchmark site when its Run evidence page should open a run directly; leave it empty to link the JSON bundle. Build the preview image: `docker compose --profile build-only build preview-image`. A build step resolves names with the resolvers in the host's `/etc/resolv.conf`; when that is a resolver only the host reaches, such as Tailscale's MagicDNS at `100.100.100.100`, `apt-get` and `npm` in the build fail to resolve. Then build on the host network: a `compose.override.yaml` beside `compose.yaml` that sets `build.network: host` for `service` and `preview-image`.
 4. Start the stack with `COMPOSE_PROFILES=public` (Caddy) or `COMPOSE_PROFILES=tunnel` (Cloudflare Tunnel) in `.env`: `docker compose up -d --build`.
 
-The Docker socket is mounted into the service container only, so the service can start preview containers; a preview container never sees it. A serving preview has no network; the dependency install runs on Docker's default bridge, so block the cloud metadata endpoint for containers on a machine whose metadata holds secrets, as the Terraform module does. With a tunnel, create the tunnel in Cloudflare Zero Trust with a public hostname that routes to `http://service:8080`, and put a separate Access application with your policy on `/view/*` and on `/p/*`; the run page carries source and trace, so its policy should be the narrower one. Set `PUBLIC_VIEWS=true` only once those policies are in place. The API paths (`/runs`, `/previews`, `/github/webhook`) must stay reachable without Access, because GitHub and the runner cannot log in: the token and the webhook signature protect them. Without an identity-aware proxy, keep `PUBLIC_VIEWS=false`; the pages then answer only requests that carry the token, which a browser does not send. The Action's `deploy.trace` defaults to `summary`; use `full` only when the `/view/*` policy is restricted to the people who may read the source. Run records are kept under `DATA_DIR/runs` for `RETENTION_DAYS`; evidence bundles are stored per run with a migration history index, so the trace and prompts are data at rest as well as a page.
+The Docker socket is mounted into the service container only, so the service can start preview containers; a preview container never sees it. A serving preview has no network; the dependency install runs on Docker's default bridge, so block the cloud metadata endpoint for containers on a machine whose metadata holds secrets, as the Terraform module does. With a tunnel, create the tunnel in Cloudflare Zero Trust with a public hostname that routes to `http://service:8080`, and put a separate Access application with your policy on `/view/*` and on `/p/*`; when `PREVIEW_DOMAIN` is enabled, put the plugin and safe applications on the corresponding `p-<id>.<PREVIEW_DOMAIN>` hosts as well; the run page carries source and trace, so its policy should be the narrower one. Set `PUBLIC_VIEWS=true` only once those policies are in place. The API paths (`/runs`, `/previews`, `/github/webhook`) must stay reachable without Access, because GitHub and the runner cannot log in: the token and the webhook signature protect them. Without an identity-aware proxy, keep `PUBLIC_VIEWS=false`; the pages then answer only requests that carry the token, which a browser does not send. The Action's `deploy.trace` defaults to `summary`; use `full` only when the `/view/*` policy is restricted to the people who may read the source. Run records are kept under `DATA_DIR/runs` for `RETENTION_DAYS`; evidence bundles are stored per run with a migration history index, so the trace and prompts are data at rest as well as a page.
 
 ## On Hetzner Cloud with the Terraform module
 
@@ -86,9 +103,18 @@ terraform output -raw deploy_token
 | `cloudflare_tunnel_token` | empty, sensitive | Run behind a Cloudflare Tunnel with no inbound port |
 | `ssh_key_ids` | none | Hetzner SSH key ids for root; the firewall opens no SSH port |
 | `volume_size` | 20 | Size of the data volume in GB |
-| `public_views` | `false` | `PUBLIC_VIEWS` |
+| `public_views` | `false` | `PUBLIC_VIEWS`; the reference module requires a Tunnel token for an identity-aware proxy, while a manual Compose deployment can supply one |
 | `evidence_url` | empty | `EVIDENCE_URL` |
 | `retention_days` | 90 | `RETENTION_DAYS` |
+| `preview_domain` | empty | `PREVIEW_DOMAIN`; the reference module requires a Tunnel token, then route `*.preview_domain` to the service and put the Access applications on the plugin and safe entries. A manual Compose deployment must add a wildcard Caddy site explicitly |
+| `model_api_key` | empty, sensitive | `MODEL_API_KEY`; it is written into the server user data, so it is also in Terraform state. Keep the state operator-readable, or inject the value out of band |
+| `model_upstream` | `https://api.deepseek.com/anthropic` | Fixed DeepSeek Messages-compatible upstream |
+| `model_models` | empty | Comma-separated allowed model ids |
+| `model_max_requests` | 200 | Requests one preview grant may make |
+| `model_max_body_bytes` | 20971520 | Largest buffered request body |
+| `model_max_concurrency` | 2 | Concurrent model requests per preview |
+| `model_global_concurrency` | 20 | Concurrent model requests across previews |
+| `model_timeout_ms` | 600000 | Upstream request deadline |
 | `dsh_version` | `0.2.0-rc.2` | The dsh version of the preview image |
 | `source_repository`, `source_ref` | this repository, `main` | What the server builds; it must be readable without credentials |
 | `conformance_mode` | `false` | Start the service with `--conformance`; for a throwaway check only |

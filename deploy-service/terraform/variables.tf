@@ -94,3 +94,64 @@ variable "retention_days" {
   type        = number
   default     = 90
 }
+
+variable "preview_domain" {
+  description = "Optional preview origin suffix; previews answer on p-<id>.<preview_domain>."
+  type        = string
+  default     = ""
+}
+
+variable "model_api_key" {
+  description = "Optional service-owned model key used by the preview gateway. Empty keeps previews keyless."
+  type        = string
+  sensitive   = true
+  default     = ""
+
+  validation {
+    condition     = var.model_api_key == "" || can(regex("^[!-~]+$", var.model_api_key))
+    error_message = "model_api_key must be a single-line printable ASCII value; CR/LF and control characters would corrupt the generated .env."
+  }
+}
+
+variable "model_upstream" {
+  description = "DeepSeek Messages-compatible upstream origin for the preview model gateway."
+  type        = string
+  default     = "https://api.deepseek.com/anthropic"
+}
+
+variable "model_models" {
+  description = "Comma-separated model ids the preview gateway admits; empty admits every id."
+  type        = string
+  default     = ""
+}
+
+variable "model_max_requests" {
+  description = "Maximum model requests one preview grant may make."
+  type        = number
+  default     = 200
+}
+
+
+variable "model_max_body_bytes" {
+  description = "Largest model request body the preview gateway buffers, in bytes."
+  type        = number
+  default     = 20971520
+}
+
+variable "model_max_concurrency" {
+  description = "Concurrent model requests one preview grant may keep in flight."
+  type        = number
+  default     = 2
+}
+
+variable "model_global_concurrency" {
+  description = "Concurrent model requests the preview gateway serves across all previews."
+  type        = number
+  default     = 20
+}
+
+variable "model_timeout_ms" {
+  description = "Upstream model request deadline, in milliseconds."
+  type        = number
+  default     = 600000
+}
