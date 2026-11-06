@@ -26,30 +26,48 @@ export type ParseCommandResult =
 export function parseCommand(body: string): ParseCommandResult {
   const lines = body.split(/\r?\n/)
   for (const line of lines) {
-    const index = line.indexOf(COMMAND_PREFIX)
-    if (index < 0) continue
-    const rest = line.slice(index + COMMAND_PREFIX.length).trim()
-    // The prefix alone, or followed by prose that is not a verb, is a request
-    // for help rather than an error: a user who typed the bot's name gets the
-    // vocabulary instead of silence.
-    if (rest === '') return { ok: false, reason: 'help' }
-    const parts = rest.split(/\s+/)
-    const verb = parts[0] ?? ''
-    const spec = COMMANDS_BY_VERB[verb]
-    if (spec === undefined) {
-      return { ok: false, reason: `\`${verb}\` is not a command.\n\n${renderCommandHelp()}` }
-    }
-    const flags: string[] = []
-    for (const token of parts.slice(1)) {
-      if (!token.startsWith('-')) {
-        return { ok: false, reason: `\`${token}\` is not an argument \`${verb}\` accepts.\n\n${renderCommandHelp()}` }
+    let from = 0
+    while (true) {
+      const index = line.indexOf(COMMAND_PREFIX, from)
+      if (index < 0) break
+      // A package name, path, or URL such as `royenheart/dsh-migrate-bot` or
+      // `https://example.com/dsh-migrate` contains the prefix but is not a
+      // command. A command starts the line or follows punctuation such as
+      // whitespace, a code fence, or an opening parenthesis, and only whitespace
+      // or the end of the line may follow the prefix; otherwise keep looking for
+      // a real command later.
+      const before = index === 0 ? undefined : line[index - 1]
+      const after = line[index + COMMAND_PREFIX.length]
+      const startsCommand = before === undefined
+        || /\s/.test(before)
+        || ['`', '(', '[', '"', "'", '>', '*'].includes(before)
+      if (!startsCommand || (after !== undefined && !/\s/.test(after))) {
+        from = index + 1
+        continue
       }
-      if (!spec.flags.includes(token)) {
-        return { ok: false, reason: `\`${verb}\` does not take \`${token}\`.\n\n${renderCommandHelp()}` }
+      const rest = line.slice(index + COMMAND_PREFIX.length).trim()
+      // The prefix alone, or followed by prose that is not a verb, is a request
+      // for help rather than an error: a user who typed the bot's name gets the
+      // vocabulary instead of silence.
+      if (rest === '') return { ok: false, reason: 'help' }
+      const parts = rest.split(/\s+/)
+      const verb = parts[0] ?? ''
+      const spec = COMMANDS_BY_VERB[verb]
+      if (spec === undefined) {
+        return { ok: false, reason: `\`${verb}\` is not a command.\n\n${renderCommandHelp()}` }
       }
-      flags.push(token)
+      const flags: string[] = []
+      for (const token of parts.slice(1)) {
+        if (!token.startsWith('-')) {
+          return { ok: false, reason: `\`${token}\` is not an argument \`${verb}\` accepts.\n\n${renderCommandHelp()}` }
+        }
+        if (!spec.flags.includes(token)) {
+          return { ok: false, reason: `\`${verb}\` does not take \`${token}\`.\n\n${renderCommandHelp()}` }
+        }
+        flags.push(token)
+      }
+      return { ok: true, command: { spec, flags } }
     }
-    return { ok: true, command: { spec, flags } }
   }
   return { ok: false, reason: 'no command' }
 }
