@@ -23,7 +23,7 @@ Every document uses these terms as written here and does not redefine them. *Rep
 | **cards check** | Holding the tree to the card ledger: every card accounted for, every required card done, its evidence in the tree. | `cards` | — |
 | **mechanical check** | The plugin's build, typecheck and tests with `@deepseek-ai/dsh-*` pinned to the release, and the plugin shape scan. | `mechanical` | — |
 | **boot check** | Installing the tree into a temporary profile and starting dsh; it passes when dsh reaches the credential check. | `boot` | boot probe |
-| **web check** | Serving a temporary web profile with the plugins mounted and waiting for its ready line. | `web` | web smoke |
+| **web check** | Serving a temporary web profile with the plugins mounted, waiting for its ready line, and reading the agent-preset roster. | `web` | web smoke |
 | **end-to-end check** | Running the suite of the suite branch against a web profile of the release that serves the tree. | `e2e` | — |
 | **end-to-end baseline** | The tests of the suite that pass against the unmodified tree on the source release; each must still pass on the target. | `e2eBaseline`, event `e2e.characterized` | — |
 | **failure fingerprint** | The normalised first failing line of a check, compared across repair attempts. | `fingerprint` | failure signature |

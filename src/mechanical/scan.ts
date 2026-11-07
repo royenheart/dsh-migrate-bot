@@ -86,10 +86,13 @@ export function scanPluginShape(root: string): ShapeFinding[] {
     findings.push({ message: 'dsh.bundle is required for an out-of-tree plugin' })
   } else {
     const patch = (bundle as Record<string, unknown>).patch
-    if (typeof patch !== 'string') {
-      findings.push({ message: 'dsh.bundle.patch must point at cordis.patch.yml' })
-    } else if (!existsSync(join(root, patch))) {
-      findings.push({ message: `dsh.bundle.patch file is missing: ${patch}` })
+    const patches = typeof patch === 'string' ? [patch] : Array.isArray(patch) ? patch : []
+    if (!Array.isArray(patches) || patches.length === 0 || !patches.every(file => typeof file === 'string' && file !== '')) {
+      findings.push({ message: 'dsh.bundle.patch must point at cordis.patch.yml or a list of patch files' })
+    } else {
+      for (const file of patches as string[]) {
+        if (!existsSync(join(root, file))) findings.push({ message: `dsh.bundle.patch file is missing: ${file}` })
+      }
     }
   }
   return findings
