@@ -80,10 +80,6 @@ resource "hcloud_server" "service" {
       condition     = !var.public_views || local.tunnel
       error_message = "public_views requires cloudflare_tunnel_token in the reference module; a manual Compose deployment can supply an identity-aware proxy instead."
     }
-    precondition {
-      condition     = var.preview_domain == "" || var.public_views
-      error_message = "preview_domain requires public_views in the reference module: an identity-aware proxy needs PUBLIC_VIEWS=true."
-    }
   }
 }
 

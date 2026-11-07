@@ -744,13 +744,15 @@ export class PreviewManager {
             const current = this.records.get(record.id)
             if (current === undefined || Date.parse(current.expiresAt) > now) return false
             this.generations.set(record.id, (this.generations.get(record.id) ?? 0) + 1)
-            this.writeMarker(record.id, {
-              closed: false,
-              detail: `Expired at ${current.expiresAt}; redeploy rebuilds it from the pull request head.`,
-              state: 'expired',
-              cloneUrl: current.cloneUrl,
-              headSha: current.headSha,
-            })
+            if (this.marker(record.id)?.closed !== true) {
+              this.writeMarker(record.id, {
+                closed: false,
+                detail: `Expired at ${current.expiresAt}; redeploy rebuilds it from the pull request head.`,
+                state: 'expired',
+                cloneUrl: current.cloneUrl,
+                headSha: current.headSha,
+              })
+            }
             await this.removeUnderLock(record.id)
             return true
           })
