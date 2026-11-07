@@ -31,7 +31,9 @@ services:
       PUBLIC_VIEWS: ${PUBLIC_VIEWS:-false}
       EVIDENCE_URL: ${EVIDENCE_URL:-}
       PROVIDER: docker
-      DSH_IMAGE: ${DSH_IMAGE:-dsh-migrate-preview:0.2.0-rc.2}
+      # Derived from one source so a preview never runs a different dsh than
+      # the image was built for; use a compose override for a custom image.
+      DSH_IMAGE: dsh-migrate-preview:${DSH_VERSION:-0.2.0-rc.2}
       IDLE_MINUTES: ${IDLE_MINUTES:-120}
       TTL_DAYS: ${TTL_DAYS:-7}
       RETENTION_DAYS: ${RETENTION_DAYS:-90}
@@ -51,7 +53,7 @@ services:
       context: ./preview-image
       args:
         DSH_VERSION: ${DSH_VERSION:-0.2.0-rc.2}
-    image: ${DSH_IMAGE:-dsh-migrate-preview:0.2.0-rc.2}
+    image: dsh-migrate-preview:${DSH_VERSION:-0.2.0-rc.2}
 
   caddy:
     profiles: [public]

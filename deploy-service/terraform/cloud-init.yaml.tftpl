@@ -26,6 +26,8 @@ write_files:
       EVIDENCE_URL=${evidence_url}
       RETENTION_DAYS=${retention_days}
       DSH_VERSION=${dsh_version}
+      # Kept for an older source_ref whose compose still reads it; the current
+      # compose derives the image tag from DSH_VERSION and ignores this.
       DSH_IMAGE=dsh-migrate-preview:${dsh_version}
       CLOUDFLARE_TUNNEL_TOKEN=${tunnel_token}
       COMPOSE_PROFILES=${profile}
