@@ -1,9 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { hasClientSurface, scrubWebOutput, WEB_READY_PATTERN, webArgs, webSmoke } from '../../src/verify/web.ts'
+import { pluginBundles, unresolvedBundleRows } from '../../src/verify/bundle.ts'
 
 function plugin(fields: Record<string, unknown>): string {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-mig-web-'))
@@ -146,6 +147,254 @@ test('a server that left a plugin out is not ready for it', async () => {
     const result = await webSmoke({ workdir: dir, bin: '/bin/dsh', timeoutMs: 5_000, webHelp: '', spawnImpl: async () => ({ code: null, output, timedOut: false, ready: true }) })
     assert.equal(result.ok, false)
     assert.match(result.signature, /^web load: @acme\/plugin: Error: Plugin @acme\/plugin@/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+
+function presetPlugin(): string {
+  const dir = plugin({ dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web' } } })
+  writeFileSync(join(dir, 'cordis.patch.yml'), [
+    '- insert:',
+    '    - id: preset-opencode-omo',
+    "      name: '@deepseek-ai/dsh-agent-preset'",
+    '      config:',
+    '        id: opencode-omo',
+    '        name: opencode-omo',
+    '',
+  ].join('\n'))
+  return dir
+}
+
+function presetFetch(broken: string | undefined): typeof fetch {
+  const login = new Response(null, { status: 303, headers: { 'set-cookie': 'dsh-auth=session; Path=/' } })
+  const api = new Response(JSON.stringify({ result: { ok: true, value: { presets: [{ id: 'opencode-omo', ...(broken === undefined ? {} : { broken }) }] } } }), { status: 200 })
+  return async (input) => String(input).includes('/api/agentPresets/list') ? api : login
+}
+
+test('a broken declared preset fails the web check', async () => {
+  const dir = presetPlugin()
+  try {
+    const result = await webSmoke({
+      workdir: dir,
+      bin: '/bin/dsh',
+      timeoutMs: 5_000,
+      webHelp: '',
+      fetchImpl: presetFetch('tool-subagent-list-agents: never started'),
+      spawnImpl: async () => ({ code: 0, output: 'dsh web: http://127.0.0.1:41234/?token=secret\n', timedOut: false, ready: true }),
+    })
+    assert.equal(result.ok, false)
+    assert.match(result.signature, /preset unhealthy/)
+    assert.match(result.detail, /opencode-omo.*never started/)
+    assert.doesNotMatch(result.detail, /secret/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('a healthy declared preset passes the web check', async () => {
+  const dir = presetPlugin()
+  try {
+    const result = await webSmoke({
+      workdir: dir,
+      bin: '/bin/dsh',
+      timeoutMs: 5_000,
+      webHelp: '',
+      fetchImpl: presetFetch(undefined),
+      spawnImpl: async () => ({ code: 0, output: 'dsh web: http://127.0.0.1:41234/?token=secret\n', timedOut: false, ready: true }),
+    })
+    assert.equal(result.ok, true)
+    assert.match(result.signature, /presets healthy: opencode-omo/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+
+test('an unresolved bundle row fails before the server boots', async () => {
+  const dir = plugin({ dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web' } } })
+  writeFileSync(join(dir, 'cordis.patch.yml'), '- insert:\n    - id: missing\n      name: "@acme/missing"\n')
+  try {
+    const result = await webSmoke({
+      workdir: dir,
+      bin: process.execPath,
+      timeoutMs: 5_000,
+      webHelp: '',
+      spawnImpl: async () => { throw new Error('must not boot when a bundle row cannot resolve') },
+    })
+    assert.equal(result.ok, false)
+    assert.match(result.signature, /unresolved bundle row/)
+    assert.match(result.detail, /@acme\/missing/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+
+test('a preset display name in config is not mistaken for a module row', () => {
+  const dir = plugin({ dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web' } } })
+  writeFileSync(join(dir, 'cordis.patch.yml'), [
+    '- insert:',
+    '    - id: preset-opencode-omo',
+    "      name: '@deepseek-ai/dsh-agent-preset'",
+    '      config:',
+    '        id: opencode-omo',
+    '        name: opencode-omo display name',
+    '',
+  ].join('\n'))
+  try {
+    const rows = pluginBundles(dir)[0]?.rows ?? []
+    assert.deepEqual(rows.map(row => row.name), ['@deepseek-ai/dsh-agent-preset'])
+    assert.equal(rows[0]?.presetId, 'opencode-omo')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+
+test('a config array of display names stays out of the module rows', () => {
+  const dir = plugin({ dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web' } } })
+  writeFileSync(join(dir, 'cordis.patch.yml'), [
+    '- insert:',
+    '    - id: model-router',
+    "      name: '@acme/router'",
+    '      config:',
+    '        models:',
+    '          - id: deepseek-chat',
+    '            name: DeepSeek Chat',
+    '',
+  ].join('\n'))
+  try {
+    const rows = pluginBundles(dir)[0]?.rows ?? []
+    assert.deepEqual(rows.map(row => row.name), ['@acme/router'])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('a disabled row does not fail resolution', async () => {
+  const dir = plugin({ dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web' } } })
+  writeFileSync(join(dir, 'cordis.patch.yml'), [
+    '- insert:',
+    '    - id: optional-missing',
+    "      name: '@acme/missing'",
+    '      disabled: true',
+    '',
+  ].join('\n'))
+  try {
+    const result = await webSmoke({
+      workdir: dir,
+      bin: process.execPath,
+      timeoutMs: 5_000,
+      webHelp: '',
+      spawnImpl: async () => ({ code: 0, output: 'dsh web: http://127.0.0.1:41234/?token=x\n', timedOut: false, ready: true }),
+    })
+    assert.equal(result.ok, true)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('the preset health timeout also stops the kept server', async () => {
+  const dir = presetPlugin()
+  let stopped = 0
+  try {
+    const result = await webSmoke({
+      workdir: dir,
+      bin: '/bin/dsh',
+      timeoutMs: 20,
+      webHelp: '',
+      fetchImpl: async () => new Promise<Response>(() => {}),
+      spawnImpl: async () => ({
+        code: 0,
+        output: 'dsh web: http://127.0.0.1:41234/?token=x\n',
+        timedOut: false,
+        ready: true,
+        stop: () => { stopped += 1 },
+      }),
+    })
+    assert.equal(result.ok, false)
+    assert.match(result.signature, /preset check timed out/)
+    assert.equal(stopped, 1)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+
+test('a disabled parent group keeps its children out of resolution', () => {
+  const dir = plugin({ dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web' } } })
+  writeFileSync(join(dir, 'cordis.patch.yml'), [
+    '- insert:',
+    '    - id: optional-group',
+    '      name: cordis:group',
+    '      group: true',
+    '      disabled: true',
+    '      config:',
+    '        - id: optional-missing',
+    "          name: '@acme/missing'",
+    '',
+  ].join('\n'))
+  try {
+    const rows = pluginBundles(dir)[0]?.rows ?? []
+    assert.deepEqual(rows.map(row => [row.name, row.enabled]), [['cordis:group', false], ['@acme/missing', false]])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+
+test('a plugin-specific config.plugins array stays out of the module rows', () => {
+  const dir = plugin({ dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web' } } })
+  writeFileSync(join(dir, 'cordis.patch.yml'), [
+    '- insert:',
+    '    - id: model-router',
+    "      name: '@acme/router'",
+    '      config:',
+    '        plugins:',
+    '          - id: nested-label',
+    '            name: Display label',
+    '',
+  ].join('\n'))
+  try {
+    const rows = pluginBundles(dir)[0]?.rows ?? []
+    assert.deepEqual(rows.map(row => row.name), ['@acme/router'])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('null and expression disabled gates stay enabled', () => {
+  const dir = plugin({ dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web' } } })
+  writeFileSync(join(dir, 'cordis.patch.yml'), [
+    '- insert:',
+    '    - id: null-gate',
+    "      name: '@acme/one'",
+    '      disabled: null',
+    '    - id: expression-gate',
+    "      name: '@acme/two'",
+    "      disabled: !!js false",
+    '',
+  ].join('\n'))
+  try {
+    const rows = pluginBundles(dir)[0]?.rows ?? []
+    assert.deepEqual(rows.map(row => [row.name, row.enabled]), [['@acme/one', true], ['@acme/two', true]])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('a relative module resolves from the patch file directory', () => {
+  const dir = plugin({ dsh: { bundle: { patch: './patches/verification.yml' }, client: { platform: 'web' } } })
+  writeFileSync(join(dir, 'cordis.patch.yml'), '')
+  const patches = join(dir, 'patches')
+  mkdirSync(patches, { recursive: true })
+  writeFileSync(join(patches, 'verification.yml'), '- insert:\n    - id: local\n      name: ../lib/index.js\n')
+  mkdirSync(join(dir, 'lib'), { recursive: true })
+  writeFileSync(join(dir, 'lib', 'index.js'), 'export default {}\n')
+  try {
+    assert.deepEqual(unresolvedBundleRows(dir, process.execPath), [])
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
