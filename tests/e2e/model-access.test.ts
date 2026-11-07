@@ -23,8 +23,10 @@ const LAUNCHER = join(ROOT, 'deploy-service', 'preview-image', 'launcher.mjs')
 const REQUIRED = process.env.DEPLOY_SERVICE_E2E === 'required'
 
 function pinnedDsh(): string {
-  const manifest = JSON.parse(readFileSync(join(ROOT, 'container', 'agent-runtime', 'package.json'), 'utf8')) as { dependencies: Record<string, string> }
-  return manifest.dependencies['@deepseek-ai/dsh'] ?? '0.2.0-rc.2'
+  const dockerfile = readFileSync(join(ROOT, 'deploy-service', 'preview-image', 'Dockerfile'), 'utf8')
+  const version = /ARG DSH_VERSION=([^\s]+)/.exec(dockerfile)?.[1]
+  if (version === undefined) throw new Error('preview-image/Dockerfile pins no DSH_VERSION')
+  return version
 }
 
 async function freePort(): Promise<number> {
@@ -51,7 +53,10 @@ async function waitPort(port: number): Promise<void> {
 
 test('a real dsh headless turn reaches the model gateway through the preview forwarder', { timeout: 300_000 }, async (t) => {
   if (process.env.DEPLOY_SERVICE_REAL_DSH === '0') return t.skip('DEPLOY_SERVICE_REAL_DSH=0 disables the real dsh model E2E')
-  if (!existsSync(GATEWAY)) return t.skip('the deploy service is not built; run `npm run deploy-service:build` first')
+  if (!existsSync(GATEWAY)) {
+    if (REQUIRED) assert.fail('the deploy service is not built; run `npm run deploy-service:build` first')
+    return t.skip('the deploy service is not built; run `npm run deploy-service:build` first')
+  }
 
   const scratch = mkdtempSync(join(tmpdir(), 'dsh-model-e2e-'))
   const children: ChildProcess[] = []
@@ -151,6 +156,7 @@ test('a real dsh headless turn reaches the model gateway through the preview for
         DSH_HOME: dshHome,
         DEEPSEEK_BASE_URL: `http://127.0.0.1:${String(relayPort)}`,
         DEEPSEEK_API_KEY: endpoint.token,
+        DSH_TELEMETRY_DISABLED: '1',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     })

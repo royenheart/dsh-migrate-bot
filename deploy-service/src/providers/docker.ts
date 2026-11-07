@@ -37,7 +37,7 @@ export interface DockerProviderOptions {
 /** The user previews run as when the service runs as root: the image's `node` user. */
 const PREVIEW_UID = 1000
 
-const LIMITS = ['--cpus', '1', '--memory', '2g', '--pids-limit', '512', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges']
+const LIMITS = ['--cpus', '1', '--memory', '2g', '--pids-limit', '512', '--ulimit', 'nofile=1024:1024', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges']
 
 export class DockerProvider implements InstanceProvider {
   private readonly instances = new Map<string, RunningInstance>()

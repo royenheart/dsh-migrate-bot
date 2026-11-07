@@ -228,8 +228,12 @@ async function forward() {
       const upstream = createConnection({ path: modelSocket })
       socket.pipe(upstream).pipe(socket)
       socket.on('error', () => upstream.destroy())
+      socket.on('close', () => upstream.destroy())
       upstream.on('error', () => socket.destroy())
+      upstream.on('close', () => socket.destroy())
     })
+    relay.maxConnections = 8
+    relay.on('error', (error) => process.stderr.write(`dsh-preview: model relay: ${String(error)}\n`))
     await new Promise((resolve, reject) => {
       relay.once('error', reject)
       relay.listen(modelPort, '127.0.0.1', () => { relay.off('error', reject); resolve() })
