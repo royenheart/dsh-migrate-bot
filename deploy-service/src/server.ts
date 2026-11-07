@@ -169,10 +169,55 @@ export function createService(deps: ServiceDeps): Server {
     return config.PUBLIC_VIEWS || hasBearer(req, config.DEPLOY_TOKEN)
   }
 
+  /** Resolve a request whose Host is one preview's dedicated origin. */
+  function previewFromHost(host: string | undefined, path: string): { id: string; safe: boolean; path: string } | undefined {
+    if (config.PREVIEW_DOMAIN === undefined || host === undefined) return undefined
+    const parts = host.toLowerCase().split(':')
+    const match = /^p-([0-9a-f]{16})\.(.+)$/.exec(parts[0] ?? '')
+    if (match === null || match[2] !== config.PREVIEW_DOMAIN) return undefined
+    if (path === '/safe') return { id: match[1] ?? '', safe: true, path: '/' }
+    if (path.startsWith('/safe/')) return { id: match[1] ?? '', safe: true, path: path.slice('/safe'.length) }
+    return { id: match[1] ?? '', safe: false, path }
+  }
+
+  /** Whether a host belongs to the preview wildcard but names no preview. */
+  function previewDomainHost(host: string | undefined): boolean {
+    if (config.PREVIEW_DOMAIN === undefined || host === undefined) return false
+    const hostname = host.toLowerCase().split(':')[0] ?? ''
+    const control = new URL(config.PUBLIC_URL).hostname.toLowerCase()
+    return hostname !== control && (hostname === config.PREVIEW_DOMAIN || hostname.endsWith(`.${config.PREVIEW_DOMAIN}`))
+  }
+
+  const publicUrl = new URL(config.PUBLIC_URL)
+  const previewPort = publicUrl.port === '' ? '' : `:${publicUrl.port}`
+  const previewOrigin = (id: string): string => `${publicUrl.protocol}//p-${id}.${config.PREVIEW_DOMAIN ?? ''}${previewPort}`
+  const requestOrigin = (host: string | undefined): string => `${publicUrl.protocol}//${(host ?? '').toLowerCase()}`
+
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', 'http://service')
     const parts = segments(url.pathname)
     const root = parts[0]
+    if (previewDomainHost(req.headers.host) && previewFromHost(req.headers.host, url.pathname) === undefined) {
+      return send(res, failure(404, 'no such preview'))
+    }
+    const byHost = previewFromHost(req.headers.host, url.pathname)
+    if (byHost !== undefined) {
+      if (!mayView(req)) return send(res, { ...failure(401, 'this page needs the deploy token, or an identity-aware proxy in front of the service with PUBLIC_VIEWS=true'), headers: { 'WWW-Authenticate': 'Bearer', ...runs.corsHeaders() } })
+      if (byHost.safe && url.pathname === '/safe') {
+        const location = `${previewOrigin(byHost.id)}/safe/${url.search}`
+        return send(res, { status: 308, contentType: 'text/plain', body: '', headers: { Location: location } })
+      }
+      if (previews.byId(byHost.id) === undefined) return send(res, failure(404, 'no such preview'))
+      let instance
+      try {
+        instance = await previews.ensureRunning(byHost.id)
+      } catch (error) {
+        return send(res, { status: 503, contentType: 'text/plain; charset=utf-8', body: `the preview is not serving: ${error instanceof Error ? error.message : String(error)}\n` })
+      }
+      previews.touch(byHost.id)
+      await proxy.web(req, res, byHost.safe ? instance.safeUrl : instance.url, `${byHost.path}${url.search}`, requestOrigin(req.headers.host))
+      return
+    }
     if (url.pathname === '/healthz') return send(res, json(200, { ok: true }))
     if (url.pathname === '/github/webhook') {
       if (req.method !== 'POST') return send(res, failure(405, 'the webhook accepts POST only'))
@@ -180,6 +225,20 @@ export function createService(deps: ServiceDeps): Server {
     }
     if (root === 'view' || root === 'p') {
       if (!mayView(req)) return send(res, { ...failure(401, 'this page needs the deploy token, or an identity-aware proxy in front of the service with PUBLIC_VIEWS=true'), headers: { 'WWW-Authenticate': 'Bearer', ...(root === 'view' ? runs.corsHeaders() : {}) } })
+      if (root === 'p' && config.PREVIEW_DOMAIN !== undefined) {
+        const target = proxyTarget(url.pathname, url.search)
+        if (target === undefined) return send(res, failure(404, 'no such preview'))
+        if ('redirect' in target) {
+          const raw = url.pathname.split('/')
+          const id = raw[2] ?? ''
+          const safe = raw[3] === 'safe'
+          if (previews.byId(id) === undefined) return send(res, failure(404, 'no such preview'))
+          const location = `${previewOrigin(id)}${safe ? '/safe/' : '/'}${url.search}`
+          return send(res, { status: 308, contentType: 'text/plain', body: '', headers: { Location: location } })
+        }
+        const location = `${previewOrigin(target.id)}${target.safe ? '/safe' : ''}${target.path}`
+        return send(res, { status: 308, contentType: 'text/plain', body: '', headers: { Location: location } })
+      }
       if (root === 'view') {
         if (req.method !== 'GET' || parts[1] === undefined) return send(res, failure(404, 'no such page'))
         if (parts.length === 3 && parts[2] === 'inspect.json') return send(res, runs.evidence(parts[1]))
@@ -188,7 +247,7 @@ export function createService(deps: ServiceDeps): Server {
       }
       const target = proxyTarget(url.pathname, url.search)
       if (target === undefined) return send(res, failure(404, 'no such preview'))
-      if ('redirect' in target) return send(res, { status: 308, contentType: 'text/plain', body: '', headers: { Location: target.redirect } })
+      if ('redirect' in target) return send(res, { status: 308, contentType: 'text/plain', body: '', headers: { Location: `${target.redirect}${url.search}` } })
       if (previews.byId(target.id) === undefined) return send(res, failure(404, 'no such preview'))
       let instance
       try {
@@ -228,6 +287,20 @@ export function createService(deps: ServiceDeps): Server {
       socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`)
     }
     const url = new URL(req.url ?? '/', 'http://service')
+    if (previewDomainHost(req.headers.host) && previewFromHost(req.headers.host, url.pathname) === undefined) return refuse('404 Not Found')
+    const byHost = previewFromHost(req.headers.host, url.pathname)
+    if (byHost !== undefined) {
+      if (!mayView(req)) return refuse('401 Unauthorized')
+      if (previews.byId(byHost.id) === undefined) return refuse('404 Not Found')
+      previews.ensureRunning(byHost.id).then(async (instance) => {
+        if (socket.destroyed) return
+        const release = previews.socketOpened(byHost.id)
+        socket.on('close', release)
+        await proxy.upgrade(req, socket, head, byHost.safe ? instance.safeUrl : instance.url, `${byHost.path}${url.search}`, requestOrigin(req.headers.host))
+      }).catch(() => { refuse('503 Service Unavailable') })
+      return
+    }
+    if (config.PREVIEW_DOMAIN !== undefined) return refuse('404 Not Found')
     if (!url.pathname.startsWith('/p/')) return refuse('404 Not Found')
     if (!mayView(req)) return refuse('401 Unauthorized')
     const target = proxyTarget(url.pathname, url.search)

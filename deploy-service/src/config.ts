@@ -34,6 +34,29 @@ export const envSchema = z.object({
     const parsed = new URL(url)
     return !url.includes('?') && !url.includes('#') && parsed.username === '' && parsed.password === ''
   }, 'must be a base URL without query, fragment or credentials').optional()),
+  /** When set, the preview model gateway is enabled and uses this upstream origin. */
+  MODEL_UPSTREAM: z.preprocess(value => value === '' ? undefined : value, z.url({ protocol: /^https?$/ }).refine(url => {
+    const parsed = new URL(url)
+    const path = parsed.pathname.replace(/\/+$/, '')
+    const https = parsed.protocol === 'https:' || ['127.0.0.1', 'localhost', '[::1]'].includes(parsed.hostname)
+    return parsed.username === '' && parsed.password === '' && !url.includes('?') && !url.includes('#') && https && path !== '' && path !== '/' && !path.endsWith('/v1')
+  }, 'must be no credentials/query/fragment, use https (or loopback), include a base path, and avoid a trailing /v1').transform(url => url.replace(/\/+$/, '')).default('https://api.deepseek.com/anthropic')),
+  /** The service-owned provider key. Only the model gateway receives it. */
+  MODEL_API_KEY: z.preprocess(value => value === '' ? undefined : value, z.string().min(1).regex(/^[\x21-\x7E]+$/, 'must be a single-line header value').optional()),
+  /** Comma-separated model ids the gateway admits; absent admits every id. */
+  MODEL_MODELS: z.preprocess(value => value === '' ? undefined : value, z.string().optional()),
+  /** Maximum model requests one preview grant may make. */
+  MODEL_MAX_REQUESTS: z.coerce.number().int().min(1).max(100000).default(200),
+  /** Largest Messages request body the gateway buffers, in bytes. */
+  MODEL_MAX_BODY_BYTES: z.coerce.number().int().min(1024).max(100 * 1024 * 1024).default(20 * 1024 * 1024),
+  /** Concurrent requests one grant may have in flight. */
+  MODEL_MAX_CONCURRENCY: z.coerce.number().int().min(1).max(100).default(2),
+  /** Concurrent requests the gateway serves across all previews. */
+  MODEL_GLOBAL_CONCURRENCY: z.coerce.number().int().min(1).max(1000).default(20),
+  /** Upstream request deadline, in milliseconds. */
+  MODEL_TIMEOUT_MS: z.coerce.number().int().min(1000).max(3600000).default(600000),
+  /** Optional preview origin suffix; previews then answer on p-<id>.<domain>. */
+  PREVIEW_DOMAIN: z.preprocess(value => value === '' ? undefined : value, z.string().regex(/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/, 'must be a lowercase DNS name').optional()),
   INSTANCE_PREFIX: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]*$/).default('dsh-preview-'),
 }).superRefine((env, context) => {
   if (env.PROVIDER === 'docker' && env.DSH_IMAGE === undefined) {

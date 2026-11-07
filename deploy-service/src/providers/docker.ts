@@ -27,6 +27,10 @@ export interface DockerProviderOptions {
   image: string
   /** Prefix of every container name, so the provider never touches another container. */
   prefix: string
+  /** Where the service's model gateway listens, mounted into the forwarder only. */
+  model?: { dir: string; socketPath: string; port: number } | undefined
+  /** Called when a container exits without an explicit stop, to revoke its model grant. */
+  onExit?: ((id: string) => void) | undefined
   log: (message: string) => void
 }
 
@@ -104,12 +108,14 @@ export class DockerProvider implements InstanceProvider {
     await this.stop(spec.id)
     for (const dir of [spec.homeDir, spec.stateDir, spec.socketDir]) mkdirSync(dir, { recursive: true })
     rmSync(join(spec.stateDir, 'ready.json'), { force: true })
-    const user = this.user([spec.workDir, spec.homeDir, spec.stateDir, spec.socketDir])
+    const model = this.options.model
+    const user = this.user([spec.workDir, spec.homeDir, spec.stateDir, spec.socketDir, ...(model === undefined ? [] : [model.dir])])
     const name = this.name(spec.id)
     const forwarder = this.name(spec.id, '-forward')
     const serve = await this.docker([
       'run', '--detach', '--init', '--name', name, '--network', 'none', ...LIMITS, ...user,
       '-e', 'PLUGIN_DIR=/plugin', '-e', 'DSH_HOME=/dsh-home', '-e', 'STATE_DIR=/state', '-e', 'HOME=/tmp',
+      ...(spec.model === undefined ? [] : ['-e', `DEEPSEEK_BASE_URL=${spec.model.baseUrl}`, '-e', `DEEPSEEK_API_KEY=${spec.model.token}`]),
       '-v', `${spec.workDir}:/plugin`, '-v', `${spec.homeDir}:/dsh-home`, '-v', `${spec.stateDir}:/state`,
       this.options.image, 'serve',
     ])
@@ -117,6 +123,7 @@ export class DockerProvider implements InstanceProvider {
       ? await this.docker([
           'run', '--detach', '--init', '--name', forwarder, '--network', `container:${name}`, ...LIMITS, ...user,
           '-e', 'STATE_DIR=/state', '-e', 'SOCKET_DIR=/sockets',
+          ...(model === undefined ? [] : ['-e', 'MODEL_SOCKET=/model/model.sock', '-e', `MODEL_PORT=${String(model.port)}`, '-v', `${model.dir}:/model:ro`]),
           '-v', `${spec.stateDir}:/state:ro`, '-v', `${spec.socketDir}:/sockets`,
           this.options.image, 'forward',
         ])
@@ -144,6 +151,7 @@ export class DockerProvider implements InstanceProvider {
         const exited = (): void => {
           if (this.instances.get(spec.id) !== running) return
           this.options.log(`instance ${spec.id}: container ${container} exited`)
+          this.options.onExit?.(spec.id)
           this.instances.delete(spec.id)
           if (ids.length > 0) void this.docker(['rm', '--force', ...ids])
         }

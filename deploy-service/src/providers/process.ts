@@ -22,6 +22,8 @@ export interface ProcessProviderOptions {
   dshBin?: string | undefined
   dshVersion?: string | undefined
   dataDir: string
+  /** Called when a child exits without an explicit stop, to revoke its model grant. */
+  onExit?: ((id: string) => void) | undefined
   log: (message: string) => void
 }
 
@@ -103,7 +105,10 @@ export class ProcessProvider implements InstanceProvider {
     const bin = await this.dsh()
     for (const dir of [spec.homeDir, spec.stateDir, spec.socketDir]) mkdirSync(dir, { recursive: true })
     rmSync(join(spec.stateDir, 'ready.json'), { force: true })
-    const serve = this.launch(spec, 'serve', instanceEnv(bin, this.options.dataDir, { PLUGIN_DIR: spec.workDir, DSH_HOME: spec.homeDir, STATE_DIR: spec.stateDir }))
+    const serve = this.launch(spec, 'serve', instanceEnv(bin, this.options.dataDir, {
+      PLUGIN_DIR: spec.workDir, DSH_HOME: spec.homeDir, STATE_DIR: spec.stateDir,
+      ...(spec.model === undefined ? {} : { DEEPSEEK_BASE_URL: spec.model.baseUrl, DEEPSEEK_API_KEY: spec.model.token }),
+    }))
     const forward = this.launch(spec, 'forward', instanceEnv(bin, this.options.dataDir, { STATE_DIR: spec.stateDir, SOCKET_DIR: spec.socketDir }))
     const instance: Instance = { children: [serve, forward] }
     this.instances.set(spec.id, instance)
@@ -111,7 +116,10 @@ export class ProcessProvider implements InstanceProvider {
     for (const child of instance.children) {
       child.on('exit', () => {
         exited = true
-        if (this.instances.get(spec.id) === instance) void this.stop(spec.id)
+        if (this.instances.get(spec.id) === instance) {
+          this.options.onExit?.(spec.id)
+          void this.stop(spec.id)
+        }
       })
     }
     try {

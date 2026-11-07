@@ -22,6 +22,8 @@ export interface InstanceSpec {
   stateDir: string
   /** Where `forward` creates the sockets; never writable by the plugin's code. */
   socketDir: string
+  /** The loopback relay a preview uses for model requests, when the service has a model gateway. */
+  model?: { baseUrl: string; token: string }
 }
 
 /** How the service reaches one `dsh web` of a running instance. */

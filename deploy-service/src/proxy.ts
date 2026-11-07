@@ -50,7 +50,7 @@ export class InstanceProxy {
   }
 
   /** The headers a request carries upstream. */
-  private headers(incoming: IncomingHttpHeaders, endpoint: InstanceEndpoint, cookie: string, upgrade: boolean): Record<string, string | string[]> {
+  private headers(incoming: IncomingHttpHeaders, endpoint: InstanceEndpoint, cookie: string, upgrade: boolean, origin = this.publicOrigin): Record<string, string | string[]> {
     const headers: Record<string, string | string[]> = {}
     for (const [name, value] of Object.entries(incoming)) {
       if (value === undefined) continue
@@ -62,7 +62,7 @@ export class InstanceProxy {
     headers.cookie = cookie
     // The browser is on the service's origin; to the instance the same request
     // comes from its own. Any other origin is passed on, and refused there.
-    if (incoming.origin === this.publicOrigin) headers.origin = `http://${endpoint.authority}`
+    if (incoming.origin === origin) headers.origin = `http://${endpoint.authority}`
     return headers
   }
 
@@ -73,14 +73,14 @@ export class InstanceProxy {
    * @param endpoint - the instance entry to reach.
    * @param path - the path and query under the entry, starting with `/`.
    */
-  async web(req: IncomingMessage, res: ServerResponse, endpoint: InstanceEndpoint, path: string): Promise<void> {
+  async web(req: IncomingMessage, res: ServerResponse, endpoint: InstanceEndpoint, path: string, origin: string = this.publicOrigin): Promise<void> {
     const cookie = await this.cookie(endpoint)
     await new Promise<void>((resolve) => {
       const upstream = httpRequest({
         socketPath: endpoint.socketPath,
         method: req.method,
         path,
-        headers: this.headers(req.headers, endpoint, cookie, false),
+        headers: this.headers(req.headers, endpoint, cookie, false, origin),
       }, (answer) => {
         const headers: Record<string, string | string[]> = {}
         for (const [name, value] of Object.entries(answer.headers)) {
@@ -118,12 +118,12 @@ export class InstanceProxy {
    * @param endpoint - the instance entry to reach.
    * @param path - the path and query under the entry.
    */
-  async upgrade(req: IncomingMessage, socket: Duplex, head: Buffer, endpoint: InstanceEndpoint, path: string): Promise<void> {
+  async upgrade(req: IncomingMessage, socket: Duplex, head: Buffer, endpoint: InstanceEndpoint, path: string, origin: string = this.publicOrigin): Promise<void> {
     const cookie = await this.cookie(endpoint)
     const upstream: Socket = connect({ path: endpoint.socketPath })
     upstream.on('connect', () => {
       const lines = [`${req.method ?? 'GET'} ${path} HTTP/1.1`]
-      for (const [name, value] of Object.entries(this.headers(req.headers, endpoint, cookie, true))) {
+      for (const [name, value] of Object.entries(this.headers(req.headers, endpoint, cookie, true, origin))) {
         for (const one of Array.isArray(value) ? value : [value]) lines.push(`${name}: ${one}`)
       }
       upstream.write(`${lines.join('\r\n')}\r\n\r\n`)
