@@ -35,7 +35,7 @@ The service is configured only by its environment. It validates every variable a
 | `IDLE_MINUTES` | no, 120 | Minutes without a request through the preview proxy before an instance stops |
 | `TTL_DAYS` | no, 7 | Days from creation to a preview's first expiry. `extend` moves it out, never past the consumer's `deploy.preview.ttlDays` (14 by default) after creation, so keep it below that |
 | `RETENTION_DAYS` | no, 90 | Days a run record, its log and its evidence are kept; the periodic sweep deletes older records |
-| `PUBLIC_VIEWS` | no, `false` | `true` serves `/view/…` and `/p/…` without the token; only behind an identity-aware proxy |
+| `PUBLIC_VIEWS` | no, `false` | `true` serves `/view/…`, `/p/…` and, when `PREVIEW_DOMAIN` is set, `p-<id>.<PREVIEW_DOMAIN>` without the token; only behind an identity-aware proxy |
 | `EVIDENCE_URL` | no | Dedicated base URL of the benchmark site; when set, a run page's evidence link opens the integrated Run evidence page instead of the raw JSON. Its origin receives credentialed CORS, so it must not share an origin with unrelated pages. If the site cannot authenticate, its Run evidence page offers a link to the run page for the identity-provider login |
 | `PREVIEW_DOMAIN` | no | Optional DNS suffix for preview origins. When set, a preview answers on `p-<id>.<PREVIEW_DOMAIN>` and the old `/p/<id>/` path redirects there. The preview and the control/run pages then have different origins |
 | `MODEL_API_KEY` | no | Service-owned provider key for live preview conversations. Empty keeps previews keyless. Supply it through the deployment environment (for example Compose `.env` or an operator-provided secret environment), never Git; the gateway is the only process that reads it |

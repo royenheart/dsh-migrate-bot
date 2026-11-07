@@ -606,7 +606,11 @@ export class PreviewManager {
       this.rebuild(rebuilt.id)
       return json(202, { state: 'building', headSha: rebuilt.headSha })
     }
-    if (request.action === 'extend') return this.extend(record, request.days, request.maxTtlDays)
+    if (request.action === 'extend') return await this.locked(record.id, async () => {
+      const current = this.records.get(record.id)
+      if (current === undefined) return failure(404, `no preview for ${key.repository}#${String(key.pullRequest)}`)
+      return this.extend(current, request.days, request.maxTtlDays)
+    })
     return await this.locked(record.id, async () => await this.publish(record.id))
   }
 
@@ -709,14 +713,17 @@ export class PreviewManager {
   private async remove(id: string, why: string): Promise<void> {
     // A build in progress sees a newer generation and discards its candidate.
     this.generations.set(id, (this.generations.get(id) ?? 0) + 1)
-    await this.locked(id, async () => {
-      this.options.modelGateway?.revoke(id)
-      await this.options.provider.destroy(id)
-      this.records.delete(id)
-      this.lastRequest.delete(id)
-      rmSync(this.dirs(id).root, { recursive: true, force: true })
-    })
+    await this.locked(id, async () => await this.removeUnderLock(id))
     this.options.log(`preview ${id}: ${why}`)
+  }
+
+  /** Remove a record while its preview lock is already held. */
+  private async removeUnderLock(id: string): Promise<void> {
+    this.options.modelGateway?.revoke(id)
+    await this.options.provider.destroy(id)
+    this.records.delete(id)
+    this.lastRequest.delete(id)
+    rmSync(this.dirs(id).root, { recursive: true, force: true })
   }
 
   /**
@@ -733,14 +740,21 @@ export class PreviewManager {
         next += 1
         if (record === undefined) return
         if (Date.parse(record.expiresAt) <= now) {
-          this.writeMarker(record.id, {
-            closed: false,
-            detail: `Expired at ${record.expiresAt}; redeploy rebuilds it from the pull request head.`,
-            state: 'expired',
-            cloneUrl: record.cloneUrl,
-            headSha: record.headSha,
+          const removed = await this.locked(record.id, async () => {
+            const current = this.records.get(record.id)
+            if (current === undefined || Date.parse(current.expiresAt) > now) return false
+            this.generations.set(record.id, (this.generations.get(record.id) ?? 0) + 1)
+            this.writeMarker(record.id, {
+              closed: false,
+              detail: `Expired at ${current.expiresAt}; redeploy rebuilds it from the pull request head.`,
+              state: 'expired',
+              cloneUrl: current.cloneUrl,
+              headSha: current.headSha,
+            })
+            await this.removeUnderLock(record.id)
+            return true
           })
-          await this.remove(record.id, `expired at ${record.expiresAt}`)
+          if (removed) this.options.log(`preview ${record.id}: expired at ${record.expiresAt}`)
           continue
         }
         const running = this.options.provider.running(record.id)

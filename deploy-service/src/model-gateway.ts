@@ -72,9 +72,15 @@ export class ModelGateway {
     this.socketPath = join(dataDir, 'model.sock')
     rmSync(this.socketPath, { force: true })
     this.server = createServer((req, res) => { void this.handle(req, res) })
+    this.server.maxConnections = 128
+    this.server.headersTimeout = 20_000
+    this.server.on('error', (error) => this.options.log(`model gateway: unix listener: ${redact(error.message, this.options.apiKey)}`))
     await listen(this.server, this.socketPath)
     chmodSync(this.socketPath, 0o666)
     const tcp = createServer((req, res) => { void this.handle(req, res) })
+    tcp.maxConnections = 128
+    tcp.headersTimeout = 20_000
+    tcp.on('error', (error) => this.options.log(`model gateway: TCP listener: ${redact(error.message, this.options.apiKey)}`))
     await new Promise<void>((resolve, reject) => {
       tcp.once('error', reject)
       tcp.listen(0, '127.0.0.1', () => { tcp.off('error', reject); resolve() })
@@ -232,7 +238,7 @@ export class ModelGateway {
       } finally {
         abort.signal.removeEventListener('abort', abortDownstream)
       }
-      this.options.log(`model gateway: preview ${grant.previewId} ${String(answer.status)} ${path}`)
+      if (answer.status >= 400) this.options.log(`model gateway: preview ${grant.previewId} ${String(answer.status)} ${path}`)
   }
 }
 

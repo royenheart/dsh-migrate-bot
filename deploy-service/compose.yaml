@@ -50,6 +50,10 @@ services:
       # Fixed: Caddy and cloudflared reach the service at service:8080.
       HOST: 0.0.0.0
       PORT: "8080"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     volumes:
       - ${DATA_DIR}:${DATA_DIR}
       - /var/run/docker.sock:/var/run/docker.sock
