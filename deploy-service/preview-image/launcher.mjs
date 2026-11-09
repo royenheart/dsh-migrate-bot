@@ -98,7 +98,14 @@ function declaresPreset() {
 
 /** The model route is keyless; the launch token is a credential and never reaches the log. */
 function redact(text) {
-  return text.replace(/token=[A-Za-z0-9_-]+/g, 'token=<redacted>')
+  return String(text)
+    .replace(/\bsk-[A-Za-z0-9_-]{20,}/g, 'sk-<redacted>')
+    .replace(/\bgh[pousr]_[A-Za-z0-9]{20,}/g, 'gh<redacted>')
+    .replace(/\bgithub_pat_[A-Za-z0-9_]{20,}/g, 'github_pat_<redacted>')
+    .replace(/\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{12,}/gi, match => `${match.split(/\s+/)[0]} <redacted>`)
+    .replace(/(?:mongodb|postgres(?:ql)?|mysql|redis):\/\/[^\s:/@]+:[^\s@/]+@/gi, match => match.replace(/:[^:@/]+@/, ':<redacted>@'))
+    .replace(/token=[A-Za-z0-9_-]+/g, 'token=<redacted>')
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, '<redacted>')
 }
 
 /** Stateful token scrubber: a token split across stdout/stderr chunks is still redacted. */
@@ -137,8 +144,8 @@ function checkHeadless(plugin, home) {
     timeout: Number(env.CHECK_TIMEOUT_MS ?? 180_000),
     killSignal: 'SIGKILL',
   })
-  process.stdout.write(result.stdout ?? '')
-  process.stderr.write(result.stderr ?? '')
+  process.stdout.write(redact(result.stdout ?? ''))
+  process.stderr.write(redact(result.stderr ?? ''))
   if (result.error?.code === 'ETIMEDOUT') {
     process.stderr.write('dsh-preview: boot check timed out\n')
     return 124
