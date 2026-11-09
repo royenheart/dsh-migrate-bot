@@ -185,7 +185,7 @@ test('a record validates while its metrics and kept files are what its attempts 
     const first = attempts[0] as Attempt
     const kept = { ...first.artifacts, 'verifier/test-stdout.txt': { path: 'attempts/M1__x/verifier/test-stdout.txt', sha256: createHash('sha256').update(output).digest('hex'), bytes: output.length } }
     write({ ...record, attempts: [{ ...first, artifacts: kept }] })
-    assert.deepEqual(validateRecords(root), [`${id}: attempts/M1__x/verifier/test-stdout.txt keeps a session token`])
+    assert.deepEqual(validateRecords(root), [`${id}: attempts/M1__x/verifier/test-stdout.txt keeps a credential`])
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

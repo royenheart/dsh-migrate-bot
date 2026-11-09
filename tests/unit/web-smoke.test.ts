@@ -109,9 +109,9 @@ test('a server that never becomes ready fails rather than hanging', async () => 
 })
 
 test('the live session token never reaches a report', async () => {
-  // Verbatim shape from `dsh 0.1.5-rc.1`: the ready line carries a session token.
-  const ready = 'dsh web: http://127.0.0.1:37489/?token=UlTfzH-hO8vTeUXbFIdCPVZMPOXYOzh-SkubMiZLe1U\n'
-  assert.doesNotMatch(scrubWebOutput(ready), /UlTfzH/)
+  // Deterministic synthetic session token: the ready line carries a token.
+  const ready = 'dsh web: http://127.0.0.1:37489/?token=test-session-token-0123456789\n'
+  assert.doesNotMatch(scrubWebOutput(ready), /test-session-token/)
   assert.match(scrubWebOutput(ready), /token=<redacted>/)
 
   const dir = plugin({ dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web' } } })
@@ -122,7 +122,7 @@ test('the live session token never reaches a report', async () => {
       timeoutMs: 5_000,
       spawnImpl: async () => ({ code: 0, output: ready, timedOut: false, ready: true }),
     })
-    assert.doesNotMatch(result.detail, /UlTfzH/)
+    assert.doesNotMatch(result.detail, /test-session-token/)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

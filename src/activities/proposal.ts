@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { BOT_EMAIL, botEnv, gitOut } from '../git/run.ts'
 import { stageChanges } from '../git/worktree.ts'
 import { slugOf, type GitHubClient, type Repository } from '../github/client.ts'
+import { redactSecrets } from '../agents/session-trace.ts'
 import { formatOfficialDiscussionInvite } from '../github/discussions.ts'
 import { formatLeftOutWorkflows } from '../github/issue-format.ts'
 import { collectPatchReports, formatPatchReportComment } from '../github/patch-reports.ts'
@@ -49,6 +50,8 @@ export interface ProposalDeps {
   github: GitHubClient
   repository: Repository
   defaultBranch: string
+  /** Configured credential values to remove from published reports. */
+  secrets?: readonly string[] | undefined
 }
 
 export async function publishProposal(
@@ -85,7 +88,7 @@ export async function publishProposal(
     ? await deps.github.rest('POST', `/repos/${repo}/pulls`, pullSchema, { title: documents.title, body: pullBody, head: PROPOSAL_BRANCH, base: deps.defaultBranch })
     : await deps.github.rest('PATCH', `/repos/${repo}/pulls/${String(pull)}`, pullSchema, { title: documents.title, body: pullBody, state: 'open' })
 
-  const reports = collectPatchReports(workdir)
+  const reports = collectPatchReports(workdir).map(report => ({ ...report, title: redactSecrets(report.title, deps.secrets), body: redactSecrets(report.body, deps.secrets) }))
   const marker = `<!-- dsh-migrate:patch-reports:${context.input.target.version} -->`
   const existing = await deps.github.paginate(`/repos/${repo}/issues/${String(issueLink.number)}/comments`, commentSchema)
   if (!existing.some(comment => comment.body?.includes(marker) === true)) {

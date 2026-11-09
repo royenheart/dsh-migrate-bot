@@ -40,7 +40,16 @@ export interface DshSpawnResult {
 }
 
 export interface DshSpawn {
-  (args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; timeoutMs: number }): Promise<DshSpawnResult>
+  (args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; timeoutMs: number; secrets?: readonly string[] }): Promise<DshSpawnResult>
+}
+
+/** Redact a structured observation before it reaches the run manifest or Langfuse. */
+function redactObservation(observation: SessionObservation, secrets: readonly string[]): SessionObservation {
+  try {
+    return JSON.parse(redactSecrets(JSON.stringify(observation), secrets)) as SessionObservation
+  } catch {
+    return observation
+  }
 }
 
 /**
@@ -79,6 +88,7 @@ function defaultSpawn(
     cwd: string
     env: NodeJS.ProcessEnv
     timeoutMs: number
+    secrets?: readonly string[] | undefined
     onStatus?: ((progress: SessionProgress) => void) | undefined
     onLog?: ((line: string) => void) | undefined
     onTrace?: ((line: string) => void) | undefined
@@ -104,7 +114,7 @@ function defaultSpawn(
     let stderr = ''
     let stderrRest = ''
     let quotaSeen = ''
-    const secrets = traceSecrets(process.env)
+    const secrets = traceSecrets(options.env, options.secrets ?? [])
     child.stdout.on('data', chunk => { stdout += String(chunk) })
     child.stderr.on('data', chunk => {
       const text = String(chunk)
@@ -124,11 +134,11 @@ function defaultSpawn(
         }
         const observation = decodeObservationLine(line, options.eventToken)
         if (observation !== undefined) {
-          options.onObservation?.(observation)
+          options.onObservation?.(redactObservation(observation, secrets))
           continue
         }
         if (line.startsWith('dsh-migrate:')) {
-          options.onLog?.(line)
+          options.onLog?.(redactSecrets(line, secrets))
           if (isInsufficientBalanceText(line)) quotaSeen = line
         }
       }
@@ -145,9 +155,9 @@ function defaultSpawn(
         const observation = decodeObservationLine(stderrRest, options.eventToken)
         if (progress !== undefined) options.onStatus?.(progress)
         else if (trace !== undefined) options.onTrace?.(redactSecrets(trace, secrets))
-        else if (observation !== undefined) options.onObservation?.(observation)
+        else if (observation !== undefined) options.onObservation?.(redactObservation(observation, secrets))
         else if (stderrRest.startsWith('dsh-migrate:')) {
-          options.onLog?.(stderrRest)
+          options.onLog?.(redactSecrets(stderrRest, secrets))
           if (isInsufficientBalanceText(stderrRest)) quotaSeen = stderrRest
         }
       }
@@ -198,6 +208,7 @@ export function createDshRunner(options: {
       if (request.usageLimit !== undefined) env.DSH_MIGRATE_USAGE_LIMIT = String(request.usageLimit)
       Object.assign(env, request.env)
       if (options.dshHome !== undefined) env.DSH_HOME = options.dshHome
+      const secrets = [...traceSecrets(env, request.secrets ?? [])]
 
       let lastUsage: SessionProgress | undefined
       const onStatus = (progress: SessionProgress) => {
@@ -214,6 +225,7 @@ export function createDshRunner(options: {
             cwd: request.workdir,
             env,
             timeoutMs,
+            secrets,
             onStatus,
             ...(options.onLog === undefined ? {} : { onLog: options.onLog }),
             ...(options.onTrace === undefined ? {} : { onTrace: options.onTrace }),
@@ -225,37 +237,39 @@ export function createDshRunner(options: {
           ['--profile', 'migrate', request.prompt],
           { cwd: request.workdir, env, timeoutMs },
         )
+      const stdout = redactSecrets(result.stdout, secrets)
+      const stderr = redactSecrets(result.stderr, secrets)
       if (result.timedOut === true) {
         if (options.reportDir !== undefined) {
           mkdirSync(options.reportDir, { recursive: true })
-          writeFileSync(join(options.reportDir, `${request.kind}.raw.txt`), result.stdout, 'utf8')
+          writeFileSync(join(options.reportDir, `${request.kind}.raw.txt`), stdout, 'utf8')
         }
         throw withUsage(new AgentTimeoutError(
           `dsh session (${request.kind}) exceeded its ${Math.round(timeoutMs / 1000)}s watchdog and was killed`
-          + `\n--- last stderr ---\n${stripObservationLines(stripTraceLines(result.stderr)).trim().slice(-2000)}`,
+          + `\n--- last stderr ---\n${stripObservationLines(stripTraceLines(stderr)).trim().slice(-2000)}`,
         ), lastUsage)
       }
-      const combined = `${stripObservationLines(stripTraceLines(result.stderr))}\n${result.stdout}`
+      const combined = `${stripObservationLines(stripTraceLines(stderr))}\n${stdout}`
       if (isQuotaLimitText(combined)) {
-        throw withUsage(new QuotaError('limit_exceeded', stripObservationLines(stripTraceLines(result.stderr)).trim() || result.stdout.trim()), lastUsage)
+        throw withUsage(new QuotaError('limit_exceeded', stripObservationLines(stripTraceLines(stderr)).trim() || stdout.trim()), lastUsage)
       }
       if (isInsufficientBalanceText(combined)) {
         throw withUsage(new QuotaError(
           'insufficient_balance',
-          `insufficient balance: dsh aborted the session (${stripObservationLines(stripTraceLines(result.stderr)).trim() || result.stdout.trim()})`,
+          `insufficient balance: dsh aborted the session (${stripObservationLines(stripTraceLines(stderr)).trim() || stdout.trim()})`,
         ), lastUsage)
       }
       if (result.code !== 0) {
-        throw withUsage(new Error(`dsh agent failed (${result.code}): ${stripObservationLines(stripTraceLines(result.stderr)) || result.stdout}`), lastUsage)
+        throw withUsage(new Error(`dsh agent failed (${result.code}): ${stripObservationLines(stripTraceLines(stderr)) || stdout}`), lastUsage)
       }
-      const report = extractReport(result.stdout)
+      const report = redactSecrets(extractReport(stdout), secrets)
       if (options.reportDir !== undefined) {
         mkdirSync(options.reportDir, { recursive: true })
-        writeFileSync(join(options.reportDir, `${request.kind}.raw.txt`), result.stdout, 'utf8')
+        writeFileSync(join(options.reportDir, `${request.kind}.raw.txt`), stdout, 'utf8')
       }
       return {
         report,
-        raw: result.stdout,
+        raw: stdout,
         ...(lastUsage === undefined ? {} : { usage: lastUsage }),
       }
     },

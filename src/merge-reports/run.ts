@@ -1,6 +1,8 @@
 import { PACKAGE_VERSION } from '../paths.ts'
 import { sha256 } from '../observability/manifest.ts'
 import { agentUsage } from '../agents/dsh.ts'
+import { redactSecrets } from '../agents/session-trace.ts'
+import { secretValues } from '../secrets.ts'
 import { isQuotaError } from '../quota/errors.ts'
 import { channelPrompt } from '../prompts/reports.ts'
 import { inline } from '../render/text.ts'
@@ -108,10 +110,11 @@ async function reportToChannel(
       workdir: deps.workdir,
       agent: deps.config.agent,
       apiKey: deps.apiKey,
+      secrets: secretValues(deps.config, deps.env),
       onObservation: observation => { observations.push(observation) },
     })
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
+    const detail = redactSecrets(error instanceof Error ? error.message : String(error), secretValues(deps.config, deps.env))
     const progress = agentUsage(error)
     const usage = progress === undefined ? undefined : { inputTokens: progress.inputTokens, outputTokens: progress.outputTokens, cacheHitTokens: progress.cacheHitTokens, ...(progress.costUsd === undefined ? {} : { usd: progress.costUsd }) }
     deps.observer?.record({

@@ -10,6 +10,7 @@ import { describeBaseline } from '../domain/outcome.ts'
 import { sha256 } from '../observability/manifest.ts'
 import type { SessionObservation, SessionObserver, SessionRecord } from '../observability/session.ts'
 import { agentUsage } from '../agents/dsh.ts'
+import { redactSecrets } from '../agents/session-trace.ts'
 import type { AgentRequest, AgentRunner } from '../agents/types.ts'
 import type { SessionProgress } from '../agents/session-status.ts'
 import type { MigrateConfig } from '../config/schema.ts'
@@ -40,6 +41,8 @@ export interface SessionDeps {
   workdir: string
   config: MigrateConfig
   apiKey: string
+  /** Explicit credential values for report/error redaction. */
+  secrets?: readonly string[] | undefined
   agent: AgentRunner
   quota: QuotaQuery | undefined
   runDir: string
@@ -108,7 +111,7 @@ export class SessionRunner {
           template: prompts.repair ?? REPAIR_PROMPT,
           overlapReport: this.reports.get('overlap') ?? '',
           extensionPointsReport: this.reports.get('extension-points') ?? '',
-          failingOutput: this.deps.lastFailure(),
+          failingOutput: redactSecrets(this.deps.lastFailure(), this.deps.secrets),
           priorRepairs: [...this.reports.entries()].filter(([name]) => name.startsWith('repair-')).map(([, text]) => text),
           harness,
           baselineNote: describeBaseline(context),
@@ -130,6 +133,7 @@ export class SessionRunner {
         ...request,
         agent: this.deps.config.agent,
         apiKey: this.deps.apiKey,
+        ...(this.deps.secrets === undefined ? {} : { secrets: this.deps.secrets }),
         usageSoFar: this.spent,
         ...(this.deps.config.quota.limit === undefined ? {} : { usageLimit: this.deps.config.quota.limit }),
         onObservation: observation => { observations.push(observation) },
@@ -139,7 +143,7 @@ export class SessionRunner {
       this.record({ kind: request.kind, name: request.name ?? request.kind, prompt: request.prompt, startedAt, outcome: 'completed', report: result.report, progress: result.usage, observations })
       return { usage }
     } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
+      const detail = redactSecrets(error instanceof Error ? error.message : String(error), this.deps.secrets)
       const progress = agentUsage(error)
       const usage = usageOf(progress)
       this.spent += usage?.usd ?? 0
@@ -207,12 +211,13 @@ export class SessionRunner {
         workdir: this.deps.workdir,
         agent: this.deps.config.agent,
         apiKey: this.deps.apiKey,
+        ...(this.deps.secrets === undefined ? {} : { secrets: this.deps.secrets }),
         usageSoFar: this.spent,
         ...(this.deps.config.quota.limit === undefined ? {} : { usageLimit: this.deps.config.quota.limit }),
         onObservation: observation => { observations.push(observation) },
       })
     } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
+      const detail = redactSecrets(error instanceof Error ? error.message : String(error), this.deps.secrets)
       const progress = agentUsage(error)
       const usage = usageOf(progress)
       this.spent += usage?.usd ?? 0

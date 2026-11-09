@@ -117,3 +117,22 @@ test('a session that finishes normally still returns its report', async () => {
 test('the package root a session is given holds the accounting that prices it', () => {
   assert.ok(existsSync(join(PACKAGE_ROOT, 'dist', 'src', 'agents', 'session-status.js')), `no session accounting under ${PACKAGE_ROOT}`)
 })
+
+
+test('explicit secrets are redacted from the report and raw output', async () => {
+  const runner = createDshRunner({
+    timeoutMs: 1_000,
+    spawnImpl: async () => ({ code: 0, stdout: '# Report\nCUSTOM value is custom-value-123\n', stderr: '', timedOut: false }),
+  })
+  const result = await runner.run({
+    kind: 'overlap',
+    prompt: 'p',
+    workdir: process.cwd(),
+    agent: { provider: 'deepseek-official', model: 'm', thinking: 'enabled', reasoningEffort: 'max', upgradeSkills: false },
+    apiKey: 'k',
+    secrets: ['custom-value-123'],
+  })
+  assert.doesNotMatch(result.report, /custom-value-123/)
+  assert.doesNotMatch(result.raw, /custom-value-123/)
+  assert.match(result.report, /<redacted>/)
+})

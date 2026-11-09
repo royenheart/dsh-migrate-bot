@@ -101,6 +101,32 @@ function redact(text) {
   return text.replace(/token=[A-Za-z0-9_-]+/g, 'token=<redacted>')
 }
 
+/** Stateful token scrubber: a token split across stdout/stderr chunks is still redacted. */
+function streamRedactor(write) {
+  let held = ''
+  const flushHead = () => {
+    const partial = /token=[A-Za-z0-9_-]*$/.exec(held)
+    if (partial !== null) {
+      write(redact(held.slice(0, partial.index)))
+      held = held.slice(partial.index)
+      return
+    }
+    const marker = /(t|to|tok|toke|token|token=)$/.exec(held)
+    if (marker !== null) {
+      const cut = held.length - marker[0].length
+      write(redact(held.slice(0, cut)))
+      held = held.slice(cut)
+      return
+    }
+    write(redact(held))
+    held = ''
+  }
+  return {
+    feed(chunk) { held += String(chunk); flushHead() },
+    flush() { const rest = held; held = ''; write(redact(rest)) },
+  }
+}
+
 /** The headless check: boot the plugin and stop at the model call. */
 function checkHeadless(plugin, home) {
   writeProfile(home, 'check', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', plugin], plugin)
@@ -181,10 +207,11 @@ function web(profile, children) {
     })
     children.push(child)
     let output = ''
+    const logger = streamRedactor(text => { process.stdout.write(`[${profile}] ${text}`) })
     const onData = (chunk) => {
       const text = String(chunk)
       // The launch token is a credential: it reaches ready.json, never the log.
-      process.stdout.write(`[${profile}] ${text.replace(/token=[A-Za-z0-9_-]+/g, 'token=<redacted>')}`)
+      logger.feed(text)
       output += text
       const ready = READY.exec(output)
       if (ready !== null) resolve({ port: Number(ready[2]), token: ready[3] })
@@ -192,6 +219,7 @@ function web(profile, children) {
     child.stdout.on('data', onData)
     child.stderr.on('data', onData)
     child.on('exit', (code) => {
+      logger.flush()
       reject(new Error(`dsh web (${profile}) exited ${String(code)}`))
       for (const other of children) other.kill('SIGTERM')
       process.exit(1)

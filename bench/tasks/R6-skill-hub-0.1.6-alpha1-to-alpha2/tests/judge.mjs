@@ -39,12 +39,15 @@ const WEIGHTS = { contract: 15, typecheck: 20, test: 30, build: 15, boot: 20, un
 const VERIFIER_MS = 2400_000
 const BOOT_MS = 120_000
 const STEPS_DEADLINE = Date.now() + VERIFIER_MS - BOOT_MS - 5 * 60_000
+const SECRET = /(?:\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}|\bAKIA[0-9A-Z]{16}\b|-----BEGIN [A-Z ]*PRIVATE KEY-----)/g
+const redact = text => String(text).replace(SECRET, '<redacted>')
+const safeEnv = extra => ({ ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !/(?:^|_)(?:API_KEY|KEY|TOKEN|SECRET|PASSWORD|AUTH|CREDENTIAL)(?:_|$)/i.test(name))), ...extra })
 const semver = createRequire(join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim(), 'npm', 'package.json'))('semver')
 
 const results = {}
 const report = (check, pass, detail) => {
   results[check] = pass ? 1 : 0
-  console.log(`${pass ? 'PASS' : 'FAIL'} ${check}${detail ? `: ${detail.trim().split('\n').slice(-12).join('\n  ')}` : ''}`)
+  console.log(`${pass ? 'PASS' : 'FAIL'} ${check}${detail ? `: ${redact(detail.trim()).split('\n').slice(-12).join('\n  ')}` : ''}`)
 }
 
 const work = join(mkdtempSync(join(tmpdir(), 'judge-')), 'plugin')
@@ -79,12 +82,12 @@ writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
 const hidden = join(TESTS, 'hidden')
 if (existsSync(hidden)) cpSync(hidden, work, { recursive: true })
 
-const run = (command, args) => spawnSync(command, args, { cwd: work, encoding: 'utf8', timeout: Math.max(1, STEPS_DEADLINE - Date.now()), maxBuffer: 64 * 1024 * 1024, env: { ...process.env, CI: '1' } })
+const run = (command, args) => spawnSync(command, args, { cwd: work, encoding: 'utf8', timeout: Math.max(1, STEPS_DEADLINE - Date.now()), maxBuffer: 64 * 1024 * 1024, env: safeEnv({ CI: '1' }) })
 const install = existsSync(join(work, 'pnpm-lock.yaml'))
   ? run('pnpm', ['install', '--no-frozen-lockfile'])
   : run('npm', ['install', '--no-audit', '--no-fund', ...(task.before === undefined ? [] : [`--before=${task.before}`])])
 const installed = install.status === 0
-if (!installed) console.log(`install failed:\n${`${install.stdout}${install.stderr}`.slice(-3000)}`)
+if (!installed) console.log(`install failed:\n${redact(`${install.stdout}${install.stderr}`).slice(-3000)}`)
 for (const script of ['typecheck', 'test', 'build']) {
   const name = task.scripts?.[script] === undefined ? script : task.scripts[script]
   if (name === null) continue
@@ -109,7 +112,7 @@ if (task.boot !== false) {
   // `dsh web` is the profile named web; the profile under test is named instead.
   const args = web ? ['--profile', 'judge', '--port', '0', ...(help.includes('--no-open') ? ['--no-open'] : [])] : ['--profile', 'judge', 'ping']
   const { output, code, ready } = await new Promise(resolve => {
-    const child = spawn('dsh', args, { cwd: work, env: { ...process.env, DSH_HOME: home, DEEPSEEK_API_KEY: 'judge-placeholder-key', DEEPSEEK_BASE_URL: 'http://127.0.0.1:9/v1', DSH_TELEMETRY_DISABLED: '1' }, stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn('dsh', args, { cwd: work, env: safeEnv({ DSH_HOME: home, DEEPSEEK_API_KEY: 'judge-placeholder-key', DEEPSEEK_BASE_URL: 'http://127.0.0.1:9/v1', DSH_TELEMETRY_DISABLED: '1' }), stdio: ['ignore', 'pipe', 'pipe'] })
     let output = ''
     const done = (ready) => { clearTimeout(timer); child.kill('SIGKILL'); resolve({ output, code: child.exitCode, ready }) }
     const timer = setTimeout(() => done(false), BOOT_MS)
@@ -122,7 +125,7 @@ if (task.boot !== false) {
   const failed = /skipping profile bundle|failed to load|did not activate|pending \(waiting|FAILED fiber|ClientPackageCompositionError/i.test(output)
   // Headless: reaching the model call (the dead endpoint or the placeholder key) proves every plugin activated.
   const reached = /TRANSPORT:|API request to .* failed|127\.0\.0\.1:9\b|MISSING_CREDENTIAL|\bAUTH\b|no api key|invalid api key|ECONNREFUSED|fetch failed|Authentication Fails/i.test(output)
-  report('boot', !failed && (web ? ready : reached || code === 0), !failed && (web ? ready : reached || code === 0) ? '' : output.slice(-3000))
+  report('boot', !failed && (web ? ready : reached || code === 0), !failed && (web ? ready : reached || code === 0) ? '' : redact(output).slice(-3000))
   rmSync(home, { recursive: true, force: true })
 }
 

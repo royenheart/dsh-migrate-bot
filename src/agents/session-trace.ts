@@ -77,19 +77,22 @@ export function redactSecrets(text: string, secrets: readonly string[] = []): st
     .replace(/\bgh[pousr]_[A-Za-z0-9]{20,}/g, 'gh<redacted>')
     .replace(/\bgithub_pat_[A-Za-z0-9_]{20,}/g, 'github_pat_<redacted>')
     .replace(/\b(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, '$1<redacted>')
-    .replace(/\btoken=[A-Za-z0-9_-]+/gi, 'token=<redacted>')
+    .replace(/\b(Basic\s+)[A-Za-z0-9+/=]+/gi, '$1<redacted>')
+    .replace(/\b(token|password|secret|api[-_]?key)=([^\s&"']+)/gi, '$1=<redacted>')
+    .replace(/(?:mongodb|postgres(?:ql)?|mysql|redis):\/\/[^\s:/@]+:[^\s@/]+@/gi, match => match.replace(/:[^:@/]+@/, ':<redacted>@'))
+    .replace(/(?:Cookie|Set-Cookie):\s*[^\n]+/gi, match => `${match.split(':')[0]}: <redacted>`)
 }
 
 /**
  * The values a session's environment holds that must not be streamed.
  * @param env - the process environment of the runner.
  */
-export function traceSecrets(env: NodeJS.ProcessEnv): string[] {
-  const secrets: string[] = []
+export function traceSecrets(env: NodeJS.ProcessEnv, extra: readonly string[] = []): string[] {
+  const secrets: string[] = [...extra]
   for (const [name, value] of Object.entries(env)) {
     if (value === undefined || value.length < 8) continue
     if (!/(?:^|_)(?:API_KEY|KEY|TOKEN|SECRET|PASSWORD)$/i.test(name)) continue
-    secrets.push(value)
+    if (!secrets.includes(value)) secrets.push(value)
   }
   return secrets
 }

@@ -80,3 +80,23 @@ export function withoutSecrets(env: NodeJS.ProcessEnv, config: MigrateConfig): N
   ])
   return Object.fromEntries(Object.entries(env).filter(([name]) => !names.has(name)))
 }
+
+/** Values of every configured credential variable, for final output redaction. */
+export function secretValues(config: MigrateConfig, env: NodeJS.ProcessEnv): string[] {
+  const names = new Set([
+    config.secrets.apiKeyEnv,
+    config.deploy.tokenEnv,
+    DEFAULT_DEPLOY_TOKEN_ENV,
+    DEFAULT_API_KEY_ENV,
+    DSH_API_KEY_ENV,
+    ...resolveChannels(config).map(channel => channel.tokenEnv),
+    ...Object.values(BUILTIN_CHANNELS).map(channel => channel.tokenEnv),
+    'GITHUB_TOKEN', 'GH_TOKEN', 'ACTIONS_RUNTIME_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
+  ])
+  const values: string[] = []
+  for (const name of names) {
+    const value = env[name]
+    if (typeof value === 'string' && value.length >= 4 && !values.includes(value)) values.push(value)
+  }
+  return values
+}
