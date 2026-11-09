@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { runMechanical } from '../mechanical/run.ts'
+import { redactSecrets } from '../agents/session-trace.ts'
 import { withoutSecrets } from '../secrets.ts'
 import { isIgnoredPath } from '../git/worktree.ts'
 import { cardsInSpan, checkLedger, ledgerPathOf, ledgerSchema, renderCardList, type CardLedger } from '../skills/cards.ts'
@@ -44,6 +45,8 @@ export interface CheckDeps {
   runDir: string
   /** The upgrade skill's release files (`references/`), for the cards check. */
   cardsDir?: string | undefined
+  /** Configured credential values for persisted check output. */
+  secrets?: readonly string[] | undefined
 }
 
 export class CheckRunner {
@@ -58,14 +61,15 @@ export class CheckRunner {
     this.sequence += 1
     const dir = join(this.deps.runDir, 'checks')
     mkdirSync(dir, { recursive: true })
-    writeFileSync(join(dir, `${String(this.sequence).padStart(2, '0')}-${request.check}.log`), output.output)
+    const safeOutput = redactSecrets(output.output, this.deps.secrets)
+    writeFileSync(join(dir, `${String(this.sequence).padStart(2, '0')}-${request.check}.log`), safeOutput)
     if (output.outcome === 'fail') this.lastFailure = { check: request.check, output: output.output }
     return {
       check: request.check,
       outcome: output.outcome,
       fingerprint: output.outcome === 'fail' ? output.fingerprint : '',
       // A failure's end says what broke; why a check was skipped is said first.
-      detail: output.output.length <= EXCERPT ? output.output : output.outcome === 'skipped' ? `${output.output.slice(0, EXCERPT)}…` : `…${output.output.slice(-EXCERPT)}`,
+      detail: safeOutput.length <= EXCERPT ? safeOutput : output.outcome === 'skipped' ? `${safeOutput.slice(0, EXCERPT)}…` : `…${safeOutput.slice(-EXCERPT)}`,
       ...(output.outcome === 'fail' && output.blame !== undefined ? { blame: output.blame } : {}),
     }
   }

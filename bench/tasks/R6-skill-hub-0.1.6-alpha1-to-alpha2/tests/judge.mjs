@@ -94,7 +94,7 @@ for (const script of ['typecheck', 'test', 'build']) {
   if (!installed) { report(script, false, 'install failed'); continue }
   if (manifest.scripts?.[name] === undefined) { report(script, false, `no "${name}" script`); continue }
   const result = run('npm', ['run', name])
-  report(script, result.status === 0, result.status === 0 ? '' : `${result.stdout}${result.stderr}`.slice(-3000))
+  report(script, result.status === 0, result.status === 0 ? '' : redact(`${result.stdout}${result.stderr}`).slice(-3000))
 }
 
 // boot: the built plugin in a scratch dsh home, keyless.

@@ -47,7 +47,7 @@ export interface ActivityDeps {
 export function createActivities(deps: ActivityDeps): ActivityRunner {
   const runDir = join(deps.home, 'runs', deps.runId)
   const cardsDir = join(skillsSource(deps.env), UPGRADE_SKILLS[0], 'references')
-  const checks = new CheckRunner({ workdir: deps.workdir, config: deps.config, cacheDir: join(deps.home, 'dsh'), runDir, cardsDir })
+  const checks = new CheckRunner({ workdir: deps.workdir, config: deps.config, cacheDir: join(deps.home, 'dsh'), runDir, cardsDir, secrets: secretValues(deps.config, deps.env) })
   const latest = new Map<CheckName, CheckResult>()
   let sessions: SessionRunner | undefined
   const sessionRunner = (): SessionRunner => {

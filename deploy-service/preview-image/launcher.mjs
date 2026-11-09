@@ -108,29 +108,39 @@ function redact(text) {
     .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, '<redacted>')
 }
 
-/** Stateful token scrubber: a token split across stdout/stderr chunks is still redacted. */
+/** Stateful line scrubber: credentials split across chunks are held until the line ends. */
 function streamRedactor(write) {
   let held = ''
-  const flushHead = () => {
-    const partial = /token=[A-Za-z0-9_-]*$/.exec(held)
-    if (partial !== null) {
-      write(redact(held.slice(0, partial.index)))
-      held = held.slice(partial.index)
-      return
+  let pem = false
+  const emitLines = () => {
+    let newline = held.indexOf('\n')
+    while (newline >= 0) {
+      const line = held.slice(0, newline + 1)
+      held = held.slice(newline + 1)
+      const begins = /-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(line)
+      const ends = /-----END [A-Z ]*PRIVATE KEY-----/.test(line)
+      if (pem) {
+        if (ends) pem = false
+      } else if (begins) {
+        pem = !ends
+      } else {
+        write(redact(line))
+      }
+      newline = held.indexOf('\n')
     }
-    const marker = /(t|to|tok|toke|token|token=)$/.exec(held)
-    if (marker !== null) {
-      const cut = held.length - marker[0].length
-      write(redact(held.slice(0, cut)))
-      held = held.slice(cut)
-      return
+    if (held.length > 64 * 1024) {
+      write(pem ? '[redacted]\n' : redact(held))
+      held = ''
     }
-    write(redact(held))
-    held = ''
   }
   return {
-    feed(chunk) { held += String(chunk); flushHead() },
-    flush() { const rest = held; held = ''; write(redact(rest)) },
+    feed(chunk) { held += String(chunk); emitLines() },
+    flush() {
+      if (pem) write('[redacted]\n')
+      else write(redact(held))
+      held = ''
+      pem = false
+    },
   }
 }
 

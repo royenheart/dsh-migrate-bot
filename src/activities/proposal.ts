@@ -65,7 +65,7 @@ export async function publishProposal(
   gitOut(['checkout', '-B', PROPOSAL_BRANCH], { cwd: workdir })
   stageChanges(workdir)
   const leftOut = alignWorkflows(workdir, deps.defaultBranch)
-  const note = leftOut === '' ? '' : `\n${redactSecrets(formatLeftOutWorkflows(leftOut), deps.secrets)}`
+  const note = leftOut === '' ? '' : `\n${formatLeftOutWorkflows(redactSecrets(leftOut, deps.secrets))}`
   const documents = { ...rendered, issue: `${rendered.issue}${note}`, pullRequest: `${rendered.pullRequest}${note}` }
   gitOut(['commit', '--quiet', '--allow-empty', '-m', documents.title], { cwd: workdir, env: botEnv() })
   const headSha = gitOut(['rev-parse', 'HEAD'], { cwd: workdir })
