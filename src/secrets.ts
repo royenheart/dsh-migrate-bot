@@ -77,7 +77,7 @@ export function withoutSecrets(env: NodeJS.ProcessEnv, config: MigrateConfig): N
     config.deploy.tokenEnv, DEFAULT_DEPLOY_TOKEN_ENV,
     ...resolveChannels(config).map(channel => channel.tokenEnv), ...Object.values(BUILTIN_CHANNELS).map(channel => channel.tokenEnv),
     'GITHUB_TOKEN', 'GH_TOKEN', 'ACTIONS_RUNTIME_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
-    'LANGFUSE_SECRET_KEY',
+    'LANGFUSE_SECRET_KEY', 'LANGFUSE_PUBLIC_KEY',
   ])
   return Object.fromEntries(Object.entries(env).filter(([name]) => !names.has(name)))
 }
@@ -93,7 +93,7 @@ export function secretValues(config: MigrateConfig, env: NodeJS.ProcessEnv): str
     ...resolveChannels(config).map(channel => channel.tokenEnv),
     ...Object.values(BUILTIN_CHANNELS).map(channel => channel.tokenEnv),
     'GITHUB_TOKEN', 'GH_TOKEN', 'ACTIONS_RUNTIME_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
-    'LANGFUSE_SECRET_KEY',
+    'LANGFUSE_SECRET_KEY', 'LANGFUSE_PUBLIC_KEY',
   ])
   const values: string[] = []
   for (const name of names) {

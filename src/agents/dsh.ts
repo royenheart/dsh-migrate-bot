@@ -209,6 +209,7 @@ export function createDshRunner(options: {
       Object.assign(env, request.env)
       if (options.dshHome !== undefined) env.DSH_HOME = options.dshHome
       const secrets = [...traceSecrets(env, request.secrets ?? [])]
+      env.DSH_MIGRATE_SECRET_VALUES = JSON.stringify(secrets)
 
       let lastUsage: SessionProgress | undefined
       const onStatus = (progress: SessionProgress) => {

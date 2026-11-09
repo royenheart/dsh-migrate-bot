@@ -172,8 +172,9 @@ async function reportToChannel(
     }
     const parsed = parsePayload(session.raw, reportPayloadSchema)
     if (!parsed.ok) return { outcome: 'failed', detail: parsed.reason, usage }
-    if (mode === 'dry-run') return { outcome: 'dry-run', detail: `${parsed.value.title}\n\n${parsed.value.body.slice(0, 1_200)}`, usage }
-    const url = await deliver(client, channel, parsed.value)
+    const safe = redactDeep(parsed.value, secretValues(deps.config, deps.env))
+    if (mode === 'dry-run') return { outcome: 'dry-run', detail: `${safe.title}\n\n${safe.body.slice(0, 1_200)}`, usage }
+    const url = await deliver(client, channel, safe)
     return { outcome: 'delivered', detail: `${channel.method} created in ${channel.repo}`, url, usage }
   }
 

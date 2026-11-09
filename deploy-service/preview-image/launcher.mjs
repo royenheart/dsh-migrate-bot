@@ -105,7 +105,7 @@ function redact(text) {
     .replace(/\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{12,}/gi, match => `${match.split(/\s+/)[0]} <redacted>`)
     .replace(/(?:mongodb|postgres(?:ql)?|mysql|redis):\/\/[^\s:/@]+:[^\s@/]+@/gi, match => match.replace(/:[^:@/]+@/, ':<redacted>@'))
     .replace(/token=[A-Za-z0-9_-]+/g, 'token=<redacted>')
-    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, '<redacted>')
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g, '<redacted>')
 }
 
 /** Stateful line scrubber: credentials split across chunks are held until the line ends. */
@@ -129,8 +129,10 @@ function streamRedactor(write) {
       newline = held.indexOf('\n')
     }
     if (held.length > 64 * 1024) {
-      write(pem ? '[redacted]\n' : redact(held))
-      held = ''
+      const keep = 512
+      const prefix = held.slice(0, held.length - keep)
+      held = held.slice(-keep)
+      write(pem ? '[redacted]\n' : redact(prefix))
     }
   }
   return {
