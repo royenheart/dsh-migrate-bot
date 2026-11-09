@@ -11,7 +11,7 @@ import {
   isQuotaLimitText,
   type SessionProgress,
 } from './session-status.ts'
-import { decodeTraceLine, redactSecrets, stripTraceLines, traceSecrets } from './session-trace.ts'
+import { decodeTraceLine, redactDeep, redactSecrets, stripTraceLines, traceSecrets } from './session-trace.ts'
 import { decodeObservationLine, stripObservationLines } from './session-observation.ts'
 import type { SessionObservation } from '../observability/session.ts'
 import type { AgentRequest, AgentResult, AgentRunner } from './types.ts'
@@ -46,7 +46,7 @@ export interface DshSpawn {
 /** Redact a structured observation before it reaches the run manifest or Langfuse. */
 function redactObservation(observation: SessionObservation, secrets: readonly string[]): SessionObservation {
   try {
-    return JSON.parse(redactSecrets(JSON.stringify(observation), secrets)) as SessionObservation
+    return redactDeep(observation, secrets)
   } catch {
     return observation
   }

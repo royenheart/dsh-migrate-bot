@@ -1,5 +1,5 @@
 import { transition } from 'xstate'
-import { redactSecrets } from './agents/session-trace.ts'
+import { redactDeep, redactSecrets } from './agents/session-trace.ts'
 import { BADGE_FILE, logPath, migrationFile, serializeLog, type StateSnapshot, type StateStore } from './state/store.ts'
 import { badgeOf } from './workflow/badge.ts'
 import { inline } from './render/text.ts'
@@ -144,7 +144,8 @@ export class InJobEngine {
 
   private async execute(request: ActivityRequest, context: MigrationContext): Promise<ActivityResult> {
     try {
-      return await this.options.activities(request, context)
+      const result = await this.options.activities(request, context)
+      return { ...result, event: redactDeep(result.event, this.options.secrets) }
     } catch (error) {
       return {
         event: { type: 'activity.error', activity: request.activity, detail: redactSecrets(error instanceof Error ? error.message : String(error), this.options.secrets) },

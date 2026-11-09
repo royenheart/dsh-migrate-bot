@@ -4,6 +4,7 @@ import {
   boundTraceLine,
   decodeTraceLine,
   encodeTraceLine,
+  redactDeep,
   redactSecrets,
   stripTraceLines,
   traceSecrets,
@@ -83,4 +84,10 @@ test('known secrets are found by name, and common credential shapes are redacted
 test('a line is bounded with an ellipsis, not cut silently', () => {
   assert.equal(boundTraceLine('abcdef', 4), 'abc…')
   assert.equal(boundTraceLine('  a \n b  ', 10), 'a b')
+})
+
+
+test('structured values are redacted without breaking their shape', () => {
+  const redacted = redactDeep({ text: 'custom-value-123', nested: ['custom-value-123'] }, ['custom-value-123'])
+  assert.deepEqual(redacted, { text: '<redacted>', nested: ['<redacted>'] })
 })

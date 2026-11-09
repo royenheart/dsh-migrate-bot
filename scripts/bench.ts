@@ -145,7 +145,7 @@ const isOutput = (name: string): boolean => name.startsWith('verifier/') || name
 /** A session token not yet redacted (`scrubWebOutput`). */
 const LIVE_TOKEN = /[?&]token=(?!<redacted>)[^\s&"']+/i
 /** Credential shapes a published artifact must not carry. */
-const SECRET_SHAPE = /(?:\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}|\bAKIA[0-9A-Z]{16}\b|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:token|password|secret|api[-_]?key)=[^\s&"']+)/
+const SECRET_SHAPE = /(?:\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}|\bAKIA[0-9A-Z]{16}\b|-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----|\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{12,}|(?:token|password|secret|api[-_]?key)=[^\s&"']+)/
 /** Values of credential-shaped environment variables in the benchmark process. */
 function publishSecrets(): string[] {
   const values: string[] = []
@@ -476,10 +476,8 @@ export function validateRecords(records: string): string[] {
   const snapshots = join(records, 'snapshots')
   for (const name of filesUnder(snapshots)) {
     const file = join(snapshots, name)
-    const bytes = readFileSync(file)
-    if (bytes.includes(0)) continue
-    const text = bytes.toString('utf8')
-    if (LIVE_TOKEN.test(text) || SECRET_SHAPE.test(text)) problems.push(`snapshot ${name} keeps a credential`)
+    const text = readFileSync(file).toString('utf8')
+    if (LIVE_TOKEN.test(text) || SECRET_SHAPE.test(text) || redactSecrets(text, publishSecrets()) !== text) problems.push(`snapshot ${name} keeps a credential`)
   }
   return problems
 }

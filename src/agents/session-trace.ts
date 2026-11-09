@@ -80,7 +80,18 @@ export function redactSecrets(text: string, secrets: readonly string[] = []): st
     .replace(/\b(Basic\s+)[A-Za-z0-9+/=]+/gi, '$1<redacted>')
     .replace(/\b(token|password|secret|api[-_]?key)=([^\s&"']+)/gi, '$1=<redacted>')
     .replace(/(?:mongodb|postgres(?:ql)?|mysql|redis):\/\/[^\s:/@]+:[^\s@/]+@/gi, match => match.replace(/:[^:@/]+@/, ':<redacted>@'))
-    .replace(/(?:Cookie|Set-Cookie):\s*[^\n]+/gi, match => `${match.split(':')[0]}: <redacted>`)
+    .replace(/(?:Cookie|Set-Cookie):\s*[^"\n]+/gi, match => `${match.split(':')[0]}: <redacted>`)
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, '<redacted>')
+}
+
+/** Redact strings inside a structured value without breaking its JSON shape. */
+export function redactDeep<T>(value: T, secrets: readonly string[] = []): T {
+  if (typeof value === 'string') return redactSecrets(value, secrets) as T
+  if (Array.isArray(value)) return value.map(item => redactDeep(item, secrets)) as T
+  if (typeof value === 'object' && value !== null) {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, redactDeep(item, secrets)])) as T
+  }
+  return value
 }
 
 /**
