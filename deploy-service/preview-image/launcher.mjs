@@ -207,8 +207,11 @@ function web(profile, children) {
     })
     children.push(child)
     let output = ''
-    const logger = streamRedactor(text => { process.stdout.write(`[${profile}] ${text}`) })
-    const onData = (chunk) => {
+    // Separate buffers: stdout and stderr interleave at the terminal, but a
+    // token never spans two different streams.
+    const logOut = streamRedactor(text => { process.stdout.write(`[${profile}] ${text}`) })
+    const logErr = streamRedactor(text => { process.stderr.write(`[${profile}] ${text}`) })
+    const onData = (logger) => (chunk) => {
       const text = String(chunk)
       // The launch token is a credential: it reaches ready.json, never the log.
       logger.feed(text)
@@ -216,10 +219,11 @@ function web(profile, children) {
       const ready = READY.exec(output)
       if (ready !== null) resolve({ port: Number(ready[2]), token: ready[3] })
     }
-    child.stdout.on('data', onData)
-    child.stderr.on('data', onData)
+    child.stdout.on('data', onData(logOut))
+    child.stderr.on('data', onData(logErr))
     child.on('exit', (code) => {
-      logger.flush()
+      logOut.flush()
+      logErr.flush()
       reject(new Error(`dsh web (${profile}) exited ${String(code)}`))
       for (const other of children) other.kill('SIGTERM')
       process.exit(1)

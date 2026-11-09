@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { z } from 'zod'
 import { loadConfigFile, parseConfig } from './config/load.ts'
-import { loadSecrets } from './secrets.ts'
+import { loadSecrets, secretValues } from './secrets.ts'
 import { createDshRunner, formatSessionProgress } from './agents/dsh.ts'
 import { runSelfTest } from './agents/self-test.ts'
 import { createActivities } from './activities/index.ts'
@@ -178,6 +178,7 @@ function engineFor(runtime: Runtime, recorder?: RunRecorder): InJobEngine {
     store: runtime.store,
     activities,
     run: runtime.runId,
+    secrets: secretValues(runtime.config, runtime.env),
     log,
     onState(state) { stream?.publish(`dsh-migrate-state: ${state}`) },
   })
@@ -239,6 +240,7 @@ async function run(runtime: Runtime, force: boolean): Promise<number> {
     plugin: findPlugins(runtime.workdir).map(plugin => plugin.name),
     agent: runtime.config.agent,
     env: runtime.env,
+    secrets: secretValues(runtime.config, runtime.env),
     log,
   })
   const engine = engineFor(runtime, recorder)
@@ -372,6 +374,7 @@ async function pullRequestClosed(runtime: Runtime, options: Options): Promise<nu
     plugin: findPlugins(runtime.workdir).map(plugin => plugin.name),
     agent: runtime.config.agent,
     env: runtime.env,
+    secrets: secretValues(runtime.config, runtime.env),
     log,
   })
   const engine = engineFor(runtime, recorder)

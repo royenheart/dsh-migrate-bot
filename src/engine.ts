@@ -1,4 +1,5 @@
 import { transition } from 'xstate'
+import { redactSecrets } from './agents/session-trace.ts'
 import { BADGE_FILE, logPath, migrationFile, serializeLog, type StateSnapshot, type StateStore } from './state/store.ts'
 import { badgeOf } from './workflow/badge.ts'
 import { inline } from './render/text.ts'
@@ -38,6 +39,8 @@ export interface EngineOptions {
   /** The workflow run, recorded in each `started` entry. */
   run: string
   log: (message: string) => void
+  /** Configured secret values removed from persisted errors. */
+  secrets?: readonly string[] | undefined
   /** The top-level state after each transition, for a live run page. */
   onState?: ((state: string) => void) | undefined
   now?: () => Date
@@ -144,7 +147,7 @@ export class InJobEngine {
       return await this.options.activities(request, context)
     } catch (error) {
       return {
-        event: { type: 'activity.error', activity: request.activity, detail: error instanceof Error ? error.message : String(error) },
+        event: { type: 'activity.error', activity: request.activity, detail: redactSecrets(error instanceof Error ? error.message : String(error), this.options.secrets) },
       }
     }
   }

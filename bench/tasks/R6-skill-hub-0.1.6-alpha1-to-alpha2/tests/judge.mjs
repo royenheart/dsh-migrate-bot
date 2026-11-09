@@ -39,9 +39,9 @@ const WEIGHTS = { contract: 15, typecheck: 20, test: 30, build: 15, boot: 20, un
 const VERIFIER_MS = 2400_000
 const BOOT_MS = 120_000
 const STEPS_DEADLINE = Date.now() + VERIFIER_MS - BOOT_MS - 5 * 60_000
-const SECRET = /(?:\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}|\bAKIA[0-9A-Z]{16}\b|-----BEGIN [A-Z ]*PRIVATE KEY-----)/g
+const SECRET = /(?:\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}|\bAKIA[0-9A-Z]{16}\b|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:postgres(?:ql)?|mysql|mongodb|redis):\/\/[^\s:/@]+:[^\s@/]+@|(?:token|password|secret|api[-_]?key)=[^\s&"']+)/g
 const redact = text => String(text).replace(SECRET, '<redacted>')
-const safeEnv = extra => ({ ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !/(?:^|_)(?:API_KEY|KEY|TOKEN|SECRET|PASSWORD|AUTH|CREDENTIAL)(?:_|$)/i.test(name))), ...extra })
+const safeEnv = extra => ({ ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !/(?:^|_)(?:API_KEY|KEY|TOKEN|SECRET|PASSWORD|AUTH|CREDENTIAL|DATABASE|POSTGRES|MYSQL|REDIS|CONNECTION_STRING)(?:_|$)/i.test(name))), ...extra })
 const semver = createRequire(join(execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim(), 'npm', 'package.json'))('semver')
 
 const results = {}

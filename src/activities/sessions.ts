@@ -233,7 +233,7 @@ export class SessionRunner {
     files.set(`reports/${name}.md`, result.report)
     // The ledger as this session left it: what a maintainer and a merge report check the cards against.
     const ledger = ledgerPathOf(this.deps.runDir)
-    if (existsSync(ledger)) files.set('cards.json', readFileSync(ledger, 'utf8'))
+    if (existsSync(ledger)) files.set('cards.json', redactSecrets(readFileSync(ledger, 'utf8'), this.deps.secrets))
     this.record({ kind: request.kind, name, prompt, startedAt, outcome: 'completed', report: result.report, progress: result.usage, observations })
 
     const blocker = request.kind === 'repair' ? parseBlocker(result.report) : undefined

@@ -145,7 +145,17 @@ const isOutput = (name: string): boolean => name.startsWith('verifier/') || name
 /** A session token not yet redacted (`scrubWebOutput`). */
 const LIVE_TOKEN = /[?&]token=(?!<redacted>)[^\s&"']+/i
 /** Credential shapes a published artifact must not carry. */
-const SECRET_SHAPE = /(?:\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}|\bAKIA[0-9A-Z]{16}\b|-----BEGIN [A-Z ]*PRIVATE KEY-----)/
+const SECRET_SHAPE = /(?:\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}|\bAKIA[0-9A-Z]{16}\b|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:token|password|secret|api[-_]?key)=[^\s&"']+)/
+/** Values of credential-shaped environment variables in the benchmark process. */
+function publishSecrets(): string[] {
+  const values: string[] = []
+  for (const [name, value] of Object.entries(process.env)) {
+    if (typeof value !== 'string' || value.length < 4) continue
+    if (!/(?:^|_)(?:API_KEY|KEY|TOKEN|SECRET|PASSWORD|AUTH|CREDENTIAL|DATABASE_URL|CONNECTION_STRING)$/i.test(name)) continue
+    if (!values.includes(value)) values.push(value)
+  }
+  return values
+}
 
 /**
  * Copy what a record keeps of a trial into its directory: the agent's files and
@@ -166,7 +176,7 @@ function keepArtifacts(trialDir: string, recordDir: string, trial: string): Atte
     // An output is kept with its session tokens redacted, as the Action's own output is; a binary file (a NUL byte) as it is.
     const bytes = readFileSync(source)
     const text = !bytes.includes(0) ? bytes.toString('utf8') : undefined
-    const scrubbed = text === undefined ? undefined : redactSecrets(scrubWebOutput(text))
+    const scrubbed = text === undefined ? undefined : redactSecrets(scrubWebOutput(text), publishSecrets())
     if (scrubbed !== undefined && scrubbed !== text) writeFileSync(target, scrubbed)
     else copyFileSync(source, target)
     artifacts[name] = { path, sha256: sha256(target), bytes: statSync(target).size }
@@ -454,11 +464,13 @@ export function validateRecords(records: string): string[] {
       for (const [name, artifact] of Object.entries(attempt.artifacts)) {
         const file = join(records, 'records', id, artifact.path)
         if (!existsSync(file) || sha256(file) !== artifact.sha256) problems.push(`${id}: ${artifact.path} is missing or changed`)
-        else if (!readFileSync(file).includes(0)) {
-          const text = readFileSync(file, 'utf8')
-          if (LIVE_TOKEN.test(text) || SECRET_SHAPE.test(text) || redactSecrets(text) !== text) problems.push(`${id}: ${artifact.path} keeps a credential`)
-        }
       }
+    }
+    const recordDir = join(records, 'records', id)
+    for (const name of filesUnder(recordDir)) {
+      const file = join(recordDir, name)
+      const text = readFileSync(file).toString('utf8')
+      if (LIVE_TOKEN.test(text) || SECRET_SHAPE.test(text) || redactSecrets(text, publishSecrets()) !== text) problems.push(`${id}: ${name} keeps a credential`)
     }
   }
   const snapshots = join(records, 'snapshots')
