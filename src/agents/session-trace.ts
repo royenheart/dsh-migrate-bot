@@ -78,7 +78,7 @@ export function redactSecrets(text: string, secrets: readonly string[] = []): st
     .replace(/\bgithub_pat_[A-Za-z0-9_]{20,}/g, 'github_pat_<redacted>')
     .replace(/\b(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, '$1<redacted>')
     .replace(/\b(Basic\s+)[A-Za-z0-9+/=]+/gi, '$1<redacted>')
-    .replace(/\b(token|password|secret|api[-_]?key)=([^\s&"']+)/gi, '$1=<redacted>')
+    .replace(/\b(token|password|secret|api[-_]?key)=(?!<redacted>)([^\s&"']+)/gi, '$1=<redacted>')
     .replace(/(?:mongodb|postgres(?:ql)?|mysql|redis):\/\/[^\s:/@]+:[^\s@/]+@/gi, match => match.replace(/:[^:@/]+@/, ':<redacted>@'))
     .replace(/(?:Cookie|Set-Cookie):\s*(?:"[^"\n]*"|[^\n]+)/gi, match => `${match.split(':')[0]}: <redacted>`)
     .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g, '<redacted>')

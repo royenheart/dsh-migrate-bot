@@ -163,14 +163,14 @@ async function reportToChannel(
   // The payload is the last fenced JSON block of everything the session printed; the report the runner extracts is its first plain or markdown block.
   if (!duplicateCheck) {
     if (channel.id === MIGRATE_BOT_CHANNEL) {
-      const parsed = parsePayload(session.raw, migrateBotPayloadSchema)
+      const parsed = parsePayload(session.payload ?? session.raw, migrateBotPayloadSchema)
       if (!parsed.ok) return { outcome: 'failed', detail: parsed.reason, usage }
       const rendered = renderMigrateBotReport(redactDeep(evidence, secretValues(deps.config, deps.env)), redactDeep(parsed.value, secretValues(deps.config, deps.env)))
       if (mode === 'dry-run') return { outcome: 'dry-run', detail: `${rendered.title}\n\n${rendered.body.slice(0, 1_200)}`, usage }
       const url = await deliver(client, channel, rendered)
       return { outcome: 'delivered', detail: `${channel.method} created in ${channel.repo}`, url, usage }
     }
-    const parsed = parsePayload(session.raw, reportPayloadSchema)
+    const parsed = parsePayload(session.payload ?? session.raw, reportPayloadSchema)
     if (!parsed.ok) return { outcome: 'failed', detail: parsed.reason, usage }
     const safe = redactDeep(parsed.value, secretValues(deps.config, deps.env))
     if (mode === 'dry-run') return { outcome: 'dry-run', detail: `${safe.title}\n\n${safe.body.slice(0, 1_200)}`, usage }
@@ -178,7 +178,7 @@ async function reportToChannel(
     return { outcome: 'delivered', detail: `${channel.method} created in ${channel.repo}`, url, usage }
   }
 
-  const parsed = parsePayload(session.raw, duplicatePayloadSchema)
+  const parsed = parsePayload(session.payload ?? session.raw, duplicatePayloadSchema)
   if (!parsed.ok) return { outcome: 'failed', detail: parsed.reason, usage }
   const posted = progress.posted
   const held: string[] = []

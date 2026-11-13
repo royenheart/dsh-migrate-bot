@@ -239,6 +239,7 @@ export function createDshRunner(options: {
           { cwd: request.workdir, env, timeoutMs },
         )
       const stdout = redactSecrets(result.stdout, secrets)
+      const rawStdout = result.stdout
       const stderr = redactSecrets(result.stderr, secrets)
       if (result.timedOut === true) {
         if (options.reportDir !== undefined) {
@@ -263,7 +264,7 @@ export function createDshRunner(options: {
       if (result.code !== 0) {
         throw withUsage(new Error(`dsh agent failed (${result.code}): ${stripObservationLines(stripTraceLines(stderr)) || stdout}`), lastUsage)
       }
-      const report = redactSecrets(extractReport(stdout), secrets)
+      const report = redactSecrets(extractReport(rawStdout), secrets)
       if (options.reportDir !== undefined) {
         mkdirSync(options.reportDir, { recursive: true })
         writeFileSync(join(options.reportDir, `${request.kind}.raw.txt`), stdout, 'utf8')
@@ -271,6 +272,7 @@ export function createDshRunner(options: {
       return {
         report,
         raw: stdout,
+        payload: rawStdout,
         ...(lastUsage === undefined ? {} : { usage: lastUsage }),
       }
     },

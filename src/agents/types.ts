@@ -25,6 +25,8 @@ export interface AgentRequest {
 export interface AgentResult {
   report: string
   raw: string
+  /** Unredacted output used only to parse a structured report payload; never published. */
+  payload?: string | undefined
   usage?: SessionProgress | undefined
 }
 
