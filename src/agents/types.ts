@@ -12,6 +12,8 @@ export interface AgentRequest {
   workdir: string
   agent: AgentConfig
   apiKey: string
+  /** Explicit credential values that must not reach reports or traces. */
+  secrets?: readonly string[] | undefined
   usageSoFar?: number | undefined
   usageLimit?: number | undefined
   /** Environment the session's tools see, such as the address of a running `dsh web`. */
@@ -23,6 +25,8 @@ export interface AgentRequest {
 export interface AgentResult {
   report: string
   raw: string
+  /** Unredacted output used only to parse a structured report payload; never published. */
+  payload?: string | undefined
   usage?: SessionProgress | undefined
 }
 

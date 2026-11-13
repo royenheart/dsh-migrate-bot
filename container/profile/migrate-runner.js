@@ -101,7 +101,8 @@ async function run(ctx, task, io) {
   const traceLevel = process.env.DSH_MIGRATE_TRACE_LEVEL || 'summary'
   const traceModule = await loadTrace()
   const traceOf = traceLevel === 'off' ? undefined : traceModule
-  const traceSecrets = traceModule === undefined || typeof traceModule.traceSecrets !== 'function' ? [] : traceModule.traceSecrets(process.env)
+  const explicitSecrets = (() => { try { const parsed = JSON.parse(process.env.DSH_MIGRATE_SECRET_VALUES ?? '[]'); return Array.isArray(parsed) ? parsed.filter(value => typeof value === 'string') : [] } catch { return [] } })()
+  const traceSecrets = traceModule === undefined || typeof traceModule.traceSecrets !== 'function' ? explicitSecrets : traceModule.traceSecrets(process.env, explicitSecrets)
   const traceState = {}
   const traceKind = process.env.DSH_MIGRATE_TRACE_KIND || ''
   const eventToken = process.env.DSH_MIGRATE_EVENT_TOKEN || ''

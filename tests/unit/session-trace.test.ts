@@ -4,6 +4,7 @@ import {
   boundTraceLine,
   decodeTraceLine,
   encodeTraceLine,
+  redactDeep,
   redactSecrets,
   stripTraceLines,
   traceSecrets,
@@ -75,6 +76,7 @@ test('a trace line survives encoding, and is stripped from diagnostics', () => {
 
 test('known secrets are found by name, and common credential shapes are redacted', () => {
   assert.deepEqual(traceSecrets({ DEEPSEEK_API_KEY: 'sk-1234567890', GITHUB_TOKEN: 'ghp_1234567890', PATH: '/usr/bin' }).sort(), ['ghp_1234567890', 'sk-1234567890'])
+  assert.deepEqual(traceSecrets({ CUSTOM_DEPLOY_AUTH: 'custom-value-123' }, ['custom-value-123']), ['custom-value-123'])
   assert.equal(redactSecrets('a sk-abcdefgh123 and ghp_abcdefghijklmnopqrst and Bearer abc.def', []), 'a sk-<redacted> and gh<redacted> and Bearer <redacted>')
   assert.equal(redactSecrets('value-1234', ['value-1234']), '<redacted>')
 })
@@ -82,4 +84,10 @@ test('known secrets are found by name, and common credential shapes are redacted
 test('a line is bounded with an ellipsis, not cut silently', () => {
   assert.equal(boundTraceLine('abcdef', 4), 'abc…')
   assert.equal(boundTraceLine('  a \n b  ', 10), 'a b')
+})
+
+
+test('structured values are redacted without breaking their shape', () => {
+  const redacted = redactDeep({ text: 'custom-value-123', nested: ['custom-value-123'] }, ['custom-value-123'])
+  assert.deepEqual(redacted, { text: '<redacted>', nested: ['<redacted>'] })
 })

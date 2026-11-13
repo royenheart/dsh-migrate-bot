@@ -21,6 +21,8 @@ export interface RunRecorderOptions {
   startedAt: string
   langfuse?: LangfuseExporter | undefined
   evaluation?: { harborJob?: string | undefined; trialId?: string | undefined; record?: string | undefined } | undefined
+  /** Explicit configured credential values for prompt redaction. */
+  secrets?: readonly string[] | undefined
   log?: ((message: string) => void) | undefined
 }
 
@@ -35,6 +37,7 @@ export class RunRecorder implements SessionObserver {
   private readonly langfuse: LangfuseExporter | undefined
   private readonly evaluation: RunRecorderOptions['evaluation']
   private readonly log: ((message: string) => void) | undefined
+  private readonly secrets: readonly string[]
 
   constructor(options: RunRecorderOptions) {
     this.runId = options.runId
@@ -45,13 +48,14 @@ export class RunRecorder implements SessionObserver {
     this.langfuse = options.langfuse
     this.evaluation = options.evaluation
     this.log = options.log
+    this.secrets = options.secrets ?? []
   }
 
   record(session: SessionRecord): void {
     // The state branch is a durable copy: known credentials are removed before
     // the prompt text and its hash leave the job. Langfuse applies its own
     // redaction independently at the egress.
-    const prompt = redactSecrets(session.prompt, traceSecrets(process.env))
+    const prompt = redactSecrets(session.prompt, [...traceSecrets(process.env), ...this.secrets])
     this.sessions.push({ ...session, prompt, promptSha256: sha256(prompt) })
   }
 
@@ -156,6 +160,7 @@ export function recorderFor(input: {
   plugin: string[]
   agent: AgentConfig
   env: NodeJS.ProcessEnv
+  secrets?: readonly string[] | undefined
   log?: ((message: string) => void) | undefined
 }): RunRecorder {
   const settings = langfuseSettings(input.env)
@@ -170,6 +175,7 @@ export function recorderFor(input: {
     startedAt: new Date().toISOString(),
     ...(langfuse === undefined ? {} : { langfuse }),
     ...(evaluation === undefined ? {} : { evaluation }),
+    ...(input.secrets === undefined ? {} : { secrets: input.secrets }),
     ...(input.log === undefined ? {} : { log: input.log }),
   })
 }

@@ -1,4 +1,5 @@
 import { describeBaseline } from '../domain/outcome.ts'
+import { redactSecrets } from '../agents/session-trace.ts'
 import { inline } from '../render/text.ts'
 import { formatAgentReport, formatWorkingTree, wrapFenced, neutralizeEmbedHtml } from './issue-format.ts'
 import type { MigrationContext } from '../workflow/machine.ts'
@@ -35,21 +36,24 @@ export function renderProposal(input: {
   diff: string
   /** The workflow run that produced the proposal, when known. */
   runUrl?: string | undefined
+  /** Configured credential values to remove from every rendered field. */
+  secrets?: readonly string[] | undefined
 }): ProposalDocuments {
+  const redact = (text: string): string => redactSecrets(text, input.secrets ?? [])
   const { context } = input
   const target = inline(context.input.target.tag, 80)
   const plugin = inline(input.pluginName, 120)
   const title = `Migrate ${plugin} to DeepSeek Harness ${inline(context.input.target.version, 80)}`
-  const checkLines = input.checks.map(check => `- ${CHECK_LABEL[check.check]}: ${check.outcome}${check.outcome === 'fail' ? ` (${inline(check.fingerprint, 200)})` : ''}`)
+  const checkLines = input.checks.map(check => `- ${CHECK_LABEL[check.check]}: ${check.outcome}${check.outcome === 'fail' ? ` (${inline(redact(check.fingerprint), 200)})` : ''}`)
   const summary = [
     `- Target release: \`${target}\``,
     `- Source release: ${context.input.source === undefined ? 'unknown' : `\`${inline(context.input.source.release.tag, 80)}\` (${context.input.source.origin})`}`,
     `- Before the migration: ${describeBaseline(context)}`,
     `- Repair attempts: ${String(context.attempts)}`,
     ...(input.runUrl === undefined ? [] : [`- Workflow run: ${input.runUrl}`]),
-    ...context.warnings.map(warning => `- Warning: ${inline(warning, 300)}`),
+    ...context.warnings.map(warning => `- Warning: ${inline(redact(warning), 300)}`),
   ].join('\n')
-  const repairs = input.reports.repairs.map((report, index) => `### Repair attempt ${String(index + 1)}\n\n${formatAgentReport(report, '_No report._')}`).join('\n\n')
+  const repairs = input.reports.repairs.map((report, index) => `### Repair attempt ${String(index + 1)}\n\n${formatAgentReport(redact(report), '_No report._')}`).join('\n\n')
   const issue = `${PROPOSAL_MARKER}
 # Migration of ${plugin} to ${target}
 
@@ -63,15 +67,15 @@ ${checkLines.length === 0 ? '_No check ran._' : checkLines.join('\n')}
 
 ## Overlap review
 
-${formatAgentReport(input.reports.overlap, '_Not run._')}
+${formatAgentReport(input.reports.overlap === undefined ? undefined : redact(input.reports.overlap), '_Not run._')}
 
 ## Extension-point review
 
-${formatAgentReport(input.reports.extensionPoints, '_Not run._')}
+${formatAgentReport(input.reports.extensionPoints === undefined ? undefined : redact(input.reports.extensionPoints), '_Not run._')}
 ${repairs === '' ? '' : `\n## Repair attempts\n\n${repairs}\n`}
 ## Working tree
 
-${formatWorkingTree(input.diff)}
+${formatWorkingTree(redact(input.diff))}
 `
   const failing = input.checks.filter(check => check.outcome === 'fail')
   const pullRequest = `${PROPOSAL_MARKER}
@@ -84,7 +88,7 @@ ${summary}
 ## Checks
 
 ${checkLines.length === 0 ? '_No check ran._' : checkLines.join('\n')}
-${failing.length === 0 ? '' : `\n${failing.map(check => wrapFenced(neutralizeEmbedHtml(check.detail))).join('\n\n')}\n`}
+${failing.length === 0 ? '' : `\n${failing.map(check => wrapFenced(neutralizeEmbedHtml(redact(check.detail)))).join('\n\n')}\n`}
 ## Before merging
 
 - [ ] The documented capabilities and entry points still work.

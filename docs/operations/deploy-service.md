@@ -89,8 +89,9 @@ The Terraform module is one way to get such a host, on Hetzner Cloud; on another
 cd deploy-service/terraform
 export HCLOUD_TOKEN=…                      # a Hetzner Cloud project API token
 terraform init
-terraform apply -var github_webhook_secret="$(openssl rand -hex 32)"
-terraform output -raw deploy_token
+export TF_VAR_github_webhook_secret="$(openssl rand -hex 32)"
+terraform apply
+terraform output -raw deploy_token | gh secret set DSH_MIGRATE_DEPLOY_TOKEN
 ```
 
 | Input | Default | Meaning |

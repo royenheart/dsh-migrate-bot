@@ -1,6 +1,8 @@
 import { PACKAGE_VERSION } from '../paths.ts'
 import { sha256 } from '../observability/manifest.ts'
 import { agentUsage } from '../agents/dsh.ts'
+import { redactDeep, redactSecrets } from '../agents/session-trace.ts'
+import { secretValues } from '../secrets.ts'
 import { isQuotaError } from '../quota/errors.ts'
 import { channelPrompt } from '../prompts/reports.ts'
 import { inline } from '../render/text.ts'
@@ -79,7 +81,8 @@ async function reportToChannel(
   if (deps.apiKey === undefined) return { outcome: 'skipped', detail: 'no DeepSeek API key, so no session can run' }
 
   const duplicateCheck = channel.kind === 'duplicate-check'
-  const evidence = await collectEvidence({
+  const secrets = secretValues(deps.config, deps.env)
+  const evidence = redactDeep(await collectEvidence({
     github: deps.github,
     repository: deps.repository,
     migration,
@@ -92,12 +95,12 @@ async function reportToChannel(
       reasoningEffort: deps.config.agent.reasoningEffort,
     },
     searchCandidates: duplicateCheck,
-  })
+  }), secrets)
   const drafts = evidence.patchReports.filter(report => report.kind === 'draft')
   if (duplicateCheck && drafts.length === 0) return { outcome: 'skipped', detail: 'the migration wrote no discussion draft' }
 
   deps.syncSkills(channel.id === UPGRADE_SKILL_CHANNEL)
-  const prompt = channelPrompt(channel, renderEvidence(evidence, { includeCandidates: duplicateCheck }))
+  const prompt = redactSecrets(channelPrompt(channel, renderEvidence(evidence, { includeCandidates: duplicateCheck })), secrets)
   const startedAt = new Date().toISOString()
   const observations: SessionObservation[] = []
   let session
@@ -108,10 +111,11 @@ async function reportToChannel(
       workdir: deps.workdir,
       agent: deps.config.agent,
       apiKey: deps.apiKey,
+      secrets: secretValues(deps.config, deps.env),
       onObservation: observation => { observations.push(observation) },
     })
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
+    const detail = redactSecrets(error instanceof Error ? error.message : String(error), secretValues(deps.config, deps.env))
     const progress = agentUsage(error)
     const usage = progress === undefined ? undefined : { inputTokens: progress.inputTokens, outputTokens: progress.outputTokens, cacheHitTokens: progress.cacheHitTokens, ...(progress.costUsd === undefined ? {} : { usd: progress.costUsd }) }
     deps.observer?.record({
@@ -159,33 +163,34 @@ async function reportToChannel(
   // The payload is the last fenced JSON block of everything the session printed; the report the runner extracts is its first plain or markdown block.
   if (!duplicateCheck) {
     if (channel.id === MIGRATE_BOT_CHANNEL) {
-      const parsed = parsePayload(session.raw, migrateBotPayloadSchema)
-      if (!parsed.ok) return { outcome: 'failed', detail: parsed.reason, usage }
-      const rendered = renderMigrateBotReport(evidence, parsed.value)
+      const parsed = parsePayload(session.payload ?? session.raw, migrateBotPayloadSchema)
+      if (!parsed.ok) return { outcome: 'failed', detail: redactSecrets(parsed.reason, secrets), usage }
+      const rendered = renderMigrateBotReport(redactDeep(evidence, secretValues(deps.config, deps.env)), redactDeep(parsed.value, secretValues(deps.config, deps.env)))
       if (mode === 'dry-run') return { outcome: 'dry-run', detail: `${rendered.title}\n\n${rendered.body.slice(0, 1_200)}`, usage }
       const url = await deliver(client, channel, rendered)
       return { outcome: 'delivered', detail: `${channel.method} created in ${channel.repo}`, url, usage }
     }
-    const parsed = parsePayload(session.raw, reportPayloadSchema)
-    if (!parsed.ok) return { outcome: 'failed', detail: parsed.reason, usage }
-    if (mode === 'dry-run') return { outcome: 'dry-run', detail: `${parsed.value.title}\n\n${parsed.value.body.slice(0, 1_200)}`, usage }
-    const url = await deliver(client, channel, parsed.value)
+    const parsed = parsePayload(session.payload ?? session.raw, reportPayloadSchema)
+    if (!parsed.ok) return { outcome: 'failed', detail: redactSecrets(parsed.reason, secrets), usage }
+    const safe = redactDeep(parsed.value, secretValues(deps.config, deps.env))
+    if (mode === 'dry-run') return { outcome: 'dry-run', detail: `${safe.title}\n\n${safe.body.slice(0, 1_200)}`, usage }
+    const url = await deliver(client, channel, safe)
     return { outcome: 'delivered', detail: `${channel.method} created in ${channel.repo}`, url, usage }
   }
 
-  const parsed = parsePayload(session.raw, duplicatePayloadSchema)
-  if (!parsed.ok) return { outcome: 'failed', detail: parsed.reason, usage }
+  const parsed = parsePayload(session.payload ?? session.raw, duplicatePayloadSchema)
+  if (!parsed.ok) return { outcome: 'failed', detail: redactSecrets(parsed.reason, secrets), usage }
   const posted = progress.posted
   const held: string[] = []
   for (const draft of drafts) {
     const decision = parsed.value.decisions.find(entry => entry.slug === draft.slug)
     if (decision === undefined || !decision.post) {
-      const why = decision === undefined ? 'no decision was returned' : decision.reason
-      const existing = decision?.existing.map(entry => entry.url).join(', ') ?? ''
+      const why = redactSecrets(decision === undefined ? 'no decision was returned' : decision.reason, secretValues(deps.config, deps.env))
+      const existing = (decision?.existing.map(entry => redactSecrets(entry.url, secretValues(deps.config, deps.env))).join(', ')) ?? ''
       held.push(`${draft.slug}: ${inline(why, 200)}${existing === '' ? '' : ` (${inline(existing, 300)})`}`)
       continue
     }
-    if (mode === 'deliver') posted.push(await deliver(client, channel, { title: draft.title, body: draft.body }))
+    if (mode === 'deliver') posted.push(await deliver(client, channel, { title: redactSecrets(draft.title, secretValues(deps.config, deps.env)), body: redactSecrets(draft.body, secretValues(deps.config, deps.env)) }))
     else posted.push(`would post ${draft.slug}`)
   }
   const detail = held.length === 0 ? '' : `held: ${held.join('; ')}`

@@ -98,7 +98,58 @@ function declaresPreset() {
 
 /** The model route is keyless; the launch token is a credential and never reaches the log. */
 function redact(text) {
-  return text.replace(/token=[A-Za-z0-9_-]+/g, 'token=<redacted>')
+  return String(text)
+    .replace(/\bsk-[A-Za-z0-9_-]{20,}/g, 'sk-<redacted>')
+    .replace(/\bgh[pousr]_[A-Za-z0-9]{20,}/g, 'gh<redacted>')
+    .replace(/\bgithub_pat_[A-Za-z0-9_]{20,}/g, 'github_pat_<redacted>')
+    .replace(/\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{12,}/gi, match => `${match.split(/\s+/)[0]} <redacted>`)
+    .replace(/(?:mongodb|postgres(?:ql)?|mysql|redis):\/\/[^\s:/@]+:[^\s@/]+@/gi, match => match.replace(/:[^:@/]+@/, ':<redacted>@'))
+    .replace(/token=[A-Za-z0-9_-]+/g, 'token=<redacted>')
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g, '<redacted>')
+}
+
+/** Stateful line scrubber: credentials split across chunks are held until the line ends. */
+function streamRedactor(write) {
+  let held = ''
+  let pem = false
+  const emitLines = () => {
+    let newline = held.indexOf('\n')
+    while (newline >= 0) {
+      const line = held.slice(0, newline + 1)
+      held = held.slice(newline + 1)
+      const begins = /-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(line)
+      const ends = /-----END [A-Z ]*PRIVATE KEY-----/.test(line)
+      if (pem) {
+        if (ends) pem = false
+      } else if (begins) {
+        pem = !ends
+      } else {
+        write(redact(line))
+      }
+      newline = held.indexOf('\n')
+    }
+    if (held.length > 64 * 1024) {
+      const keep = 512
+      const markers = ['token=', 'Bearer ', 'Basic ', 'sk-', 'ghp_', 'github_pat_', 'AKIA', '-----BEGIN ']
+      let cut = held.length - keep
+      for (const candidate of markers) {
+        const at = held.lastIndexOf(candidate)
+        if (at >= 0 && at < cut) cut = at
+      }
+      const prefix = held.slice(0, cut)
+      held = held.slice(cut)
+      write(pem ? '[redacted]\n' : redact(prefix))
+    }
+  }
+  return {
+    feed(chunk) { held += String(chunk); emitLines() },
+    flush() {
+      if (pem) write('[redacted]\n')
+      else write(redact(held))
+      held = ''
+      pem = false
+    },
+  }
 }
 
 /** The headless check: boot the plugin and stop at the model call. */
@@ -111,8 +162,8 @@ function checkHeadless(plugin, home) {
     timeout: Number(env.CHECK_TIMEOUT_MS ?? 180_000),
     killSignal: 'SIGKILL',
   })
-  process.stdout.write(result.stdout ?? '')
-  process.stderr.write(result.stderr ?? '')
+  process.stdout.write(redact(result.stdout ?? ''))
+  process.stderr.write(redact(result.stderr ?? ''))
   if (result.error?.code === 'ETIMEDOUT') {
     process.stderr.write('dsh-preview: boot check timed out\n')
     return 124
@@ -181,17 +232,23 @@ function web(profile, children) {
     })
     children.push(child)
     let output = ''
-    const onData = (chunk) => {
+    // Separate buffers: stdout and stderr interleave at the terminal, but a
+    // token never spans two different streams.
+    const logOut = streamRedactor(text => { process.stdout.write(`[${profile}] ${text}`) })
+    const logErr = streamRedactor(text => { process.stderr.write(`[${profile}] ${text}`) })
+    const onData = (logger) => (chunk) => {
       const text = String(chunk)
       // The launch token is a credential: it reaches ready.json, never the log.
-      process.stdout.write(`[${profile}] ${text.replace(/token=[A-Za-z0-9_-]+/g, 'token=<redacted>')}`)
+      logger.feed(text)
       output += text
       const ready = READY.exec(output)
       if (ready !== null) resolve({ port: Number(ready[2]), token: ready[3] })
     }
-    child.stdout.on('data', onData)
-    child.stderr.on('data', onData)
+    child.stdout.on('data', onData(logOut))
+    child.stderr.on('data', onData(logErr))
     child.on('exit', (code) => {
+      logOut.flush()
+      logErr.flush()
       reject(new Error(`dsh web (${profile}) exited ${String(code)}`))
       for (const other of children) other.kill('SIGTERM')
       process.exit(1)

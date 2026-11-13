@@ -25,6 +25,7 @@ import { compare, computeMetrics } from '../src/evaluation/metrics.ts'
 import { recordSchema, RECORD_SCHEMA, SUBJECTS, type Attempt, type BenchmarkRecord, type SubjectId, type TaskEntry } from '../src/evaluation/record.ts'
 import { UPGRADE_SKILLS } from '../src/skills/upgrade.ts'
 import { scrubWebOutput } from '../src/verify/web.ts'
+import { redactSecrets } from '../src/agents/session-trace.ts'
 import { REPO_ROOT } from './repo.ts'
 import { botSnapshot, checkSnapshot, storeSnapshot } from './snapshot.ts'
 
@@ -142,7 +143,19 @@ function filesUnder(dir: string): string[] {
  */
 const isOutput = (name: string): boolean => name.startsWith('verifier/') || name.endsWith('.log')
 /** A session token not yet redacted (`scrubWebOutput`). */
-const LIVE_TOKEN = /[?&]token=(?!<redacted>)[^\s&"']+/i
+const LIVE_TOKEN = /[?&]token=(?!<redacted>)[A-Za-z0-9_-]{16,}(?![A-Za-z0-9_-])/i
+/** Credential shapes a published artifact must not carry. */
+const SECRET_SHAPE = /(?:\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}|\bAKIA[0-9A-Z]{16}\b|-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{12,})/
+/** Values of credential-shaped environment variables in the benchmark process. */
+function publishSecrets(): string[] {
+  const values: string[] = []
+  for (const [name, value] of Object.entries(process.env)) {
+    if (typeof value !== 'string' || value.length < 4) continue
+    if (!/(?:^|_)(?:API_KEY|KEY|TOKEN|SECRET|PASSWORD|AUTH|CREDENTIAL|DATABASE_URL|CONNECTION_STRING)$/i.test(name)) continue
+    if (!values.includes(value)) values.push(value)
+  }
+  return values
+}
 
 /**
  * Copy what a record keeps of a trial into its directory: the agent's files and
@@ -162,8 +175,9 @@ function keepArtifacts(trialDir: string, recordDir: string, trial: string): Atte
     mkdirSync(dirname(target), { recursive: true })
     // An output is kept with its session tokens redacted, as the Action's own output is; a binary file (a NUL byte) as it is.
     const bytes = readFileSync(source)
-    const text = isOutput(name) && !bytes.includes(0) ? bytes.toString('utf8') : undefined
-    if (text !== undefined && scrubWebOutput(text) !== text) writeFileSync(target, scrubWebOutput(text))
+    const text = !bytes.includes(0) ? bytes.toString('utf8') : undefined
+    const scrubbed = text === undefined ? undefined : redactSecrets(scrubWebOutput(text), publishSecrets())
+    if (scrubbed !== undefined && scrubbed !== text) writeFileSync(target, scrubbed)
     else copyFileSync(source, target)
     artifacts[name] = { path, sha256: sha256(target), bytes: statSync(target).size }
   }
@@ -450,9 +464,21 @@ export function validateRecords(records: string): string[] {
       for (const [name, artifact] of Object.entries(attempt.artifacts)) {
         const file = join(records, 'records', id, artifact.path)
         if (!existsSync(file) || sha256(file) !== artifact.sha256) problems.push(`${id}: ${artifact.path} is missing or changed`)
-        else if (isOutput(name) && LIVE_TOKEN.test(readFileSync(file, 'utf8'))) problems.push(`${id}: ${artifact.path} keeps a session token`)
       }
     }
+    const recordDir = join(records, 'records', id)
+    for (const name of filesUnder(recordDir)) {
+      const file = join(recordDir, name)
+      const text = readFileSync(file).toString('utf8')
+      const secretValues = publishSecrets()
+      if (LIVE_TOKEN.test(text) || SECRET_SHAPE.test(text) || secretValues.some(value => text.includes(value))) problems.push(`${id}: ${name} keeps a credential`)
+    }
+  }
+  const snapshots = join(records, 'snapshots')
+  for (const name of filesUnder(snapshots)) {
+    const file = join(snapshots, name)
+    const text = readFileSync(file).toString('utf8')
+    if (LIVE_TOKEN.test(text) || SECRET_SHAPE.test(text) || publishSecrets().some(value => text.includes(value))) problems.push(`snapshot ${name} keeps a credential`)
   }
   return problems
 }

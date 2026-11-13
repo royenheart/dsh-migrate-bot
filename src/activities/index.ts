@@ -6,6 +6,7 @@ import { runReportChannel, type ReportDeps } from '../merge-reports/run.ts'
 import { CheckRunner } from './checks.ts'
 import { skillsSource, UPGRADE_SKILLS } from '../skills/upgrade.ts'
 import { SessionRunner } from './sessions.ts'
+import { secretValues } from '../secrets.ts'
 import { characterize, publishE2E, type E2EDeps } from './e2e-suite.ts'
 import { publishProposal } from './proposal.ts'
 import type { ActivityRunner } from '../engine.ts'
@@ -46,7 +47,7 @@ export interface ActivityDeps {
 export function createActivities(deps: ActivityDeps): ActivityRunner {
   const runDir = join(deps.home, 'runs', deps.runId)
   const cardsDir = join(skillsSource(deps.env), UPGRADE_SKILLS[0], 'references')
-  const checks = new CheckRunner({ workdir: deps.workdir, config: deps.config, cacheDir: join(deps.home, 'dsh'), runDir, cardsDir })
+  const checks = new CheckRunner({ workdir: deps.workdir, config: deps.config, cacheDir: join(deps.home, 'dsh'), runDir, cardsDir, secrets: secretValues(deps.config, deps.env) })
   const latest = new Map<CheckName, CheckResult>()
   let sessions: SessionRunner | undefined
   const sessionRunner = (): SessionRunner => {
@@ -55,6 +56,7 @@ export function createActivities(deps: ActivityDeps): ActivityRunner {
       workdir: deps.workdir,
       config: deps.config,
       apiKey: deps.apiKey,
+      secrets: secretValues(deps.config, deps.env),
       agent: deps.agent,
       quota: deps.quota,
       runDir,
@@ -101,8 +103,9 @@ export function createActivities(deps: ActivityDeps): ActivityRunner {
           reports: { overlap: reports.get('reports/overlap.md'), extensionPoints: reports.get('reports/extension-points.md'), repairs },
           diff: treeDiff(deps.workdir),
           runUrl: deps.runUrl,
+          secrets: secretValues(deps.config, deps.env),
         })
-        return await publishProposal({ workdir: deps.workdir, github: deps.github.client, repository: deps.github.repository, defaultBranch: deps.github.defaultBranch }, context, documents)
+        return await publishProposal({ workdir: deps.workdir, github: deps.github.client, repository: deps.github.repository, defaultBranch: deps.github.defaultBranch, secrets: secretValues(deps.config, deps.env) }, context, documents)
       }
       case 'deliverReport': {
         if (deps.github === undefined) throw new Error('a merge report needs a GitHub token')
