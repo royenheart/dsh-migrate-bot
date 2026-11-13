@@ -164,14 +164,14 @@ async function reportToChannel(
   if (!duplicateCheck) {
     if (channel.id === MIGRATE_BOT_CHANNEL) {
       const parsed = parsePayload(session.payload ?? session.raw, migrateBotPayloadSchema)
-      if (!parsed.ok) return { outcome: 'failed', detail: parsed.reason, usage }
+      if (!parsed.ok) return { outcome: 'failed', detail: redactSecrets(parsed.reason, secrets), usage }
       const rendered = renderMigrateBotReport(redactDeep(evidence, secretValues(deps.config, deps.env)), redactDeep(parsed.value, secretValues(deps.config, deps.env)))
       if (mode === 'dry-run') return { outcome: 'dry-run', detail: `${rendered.title}\n\n${rendered.body.slice(0, 1_200)}`, usage }
       const url = await deliver(client, channel, rendered)
       return { outcome: 'delivered', detail: `${channel.method} created in ${channel.repo}`, url, usage }
     }
     const parsed = parsePayload(session.payload ?? session.raw, reportPayloadSchema)
-    if (!parsed.ok) return { outcome: 'failed', detail: parsed.reason, usage }
+    if (!parsed.ok) return { outcome: 'failed', detail: redactSecrets(parsed.reason, secrets), usage }
     const safe = redactDeep(parsed.value, secretValues(deps.config, deps.env))
     if (mode === 'dry-run') return { outcome: 'dry-run', detail: `${safe.title}\n\n${safe.body.slice(0, 1_200)}`, usage }
     const url = await deliver(client, channel, safe)
@@ -179,7 +179,7 @@ async function reportToChannel(
   }
 
   const parsed = parsePayload(session.payload ?? session.raw, duplicatePayloadSchema)
-  if (!parsed.ok) return { outcome: 'failed', detail: parsed.reason, usage }
+  if (!parsed.ok) return { outcome: 'failed', detail: redactSecrets(parsed.reason, secrets), usage }
   const posted = progress.posted
   const held: string[] = []
   for (const draft of drafts) {

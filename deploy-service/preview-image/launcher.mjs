@@ -131,9 +131,11 @@ function streamRedactor(write) {
     if (held.length > 64 * 1024) {
       const keep = 512
       const markers = ['token=', 'Bearer ', 'Basic ', 'sk-', 'ghp_', 'github_pat_', 'AKIA', '-----BEGIN ']
-      let marker = -1
-      for (const candidate of markers) marker = Math.max(marker, held.lastIndexOf(candidate))
-      const cut = marker > 0 && marker < held.length - keep ? marker : held.length - keep
+      let cut = held.length - keep
+      for (const candidate of markers) {
+        const at = held.lastIndexOf(candidate)
+        if (at >= 0 && at < cut) cut = at
+      }
       const prefix = held.slice(0, cut)
       held = held.slice(cut)
       write(pem ? '[redacted]\n' : redact(prefix))
