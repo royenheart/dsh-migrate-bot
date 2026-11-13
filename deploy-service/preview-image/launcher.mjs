@@ -84,6 +84,18 @@ function declaresClient() {
   }
 }
 
+/** Whether a bundle patch declares an agent preset; the headless composition has no registry. */
+function declaresPreset() {
+  try {
+    const manifest = JSON.parse(readFileSync(join(pluginDir, 'package.json'), 'utf8'))
+    const patch = manifest?.dsh?.bundle?.patch
+    const files = typeof patch === 'string' ? [patch] : Array.isArray(patch) ? patch : []
+    return files.some(file => typeof file === 'string' && /@deepseek-ai\/dsh-agent-preset/.test(readFileSync(join(pluginDir, file), 'utf8')))
+  } catch {
+    return false
+  }
+}
+
 /** The model route is keyless; the launch token is a credential and never reaches the log. */
 function redact(text) {
   return text.replace(/token=[A-Za-z0-9_-]+/g, 'token=<redacted>')
@@ -152,7 +164,7 @@ async function check() {
   const home = mkdtempSync(join(tmpdir(), 'dsh-preview-check-'))
   let code
   try {
-    code = declaresClient() ? await checkWeb(plugin, home) : checkHeadless(plugin, home)
+    code = declaresClient() || declaresPreset() ? await checkWeb(plugin, home) : checkHeadless(plugin, home)
   } finally {
     rmSync(home, { recursive: true, force: true })
   }

@@ -9,6 +9,7 @@ import { bootProbe, normalizeSignature } from '../verify/boot.ts'
 import { errorSummary } from '../mechanical/errors.ts'
 import { ensureDsh, releaseCutoff, releaseTimes } from '../verify/dsh-install.ts'
 import { hasClientSurface, startWebHost, webSmoke } from '../verify/web.ts'
+import { presetPluginNames } from '../verify/bundle.ts'
 import { readSuite, runSuite, type SuiteRun } from '../e2e/suite.ts'
 import { suiteDirOf } from './e2e-suite.ts'
 import type { MigrateConfig } from '../config/schema.ts'
@@ -143,15 +144,16 @@ export class CheckRunner {
         // A plugin with a browser half may need services only the web
         // composition provides; the web check loads it there.
         const plugins = findPlugins(workdir)
-        const headless = plugins.filter(plugin => !declaresClient(plugin))
+        const presetPlugins = new Set(config.checks.web.enabled ? presetPluginNames(workdir) : [])
+        const headless = plugins.filter(plugin => !declaresClient(plugin) && !presetPlugins.has(plugin.name))
         if (plugins.length > 0 && headless.length === 0) {
-          return { outcome: 'skipped', fingerprint: '', output: 'every plugin has a browser half (dsh.client); the web check loads them in the web composition' }
+          return { outcome: 'skipped', fingerprint: '', output: 'every plugin has a browser half (dsh.client) or declares an agent preset; the web check loads them in the web composition' }
         }
         const probe = await bootProbe({ workdir, bin: installed.bin, dshTag: release.tag, timeoutMs: config.checks.boot.timeoutMs, plugins: headless.length > 0 ? headless : undefined, env })
         return { outcome: probe.outcome === 'pass' ? 'pass' : 'fail', fingerprint: probe.signature, output: probe.detail }
       }
       case 'web': {
-        if (!hasClientSurface(workdir)) return { outcome: 'skipped', fingerprint: '', output: 'the plugin declares no dsh.client surface' }
+        if (!hasClientSurface(workdir) && presetPluginNames(workdir).length === 0) return { outcome: 'skipped', fingerprint: '', output: 'the plugin declares no dsh.client surface or preset' }
         const smoke = await webSmoke({ workdir, bin: this.dsh(release), timeoutMs: config.checks.web.timeoutMs, dshTag: release.tag, env })
         if (smoke.skipped !== undefined) return { outcome: 'skipped', fingerprint: '', output: smoke.skipped }
         return { outcome: smoke.ok ? 'pass' : 'fail', fingerprint: smoke.signature, output: smoke.detail }

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { classifyBoot, linkPlugins, skippedBundle, writeProbeProfile, type BootProbeResult } from './boot.ts'
 import { declaresClient, findPlugins } from '../plugins.ts'
+import { declaredPresets, pluginBundles, presetPluginNames, unresolvedBundleRows } from './bundle.ts'
 
 /**
  * The web check: boot the real `dsh web` server with the plugin mounted
@@ -69,6 +70,8 @@ export interface WebSmokeOptions {
   webHelp?: string | undefined
   /** The environment dsh starts from; the Action's own unless the caller removed its secrets. */
   env?: NodeJS.ProcessEnv | undefined
+  /** HTTP implementation for the preset-health probe. */
+  fetchImpl?: typeof fetch | undefined
 }
 
 /**
@@ -89,6 +92,83 @@ function webHelp(bin: string): string {
 /** Whether a plugin of the repository declares a browser surface through `dsh.client`. */
 export function hasClientSurface(workdir: string): boolean {
   return findPlugins(workdir).some(declaresClient)
+}
+
+/** One preset the host roster reports. */
+export interface RosterPreset {
+  id: string
+  broken?: string
+}
+
+/** Presets the shipped web app owns; a plugin declaration of the same id is ambiguous. */
+const SHIPPED_PRESETS = new Set(['standard', 'ptc', 'minimal', 'cordis'])
+
+/** Read the agent-preset roster over the same browser session the page uses. */
+export async function readPresetRoster(url: string, fetchImpl: typeof fetch = fetch, signal?: AbortSignal): Promise<RosterPreset[]> {
+  const login = await fetchImpl(url, { redirect: 'manual', ...(signal === undefined ? {} : { signal }) })
+  const cookie = login.headers.get('set-cookie')?.split(';', 1)[0]
+  if (login.status !== 303 || cookie === undefined || cookie === '') throw new Error('the launch URL did not exchange for a browser session')
+  const endpoint = new URL('/api/agentPresets/list', new URL(url).origin)
+  const response = await fetchImpl(endpoint, {
+    method: 'POST',
+    headers: { cookie, 'content-type': 'application/json' },
+    ...(signal === undefined ? {} : { signal }),
+    body: JSON.stringify({ type: 'client-request', rpcId: 'preset-health', method: 'agentPresets/list', payload: { args: {} } }),
+  })
+  if (!response.ok) throw new Error(`the preset roster answered HTTP ${String(response.status)}`)
+  const body = await response.json() as { result?: { ok?: boolean; value?: { presets?: unknown }; error?: { message?: string } } }
+  if (body.result?.ok !== true || !Array.isArray(body.result.value?.presets)) throw new Error(body.result?.error?.message ?? 'the preset roster returned no presets')
+  return body.result.value.presets.map((entry, index) => {
+    if (typeof entry !== 'object' || entry === null || typeof (entry as Record<string, unknown>).id !== 'string') throw new Error(`preset roster entry ${String(index)} has no id`)
+    const broken = (entry as Record<string, unknown>).broken
+    if (broken !== undefined && typeof broken !== 'string') throw new Error(`preset roster entry ${String(index)} has an invalid broken reason`)
+    return { id: (entry as Record<string, unknown>).id as string, ...(broken === undefined ? {} : { broken }) }
+  })
+}
+
+/** Fail when a declared preset is missing or broken; bundle rows are advisory and checked separately. */
+async function presetHealth(workdir: string, bin: string, url: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<{ ok: true; note: string } | { ok: false; signature: string; detail: string }> {
+  const declared = declaredPresets(workdir, bin)
+  if (declared.length === 0) return { ok: true, note: '' }
+  const counts = new Map<string, number>()
+  for (const preset of declared) counts.set(preset.id, (counts.get(preset.id) ?? 0) + 1)
+  const duplicates = [...counts].filter(([, count]) => count > 1).map(([id]) => id)
+  if (duplicates.length > 0) return { ok: false, signature: `web: duplicate preset declaration: ${duplicates.join(', ')}`, detail: duplicates.join(', ') }
+  const collisions = declared.map(preset => preset.id).filter(id => SHIPPED_PRESETS.has(id))
+  if (collisions.length > 0) return { ok: false, signature: `web: preset declaration collides with a shipped preset: ${[...new Set(collisions)].join(', ')}`, detail: collisions.join(', ') }
+  let roster: RosterPreset[]
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), Math.max(1, timeoutMs))
+  try {
+    roster = await Promise.race([
+      readPresetRoster(url, fetchImpl, controller.signal),
+      new Promise<never>((_, reject) => {
+        controller.signal.addEventListener('abort', () => reject(new Error('preset health check timed out')), { once: true })
+      }),
+    ])
+  } catch (error) {
+    return { ok: false, signature: controller.signal.aborted ? 'web: preset check timed out' : 'web: preset roster unavailable', detail: error instanceof Error ? error.message : String(error) }
+  } finally {
+    clearTimeout(timer)
+  }
+  const unhealthy = declared.filter(preset => {
+    const row = roster.find(candidate => candidate.id === preset.id)
+    if (row?.broken !== undefined) return true
+    return row === undefined && preset.unknown !== true
+  })
+  if (unhealthy.length > 0) {
+    const detail = unhealthy.map(preset => {
+      const row = roster.find(candidate => candidate.id === preset.id)
+      return row?.broken === undefined ? `${preset.id} (${preset.plugin}) is absent` : `${preset.id} (${preset.plugin}): ${row.broken}`
+    }).join('; ')
+    const signature = `web: preset unhealthy: ${unhealthy.map(preset => {
+      const row = roster.find(candidate => candidate.id === preset.id)
+      return `${preset.id} (${row?.broken ?? 'absent'})`
+    }).join(', ')}`
+    return { ok: false, signature: scrubWebOutput(signature), detail: scrubWebOutput(detail) }
+  }
+  const uncertain = declared.filter(preset => preset.unknown === true).map(preset => preset.id)
+  return { ok: true, note: `; presets healthy: ${declared.map(preset => preset.id).join(', ')}${uncertain.length === 0 ? '' : `; conditional preset gate advisory: ${uncertain.join(', ')}`}` }
 }
 
 /**
@@ -197,7 +277,7 @@ function notReady(result: WebSmokeSpawnResult): WebSmokeResult {
     // Reached the model call without ever serving: that is a web-layer failure.
     return { ok: false, signature: 'web: exited before serving', detail: scrubWebOutput(result.output).slice(-4000) }
   }
-  return { ok: false, signature: `web ${classified.signature}`, detail: classified.detail }
+  return { ok: false, signature: scrubWebOutput(`web ${classified.signature}`), detail: scrubWebOutput(classified.detail) }
 }
 
 /**
@@ -209,19 +289,32 @@ function notReady(result: WebSmokeSpawnResult): WebSmokeResult {
  * @param options - workdir, dsh binary, timeout, injectable spawn
  */
 export async function webSmoke(options: WebSmokeOptions): Promise<WebSmokeResult> {
-  if (!hasClientSurface(options.workdir)) {
+  if (!hasClientSurface(options.workdir) && presetPluginNames(options.workdir).length === 0) {
     return {
       ok: true,
       signature: 'web: no client surface',
       detail: '',
-      skipped: 'no plugin declares a dsh.client surface',
+      skipped: 'no plugin declares a dsh.client surface or a declared preset',
     }
   }
-  const served = await serveWeb(options, false)
+  const bundleErrors = pluginBundles(options.workdir, options.bin).flatMap(bundle => bundle.error === undefined ? [] : [`${bundle.name}: ${bundle.error}`])
+  const unresolved = unresolvedBundleRows(options.workdir, options.bin)
+  const advisory = [
+    ...bundleErrors,
+    ...unresolved.slice(0, 5).map(row => `${row.id ?? '(no id)'} ${row.name} did not resolve`),
+    ...(unresolved.length > 5 ? [`${String(unresolved.length - 5)} more unresolved row(s)`] : []),
+  ]
+  const served = await serveWeb(options, true)
   try {
     const skipped = skippedBundle(served.result.output)
-    if (served.result.ready && skipped === undefined) return { ok: true, signature: 'web: server ready', detail: scrubWebOutput(served.result.output).slice(-2000) }
-    return notReady(served.result)
+    if (!served.result.ready || skipped !== undefined) return notReady(served.result)
+    const url = served.result.output.split('\n').find(text => (options.readyPattern ?? WEB_READY_PATTERN).test(text))?.match(/https?:\/\/\S+/)?.[0]
+    if (url === undefined) return { ok: false, signature: 'web: no launch URL', detail: '' }
+    const deadline = Date.now() + options.timeoutMs
+    const health = await presetHealth(options.workdir, options.bin, url, options.fetchImpl ?? fetch, Math.max(1, deadline - Date.now()))
+    if (!health.ok) return { ok: false, signature: health.signature, detail: `${scrubWebOutput(health.detail)}\n${scrubWebOutput(served.result.output).slice(-2000)}` }
+    const detail = scrubWebOutput(served.result.output).slice(-2000)
+    return { ok: true, signature: `web: server ready${health.note}`, detail: advisory.length === 0 ? detail : `${detail}\nadvisory: ${advisory.join('; ')}` }
   } finally {
     served.stop()
   }
