@@ -179,7 +179,7 @@ test('a record validates while its metrics and kept files are what its attempts 
     assert.deepEqual(validateRecords(root), [`${id}: attempts/M1__x/agent/proposed.diff is missing or changed`])
     // A kept output must not quote a session token.
     writeFileSync(join(dir, 'attempts', 'M1__x', 'agent', 'proposed.diff'), diff)
-    const output = 'dsh web: http://127.0.0.1:4100/?token=f00d\n'
+    const output = 'dsh web: http://127.0.0.1:4100/?token=test-session-token-0123456789\n'
     mkdirSync(join(dir, 'attempts', 'M1__x', 'verifier'), { recursive: true })
     writeFileSync(join(dir, 'attempts', 'M1__x', 'verifier', 'test-stdout.txt'), output)
     const first = attempts[0] as Attempt
