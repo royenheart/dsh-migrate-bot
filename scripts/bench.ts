@@ -143,7 +143,7 @@ function filesUnder(dir: string): string[] {
  */
 const isOutput = (name: string): boolean => name.startsWith('verifier/') || name.endsWith('.log')
 /** A session token not yet redacted (`scrubWebOutput`). */
-const LIVE_TOKEN = /[?&]token=(?!<redacted>)[^\s&"']+/i
+const LIVE_TOKEN = /[?&]token=(?!<redacted>)[A-Za-z0-9_-]{16,}(?![A-Za-z0-9_-])/i
 /** Credential shapes a published artifact must not carry. */
 const SECRET_SHAPE = /(?:\bsk-[A-Za-z0-9_-]{20,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}|\bAKIA[0-9A-Z]{16}\b|-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{12,})/
 /** Values of credential-shaped environment variables in the benchmark process. */
