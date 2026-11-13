@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/).
 Entries are generated from the commit history by [Commitizen](https://commitizen-tools.github.io/commitizen/); do not edit them by hand.
 
+## v1.0.0-rc.5 (2026-11-13)
+
+### Feat
+
+- **deploy-service**: serve live preview conversations through a model gateway
+
+### Fix
+
+- define the observation emission counter in runner scope
+- verify bundle rows and presets in the web check
+- **deploy-service**: preserve close markers and bearer preview domains
+- **deploy-service**: bound preview model gateway resources
+- **deploy-service**: derive the preview image tag from the dsh version
+- **commands**: skip URL-embedded command prefixes
+- **commands**: ignore package names that merely contain the prefix
+
+### Docs
+
+- **deploy-service**: state the Docker-tag-safe version constraint
+- **deploy-service**: keep the old image env and state the restart step
+
+## v1.0.0-rc.4 (2026-11-06)
+
+### Fix
+
+- **runner**: keep the observation emission counter in the callback scope
+- **tests**: derive the report Action version from the package version
+
 ## v1.0.0-rc.3 (2026-11-06)
 
 ### Feat
